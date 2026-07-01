@@ -1,0 +1,3331 @@
+<?xml version="1.0" ?>
+<robot name="HEXAPEDAL_URDF" xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+<xacro:include filename="$(find HEXAPEDAL_URDF_description)/urdf/materials.xacro" />
+<xacro:include filename="$(find HEXAPEDAL_URDF_description)/urdf/HEXAPEDAL_URDF.trans" />
+<xacro:include filename="$(find HEXAPEDAL_URDF_description)/urdf/HEXAPEDAL_URDF.gazebo" />
+<link name="base_link">
+  <inertial>
+    <origin xyz="0.00025434395505728345 -0.006770052707082428 -0.01980778635493637" rpy="0 0 0"/>
+    <mass value="0.4167268942372759"/>
+    <inertia ixx="0.002392" iyy="0.002531" izz="0.004185" ixy="-1.3e-05" iyz="1.2e-05" ixz="-2e-06"/>
+  </inertial>
+  <visual>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/base_link.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/base_link.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="LF_motor_horn_1_1">
+  <inertial>
+    <origin xyz="2.0112883578060625e-07 -2.0112900961377633e-07 -0.0029620014635889577" rpy="0 0 0"/>
+    <mass value="0.0019994583976964877"/>
+    <inertia ixx="0.0" iyy="0.0" izz="0.0" ixy="0.0" iyz="-0.0" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.130461 0.130461 -0.0329" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LF_motor_horn_1_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.130461 0.130461 -0.0329" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LF_motor_horn_1_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="LM_motor_horn_1_1">
+  <inertial>
+    <origin xyz="6.38378239159465e-16 -1.2255637395598544e-13 -0.002962001463593416" rpy="0 0 0"/>
+    <mass value="0.0019994583976964877"/>
+    <inertia ixx="0.0" iyy="0.0" izz="0.0" ixy="-0.0" iyz="-0.0" ixz="0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.1845 0.0 -0.0329" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LM_motor_horn_1_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.1845 0.0 -0.0329" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LM_motor_horn_1_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="LB_motor_horn_1_1">
+  <inertial>
+    <origin xyz="2.011290100023544e-07 2.0112882784251163e-07 -0.0029620014636008683" rpy="0 0 0"/>
+    <mass value="0.0019994583976964877"/>
+    <inertia ixx="0.0" iyy="0.0" izz="0.0" ixy="-0.0" iyz="-0.0" ixz="0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.130461 -0.130461 -0.0329" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LB_motor_horn_1_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.130461 -0.130461 -0.0329" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LB_motor_horn_1_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="RF_motor_horn_1_1">
+  <inertial>
+    <origin xyz="-2.0112901133462202e-07 -2.011288341430273e-07 -0.0029620014635999697" rpy="0 0 0"/>
+    <mass value="0.0019994583976964877"/>
+    <inertia ixx="0.0" iyy="0.0" izz="0.0" ixy="-0.0" iyz="0.0" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.130461 0.130461 -0.0329" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RF_motor_horn_1_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.130461 0.130461 -0.0329" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RF_motor_horn_1_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="RM_motor_horn_1_1">
+  <inertial>
+    <origin xyz="8.881784197001252e-16 1.160120332257981e-13 -0.0029620014635937213" rpy="0 0 0"/>
+    <mass value="0.0019994583976964877"/>
+    <inertia ixx="0.0" iyy="0.0" izz="0.0" ixy="-0.0" iyz="0.0" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.1845 0.0 -0.0329" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RM_motor_horn_1_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.1845 0.0 -0.0329" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RM_motor_horn_1_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="RB_motor_horn_1_1">
+  <inertial>
+    <origin xyz="-2.0112883852840824e-07 2.0112901186197796e-07 -0.002962001463585443" rpy="0 0 0"/>
+    <mass value="0.0019994583976964877"/>
+    <inertia ixx="0.0" iyy="0.0" izz="0.0" ixy="0.0" iyz="0.0" ixz="0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.130461 -0.130461 -0.0329" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RB_motor_horn_1_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.130461 -0.130461 -0.0329" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RB_motor_horn_1_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="LF_motor_horn_3_1">
+  <inertial>
+    <origin xyz="0.002093982657406651 0.002094294184112 -1.198336750524813e-13" rpy="0 0 0"/>
+    <mass value="0.0019994583976964877"/>
+    <inertia ixx="0.0" iyy="0.0" izz="0.0" ixy="0.0" iyz="0.0" ixz="0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.247205 0.293732 -0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LF_motor_horn_3_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.247205 0.293732 -0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LF_motor_horn_3_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="LM_motor_horn_3_1">
+  <inertial>
+    <origin xyz="6.120430273703903e-10 0.0029620017478611885 -1.204861430465493e-13" rpy="0 0 0"/>
+    <mass value="0.0019994583976964877"/>
+    <inertia ixx="0.0" iyy="0.0" izz="0.0" ixy="-0.0" iyz="0.0" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.3825 0.0329 -0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LM_motor_horn_3_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.3825 0.0329 -0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LM_motor_horn_3_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="LB_motor_horn_3_1">
+  <inertial>
+    <origin xyz="-0.0020942941841195495 0.0020939826573903586 -1.3103147223346533e-13" rpy="0 0 0"/>
+    <mass value="0.0019994583976964877"/>
+    <inertia ixx="0.0" iyy="0.0" izz="0.0" ixy="-0.0" iyz="0.0" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.293732 -0.247205 0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LB_motor_horn_3_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.293732 -0.247205 0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LB_motor_horn_3_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="RF_motor_horn_3_1">
+  <inertial>
+    <origin xyz="-0.0020939826574031817 0.002094294184122325 1.1608196480971957e-13" rpy="0 0 0"/>
+    <mass value="0.0019994583976964877"/>
+    <inertia ixx="0.0" iyy="0.0" izz="0.0" ixy="-0.0" iyz="-0.0" ixz="0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.247205 0.293732 0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RF_motor_horn_3_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.247205 0.293732 0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RF_motor_horn_3_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="RM_motor_horn_3_1">
+  <inertial>
+    <origin xyz="-6.12038641989443e-10 0.0029620017478554604 1.2246567287593702e-13" rpy="0 0 0"/>
+    <mass value="0.0019994583976964877"/>
+    <inertia ixx="0.0" iyy="0.0" izz="0.0" ixy="0.0" iyz="-0.0" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.3825 0.0329 -0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RM_motor_horn_3_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.3825 0.0329 -0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RM_motor_horn_3_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="RB_motor_horn_3_1">
+  <inertial>
+    <origin xyz="0.0020942941841201046 0.0020939826574023768 1.291727322381926e-13" rpy="0 0 0"/>
+    <mass value="0.0019994583976964877"/>
+    <inertia ixx="0.0" iyy="0.0" izz="0.0" ixy="0.0" iyz="-0.0" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.293732 -0.247205 -0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RB_motor_horn_3_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.293732 -0.247205 -0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RB_motor_horn_3_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="DXF_Lipo_3s_7200mah_100c_R_1">
+  <inertial>
+    <origin xyz="2.8449465006019636e-16 -5.507747036226363e-16 0.01899999999999944" rpy="0 0 0"/>
+    <mass value="0.43481956000000005"/>
+    <inertia ixx="0.000763" iyy="0.000132" izz="0.00079" ixy="-0.0" iyz="-0.0" ixz="0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.0525 0.005 0.0458" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/DXF_Lipo_3s_7200mah_100c_R_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.0525 0.005 0.0458" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/DXF_Lipo_3s_7200mah_100c_R_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="DXF_Lipo_2s_7200mah_100c_1">
+  <inertial>
+    <origin xyz="2.575717417130363e-16 -5.863365348801608e-16 0.01349999999999954" rpy="0 0 0"/>
+    <mass value="0.31407264000000007"/>
+    <inertia ixx="0.000532" iyy="7.9e-05" izz="0.000573" ixy="-0.0" iyz="-0.0" ixz="0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.0 0.005 0.0458" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/DXF_Lipo_2s_7200mah_100c_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.0 0.005 0.0458" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/DXF_Lipo_2s_7200mah_100c_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="DC_Converter_R_1">
+  <inertial>
+    <origin xyz="3.0531133177191805e-16 -2.7977620220553945e-16 0.008999999999999488" rpy="0 0 0"/>
+    <mass value="0.020008620000000005"/>
+    <inertia ixx="5e-06" iyy="1e-06" izz="6e-06" ixy="-0.0" iyz="0.0" ixz="0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.095 0.0 0.0438" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/DC_Converter_R_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.095 0.0 0.0438" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/DC_Converter_R_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="DC_Converter_L_1">
+  <inertial>
+    <origin xyz="2.498001805406602e-16 -4.04121180963557e-16 0.008999999999999522" rpy="0 0 0"/>
+    <mass value="0.020008620000000005"/>
+    <inertia ixx="5e-06" iyy="1e-06" izz="6e-06" ixy="-0.0" iyz="-0.0" ixz="0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.095 0.0 0.0438" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/DC_Converter_L_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.095 0.0 0.0438" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/DC_Converter_L_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="DXF_Lipo_3s_7200mah_100c_L_1">
+  <inertial>
+    <origin xyz="3.7470027081099033e-16 -7.728193085476676e-16 0.01899999999999952" rpy="0 0 0"/>
+    <mass value="0.43481956000000005"/>
+    <inertia ixx="0.000763" iyy="0.000132" izz="0.00079" ixy="-0.0" iyz="-0.0" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.0525 0.005 0.0458" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/DXF_Lipo_3s_7200mah_100c_L_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.0525 0.005 0.0458" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/DXF_Lipo_3s_7200mah_100c_L_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="AMASS_XT60_F_FeMale_1_1">
+  <inertial>
+    <origin xyz="4.403270908240331e-07 -0.0042722788702512365 -0.005825000000000344" rpy="0 0 0"/>
+    <mass value="0.0059978303405165"/>
+    <inertia ixx="0.0" iyy="0.0" izz="1e-06" ixy="0.0" iyz="0.0" ixz="0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.020915 -0.115 -0.0382" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/AMASS_XT60_F_FeMale_1_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.020915 -0.115 -0.0382" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/AMASS_XT60_F_FeMale_1_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="XHP_4_1_1">
+  <inertial>
+    <origin xyz="-0.020915 -0.112 -0.0227" rpy="0 0 0"/>
+    <mass value="0.0"/>
+    <inertia ixx="0.0" iyy="0.0" izz="0.0" ixy="0.0" iyz="0.0" ixz="0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.020915 -0.112 -0.0227" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/XHP_4_1_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.020915 -0.112 -0.0227" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/XHP_4_1_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="Volt_Meter_1_1">
+  <inertial>
+    <origin xyz="4.403270944530746e-07 -0.0051176670331799096 -0.010000000000000276" rpy="0 0 0"/>
+    <mass value="0.0099955365"/>
+    <inertia ixx="1e-06" iyy="2e-06" izz="2e-06" ixy="0.0" iyz="0.0" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.019635 -0.115 -0.0392" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/Volt_Meter_1_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.019635 -0.115 -0.0392" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/Volt_Meter_1_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="XHP_4_2_1">
+  <inertial>
+    <origin xyz="-0.020915 -0.112 0.0373" rpy="0 0 0"/>
+    <mass value="0.0"/>
+    <inertia ixx="0.0" iyy="0.0" izz="0.0" ixy="0.0" iyz="0.0" ixz="0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.020915 -0.112 0.0373" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/XHP_4_2_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.020915 -0.112 0.0373" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/XHP_4_2_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="AMASS_XT60E_F_FeMale_3_1">
+  <inertial>
+    <origin xyz="4.4032709085872757e-07 -0.004272278870251292 -0.005825000000000472" rpy="0 0 0"/>
+    <mass value="0.0059978303405165"/>
+    <inertia ixx="0.0" iyy="0.0" izz="1e-06" ixy="0.0" iyz="0.0" ixz="0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.020915 -0.115 0.0218" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/AMASS_XT60E_F_FeMale_3_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.020915 -0.115 0.0218" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/AMASS_XT60E_F_FeMale_3_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="XHP_3_1">
+  <inertial>
+    <origin xyz="-0.020915 -0.112 0.0073" rpy="0 0 0"/>
+    <mass value="0.0"/>
+    <inertia ixx="0.0" iyy="0.0" izz="0.0" ixy="0.0" iyz="0.0" ixz="0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.020915 -0.112 0.0073" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/XHP_3_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.020915 -0.112 0.0073" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/XHP_3_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="AMASS_XT60E_F_FeMale_2_1">
+  <inertial>
+    <origin xyz="4.4032709084138033e-07 -0.004272278870251223 -0.005825000000000369" rpy="0 0 0"/>
+    <mass value="0.0059978303405165"/>
+    <inertia ixx="0.0" iyy="0.0" izz="1e-06" ixy="0.0" iyz="-0.0" ixz="0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.020915 -0.115 -0.0082" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/AMASS_XT60E_F_FeMale_2_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.020915 -0.115 -0.0082" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/AMASS_XT60E_F_FeMale_2_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="Volt_Meter_2_1">
+  <inertial>
+    <origin xyz="4.4032709435246065e-07 -0.005117667033180104 -0.01000000000000039" rpy="0 0 0"/>
+    <mass value="0.0099955365"/>
+    <inertia ixx="1e-06" iyy="2e-06" izz="2e-06" ixy="-0.0" iyz="0.0" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.019635 -0.115 -0.0092" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/Volt_Meter_2_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.019635 -0.115 -0.0092" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/Volt_Meter_2_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="Volt_Meter_3_1">
+  <inertial>
+    <origin xyz="4.403270944600135e-07 -0.00511766703318009 -0.010000000000000453" rpy="0 0 0"/>
+    <mass value="0.0099955365"/>
+    <inertia ixx="1e-06" iyy="2e-06" izz="2e-06" ixy="0.0" iyz="0.0" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.019635 -0.115 0.0208" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/Volt_Meter_3_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.019635 -0.115 0.0208" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/Volt_Meter_3_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="flame2_1">
+  <inertial>
+    <origin xyz="-0.11049076535099432 -0.012576471461830946 -0.006020172140728458" rpy="0 0 0"/>
+    <mass value="0.17303971949014474"/>
+    <inertia ixx="0.000418" iyy="0.000571" izz="0.000943" ixy="4e-06" iyz="-1.1e-05" ixz="3e-06"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.109 0.0 0.0068" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/flame2_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.109 0.0 0.0068" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/flame2_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="STM32_F446RE_1">
+  <inertial>
+    <origin xyz="4.831204880595408e-16 2.3592239273284576e-16 0.007499999999999691" rpy="0 0 0"/>
+    <mass value="0.077009625"/>
+    <inertia ixx="3.3e-05" iyy="4.5e-05" izz="7.5e-05" ixy="0.0" iyz="-0.0" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.00775 0.064 0.0018" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/STM32_F446RE_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.00775 0.064 0.0018" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/STM32_F446RE_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="Jetson_Orin_Nano_Super_1">
+  <inertial>
+    <origin xyz="2.3809079707781677e-16 2.393918396847994e-16 0.017999999999999645" rpy="0 0 0"/>
+    <mass value="0.17497958400000005"/>
+    <inertia ixx="0.000177" iyy="0.000142" izz="0.000281" ixy="0.0" iyz="-0.0" ixz="0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.003 -0.025 0.0018" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/Jetson_Orin_Nano_Super_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.003 -0.025 0.0018" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/Jetson_Orin_Nano_Super_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="Relay_Module_L_1">
+  <inertial>
+    <origin xyz="3.191891195797325e-16 0.023500000000000045 0.008999999999999746" rpy="0 0 0"/>
+    <mass value="0.02999916"/>
+    <inertia ixx="6e-06" iyy="1e-05" izz="1.5e-05" ixy="0.0" iyz="-0.0" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.076 0.047 0.0018" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/Relay_Module_L_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.076 0.047 0.0018" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/Relay_Module_L_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="Relay_Module_R_1">
+  <inertial>
+    <origin xyz="4.163336342344337e-16 -0.023499999999999688 0.00899999999999975" rpy="0 0 0"/>
+    <mass value="0.02999916"/>
+    <inertia ixx="6e-06" iyy="1e-05" izz="1.5e-05" ixy="0.0" iyz="-0.0" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.076 -0.047 0.0018" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/Relay_Module_R_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.076 -0.047 0.0018" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/Relay_Module_R_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="flame3_1">
+  <inertial>
+    <origin xyz="0.0003600578910396912 0.10760101140949482 0.0024194052083597803" rpy="0 0 0"/>
+    <mass value="0.1163167501176156"/>
+    <inertia ixx="0.000388" iyy="0.000391" izz="0.000779" ixy="-3e-06" iyz="0.0" ixz="0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.0 0.11 -0.0442" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/flame3_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.0 0.11 -0.0442" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/flame3_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="NEO_M8N_GPS_1">
+  <inertial>
+    <origin xyz="1.3877787807814457e-17 -3.7273703973462434e-16 0.009999999999999808" rpy="0 0 0"/>
+    <mass value="0.02998296758677929"/>
+    <inertia ixx="7e-06" iyy="7e-06" izz="1.1e-05" ixy="-0.0" iyz="0.0" ixz="0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.0715 0.0 -0.0482" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/NEO_M8N_GPS_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.0715 0.0 -0.0482" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/NEO_M8N_GPS_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="IMU_WT931_1">
+  <inertial>
+    <origin xyz="-1.5777684492235266e-10 1.5777676609651792e-10 -0.0023676470387148443" rpy="0 0 0"/>
+    <mass value="0.0010624319757871633"/>
+    <inertia ixx="0.0" iyy="0.0" izz="0.0" ixy="-0.0" iyz="0.0" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.0 0.0 -0.0472" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/IMU_WT931_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.0 0.0 -0.0472" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/IMU_WT931_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="FrSky_Archer_Plus_SR10_1">
+  <inertial>
+    <origin xyz="5.273559366969494e-16 -2.1316282072803005e-16 0.007349999999999808" rpy="0 0 0"/>
+    <mass value="0.012997634895000004"/>
+    <inertia ixx="3e-06" iyy="1e-06" izz="3e-06" ixy="-0.0" iyz="-0.0" ixz="0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.07735 0.0 -0.0482" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/FrSky_Archer_Plus_SR10_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.07735 0.0 -0.0482" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/FrSky_Archer_Plus_SR10_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="LoRa_RYLR998_1">
+  <inertial>
+    <origin xyz="0.0004348211949647546 0.0005449530534666208 0.005964620812017762" rpy="0 0 0"/>
+    <mass value="0.0020002839074081727"/>
+    <inertia ixx="0.0" iyy="0.0" izz="0.0" ixy="-0.0" iyz="-0.0" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.031 -0.074 -0.0492" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LoRa_RYLR998_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.031 -0.074 -0.0492" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LoRa_RYLR998_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="ON-OFF__Switch_1">
+  <inertial>
+    <origin xyz="-0.006499999999999735 -4.163336342344337e-17 -0.006040995607613682" rpy="0 0 0"/>
+    <mass value="0.004002379999999999"/>
+    <inertia ixx="0.0" iyy="0.0" izz="0.0" ixy="0.0" iyz="-0.0" ixz="0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.025 -0.074 -0.0492" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/ON-OFF__Switch_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.025 -0.074 -0.0492" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/ON-OFF__Switch_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="RB_flame4_1">
+  <inertial>
+    <origin xyz="-0.020163841378833383 0.02016384139333631 -0.0036246185003608526" rpy="0 0 0"/>
+    <mass value="0.06395081687871436"/>
+    <inertia ixx="6.2e-05" iyy="6.2e-05" izz="7.4e-05" ixy="1.7e-05" iyz="2e-06" ixz="-2e-06"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.08061 -0.08061 0.0008" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RB_flame4_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.08061 -0.08061 0.0008" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RB_flame4_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="RM_flame4_1">
+  <inertial>
+    <origin xyz="-0.028515733220629627 1.024826445927829e-11 -0.0036246185003594943" rpy="0 0 0"/>
+    <mass value="0.06395081687871436"/>
+    <inertia ixx="4.5e-05" iyy="7.8e-05" izz="7.4e-05" ixy="0.0" iyz="-0.0" ixz="-2e-06"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.114 0.0 0.0008" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RM_flame4_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.114 0.0 0.0008" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RM_flame4_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="RF_flame4_1">
+  <inertial>
+    <origin xyz="-0.02016384139333474 -0.020163841378829747 -0.0036246185003646542" rpy="0 0 0"/>
+    <mass value="0.06395081687871436"/>
+    <inertia ixx="6.2e-05" iyy="6.2e-05" izz="7.4e-05" ixy="-1.7e-05" iyz="-2e-06" ixz="-2e-06"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.08061 0.08061 0.0008" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RF_flame4_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.08061 0.08061 0.0008" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RF_flame4_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="LB_flame4_1">
+  <inertial>
+    <origin xyz="0.020163841393337184 0.020163841378827235 -0.003624618500364335" rpy="0 0 0"/>
+    <mass value="0.06395081687871436"/>
+    <inertia ixx="6.2e-05" iyy="6.2e-05" izz="7.4e-05" ixy="-1.7e-05" iyz="2e-06" ixz="2e-06"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.08061 -0.08061 0.0008" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LB_flame4_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.08061 -0.08061 0.0008" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LB_flame4_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="LM_flame4_1">
+  <inertial>
+    <origin xyz="0.0285157332206301 -1.0254801452447281e-11 -0.0036246185003593165" rpy="0 0 0"/>
+    <mass value="0.06395081687871436"/>
+    <inertia ixx="4.5e-05" iyy="7.8e-05" izz="7.4e-05" ixy="0.0" iyz="0.0" ixz="2e-06"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.114 0.0 0.0008" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LM_flame4_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.114 0.0 0.0008" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LM_flame4_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="LF_flame4_1">
+  <inertial>
+    <origin xyz="0.02016384137883573 -0.02016384139333889 -0.0036246185003615014" rpy="0 0 0"/>
+    <mass value="0.06395081687871436"/>
+    <inertia ixx="6.2e-05" iyy="6.2e-05" izz="7.4e-05" ixy="1.7e-05" iyz="-2e-06" ixz="2e-06"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.08061 0.08061 0.0008" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LF_flame4_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.08061 0.08061 0.0008" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LF_flame4_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="RF_DS51150_270_1_1">
+  <inertial>
+    <origin xyz="-0.02303277026668618 -0.023032770253798768 -0.006733285359171658" rpy="0 0 0"/>
+    <mass value="0.16496568495572975"/>
+    <inertia ixx="6.8e-05" iyy="6.8e-05" izz="7.3e-05" ixy="-2.4e-05" iyz="0.0" ixz="0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.093692 0.093692 -0.0087" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RF_DS51150_270_1_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.093692 0.093692 -0.0087" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RF_DS51150_270_1_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="RM_DS51150_270_1_1">
+  <inertial>
+    <origin xyz="-0.03257375316691127 9.103111479469606e-12 -0.006733285359164957" rpy="0 0 0"/>
+    <mass value="0.16496568495572975"/>
+    <inertia ixx="4.4e-05" iyy="9.3e-05" izz="7.3e-05" ixy="-0.0" iyz="-0.0" ixz="0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.1325 0.0 -0.0087" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RM_DS51150_270_1_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.1325 0.0 -0.0087" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RM_DS51150_270_1_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="RB_DS51150_270_1_1">
+  <inertial>
+    <origin xyz="-0.023032770253802654 0.02303277026668539 -0.006733285359163029" rpy="0 0 0"/>
+    <mass value="0.16496568495572975"/>
+    <inertia ixx="6.8e-05" iyy="6.8e-05" izz="7.3e-05" ixy="2.4e-05" iyz="-0.0" ixz="0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.093692 -0.093692 -0.0087" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RB_DS51150_270_1_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.093692 -0.093692 -0.0087" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RB_DS51150_270_1_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="LF_DS51150_270_1_1">
+  <inertial>
+    <origin xyz="0.02303277025380067 -0.02303277026668371 -0.006733285359159702" rpy="0 0 0"/>
+    <mass value="0.16496568495572975"/>
+    <inertia ixx="6.8e-05" iyy="6.8e-05" izz="7.3e-05" ixy="2.4e-05" iyz="0.0" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.093692 0.093692 -0.0087" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LF_DS51150_270_1_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.093692 0.093692 -0.0087" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LF_DS51150_270_1_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="LM_DS51150_270_1_1">
+  <inertial>
+    <origin xyz="0.03257375316691205 -9.109372835345474e-12 -0.006733285359164388" rpy="0 0 0"/>
+    <mass value="0.16496568495572975"/>
+    <inertia ixx="4.4e-05" iyy="9.3e-05" izz="7.3e-05" ixy="-0.0" iyz="0.0" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.1325 -0.0 -0.0087" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LM_DS51150_270_1_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.1325 -0.0 -0.0087" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LM_DS51150_270_1_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="LB_DS51150_270_1_1">
+  <inertial>
+    <origin xyz="0.023032770266683683 0.02303277025379316 -0.006733285359171906" rpy="0 0 0"/>
+    <mass value="0.16496568495572975"/>
+    <inertia ixx="6.8e-05" iyy="6.8e-05" izz="7.3e-05" ixy="-2.4e-05" iyz="-0.0" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.093692 -0.093692 -0.0087" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LB_DS51150_270_1_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.093692 -0.093692 -0.0087" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LB_DS51150_270_1_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="RF_bearing_1_1">
+  <inertial>
+    <origin xyz="-2.0112892396006998e-07 -2.0112892160084606e-07 -0.0020000000000082105" rpy="0 0 0"/>
+    <mass value="0.003999875766550524"/>
+    <inertia ixx="0.0" iyy="0.0" izz="0.0" ixy="0.0" iyz="0.0" ixz="0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.130461 0.130461 0.0273" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RF_bearing_1_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.130461 0.130461 0.0273" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RF_bearing_1_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="RM_bearing_1_1">
+  <inertial>
+    <origin xyz="6.38378239159465e-16 -5.943443107125054e-15 -0.0019999999999986452" rpy="0 0 0"/>
+    <mass value="0.003999875766550524"/>
+    <inertia ixx="0.0" iyy="0.0" izz="0.0" ixy="0.0" iyz="0.0" ixz="0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.1845 0.0 0.0273" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RM_bearing_1_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.1845 0.0 0.0273" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RM_bearing_1_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="RB_bearing_1_1">
+  <inertial>
+    <origin xyz="-2.0112893012180777e-07 2.0112893023283007e-07 -0.0020000000000093346" rpy="0 0 0"/>
+    <mass value="0.003999875766550524"/>
+    <inertia ixx="0.0" iyy="0.0" izz="0.0" ixy="0.0" iyz="0.0" ixz="0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.130461 -0.130461 0.0273" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RB_bearing_1_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.130461 -0.130461 0.0273" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RB_bearing_1_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="LF_bearing_1_1">
+  <inertial>
+    <origin xyz="2.0112893533985599e-07 -2.0112893586721192e-07 -0.0020000000000142994" rpy="0 0 0"/>
+    <mass value="0.003999875766550524"/>
+    <inertia ixx="0.0" iyy="0.0" izz="0.0" ixy="0.0" iyz="0.0" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.130461 0.130461 0.0273" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LF_bearing_1_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.130461 0.130461 0.0273" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LF_bearing_1_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="LM_bearing_1_1">
+  <inertial>
+    <origin xyz="1.3877787807814457e-16 -5.610645221580635e-16 -0.0019999999999999706" rpy="0 0 0"/>
+    <mass value="0.003999875766550524"/>
+    <inertia ixx="0.0" iyy="0.0" izz="0.0" ixy="0.0" iyz="0.0" ixz="0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.1845 -0.0 0.0273" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LM_bearing_1_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.1845 -0.0 0.0273" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LM_bearing_1_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="LB_bearing_1_1">
+  <inertial>
+    <origin xyz="2.0112892634704949e-07 2.011289191583554e-07 -0.0020000000000078635" rpy="0 0 0"/>
+    <mass value="0.003999875766550524"/>
+    <inertia ixx="0.0" iyy="0.0" izz="0.0" ixy="0.0" iyz="0.0" ixz="0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.130461 -0.130461 0.0273" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LB_bearing_1_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.130461 -0.130461 0.0273" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LB_bearing_1_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="RF_coxaR_1">
+  <inertial>
+    <origin xyz="-0.026461978688164522 -0.025864326587117292 -0.03422260266700058" rpy="0 0 0"/>
+    <mass value="0.09366200268610271"/>
+    <inertia ixx="0.000115" iyy="0.000118" izz="0.000126" ixy="-9e-06" iyz="1e-06" ixz="1e-06"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.130461 0.130461 -0.0338" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RF_coxaR_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.130461 0.130461 -0.0338" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RF_coxaR_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="RM_coxaR_1">
+  <inertial>
+    <origin xyz="-0.03700000085533792 0.00042260385343185103 -0.034222602666993805" rpy="0 0 0"/>
+    <mass value="0.09366200268610271"/>
+    <inertia ixx="0.000108" iyy="0.000126" izz="0.000126" ixy="1e-06" iyz="-0.0" ixz="1e-06"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.1845 0.0 -0.0338" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RM_coxaR_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.1845 0.0 -0.0338" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RM_coxaR_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="RB_coxaR_1">
+  <inertial>
+    <origin xyz="-0.025864326587121872 0.0264619786881653 -0.03422260266698591" rpy="0 0 0"/>
+    <mass value="0.09366200268610271"/>
+    <inertia ixx="0.000118" iyy="0.000115" izz="0.000126" ixy="9e-06" iyz="-1e-06" ixz="1e-06"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.130461 -0.130461 -0.0338" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RB_coxaR_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.130461 -0.130461 -0.0338" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RB_coxaR_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="LF_coxaL_1">
+  <inertial>
+    <origin xyz="0.026461977339773762 -0.02586432793551091 -0.03422260266700289" rpy="0 0 0"/>
+    <mass value="0.09366200268610271"/>
+    <inertia ixx="0.000115" iyy="0.000118" izz="0.000126" ixy="9e-06" iyz="1e-06" ixz="-1e-06"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.130461 0.130461 -0.0338" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LF_coxaL_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.130461 0.130461 -0.0338" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LF_coxaL_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="LM_coxaL_1">
+  <inertial>
+    <origin xyz="0.03700000085533961 0.0004226019465262798 -0.03422260266700458" rpy="0 0 0"/>
+    <mass value="0.09366200268610271"/>
+    <inertia ixx="0.000108" iyy="0.000126" izz="0.000126" ixy="-1e-06" iyz="-0.0" ixz="-1e-06"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.1845 0.0 -0.0338" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LM_coxaL_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.1845 0.0 -0.0338" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LM_coxaL_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="LB_coxaL_1">
+  <inertial>
+    <origin xyz="0.025864327935510606 0.02646197733976441 -0.03422260266701252" rpy="0 0 0"/>
+    <mass value="0.09366200268610271"/>
+    <inertia ixx="0.000118" iyy="0.000115" izz="0.000126" ixy="-9e-06" iyz="-1e-06" ixz="-1e-06"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.130461 -0.130461 -0.0338" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LB_coxaL_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.130461 -0.130461 -0.0338" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LB_coxaL_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="RF_link1_right_1">
+  <inertial>
+    <origin xyz="-0.02267702051956627 -0.03745516000082166 -0.01560912686709651" rpy="0 0 0"/>
+    <mass value="0.05250233789665554"/>
+    <inertia ixx="6.3e-05" iyy="6.3e-05" izz="0.000106" ixy="-4.5e-05" iyz="-1e-06" ixz="1e-06"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.212344 0.180807 -0.015" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RF_link1_right_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.212344 0.180807 -0.015" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RF_link1_right_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="RF_DS51150_270_3_1">
+  <inertial>
+    <origin xyz="0.01710676384389065 -0.01721159039844028 -0.014999999990897345" rpy="0 0 0"/>
+    <mass value="0.16496568495572975"/>
+    <inertia ixx="5.9e-05" iyy="5.8e-05" izz="9.3e-05" ixy="-1.5e-05" iyz="0.0" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.272448 0.240911 -0.015" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RF_DS51150_270_3_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.272448 0.240911 -0.015" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RF_DS51150_270_3_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="RF_bearing_2_1">
+  <inertial>
+    <origin xyz="-0.001414543867943402 0.0014139135582232343 -7.814580260766602e-15" rpy="0 0 0"/>
+    <mass value="0.003999875766550524"/>
+    <inertia ixx="0.0" iyy="0.0" izz="0.0" ixy="-0.0" iyz="0.0" ixz="0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.203505 0.164897 0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RF_bearing_2_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.203505 0.164897 0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RF_bearing_2_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="RF_bearing_3_1">
+  <inertial>
+    <origin xyz="-0.001414573372445993 0.0014138844492518898 -6.6213969419652754e-15" rpy="0 0 0"/>
+    <mass value="0.003999875766550524"/>
+    <inertia ixx="0.0" iyy="0.0" izz="0.0" ixy="-0.0" iyz="0.0" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.289772 0.251164 0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RF_bearing_3_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.289772 0.251164 0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RF_bearing_3_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="RM_link1_right_1">
+  <inertial>
+    <origin xyz="-0.042519610743761205 -0.010449696082244518 -0.015609126867089325" rpy="0 0 0"/>
+    <mass value="0.05250233789665554"/>
+    <inertia ixx="1.8e-05" iyy="0.000108" izz="0.000106" ixy="0.0" iyz="-1e-06" ixz="0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.278 -0.0223 -0.015" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RM_link1_right_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.278 -0.0223 -0.015" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RM_link1_right_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="RM_DS51150_270_3_1">
+  <inertial>
+    <origin xyz="-7.375365070266815e-05 -0.024266714445642025 -0.014999999990890616" rpy="0 0 0"/>
+    <mass value="0.16496568495572975"/>
+    <inertia ixx="4.4e-05" iyy="7.3e-05" izz="9.3e-05" ixy="-0.0" iyz="0.0" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.363 -0.0223 -0.015" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RM_DS51150_270_3_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.363 -0.0223 -0.015" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RM_DS51150_270_3_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="RM_bearing_2_1">
+  <inertial>
+    <origin xyz="1.9010454876955407e-09 0.0020000000343807153 -5.845658345130259e-16" rpy="0 0 0"/>
+    <mass value="0.003999875766550524"/>
+    <inertia ixx="0.0" iyy="0.0" izz="0.0" ixy="0.0" iyz="0.0" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.2605 -0.0273 0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RM_bearing_2_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.2605 -0.0273 0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RM_bearing_2_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="RM_bearing_3_1">
+  <inertial>
+    <origin xyz="-9.301754921864358e-10 0.0020000003140649113 4.3617374676323425e-16" rpy="0 0 0"/>
+    <mass value="0.003999875766550524"/>
+    <inertia ixx="0.0" iyy="0.0" izz="0.0" ixy="0.0" iyz="0.0" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.3825 -0.0273 -0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RM_bearing_3_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.3825 -0.0273 -0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RM_bearing_3_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="RF_motor_horn_2_1">
+  <inertial>
+    <origin xyz="-0.002730741156483446 0.0027305352830273577 -1.3010291546405598e-13" rpy="0 0 0"/>
+    <mass value="0.0019994583976964877"/>
+    <inertia ixx="0.0" iyy="0.0" izz="0.0" ixy="-0.0" iyz="0.0" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.158887 0.206687 0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RF_motor_horn_2_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.158887 0.206687 0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RF_motor_horn_2_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="RM_motor_horn_2_1">
+  <inertial>
+    <origin xyz="2.7755575615628914e-16 0.00386200146358686 -1.2329364841068194e-13" rpy="0 0 0"/>
+    <mass value="0.0019994583976964877"/>
+    <inertia ixx="0.0" iyy="0.0" izz="0.0" ixy="0.0" iyz="0.0" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.2585 0.0338 0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RM_motor_horn_2_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.2585 0.0338 0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RM_motor_horn_2_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="RB_link1_right_1">
+  <inertial>
+    <origin xyz="-0.0374551600008253 0.022677020519566188 -0.015609126867082521" rpy="0 0 0"/>
+    <mass value="0.05250233789665554"/>
+    <inertia ixx="6.3e-05" iyy="6.3e-05" izz="0.000106" ixy="4.5e-05" iyz="-1e-06" ixz="-1e-06"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.180807 -0.212344 -0.015" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RB_link1_right_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.180807 -0.212344 -0.015" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RB_link1_right_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="RB_DS51150_270_3_1">
+  <inertial>
+    <origin xyz="-0.017211590398443055 -0.01710676384389115 -0.014999999990884003" rpy="0 0 0"/>
+    <mass value="0.16496568495572975"/>
+    <inertia ixx="5.8e-05" iyy="5.9e-05" izz="9.3e-05" ixy="1.5e-05" iyz="0.0" ixz="0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.240911 -0.272448 -0.015" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RB_DS51150_270_3_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.240911 -0.272448 -0.015" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RB_DS51150_270_3_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="RB_bearing_2_1">
+  <inertial>
+    <origin xyz="0.0014139135582186269 0.0014145438679437072 6.907973423450586e-15" rpy="0 0 0"/>
+    <mass value="0.003999875766550524"/>
+    <inertia ixx="0.0" iyy="0.0" izz="0.0" ixy="0.0" iyz="-0.0" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.164897 -0.203505 -0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RB_bearing_2_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.164897 -0.203505 -0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RB_bearing_2_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="RB_bearing_3_1">
+  <inertial>
+    <origin xyz="0.001413884449248587 0.001414573372446215 6.5932250859342844e-15" rpy="0 0 0"/>
+    <mass value="0.003999875766550524"/>
+    <inertia ixx="0.0" iyy="0.0" izz="0.0" ixy="0.0" iyz="-0.0" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.251164 -0.289772 -0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RB_bearing_3_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.251164 -0.289772 -0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RB_bearing_3_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="RB_motor_horn_2_1">
+  <inertial>
+    <origin xyz="0.002730535283023028 0.0027307411564839457 -1.1552454591749474e-13" rpy="0 0 0"/>
+    <mass value="0.0019994583976964877"/>
+    <inertia ixx="0.0" iyy="0.0" izz="0.0" ixy="0.0" iyz="0.0" ixz="0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.206687 -0.158887 -0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RB_motor_horn_2_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.206687 -0.158887 -0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RB_motor_horn_2_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="LF_link1_left_1">
+  <inertial>
+    <origin xyz="0.022677020468858555 -0.0374551599376734 -0.015609126838019996" rpy="0 0 0"/>
+    <mass value="0.05250233779836387"/>
+    <inertia ixx="6.3e-05" iyy="6.3e-05" izz="0.000106" ixy="4.5e-05" iyz="-1e-06" ixz="-1e-06"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.212344 0.180807 -0.015" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LF_link1_left_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.212344 0.180807 -0.015" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LF_link1_left_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="LF_DS51150_270_3_1">
+  <inertial>
+    <origin xyz="-0.01710676384388604 -0.017211590398448384 -0.015000000009106949" rpy="0 0 0"/>
+    <mass value="0.16496568495572975"/>
+    <inertia ixx="5.9e-05" iyy="5.8e-05" izz="9.3e-05" ixy="1.5e-05" iyz="-0.0" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.272448 0.240911 -0.015" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LF_DS51150_270_3_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.272448 0.240911 -0.015" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LF_DS51150_270_3_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="LF_bearing_2_1">
+  <inertial>
+    <origin xyz="0.0014145438679470934 0.001413913558220542 1.0776883636092223e-15" rpy="0 0 0"/>
+    <mass value="0.003999875766550524"/>
+    <inertia ixx="0.0" iyy="0.0" izz="0.0" ixy="0.0" iyz="-0.0" ixz="0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.203505 0.164897 -0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LF_bearing_2_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.203505 0.164897 -0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LF_bearing_2_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="LF_bearing_3_1">
+  <inertial>
+    <origin xyz="0.001414573372453043 0.0014138844492450342 2.882113274719604e-15" rpy="0 0 0"/>
+    <mass value="0.003999875766550524"/>
+    <inertia ixx="0.0" iyy="0.0" izz="0.0" ixy="0.0" iyz="0.0" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.289772 0.251164 -0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LF_bearing_3_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.289772 0.251164 -0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LF_bearing_3_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="LF_motor_horn_2_1">
+  <inertial>
+    <origin xyz="0.0027307411564832795 0.0027305352830216123 1.2299043355790824e-13" rpy="0 0 0"/>
+    <mass value="0.0019994583976964877"/>
+    <inertia ixx="0.0" iyy="0.0" izz="0.0" ixy="0.0" iyz="-0.0" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.158887 0.206687 -0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LF_motor_horn_2_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.158887 0.206687 -0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LF_motor_horn_2_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="LM_link1_left_1">
+  <inertial>
+    <origin xyz="0.04251961066324983 -0.010449696073440614 -0.015609126838021539" rpy="0 0 0"/>
+    <mass value="0.05250233779836387"/>
+    <inertia ixx="1.8e-05" iyy="0.000108" izz="0.000106" ixy="-0.0" iyz="-1e-06" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.278 -0.0223 -0.015" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LM_link1_left_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.278 -0.0223 -0.015" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LM_link1_left_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="LM_DS51150_270_3_1">
+  <inertial>
+    <origin xyz="7.375365070705353e-05 -0.02426671444563584 -0.015000000009107934" rpy="0 0 0"/>
+    <mass value="0.16496568495572975"/>
+    <inertia ixx="4.4e-05" iyy="7.3e-05" izz="9.3e-05" ixy="0.0" iyz="-0.0" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.363 -0.0223 -0.015" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LM_DS51150_270_3_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.363 -0.0223 -0.015" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LM_DS51150_270_3_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="LM_bearing_2_1">
+  <inertial>
+    <origin xyz="-1.9010418239595595e-09 0.002000000034388029 -1.1388224673805745e-15" rpy="0 0 0"/>
+    <mass value="0.003999875766550524"/>
+    <inertia ixx="0.0" iyy="0.0" izz="0.0" ixy="-0.0" iyz="-0.0" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.2605 -0.0273 0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LM_bearing_2_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.2605 -0.0273 0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LM_bearing_2_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="LM_bearing_3_1">
+  <inertial>
+    <origin xyz="9.301808767681052e-10 0.002000000314071406 1.664605366588682e-15" rpy="0 0 0"/>
+    <mass value="0.003999875766550524"/>
+    <inertia ixx="0.0" iyy="0.0" izz="0.0" ixy="-0.0" iyz="0.0" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.3825 -0.0273 -0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LM_bearing_3_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.3825 -0.0273 -0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LM_bearing_3_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="LM_motor_horn_2_1">
+  <inertial>
+    <origin xyz="1.9984014443252818e-15 0.003862001463592203 1.2133701402773676e-13" rpy="0 0 0"/>
+    <mass value="0.0019994583976964877"/>
+    <inertia ixx="0.0" iyy="0.0" izz="0.0" ixy="0.0" iyz="-0.0" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.2585 0.0338 0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LM_motor_horn_2_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.2585 0.0338 0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LM_motor_horn_2_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="LB_link1_left_1">
+  <inertial>
+    <origin xyz="0.03745515993767118 0.02267702046884279 -0.015609126838030665" rpy="0 0 0"/>
+    <mass value="0.05250233779836387"/>
+    <inertia ixx="6.3e-05" iyy="6.3e-05" izz="0.000106" ixy="-4.5e-05" iyz="-1e-06" ixz="1e-06"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.180807 -0.212344 -0.015" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LB_link1_left_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.180807 -0.212344 -0.015" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LB_link1_left_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="LB_DS51150_270_3_1">
+  <inertial>
+    <origin xyz="0.01721159039844289 -0.017106763843903028 -0.015000000009118233" rpy="0 0 0"/>
+    <mass value="0.16496568495572975"/>
+    <inertia ixx="5.8e-05" iyy="5.9e-05" izz="9.3e-05" ixy="-1.5e-05" iyz="-0.0" ixz="0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.240911 -0.272448 -0.015" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LB_DS51150_270_3_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.240911 -0.272448 -0.015" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LB_DS51150_270_3_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="LB_bearing_2_1">
+  <inertial>
+    <origin xyz="-0.0014139135582192375 0.001414543867932605 -9.083294784969604e-15" rpy="0 0 0"/>
+    <mass value="0.003999875766550524"/>
+    <inertia ixx="0.0" iyy="0.0" izz="0.0" ixy="-0.0" iyz="0.0" ixz="0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.164897 -0.203505 0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LB_bearing_2_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.164897 -0.203505 0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LB_bearing_2_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="LB_bearing_3_1">
+  <inertial>
+    <origin xyz="-0.001413884449249475 0.0014145733724335585 -8.504229794121158e-15" rpy="0 0 0"/>
+    <mass value="0.003999875766550524"/>
+    <inertia ixx="0.0" iyy="0.0" izz="0.0" ixy="-0.0" iyz="0.0" ixz="0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.251164 -0.289772 0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LB_bearing_3_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.251164 -0.289772 0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LB_bearing_3_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="LB_motor_horn_2_1">
+  <inertial>
+    <origin xyz="-0.0027305352830239438 0.0027307411564732598 1.1333888079242351e-13" rpy="0 0 0"/>
+    <mass value="0.0019994583976964877"/>
+    <inertia ixx="0.0" iyy="0.0" izz="0.0" ixy="-0.0" iyz="-0.0" ixz="0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.206687 -0.158887 0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LB_motor_horn_2_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.206687 -0.158887 0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LB_motor_horn_2_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="RF_link2_R_front_1">
+  <inertial>
+    <origin xyz="-0.052458720771691 -0.044169733961344604 -0.0005133150665793184" rpy="0 0 0"/>
+    <mass value="0.0313983406227064"/>
+    <inertia ixx="5e-05" iyy="6.5e-05" izz="0.000103" ixy="-5.1e-05" iyz="-1e-06" ixz="-1e-06"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.246568 0.294369 0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RF_link2_R_front_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.246568 0.294369 0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RF_link2_R_front_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="RF_foot_1">
+  <inertial>
+    <origin xyz="-0.025134182470437028 -0.0006979860263925941 -6.48422762252682e-05" rpy="0 0 0"/>
+    <mass value="0.03802148330246935"/>
+    <inertia ixx="9e-06" iyy="9e-06" izz="1.1e-05" ixy="-2e-06" iyz="-0.0" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.36725 0.391687 0.003" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RF_foot_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.36725 0.391687 0.003" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RF_foot_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="RF_foot_cover_1">
+  <inertial>
+    <origin xyz="0.033617274814289666 0.033616592693884395 -0.00014557553654941623" rpy="0 0 0"/>
+    <mass value="0.024550496002889725"/>
+    <inertia ixx="1.1e-05" iyy="1.1e-05" izz="1.2e-05" ixy="-5e-06" iyz="0.0" ixz="0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.412388 0.412388 0.003" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RF_foot_cover_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.412388 0.412388 0.003" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RF_foot_cover_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="RF_link2_R_back_1">
+  <inertial>
+    <origin xyz="0.05563711166245294 0.07102603322109441 0.002514506476120399" rpy="0 0 0"/>
+    <mass value="0.03186384547658659"/>
+    <inertia ixx="6.6e-05" iyy="5.2e-05" izz="0.000106" ixy="-5.3e-05" iyz="-1e-06" ixz="-1e-06"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.391714 0.367284 0.003" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RF_link2_R_back_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.391714 0.367284 0.003" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RF_link2_R_back_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="RM_link2_R_front_1">
+  <inertial>
+    <origin xyz="-0.0683268564920006 0.005860787535257473 -0.0005133150665723019" rpy="0 0 0"/>
+    <mass value="0.0313983406227064"/>
+    <inertia ixx="7e-06" iyy="0.000108" izz="0.000103" ixy="7e-06" iyz="0.0" ixz="-2e-06"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.3825 0.0338 -0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RM_link2_R_front_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.3825 0.0338 -0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RM_link2_R_front_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="RM_foot_1">
+  <inertial>
+    <origin xyz="-0.018265600710221097 0.0172784318001297 -6.484227621740557e-05" rpy="0 0 0"/>
+    <mass value="0.03802148330246935"/>
+    <inertia ixx="7e-06" iyy="1.1e-05" izz="1.1e-05" ixy="0.0" iyz="0.0" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.53665 0.017279 0.003" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RM_foot_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.53665 0.017279 0.003" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RM_foot_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="RM_foot_cover_1">
+  <inertial>
+    <origin xyz="0.047541821080527735 -4.823319702573935e-07 -0.00014553493621834385" rpy="0 0 0"/>
+    <mass value="0.024550496002889725"/>
+    <inertia ixx="7e-06" iyy="1.6e-05" izz="1.2e-05" ixy="0.0" iyz="-0.0" ixz="0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.583205 0.0 0.002696" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RM_foot_cover_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.583205 0.0 0.002696" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RM_foot_cover_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="RM_link2_R_back_1">
+  <inertial>
+    <origin xyz="0.0895647359665599 0.010881229453644378 0.0025145064761281973" rpy="0 0 0"/>
+    <mass value="0.03186384547658659"/>
+    <inertia ixx="7e-06" iyy="0.000112" izz="0.000106" ixy="-7e-06" iyz="-0.0" ixz="-2e-06"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.536693 -0.017275 0.003" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RM_link2_R_back_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.536693 -0.017275 0.003" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RM_link2_R_back_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="RB_link2_R_front_1">
+  <inertial>
+    <origin xyz="-0.04416973396134605 0.05245872077168984 -0.0005133150665662978" rpy="0 0 0"/>
+    <mass value="0.0313983406227064"/>
+    <inertia ixx="6.5e-05" iyy="5e-05" izz="0.000103" ixy="5.1e-05" iyz="1e-06" ixz="-1e-06"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.294369 -0.246568 -0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RB_link2_R_front_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.294369 -0.246568 -0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RB_link2_R_front_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="RB_foot_1">
+  <inertial>
+    <origin xyz="-0.0006979860263928162 0.025134182470434308 -6.48422762124538e-05" rpy="0 0 0"/>
+    <mass value="0.03802148330246935"/>
+    <inertia ixx="9e-06" iyy="9e-06" izz="1.1e-05" ixy="2e-06" iyz="0.0" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.391687 -0.36725 0.003" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RB_foot_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.391687 -0.36725 0.003" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RB_foot_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="RB_foot_cover_1">
+  <inertial>
+    <origin xyz="0.033616592693883784 -0.033617274814292775 -0.0001455349362131926" rpy="0 0 0"/>
+    <mass value="0.024550496002889725"/>
+    <inertia ixx="1.1e-05" iyy="1.1e-05" izz="1.2e-05" ixy="5e-06" iyz="-0.0" ixz="0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.412388 -0.412388 0.002696" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RB_foot_cover_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.412388 -0.412388 0.002696" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RB_foot_cover_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="RB_link2_R_back_1">
+  <inertial>
+    <origin xyz="0.07102603322109385 -0.05563711166245544 0.0025145064761334197" rpy="0 0 0"/>
+    <mass value="0.03186384547658659"/>
+    <inertia ixx="5.2e-05" iyy="6.6e-05" izz="0.000106" ixy="5.3e-05" iyz="1e-06" ixz="-1e-06"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.367284 -0.391714 0.003" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RB_link2_R_back_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.367284 -0.391714 0.003" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RB_link2_R_back_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="LF_link2_L_front_1">
+  <inertial>
+    <origin xyz="0.052457788618937407 -0.044168951791509425 -0.0005133264962653171" rpy="0 0 0"/>
+    <mass value="0.03139834059988974"/>
+    <inertia ixx="5e-05" iyy="6.5e-05" izz="0.000103" ixy="5.1e-05" iyz="-1e-06" ixz="1e-06"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.246568 0.294369 -0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LF_link2_L_front_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.246568 0.294369 -0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LF_link2_L_front_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="LF_foot_1">
+  <inertial>
+    <origin xyz="0.025100248439388295 -0.000670013344346021 -6.437323059637788e-05" rpy="0 0 0"/>
+    <mass value="0.03802148330246935"/>
+    <inertia ixx="9e-06" iyy="9e-06" izz="1.1e-05" ixy="2e-06" iyz="-0.0" ixz="0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.367289 0.391719 0.003" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LF_foot_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.367289 0.391719 0.003" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LF_foot_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="LF_foot_cover_1">
+  <inertial>
+    <origin xyz="-0.033616330405724704 0.03361644381554568 -0.00014510649092045304" rpy="0 0 0"/>
+    <mass value="0.024550496002889725"/>
+    <inertia ixx="1.1e-05" iyy="1.1e-05" izz="1.2e-05" ixy="5e-06" iyz="0.0" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.412392 0.412392 0.003" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LF_foot_cover_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.412392 0.412392 0.003" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LF_foot_cover_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="LF_link2_L_back_1">
+  <inertial>
+    <origin xyz="-0.055637094521202635 0.07102616679574036 0.0025149757452667494" rpy="0 0 0"/>
+    <mass value="0.03186384547658655"/>
+    <inertia ixx="6.6e-05" iyy="5.2e-05" izz="0.000106" ixy="5.3e-05" iyz="-1e-06" ixz="1e-06"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.391691 0.367255 0.003" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LF_link2_L_back_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.391691 0.367255 0.003" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LF_link2_L_back_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="LM_link2_L_front_1">
+  <inertial>
+    <origin xyz="0.06832564428286686 0.005860681481327609 -0.000513326496265989" rpy="0 0 0"/>
+    <mass value="0.03139834059988974"/>
+    <inertia ixx="7e-06" iyy="0.000108" izz="0.000103" ixy="-7e-06" iyz="0.0" ixz="2e-06"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.3825 0.0338 -0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LM_link2_L_front_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.3825 0.0338 -0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LM_link2_L_front_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="LM_foot_1">
+  <inertial>
+    <origin xyz="0.018222030635048125 0.017275166237300094 -6.437323059723483e-05" rpy="0 0 0"/>
+    <mass value="0.03802148330246935"/>
+    <inertia ixx="7e-06" iyy="1.1e-05" izz="1.1e-05" ixy="0.0" iyz="-0.0" ixz="0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.5367 0.017275 0.003" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LM_foot_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.5367 0.017275 0.003" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LM_foot_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="LM_foot_cover_1">
+  <inertial>
+    <origin xyz="-0.04754139115570033 8.019285624782674e-08 -0.00014506589059803563" rpy="0 0 0"/>
+    <mass value="0.024550496002889725"/>
+    <inertia ixx="7e-06" iyy="1.6e-05" izz="1.2e-05" ixy="-0.0" iyz="-0.0" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.583211 -0.0 0.002696" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LM_foot_cover_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.583211 -0.0 0.002696" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LM_foot_cover_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="LM_link2_L_back_1">
+  <inertial>
+    <origin xyz="-0.08956458785002985 0.010881578666571745 0.002514975745266785" rpy="0 0 0"/>
+    <mass value="0.03186384547658655"/>
+    <inertia ixx="7e-06" iyy="0.000112" izz="0.000106" ixy="7e-06" iyz="-0.0" ixz="2e-06"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.536656 -0.017279 0.003" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LM_link2_L_back_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.536656 -0.017279 0.003" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LM_link2_L_back_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="LB_link2_L_front_1">
+  <inertial>
+    <origin xyz="0.04416895179150143 0.05245778861891914 -0.0005133264962765206" rpy="0 0 0"/>
+    <mass value="0.03139834059988974"/>
+    <inertia ixx="6.5e-05" iyy="5e-05" izz="0.000103" ixy="-5.1e-05" iyz="1e-06" ixz="1e-06"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.294369 -0.246568 0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LB_link2_L_front_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.294369 -0.246568 0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LB_link2_L_front_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="LB_foot_1">
+  <inertial>
+    <origin xyz="0.0006700133443381384 0.02510024843936709 -6.437323060761325e-05" rpy="0 0 0"/>
+    <mass value="0.03802148330246935"/>
+    <inertia ixx="9e-06" iyy="9e-06" izz="1.1e-05" ixy="-2e-06" iyz="0.0" ixz="0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.391719 -0.367289 0.003" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LB_foot_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.391719 -0.367289 0.003" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LB_foot_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="LB_foot_cover_1">
+  <inertial>
+    <origin xyz="-0.0336164438155534 -0.03361633040574513 -0.00014510649093177732" rpy="0 0 0"/>
+    <mass value="0.024550496002889725"/>
+    <inertia ixx="1.1e-05" iyy="1.1e-05" izz="1.2e-05" ixy="-5e-06" iyz="-0.0" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.412392 -0.412392 0.003" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LB_foot_cover_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.412392 -0.412392 0.003" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LB_foot_cover_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="LB_link2_L_back_1">
+  <inertial>
+    <origin xyz="-0.07102616679574847 -0.055637094521222286 0.0025149757452558783" rpy="0 0 0"/>
+    <mass value="0.03186384547658655"/>
+    <inertia ixx="5.2e-05" iyy="6.6e-05" izz="0.000106" ixy="-5.3e-05" iyz="1e-06" ixz="1e-06"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.367255 -0.391691 0.003" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LB_link2_L_back_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.367255 -0.391691 0.003" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LB_link2_L_back_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="LF_DS51150_270_2_1">
+  <inertial>
+    <origin xyz="0.03560985654621948 0.00813678893539413 9.110342665696092e-12" rpy="0 0 0"/>
+    <mass value="0.16496568495572975"/>
+    <inertia ixx="5.8e-05" iyy="5.9e-05" izz="9.3e-05" ixy="1.5e-05" iyz="0.0" ixz="0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.159523 0.206051 -0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LF_DS51150_270_2_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.159523 0.206051 -0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LF_DS51150_270_2_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="LM_DS51150_270_2_1">
+  <inertial>
+    <origin xyz="0.019426246833090577 0.03093328535916428 9.108621719353466e-12" rpy="0 0 0"/>
+    <mass value="0.16496568495572975"/>
+    <inertia ixx="4.4e-05" iyy="7.3e-05" izz="9.3e-05" ixy="-0.0" iyz="0.0" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.2585 0.0329 0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LM_DS51150_270_2_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.2585 0.0329 0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LM_DS51150_270_2_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="LB_DS51150_270_2_1">
+  <inertial>
+    <origin xyz="-0.008136788935395461 0.03560985654620624 9.100279146254787e-12" rpy="0 0 0"/>
+    <mass value="0.16496568495572975"/>
+    <inertia ixx="5.9e-05" iyy="5.8e-05" izz="9.3e-05" ixy="-1.5e-05" iyz="0.0" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.206051 -0.159523 0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LB_DS51150_270_2_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.206051 -0.159523 0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/LB_DS51150_270_2_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="RF_DS51150_270_2_1">
+  <inertial>
+    <origin xyz="-0.03560985654621729 0.008136788935399347 -9.116900409543385e-12" rpy="0 0 0"/>
+    <mass value="0.16496568495572975"/>
+    <inertia ixx="5.8e-05" iyy="5.9e-05" izz="9.3e-05" ixy="-1.5e-05" iyz="-0.0" ixz="0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.159523 0.206051 0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RF_DS51150_270_2_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.159523 0.206051 0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RF_DS51150_270_2_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="RM_DS51150_270_2_1">
+  <inertial>
+    <origin xyz="-0.019426246833087912 0.030933285359158263 -9.10998722897422e-12" rpy="0 0 0"/>
+    <mass value="0.16496568495572975"/>
+    <inertia ixx="4.4e-05" iyy="7.3e-05" izz="9.3e-05" ixy="0.0" iyz="-0.0" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.2585 0.0329 0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RM_DS51150_270_2_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.2585 0.0329 0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RM_DS51150_270_2_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="RB_DS51150_270_2_1">
+  <inertial>
+    <origin xyz="0.008136788935395045 0.0356098565462174 -9.10249777711318e-12" rpy="0 0 0"/>
+    <mass value="0.16496568495572975"/>
+    <inertia ixx="5.9e-05" iyy="5.8e-05" izz="9.3e-05" ixy="1.5e-05" iyz="-0.0" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.206051 -0.159523 -0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RB_DS51150_270_2_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="0.206051 -0.159523 -0.0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="file://$(find HEXAPEDAL_URDF_description)/meshes/RB_DS51150_270_2_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<joint name="LF_1" type="revolute">
+  <origin xyz="0.130461 -0.130461 0.0329" rpy="0 0 0"/>
+  <parent link="LF_DS51150_270_1_1"/>
+  <child link="LF_motor_horn_1_1"/>
+  <axis xyz="0.0 0.0 1.0"/>
+  <limit upper="2.356194" lower="-2.356194" effort="100" velocity="100"/>
+</joint>
+
+<joint name="LM_1" type="revolute">
+  <origin xyz="0.1845 -0.0 0.0329" rpy="0 0 0"/>
+  <parent link="LM_DS51150_270_1_1"/>
+  <child link="LM_motor_horn_1_1"/>
+  <axis xyz="-0.0 0.0 1.0"/>
+  <limit upper="2.356194" lower="-2.356194" effort="100" velocity="100"/>
+</joint>
+
+<joint name="LB_1" type="revolute">
+  <origin xyz="0.130461 0.130461 0.0329" rpy="0 0 0"/>
+  <parent link="LB_DS51150_270_1_1"/>
+  <child link="LB_motor_horn_1_1"/>
+  <axis xyz="-0.0 0.0 1.0"/>
+  <limit upper="2.356194" lower="-2.356194" effort="100" velocity="100"/>
+</joint>
+
+<joint name="RF_1" type="revolute">
+  <origin xyz="-0.130461 -0.130461 0.0329" rpy="0 0 0"/>
+  <parent link="RF_DS51150_270_1_1"/>
+  <child link="RF_motor_horn_1_1"/>
+  <axis xyz="0.0 -0.0 1.0"/>
+  <limit upper="2.356194" lower="-2.356194" effort="100" velocity="100"/>
+</joint>
+
+<joint name="RM_1" type="revolute">
+  <origin xyz="-0.1845 -0.0 0.0329" rpy="0 0 0"/>
+  <parent link="RM_DS51150_270_1_1"/>
+  <child link="RM_motor_horn_1_1"/>
+  <axis xyz="0.0 -0.0 1.0"/>
+  <limit upper="2.356194" lower="-2.356194" effort="100" velocity="100"/>
+</joint>
+
+<joint name="RB_1" type="revolute">
+  <origin xyz="-0.130461 0.130461 0.0329" rpy="0 0 0"/>
+  <parent link="RB_DS51150_270_1_1"/>
+  <child link="RB_motor_horn_1_1"/>
+  <axis xyz="-0.0 -0.0 1.0"/>
+  <limit upper="2.356194" lower="-2.356194" effort="100" velocity="100"/>
+</joint>
+
+<joint name="LF_3" type="revolute">
+  <origin xyz="0.247205 -0.293732 0.0" rpy="0 0 0"/>
+  <parent link="LF_DS51150_270_3_1"/>
+  <child link="LF_motor_horn_3_1"/>
+  <axis xyz="-0.707107 -0.707107 -0.0"/>
+  <limit upper="2.356194" lower="-2.356194" effort="100" velocity="100"/>
+</joint>
+
+<joint name="LM_3" type="revolute">
+  <origin xyz="0.3825 -0.0329 0.0" rpy="0 0 0"/>
+  <parent link="LM_DS51150_270_3_1"/>
+  <child link="LM_motor_horn_3_1"/>
+  <axis xyz="0.0 -1.0 0.0"/>
+  <limit upper="2.356194" lower="-2.356194" effort="100" velocity="100"/>
+</joint>
+
+<joint name="LB_3" type="revolute">
+  <origin xyz="0.293732 0.247205 -0.0" rpy="0 0 0"/>
+  <parent link="LB_DS51150_270_3_1"/>
+  <child link="LB_motor_horn_3_1"/>
+  <axis xyz="0.707107 -0.707107 0.0"/>
+  <limit upper="2.356194" lower="-2.356194" effort="100" velocity="100"/>
+</joint>
+
+<joint name="RF_3" type="revolute">
+  <origin xyz="-0.247205 -0.293732 -0.0" rpy="0 0 0"/>
+  <parent link="RF_DS51150_270_3_1"/>
+  <child link="RF_motor_horn_3_1"/>
+  <axis xyz="0.707107 -0.707107 0.0"/>
+  <limit upper="2.356194" lower="-2.356194" effort="100" velocity="100"/>
+</joint>
+
+<joint name="RM_3" type="revolute">
+  <origin xyz="-0.3825 -0.0329 0.0" rpy="0 0 0"/>
+  <parent link="RM_DS51150_270_3_1"/>
+  <child link="RM_motor_horn_3_1"/>
+  <axis xyz="-0.0 -1.0 -0.0"/>
+  <limit upper="2.356194" lower="-2.356194" effort="100" velocity="100"/>
+</joint>
+
+<joint name="RB_3" type="revolute">
+  <origin xyz="-0.293732 0.247205 0.0" rpy="0 0 0"/>
+  <parent link="RB_DS51150_270_3_1"/>
+  <child link="RB_motor_horn_3_1"/>
+  <axis xyz="-0.707107 -0.707107 0.0"/>
+  <limit upper="2.356194" lower="-2.356194" effort="100" velocity="100"/>
+</joint>
+
+<joint name="Rigid 46" type="fixed">
+  <origin xyz="-0.0525 -0.005 -0.0458" rpy="0 0 0"/>
+  <parent link="base_link"/>
+  <child link="DXF_Lipo_3s_7200mah_100c_R_1"/>
+</joint>
+
+<joint name="Rigid 47" type="fixed">
+  <origin xyz="0.0 -0.005 -0.0458" rpy="0 0 0"/>
+  <parent link="base_link"/>
+  <child link="DXF_Lipo_2s_7200mah_100c_1"/>
+</joint>
+
+<joint name="Rigid 48" type="fixed">
+  <origin xyz="-0.095 -0.0 -0.0438" rpy="0 0 0"/>
+  <parent link="base_link"/>
+  <child link="DC_Converter_R_1"/>
+</joint>
+
+<joint name="Rigid 49" type="fixed">
+  <origin xyz="0.095 -0.0 -0.0438" rpy="0 0 0"/>
+  <parent link="base_link"/>
+  <child link="DC_Converter_L_1"/>
+</joint>
+
+<joint name="Rigid 50" type="fixed">
+  <origin xyz="0.0525 -0.005 -0.0458" rpy="0 0 0"/>
+  <parent link="base_link"/>
+  <child link="DXF_Lipo_3s_7200mah_100c_L_1"/>
+</joint>
+
+<joint name="Rigid 51" type="fixed">
+  <origin xyz="0.020915 0.115 0.0382" rpy="0 0 0"/>
+  <parent link="base_link"/>
+  <child link="AMASS_XT60_F_FeMale_1_1"/>
+</joint>
+
+<joint name="Rigid 52" type="fixed">
+  <origin xyz="0.020915 0.112 0.0227" rpy="0 0 0"/>
+  <parent link="base_link"/>
+  <child link="XHP_4_1_1"/>
+</joint>
+
+<joint name="Rigid 53" type="fixed">
+  <origin xyz="-0.019635 0.115 0.0392" rpy="0 0 0"/>
+  <parent link="base_link"/>
+  <child link="Volt_Meter_1_1"/>
+</joint>
+
+<joint name="Rigid 54" type="fixed">
+  <origin xyz="0.020915 0.112 -0.0373" rpy="0 0 0"/>
+  <parent link="base_link"/>
+  <child link="XHP_4_2_1"/>
+</joint>
+
+<joint name="Rigid 55" type="fixed">
+  <origin xyz="0.020915 0.115 -0.0218" rpy="0 0 0"/>
+  <parent link="base_link"/>
+  <child link="AMASS_XT60E_F_FeMale_3_1"/>
+</joint>
+
+<joint name="Rigid 56" type="fixed">
+  <origin xyz="0.020915 0.112 -0.0073" rpy="0 0 0"/>
+  <parent link="base_link"/>
+  <child link="XHP_3_1"/>
+</joint>
+
+<joint name="Rigid 57" type="fixed">
+  <origin xyz="0.020915 0.115 0.0082" rpy="0 0 0"/>
+  <parent link="base_link"/>
+  <child link="AMASS_XT60E_F_FeMale_2_1"/>
+</joint>
+
+<joint name="Rigid 58" type="fixed">
+  <origin xyz="-0.019635 0.115 0.0092" rpy="0 0 0"/>
+  <parent link="base_link"/>
+  <child link="Volt_Meter_2_1"/>
+</joint>
+
+<joint name="Rigid 59" type="fixed">
+  <origin xyz="-0.019635 0.115 -0.0208" rpy="0 0 0"/>
+  <parent link="base_link"/>
+  <child link="Volt_Meter_3_1"/>
+</joint>
+
+<joint name="Rigid 60" type="fixed">
+  <origin xyz="0.109 -0.0 -0.0068" rpy="0 0 0"/>
+  <parent link="base_link"/>
+  <child link="flame2_1"/>
+</joint>
+
+<joint name="Rigid 61" type="fixed">
+  <origin xyz="0.00775 -0.064 -0.0018" rpy="0 0 0"/>
+  <parent link="flame2_1"/>
+  <child link="STM32_F446RE_1"/>
+</joint>
+
+<joint name="Rigid 62" type="fixed">
+  <origin xyz="0.003 0.025 -0.0018" rpy="0 0 0"/>
+  <parent link="flame2_1"/>
+  <child link="Jetson_Orin_Nano_Super_1"/>
+</joint>
+
+<joint name="Rigid 63" type="fixed">
+  <origin xyz="-0.076 -0.047 -0.0018" rpy="0 0 0"/>
+  <parent link="flame2_1"/>
+  <child link="Relay_Module_L_1"/>
+</joint>
+
+<joint name="Rigid 64" type="fixed">
+  <origin xyz="-0.076 0.047 -0.0018" rpy="0 0 0"/>
+  <parent link="flame2_1"/>
+  <child link="Relay_Module_R_1"/>
+</joint>
+
+<joint name="Rigid 65" type="fixed">
+  <origin xyz="0.0 -0.11 0.0442" rpy="0 0 0"/>
+  <parent link="base_link"/>
+  <child link="flame3_1"/>
+</joint>
+
+<joint name="Rigid 66" type="fixed">
+  <origin xyz="0.0715 -0.0 0.0482" rpy="0 0 0"/>
+  <parent link="flame3_1"/>
+  <child link="NEO_M8N_GPS_1"/>
+</joint>
+
+<joint name="Rigid 67" type="fixed">
+  <origin xyz="0.0 -0.0 0.0472" rpy="0 0 0"/>
+  <parent link="flame3_1"/>
+  <child link="IMU_WT931_1"/>
+</joint>
+
+<joint name="Rigid 68" type="fixed">
+  <origin xyz="-0.07735 -0.0 0.0482" rpy="0 0 0"/>
+  <parent link="flame3_1"/>
+  <child link="FrSky_Archer_Plus_SR10_1"/>
+</joint>
+
+<joint name="Rigid 69" type="fixed">
+  <origin xyz="0.031 0.074 0.0492" rpy="0 0 0"/>
+  <parent link="flame3_1"/>
+  <child link="LoRa_RYLR998_1"/>
+</joint>
+
+<joint name="Rigid 70" type="fixed">
+  <origin xyz="-0.025 0.074 0.0492" rpy="0 0 0"/>
+  <parent link="flame3_1"/>
+  <child link="ON-OFF__Switch_1"/>
+</joint>
+
+<joint name="Rigid 71" type="fixed">
+  <origin xyz="-0.08061 0.08061 -0.0008" rpy="0 0 0"/>
+  <parent link="base_link"/>
+  <child link="RB_flame4_1"/>
+</joint>
+
+<joint name="Rigid 72" type="fixed">
+  <origin xyz="-0.114 -0.0 -0.0008" rpy="0 0 0"/>
+  <parent link="base_link"/>
+  <child link="RM_flame4_1"/>
+</joint>
+
+<joint name="Rigid 73" type="fixed">
+  <origin xyz="-0.08061 -0.08061 -0.0008" rpy="0 0 0"/>
+  <parent link="base_link"/>
+  <child link="RF_flame4_1"/>
+</joint>
+
+<joint name="Rigid 74" type="fixed">
+  <origin xyz="0.08061 0.08061 -0.0008" rpy="0 0 0"/>
+  <parent link="base_link"/>
+  <child link="LB_flame4_1"/>
+</joint>
+
+<joint name="Rigid 75" type="fixed">
+  <origin xyz="0.114 -0.0 -0.0008" rpy="0 0 0"/>
+  <parent link="base_link"/>
+  <child link="LM_flame4_1"/>
+</joint>
+
+<joint name="Rigid 76" type="fixed">
+  <origin xyz="0.08061 -0.08061 -0.0008" rpy="0 0 0"/>
+  <parent link="base_link"/>
+  <child link="LF_flame4_1"/>
+</joint>
+
+<joint name="Rigid 77" type="fixed">
+  <origin xyz="-0.093692 -0.093692 0.0087" rpy="0 0 0"/>
+  <parent link="RF_flame4_1"/>
+  <child link="RF_DS51150_270_1_1"/>
+</joint>
+
+<joint name="Rigid 78" type="fixed">
+  <origin xyz="-0.1325 -0.0 0.0087" rpy="0 0 0"/>
+  <parent link="RM_flame4_1"/>
+  <child link="RM_DS51150_270_1_1"/>
+</joint>
+
+<joint name="Rigid 79" type="fixed">
+  <origin xyz="-0.093692 0.093692 0.0087" rpy="0 0 0"/>
+  <parent link="RB_flame4_1"/>
+  <child link="RB_DS51150_270_1_1"/>
+</joint>
+
+<joint name="Rigid 80" type="fixed">
+  <origin xyz="0.093692 -0.093692 0.0087" rpy="0 0 0"/>
+  <parent link="LF_flame4_1"/>
+  <child link="LF_DS51150_270_1_1"/>
+</joint>
+
+<joint name="Rigid 81" type="fixed">
+  <origin xyz="0.1325 0.0 0.0087" rpy="0 0 0"/>
+  <parent link="LM_flame4_1"/>
+  <child link="LM_DS51150_270_1_1"/>
+</joint>
+
+<joint name="Rigid 82" type="fixed">
+  <origin xyz="0.093692 0.093692 0.0087" rpy="0 0 0"/>
+  <parent link="LB_flame4_1"/>
+  <child link="LB_DS51150_270_1_1"/>
+</joint>
+
+<joint name="Rigid 83" type="fixed">
+  <origin xyz="-0.130461 -0.130461 -0.0273" rpy="0 0 0"/>
+  <parent link="RF_flame4_1"/>
+  <child link="RF_bearing_1_1"/>
+</joint>
+
+<joint name="Rigid 84" type="fixed">
+  <origin xyz="-0.1845 -0.0 -0.0273" rpy="0 0 0"/>
+  <parent link="RM_flame4_1"/>
+  <child link="RM_bearing_1_1"/>
+</joint>
+
+<joint name="Rigid 85" type="fixed">
+  <origin xyz="-0.130461 0.130461 -0.0273" rpy="0 0 0"/>
+  <parent link="RB_flame4_1"/>
+  <child link="RB_bearing_1_1"/>
+</joint>
+
+<joint name="Rigid 86" type="fixed">
+  <origin xyz="0.130461 -0.130461 -0.0273" rpy="0 0 0"/>
+  <parent link="LF_flame4_1"/>
+  <child link="LF_bearing_1_1"/>
+</joint>
+
+<joint name="Rigid 87" type="fixed">
+  <origin xyz="0.1845 0.0 -0.0273" rpy="0 0 0"/>
+  <parent link="LM_flame4_1"/>
+  <child link="LM_bearing_1_1"/>
+</joint>
+
+<joint name="Rigid 88" type="fixed">
+  <origin xyz="0.130461 0.130461 -0.0273" rpy="0 0 0"/>
+  <parent link="LB_flame4_1"/>
+  <child link="LB_bearing_1_1"/>
+</joint>
+
+<joint name="Rigid 89" type="fixed">
+  <origin xyz="-0.130461 -0.130461 0.0338" rpy="0 0 0"/>
+  <parent link="RF_motor_horn_1_1"/>
+  <child link="RF_coxaR_1"/>
+</joint>
+
+<joint name="Rigid 90" type="fixed">
+  <origin xyz="-0.1845 -0.0 0.0338" rpy="0 0 0"/>
+  <parent link="RM_motor_horn_1_1"/>
+  <child link="RM_coxaR_1"/>
+</joint>
+
+<joint name="Rigid 91" type="fixed">
+  <origin xyz="-0.130461 0.130461 0.0338" rpy="0 0 0"/>
+  <parent link="RB_motor_horn_1_1"/>
+  <child link="RB_coxaR_1"/>
+</joint>
+
+<joint name="Rigid 92" type="fixed">
+  <origin xyz="0.130461 -0.130461 0.0338" rpy="0 0 0"/>
+  <parent link="LF_motor_horn_1_1"/>
+  <child link="LF_coxaL_1"/>
+</joint>
+
+<joint name="Rigid 93" type="fixed">
+  <origin xyz="0.1845 -0.0 0.0338" rpy="0 0 0"/>
+  <parent link="LM_motor_horn_1_1"/>
+  <child link="LM_coxaL_1"/>
+</joint>
+
+<joint name="Rigid 94" type="fixed">
+  <origin xyz="0.130461 0.130461 0.0338" rpy="0 0 0"/>
+  <parent link="LB_motor_horn_1_1"/>
+  <child link="LB_coxaL_1"/>
+</joint>
+
+<joint name="Rigid 95" type="fixed">
+  <origin xyz="-0.212344 -0.180807 0.015" rpy="0 0 0"/>
+  <parent link="RF_DS51150_270_2_1"/>
+  <child link="RF_link1_right_1"/>
+</joint>
+
+<joint name="Rigid 96" type="fixed">
+  <origin xyz="-0.272448 -0.240911 0.015" rpy="0 0 0"/>
+  <parent link="RF_link1_right_1"/>
+  <child link="RF_DS51150_270_3_1"/>
+</joint>
+
+<joint name="Rigid 97" type="fixed">
+  <origin xyz="-0.203505 -0.164897 -0.0" rpy="0 0 0"/>
+  <parent link="RF_link1_right_1"/>
+  <child link="RF_bearing_2_1"/>
+</joint>
+
+<joint name="Rigid 98" type="fixed">
+  <origin xyz="-0.289772 -0.251164 -0.0" rpy="0 0 0"/>
+  <parent link="RF_link1_right_1"/>
+  <child link="RF_bearing_3_1"/>
+</joint>
+
+<joint name="Rigid 99" type="fixed">
+  <origin xyz="-0.278 0.0223 0.015" rpy="0 0 0"/>
+  <parent link="RM_DS51150_270_2_1"/>
+  <child link="RM_link1_right_1"/>
+</joint>
+
+<joint name="Rigid 100" type="fixed">
+  <origin xyz="-0.363 0.0223 0.015" rpy="0 0 0"/>
+  <parent link="RM_link1_right_1"/>
+  <child link="RM_DS51150_270_3_1"/>
+</joint>
+
+<joint name="Rigid 101" type="fixed">
+  <origin xyz="-0.2605 0.0273 -0.0" rpy="0 0 0"/>
+  <parent link="RM_link1_right_1"/>
+  <child link="RM_bearing_2_1"/>
+</joint>
+
+<joint name="Rigid 102" type="fixed">
+  <origin xyz="-0.3825 0.0273 0.0" rpy="0 0 0"/>
+  <parent link="RM_link1_right_1"/>
+  <child link="RM_bearing_3_1"/>
+</joint>
+
+<joint name="Rigid 103" type="fixed">
+  <origin xyz="-0.158887 -0.206687 -0.0" rpy="0 0 0"/>
+  <parent link="RF_coxaR_1"/>
+  <child link="RF_motor_horn_2_1"/>
+</joint>
+
+<joint name="Rigid 104" type="fixed">
+  <origin xyz="-0.2585 -0.0338 -0.0" rpy="0 0 0"/>
+  <parent link="RM_coxaR_1"/>
+  <child link="RM_motor_horn_2_1"/>
+</joint>
+
+<joint name="Rigid 105" type="fixed">
+  <origin xyz="-0.180807 0.212344 0.015" rpy="0 0 0"/>
+  <parent link="RB_DS51150_270_2_1"/>
+  <child link="RB_link1_right_1"/>
+</joint>
+
+<joint name="Rigid 106" type="fixed">
+  <origin xyz="-0.240911 0.272448 0.015" rpy="0 0 0"/>
+  <parent link="RB_link1_right_1"/>
+  <child link="RB_DS51150_270_3_1"/>
+</joint>
+
+<joint name="Rigid 107" type="fixed">
+  <origin xyz="-0.164897 0.203505 0.0" rpy="0 0 0"/>
+  <parent link="RB_link1_right_1"/>
+  <child link="RB_bearing_2_1"/>
+</joint>
+
+<joint name="Rigid 108" type="fixed">
+  <origin xyz="-0.251164 0.289772 0.0" rpy="0 0 0"/>
+  <parent link="RB_link1_right_1"/>
+  <child link="RB_bearing_3_1"/>
+</joint>
+
+<joint name="Rigid 109" type="fixed">
+  <origin xyz="-0.206687 0.158887 0.0" rpy="0 0 0"/>
+  <parent link="RB_coxaR_1"/>
+  <child link="RB_motor_horn_2_1"/>
+</joint>
+
+<joint name="Rigid 110" type="fixed">
+  <origin xyz="0.212344 -0.180807 0.015" rpy="0 0 0"/>
+  <parent link="LF_DS51150_270_2_1"/>
+  <child link="LF_link1_left_1"/>
+</joint>
+
+<joint name="Rigid 111" type="fixed">
+  <origin xyz="0.272448 -0.240911 0.015" rpy="0 0 0"/>
+  <parent link="LF_link1_left_1"/>
+  <child link="LF_DS51150_270_3_1"/>
+</joint>
+
+<joint name="Rigid 112" type="fixed">
+  <origin xyz="0.203505 -0.164897 0.0" rpy="0 0 0"/>
+  <parent link="LF_link1_left_1"/>
+  <child link="LF_bearing_2_1"/>
+</joint>
+
+<joint name="Rigid 113" type="fixed">
+  <origin xyz="0.289772 -0.251164 0.0" rpy="0 0 0"/>
+  <parent link="LF_link1_left_1"/>
+  <child link="LF_bearing_3_1"/>
+</joint>
+
+<joint name="Rigid 114" type="fixed">
+  <origin xyz="0.158887 -0.206687 0.0" rpy="0 0 0"/>
+  <parent link="LF_coxaL_1"/>
+  <child link="LF_motor_horn_2_1"/>
+</joint>
+
+<joint name="Rigid 115" type="fixed">
+  <origin xyz="0.278 0.0223 0.015" rpy="0 0 0"/>
+  <parent link="LM_DS51150_270_2_1"/>
+  <child link="LM_link1_left_1"/>
+</joint>
+
+<joint name="Rigid 116" type="fixed">
+  <origin xyz="0.363 0.0223 0.015" rpy="0 0 0"/>
+  <parent link="LM_link1_left_1"/>
+  <child link="LM_DS51150_270_3_1"/>
+</joint>
+
+<joint name="Rigid 117" type="fixed">
+  <origin xyz="0.2605 0.0273 -0.0" rpy="0 0 0"/>
+  <parent link="LM_link1_left_1"/>
+  <child link="LM_bearing_2_1"/>
+</joint>
+
+<joint name="Rigid 118" type="fixed">
+  <origin xyz="0.3825 0.0273 0.0" rpy="0 0 0"/>
+  <parent link="LM_link1_left_1"/>
+  <child link="LM_bearing_3_1"/>
+</joint>
+
+<joint name="Rigid 119" type="fixed">
+  <origin xyz="0.2585 -0.0338 -0.0" rpy="0 0 0"/>
+  <parent link="LM_coxaL_1"/>
+  <child link="LM_motor_horn_2_1"/>
+</joint>
+
+<joint name="Rigid 120" type="fixed">
+  <origin xyz="0.180807 0.212344 0.015" rpy="0 0 0"/>
+  <parent link="LB_DS51150_270_2_1"/>
+  <child link="LB_link1_left_1"/>
+</joint>
+
+<joint name="Rigid 121" type="fixed">
+  <origin xyz="0.240911 0.272448 0.015" rpy="0 0 0"/>
+  <parent link="LB_link1_left_1"/>
+  <child link="LB_DS51150_270_3_1"/>
+</joint>
+
+<joint name="Rigid 122" type="fixed">
+  <origin xyz="0.164897 0.203505 -0.0" rpy="0 0 0"/>
+  <parent link="LB_link1_left_1"/>
+  <child link="LB_bearing_2_1"/>
+</joint>
+
+<joint name="Rigid 123" type="fixed">
+  <origin xyz="0.251164 0.289772 -0.0" rpy="0 0 0"/>
+  <parent link="LB_link1_left_1"/>
+  <child link="LB_bearing_3_1"/>
+</joint>
+
+<joint name="Rigid 124" type="fixed">
+  <origin xyz="0.206687 0.158887 -0.0" rpy="0 0 0"/>
+  <parent link="LB_coxaL_1"/>
+  <child link="LB_motor_horn_2_1"/>
+</joint>
+
+<joint name="Rigid 125" type="fixed">
+  <origin xyz="-0.246568 -0.294369 -0.0" rpy="0 0 0"/>
+  <parent link="RF_motor_horn_3_1"/>
+  <child link="RF_link2_R_front_1"/>
+</joint>
+
+<joint name="Rigid 126" type="fixed">
+  <origin xyz="-0.36725 -0.391687 -0.003" rpy="0 0 0"/>
+  <parent link="RF_link2_R_front_1"/>
+  <child link="RF_foot_1"/>
+</joint>
+
+<joint name="Rigid 127" type="fixed">
+  <origin xyz="-0.412388 -0.412388 -0.003" rpy="0 0 0"/>
+  <parent link="RF_foot_1"/>
+  <child link="RF_foot_cover_1"/>
+</joint>
+
+<joint name="Rigid 128" type="fixed">
+  <origin xyz="-0.391714 -0.367284 -0.003" rpy="0 0 0"/>
+  <parent link="RF_foot_1"/>
+  <child link="RF_link2_R_back_1"/>
+</joint>
+
+<joint name="Rigid 129" type="fixed">
+  <origin xyz="-0.3825 -0.0338 0.0" rpy="0 0 0"/>
+  <parent link="RM_motor_horn_3_1"/>
+  <child link="RM_link2_R_front_1"/>
+</joint>
+
+<joint name="Rigid 130" type="fixed">
+  <origin xyz="-0.53665 -0.017279 -0.003" rpy="0 0 0"/>
+  <parent link="RM_link2_R_front_1"/>
+  <child link="RM_foot_1"/>
+</joint>
+
+<joint name="Rigid 131" type="fixed">
+  <origin xyz="-0.583205 -0.0 -0.002696" rpy="0 0 0"/>
+  <parent link="RM_foot_1"/>
+  <child link="RM_foot_cover_1"/>
+</joint>
+
+<joint name="Rigid 132" type="fixed">
+  <origin xyz="-0.536693 0.017275 -0.003" rpy="0 0 0"/>
+  <parent link="RM_foot_1"/>
+  <child link="RM_link2_R_back_1"/>
+</joint>
+
+<joint name="Rigid 133" type="fixed">
+  <origin xyz="-0.294369 0.246568 0.0" rpy="0 0 0"/>
+  <parent link="RB_motor_horn_3_1"/>
+  <child link="RB_link2_R_front_1"/>
+</joint>
+
+<joint name="Rigid 134" type="fixed">
+  <origin xyz="-0.391687 0.36725 -0.003" rpy="0 0 0"/>
+  <parent link="RB_link2_R_front_1"/>
+  <child link="RB_foot_1"/>
+</joint>
+
+<joint name="Rigid 135" type="fixed">
+  <origin xyz="-0.412388 0.412388 -0.002696" rpy="0 0 0"/>
+  <parent link="RB_foot_1"/>
+  <child link="RB_foot_cover_1"/>
+</joint>
+
+<joint name="Rigid 136" type="fixed">
+  <origin xyz="-0.367284 0.391714 -0.003" rpy="0 0 0"/>
+  <parent link="RB_foot_1"/>
+  <child link="RB_link2_R_back_1"/>
+</joint>
+
+<joint name="Rigid 137" type="fixed">
+  <origin xyz="0.246568 -0.294369 0.0" rpy="0 0 0"/>
+  <parent link="LF_motor_horn_3_1"/>
+  <child link="LF_link2_L_front_1"/>
+</joint>
+
+<joint name="Rigid 138" type="fixed">
+  <origin xyz="0.367289 -0.391719 -0.003" rpy="0 0 0"/>
+  <parent link="LF_link2_L_front_1"/>
+  <child link="LF_foot_1"/>
+</joint>
+
+<joint name="Rigid 139" type="fixed">
+  <origin xyz="0.412392 -0.412392 -0.003" rpy="0 0 0"/>
+  <parent link="LF_foot_1"/>
+  <child link="LF_foot_cover_1"/>
+</joint>
+
+<joint name="Rigid 140" type="fixed">
+  <origin xyz="0.391691 -0.367255 -0.003" rpy="0 0 0"/>
+  <parent link="LF_foot_1"/>
+  <child link="LF_link2_L_back_1"/>
+</joint>
+
+<joint name="Rigid 141" type="fixed">
+  <origin xyz="0.3825 -0.0338 0.0" rpy="0 0 0"/>
+  <parent link="LM_motor_horn_3_1"/>
+  <child link="LM_link2_L_front_1"/>
+</joint>
+
+<joint name="Rigid 142" type="fixed">
+  <origin xyz="0.5367 -0.017275 -0.003" rpy="0 0 0"/>
+  <parent link="LM_link2_L_front_1"/>
+  <child link="LM_foot_1"/>
+</joint>
+
+<joint name="Rigid 143" type="fixed">
+  <origin xyz="0.583211 0.0 -0.002696" rpy="0 0 0"/>
+  <parent link="LM_foot_1"/>
+  <child link="LM_foot_cover_1"/>
+</joint>
+
+<joint name="Rigid 144" type="fixed">
+  <origin xyz="0.536656 0.017279 -0.003" rpy="0 0 0"/>
+  <parent link="LM_foot_1"/>
+  <child link="LM_link2_L_back_1"/>
+</joint>
+
+<joint name="Rigid 145" type="fixed">
+  <origin xyz="0.294369 0.246568 -0.0" rpy="0 0 0"/>
+  <parent link="LB_motor_horn_3_1"/>
+  <child link="LB_link2_L_front_1"/>
+</joint>
+
+<joint name="Rigid 146" type="fixed">
+  <origin xyz="0.391719 0.367289 -0.003" rpy="0 0 0"/>
+  <parent link="LB_link2_L_front_1"/>
+  <child link="LB_foot_1"/>
+</joint>
+
+<joint name="Rigid 147" type="fixed">
+  <origin xyz="0.412392 0.412392 -0.003" rpy="0 0 0"/>
+  <parent link="LB_foot_1"/>
+  <child link="LB_foot_cover_1"/>
+</joint>
+
+<joint name="Rigid 148" type="fixed">
+  <origin xyz="0.367255 0.391691 -0.003" rpy="0 0 0"/>
+  <parent link="LB_foot_1"/>
+  <child link="LB_link2_L_back_1"/>
+</joint>
+
+<joint name="LF_2" type="revolute">
+  <origin xyz="0.159523 -0.206051 0.0" rpy="0 0 0"/>
+  <parent link="LF_motor_horn_2_1"/>
+  <child link="LF_DS51150_270_2_1"/>
+  <axis xyz="0.707107 0.707107 0.0"/>
+  <limit upper="2.356194" lower="-2.356194" effort="100" velocity="100"/>
+</joint>
+
+<joint name="LM_2" type="revolute">
+  <origin xyz="0.2585 -0.0329 -0.0" rpy="0 0 0"/>
+  <parent link="LM_motor_horn_2_1"/>
+  <child link="LM_DS51150_270_2_1"/>
+  <axis xyz="-0.0 1.0 -0.0"/>
+  <limit upper="2.356194" lower="-2.356194" effort="100" velocity="100"/>
+</joint>
+
+<joint name="LB_2" type="revolute">
+  <origin xyz="0.206051 0.159523 -0.0" rpy="0 0 0"/>
+  <parent link="LB_motor_horn_2_1"/>
+  <child link="LB_DS51150_270_2_1"/>
+  <axis xyz="-0.707107 0.707107 -0.0"/>
+  <limit upper="2.356194" lower="-2.356194" effort="100" velocity="100"/>
+</joint>
+
+<joint name="RF_2" type="revolute">
+  <origin xyz="-0.159523 -0.206051 -0.0" rpy="0 0 0"/>
+  <parent link="RF_motor_horn_2_1"/>
+  <child link="RF_DS51150_270_2_1"/>
+  <axis xyz="-0.707107 0.707107 0.0"/>
+  <limit upper="2.356194" lower="-2.356194" effort="100" velocity="100"/>
+</joint>
+
+<joint name="RM_2" type="revolute">
+  <origin xyz="-0.2585 -0.0329 -0.0" rpy="0 0 0"/>
+  <parent link="RM_motor_horn_2_1"/>
+  <child link="RM_DS51150_270_2_1"/>
+  <axis xyz="0.0 1.0 0.0"/>
+  <limit upper="2.356194" lower="-2.356194" effort="100" velocity="100"/>
+</joint>
+
+<joint name="RB_2" type="revolute">
+  <origin xyz="-0.206051 0.159523 0.0" rpy="0 0 0"/>
+  <parent link="RB_motor_horn_2_1"/>
+  <child link="RB_DS51150_270_2_1"/>
+  <axis xyz="0.707107 0.707107 -0.0"/>
+  <limit upper="2.356194" lower="-2.356194" effort="100" velocity="100"/>
+</joint>
+
+</robot>
