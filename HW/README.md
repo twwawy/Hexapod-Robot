@@ -10,6 +10,7 @@ Jetson Orin Nano Super는 LiDAR, Depth Camera 등 각종 센서 데이터를 종
 |---|---|
 | Main Computer | Jetson Orin Nano Super |
 | MCU | STM32 NUCLEO-F446RE |
+| Controller | RadioMaster Pocket ELRS |
 | Actuator | DS51150-270 Servo Motor |
 | LiDAR | Livox Mid-360 |
 | Depth Camera | Intel RealSense D435 |
