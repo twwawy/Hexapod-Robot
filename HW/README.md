@@ -19,4 +19,4 @@ Jetson Orin Nano Super는 LiDAR, Depth Camera 등 각종 센서 데이터를 종
 | Battery | 3S / 2S 7200mAh Battery |
 | Frame | 3D Printed PLA Parts |
 
-자세한 부품 목록은 [hardware/parts.md]를 참고하세요.
+자세한 부품 목록은 [parts.md]를 참고하세요.
