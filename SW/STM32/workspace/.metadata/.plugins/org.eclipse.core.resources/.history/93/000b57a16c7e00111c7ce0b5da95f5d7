@@ -1,0 +1,54 @@
+/* lora_comm.c - RYLR998 LoRa telemetry transmission */
+#include "stm32f4xx_hal.h"
+#include <stdint.h>
+#include <stdio.h>
+#include <string.h>
+
+extern UART_HandleTypeDef huart1;
+
+static void LoRa_Write(const char *text)
+{
+    HAL_UART_Transmit(&huart1, (uint8_t *)text,
+                      (uint16_t)strlen(text), 100);
+}
+
+static uint8_t Checksum8(const char *data)
+{
+    uint8_t crc = 0;
+    while (*data != '\0') crc ^= (uint8_t)*data++;
+    return crc;
+}
+
+void LoRa_Init(void)
+{
+    LoRa_Write("AT+ADDRESS=1\r\n");
+    HAL_Delay(100);
+    LoRa_Write("AT+NETWORKID=6\r\n");
+    HAL_Delay(100);
+    LoRa_Write("AT+BAND=920900000\r\n");
+    HAL_Delay(100);
+    LoRa_Write("AT+PARAMETER=9,7,1,12\r\n");
+}
+
+void LoRa_SendRobotState(uint16_t destination, uint32_t sequence,
+                         float x, float y, float z,
+                         uint8_t battery, uint8_t status)
+{
+    char payload[96];
+    char command[128];
+
+    snprintf(payload, sizeof(payload),
+             "STATE|%lu|%.2f|%.2f|%.2f|%u|%u",
+             (unsigned long)sequence, x, y, z,
+             battery, status);
+
+    uint8_t crc = Checksum8(payload);
+
+    snprintf(command, sizeof(command),
+             "AT+SEND=%u,%u,%s|%02X\r\n",
+             destination,
+             (unsigned)(strlen(payload) + 3),
+             payload, crc);
+
+    LoRa_Write(command);
+}

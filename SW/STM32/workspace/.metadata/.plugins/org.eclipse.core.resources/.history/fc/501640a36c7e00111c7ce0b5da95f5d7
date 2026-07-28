@@ -1,0 +1,61 @@
+/* leg_ik_3dof.c - 3-DOF hexapod leg inverse kinematics */
+#include <math.h>
+#include <stdbool.h>
+
+#define L1  74.0f
+#define L2 174.0f
+#define L3 302.0f
+#define RAD_TO_DEG 57.29577951f
+
+typedef struct {
+    float theta1;
+    float theta2;
+    float theta3;
+} JointAngle;
+
+static float Clamp(float value, float min_value, float max_value)
+{
+    if (value < min_value) return min_value;
+    if (value > max_value) return max_value;
+    return value;
+}
+
+bool Leg_InverseKinematics(float x, float y, float z,
+                           bool knee_down, JointAngle *angle)
+{
+    float theta1 = atan2f(-x, y);
+    float rho = hypotf(x, y);
+
+    float l4 = sqrtf(
+        powf(-x + L1 * sinf(theta1), 2.0f) +
+        powf( y - L1 * cosf(theta1), 2.0f) +
+        z * z
+    );
+
+    if (l4 < 1.0e-6f) return false;
+
+    float d2 = (L2*L2 - L3*L3 + l4*l4) / (2.0f * L2 * l4);
+    float d3 = (powf(rho - L1, 2.0f) + z*z - L2*L2 - L3*L3)
+             / (2.0f * L2 * L3);
+
+    if (fabsf(d2) > 1.0f || fabsf(d3) > 1.0f) return false;
+
+    d2 = Clamp(d2, -1.0f, 1.0f);
+    d3 = Clamp(d3, -1.0f, 1.0f);
+
+    float theta2 =
+        atan2f(sqrtf(1.0f - d2*d2), d2)
+        - atan2f(-z, rho - L1);
+
+    float knee_sign = knee_down ? 1.0f : -1.0f;
+    float theta3 =
+        atan2f(knee_sign * sqrtf(1.0f - d3*d3), d3);
+
+    angle->theta1 = theta1 * RAD_TO_DEG;
+    angle->theta2 = theta2 * RAD_TO_DEG;
+    angle->theta3 = theta3 * RAD_TO_DEG;
+
+    return fabsf(angle->theta1) <= 135.0f &&
+           fabsf(angle->theta2) <= 135.0f &&
+           fabsf(angle->theta3) <= 135.0f;
+}
