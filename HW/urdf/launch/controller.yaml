@@ -1,0 +1,79 @@
+HEXAPEDAL_URDF_controller:
+  # Publish all joint states -----------------------------------
+  joint_state_controller:
+    type: joint_state_controller/JointStateController
+    publish_rate: 50
+
+  # Position Controllers --------------------------------------
+  LF_1_position_controller:
+    type: effort_controllers/JointPositionController
+    joint: LF_1
+    pid: {p: 100.0, i: 0.01, d: 10.0}
+  LM_1_position_controller:
+    type: effort_controllers/JointPositionController
+    joint: LM_1
+    pid: {p: 100.0, i: 0.01, d: 10.0}
+  LB_1_position_controller:
+    type: effort_controllers/JointPositionController
+    joint: LB_1
+    pid: {p: 100.0, i: 0.01, d: 10.0}
+  RF_1_position_controller:
+    type: effort_controllers/JointPositionController
+    joint: RF_1
+    pid: {p: 100.0, i: 0.01, d: 10.0}
+  RM_1_position_controller:
+    type: effort_controllers/JointPositionController
+    joint: RM_1
+    pid: {p: 100.0, i: 0.01, d: 10.0}
+  RB_1_position_controller:
+    type: effort_controllers/JointPositionController
+    joint: RB_1
+    pid: {p: 100.0, i: 0.01, d: 10.0}
+  LF_2_position_controller:
+    type: effort_controllers/JointPositionController
+    joint: LF_2
+    pid: {p: 100.0, i: 0.01, d: 10.0}
+  LM_2_position_controller:
+    type: effort_controllers/JointPositionController
+    joint: LM_2
+    pid: {p: 100.0, i: 0.01, d: 10.0}
+  LB_2_position_controller:
+    type: effort_controllers/JointPositionController
+    joint: LB_2
+    pid: {p: 100.0, i: 0.01, d: 10.0}
+  RF_2_position_controller:
+    type: effort_controllers/JointPositionController
+    joint: RF_2
+    pid: {p: 100.0, i: 0.01, d: 10.0}
+  RM_2_position_controller:
+    type: effort_controllers/JointPositionController
+    joint: RM_2
+    pid: {p: 100.0, i: 0.01, d: 10.0}
+  RB_2_position_controller:
+    type: effort_controllers/JointPositionController
+    joint: RB_2
+    pid: {p: 100.0, i: 0.01, d: 10.0}
+  LF_3_position_controller:
+    type: effort_controllers/JointPositionController
+    joint: LF_3
+    pid: {p: 100.0, i: 0.01, d: 10.0}
+  LM_3_position_controller:
+    type: effort_controllers/JointPositionController
+    joint: LM_3
+    pid: {p: 100.0, i: 0.01, d: 10.0}
+  LB_3_position_controller:
+    type: effort_controllers/JointPositionController
+    joint: LB_3
+    pid: {p: 100.0, i: 0.01, d: 10.0}
+  RF_3_position_controller:
+    type: effort_controllers/JointPositionController
+    joint: RF_3
+    pid: {p: 100.0, i: 0.01, d: 10.0}
+  RM_3_position_controller:
+    type: effort_controllers/JointPositionController
+    joint: RM_3
+    pid: {p: 100.0, i: 0.01, d: 10.0}
+  RB_3_position_controller:
+    type: effort_controllers/JointPositionController
+    joint: RB_3
+    pid: {p: 100.0, i: 0.01, d: 10.0}

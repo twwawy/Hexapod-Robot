@@ -1,0 +1,9 @@
+<launch>
+
+<rosparam file="$(find HEXAPEDAL_URDF_description)/launch/controller.yaml" command="load"/>
+<node name="controller_spawner" pkg="controller_manager" type="spawner" respawn="false" output="screen" ns="HEXAPEDAL_URDF" args="LF_1_position_controller LM_1_position_controller LB_1_position_controller RF_1_position_controller RM_1_position_controller RB_1_position_controller LF_2_position_controller LM_2_position_controller LB_2_position_controller RF_2_position_controller RM_2_position_controller RB_2_position_controller LF_3_position_controller LM_3_position_controller LB_3_position_controller RF_3_position_controller RM_3_position_controller RB_3_position_controller joint_state_controller "/>
+<node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher" respawn="false" output="screen">
+  <remap from="/joint_states" to="/HEXAPEDAL_URDF/joint_states"/>
+</node>
+
+</launch>
