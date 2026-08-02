@@ -1,0 +1,5 @@
+__pycache__/
+*.pyc
+wandb/
+SW/mjx/artifacts/
+SW/mjx/**/__pycache__/
