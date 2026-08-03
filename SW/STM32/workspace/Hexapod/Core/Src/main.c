@@ -21,6 +21,9 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "gps.h"
+#include "imu.h"
+#include "nav_kalman.h"
 
 /* USER CODE END Includes */
 
@@ -57,6 +60,11 @@ UART_HandleTypeDef huart3;
 UART_HandleTypeDef huart6;
 
 /* USER CODE BEGIN PV */
+static GPS_Handle_t g_gps;
+static IMU_Handle_t g_imu;
+static GPS_Data_t g_gps_data;
+static IMU_Data_t g_imu_data;
+static NavKalman_t g_nav_kalman;
 
 /* USER CODE END PV */
 
@@ -128,6 +136,19 @@ int main(void)
   MX_USART3_UART_Init();
   MX_USART6_UART_Init();
   /* USER CODE BEGIN 2 */
+  GPS_Init(&g_gps, &huart2);
+  IMU_Init(&g_imu, &huart3);
+  NavKalman_Init(&g_nav_kalman, NULL);
+
+  if (GPS_Start(&g_gps) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  if (IMU_Start(&g_imu) != HAL_OK)
+  {
+    Error_Handler();
+  }
 
   /* USER CODE END 2 */
 
@@ -138,6 +159,14 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+    (void)GPS_Process(&g_gps);
+    (void)IMU_Process(&g_imu);
+
+    /* These snapshots are safe to inspect in the debugger or forward to
+       the Jetson. The Kalman predict step is intentionally not called until
+       the installed WT931 axis directions and gravity sign are verified. */
+    (void)GPS_GetLatest(&g_gps, &g_gps_data);
+    (void)IMU_GetLatest(&g_imu, &g_imu_data);
   }
   /* USER CODE END 3 */
 }
@@ -903,6 +932,17 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{
+  GPS_RxCpltCallback(&g_gps, huart);
+  IMU_RxCpltCallback(&g_imu, huart);
+}
+
+void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
+{
+  GPS_ErrorCallback(&g_gps, huart);
+  IMU_ErrorCallback(&g_imu, huart);
+}
 
 /* USER CODE END 4 */
 
