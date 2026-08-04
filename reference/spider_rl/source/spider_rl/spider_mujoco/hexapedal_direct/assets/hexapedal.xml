@@ -1,0 +1,416 @@
+<mujoco model="hexapedal_direct">
+  <compiler angle="radian" autolimits="true" meshdir="../../../../../../HEXAPEDAL_URDF_description/meshes"/>
+  <option timestep="0.008333333333333333" gravity="0 0 -9.81"/>
+  <default>
+    <default class="visual">
+      <geom group="1" rgba="0.7 0.7 0.7 1" contype="0" conaffinity="0"/>
+    </default>
+    <default class="collision">
+      <geom group="0" contype="1" conaffinity="0" friction="1 0.02 0.002" solref="0.005 1" solimp="0.9 0.95 0.001"/>
+    </default>
+  </default>
+  <asset>
+    <mesh name="LB_DS51150_270_1_1" file="LB_DS51150_270_1_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="LB_DS51150_270_2_1" file="LB_DS51150_270_2_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="LB_DS51150_270_3_1" file="LB_DS51150_270_3_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="LB_bearing_1_1" file="LB_bearing_1_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="LB_bearing_2_1" file="LB_bearing_2_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="LB_bearing_3_1" file="LB_bearing_3_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="LB_coxaL_1" file="LB_coxaL_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="LB_flame4_1" file="LB_flame4_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="LB_foot_1" file="LB_foot_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="LB_foot_cover_1" file="LB_foot_cover_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="LB_link1_left_1" file="LB_link1_left_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="LB_link2_L_back_1" file="LB_link2_L_back_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="LB_link2_L_front_1" file="LB_link2_L_front_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="LB_motor_horn_1_1" file="LB_motor_horn_1_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="LB_motor_horn_2_1" file="LB_motor_horn_2_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="LB_motor_horn_3_1" file="LB_motor_horn_3_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="LF_DS51150_270_1_1" file="LF_DS51150_270_1_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="LF_DS51150_270_2_1" file="LF_DS51150_270_2_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="LF_DS51150_270_3_1" file="LF_DS51150_270_3_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="LF_bearing_1_1" file="LF_bearing_1_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="LF_bearing_2_1" file="LF_bearing_2_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="LF_bearing_3_1" file="LF_bearing_3_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="LF_coxaL_1" file="LF_coxaL_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="LF_flame4_1" file="LF_flame4_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="LF_foot_1" file="LF_foot_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="LF_foot_cover_1" file="LF_foot_cover_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="LF_link1_left_1" file="LF_link1_left_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="LF_link2_L_back_1" file="LF_link2_L_back_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="LF_link2_L_front_1" file="LF_link2_L_front_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="LF_motor_horn_1_1" file="LF_motor_horn_1_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="LF_motor_horn_2_1" file="LF_motor_horn_2_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="LF_motor_horn_3_1" file="LF_motor_horn_3_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="LM_DS51150_270_1_1" file="LM_DS51150_270_1_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="LM_DS51150_270_2_1" file="LM_DS51150_270_2_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="LM_DS51150_270_3_1" file="LM_DS51150_270_3_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="LM_bearing_1_1" file="LM_bearing_1_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="LM_bearing_2_1" file="LM_bearing_2_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="LM_bearing_3_1" file="LM_bearing_3_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="LM_coxaL_1" file="LM_coxaL_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="LM_flame4_1" file="LM_flame4_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="LM_foot_1" file="LM_foot_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="LM_foot_cover_1" file="LM_foot_cover_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="LM_link1_left_1" file="LM_link1_left_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="LM_link2_L_back_1" file="LM_link2_L_back_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="LM_link2_L_front_1" file="LM_link2_L_front_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="LM_motor_horn_1_1" file="LM_motor_horn_1_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="LM_motor_horn_2_1" file="LM_motor_horn_2_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="LM_motor_horn_3_1" file="LM_motor_horn_3_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="RB_DS51150_270_1_1" file="RB_DS51150_270_1_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="RB_DS51150_270_2_1" file="RB_DS51150_270_2_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="RB_DS51150_270_3_1" file="RB_DS51150_270_3_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="RB_bearing_1_1" file="RB_bearing_1_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="RB_bearing_2_1" file="RB_bearing_2_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="RB_bearing_3_1" file="RB_bearing_3_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="RB_coxaR_1" file="RB_coxaR_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="RB_flame4_1" file="RB_flame4_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="RB_foot_1" file="RB_foot_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="RB_foot_cover_1" file="RB_foot_cover_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="RB_link1_right_1" file="RB_link1_right_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="RB_link2_R_back_1" file="RB_link2_R_back_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="RB_link2_R_front_1" file="RB_link2_R_front_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="RB_motor_horn_1_1" file="RB_motor_horn_1_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="RB_motor_horn_2_1" file="RB_motor_horn_2_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="RB_motor_horn_3_1" file="RB_motor_horn_3_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="RF_DS51150_270_1_1" file="RF_DS51150_270_1_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="RF_DS51150_270_2_1" file="RF_DS51150_270_2_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="RF_DS51150_270_3_1" file="RF_DS51150_270_3_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="RF_bearing_1_1" file="RF_bearing_1_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="RF_bearing_2_1" file="RF_bearing_2_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="RF_bearing_3_1" file="RF_bearing_3_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="RF_coxaR_1" file="RF_coxaR_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="RF_flame4_1" file="RF_flame4_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="RF_foot_1" file="RF_foot_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="RF_foot_cover_1" file="RF_foot_cover_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="RF_link1_right_1" file="RF_link1_right_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="RF_link2_R_back_1" file="RF_link2_R_back_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="RF_link2_R_front_1" file="RF_link2_R_front_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="RF_motor_horn_1_1" file="RF_motor_horn_1_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="RF_motor_horn_2_1" file="RF_motor_horn_2_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="RF_motor_horn_3_1" file="RF_motor_horn_3_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="RM_DS51150_270_1_1" file="RM_DS51150_270_1_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="RM_DS51150_270_2_1" file="RM_DS51150_270_2_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="RM_DS51150_270_3_1" file="RM_DS51150_270_3_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="RM_bearing_1_1" file="RM_bearing_1_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="RM_bearing_2_1" file="RM_bearing_2_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="RM_bearing_3_1" file="RM_bearing_3_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="RM_coxaR_1" file="RM_coxaR_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="RM_flame4_1" file="RM_flame4_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="RM_foot_1" file="RM_foot_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="RM_foot_cover_1" file="RM_foot_cover_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="RM_link1_right_1" file="RM_link1_right_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="RM_link2_R_back_1" file="RM_link2_R_back_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="RM_link2_R_front_1" file="RM_link2_R_front_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="RM_motor_horn_1_1" file="RM_motor_horn_1_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="RM_motor_horn_2_1" file="RM_motor_horn_2_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="RM_motor_horn_3_1" file="RM_motor_horn_3_1.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="base_link" file="base_link.stl" scale="0.001 0.001 0.001"/>
+  </asset>
+  <worldbody>
+    <geom name="ground" type="plane" size="5 5 0.1" pos="0 0 0" rgba="0.2 0.25 0.3 1" contype="0" conaffinity="1" friction="1 0.02 0.002"/>
+    <body name="base_link">
+      <freejoint name="base_freejoint"/>
+      <inertial pos="-0.000718538520775 -0.00160985665191 -0.00905082819163" mass="3.73732395734" fullinertia="0.0206092447058 0.0334168391593 0.049450959874 4.26368750144e-05 -2.5241949875e-05 -0.000248451211296"/>
+      <geom name="base_link_visual_0" pos="0 0 0" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="base_link"/>
+      <geom name="RB_flame4_1_visual_0" pos="0 0 0" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="RB_flame4_1"/>
+      <geom name="RM_flame4_1_visual_0" pos="0 0 0" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="RM_flame4_1"/>
+      <geom name="RF_flame4_1_visual_0" pos="0 0 0" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="RF_flame4_1"/>
+      <geom name="LB_flame4_1_visual_0" pos="0 0 0" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="LB_flame4_1"/>
+      <geom name="LM_flame4_1_visual_0" pos="0 0 0" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="LM_flame4_1"/>
+      <geom name="LF_flame4_1_visual_0" pos="0 0 0" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="LF_flame4_1"/>
+      <geom name="RF_DS51150_270_1_1_visual_0" pos="0 0 0" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="RF_DS51150_270_1_1"/>
+      <geom name="RM_DS51150_270_1_1_visual_0" pos="0 0 0" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="RM_DS51150_270_1_1"/>
+      <geom name="RB_DS51150_270_1_1_visual_0" pos="0 0 0" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="RB_DS51150_270_1_1"/>
+      <geom name="LF_DS51150_270_1_1_visual_0" pos="0 0 0" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="LF_DS51150_270_1_1"/>
+      <geom name="LM_DS51150_270_1_1_visual_0" pos="0 0 0" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="LM_DS51150_270_1_1"/>
+      <geom name="LB_DS51150_270_1_1_visual_0" pos="0 0 0" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="LB_DS51150_270_1_1"/>
+      <geom name="RF_bearing_1_1_visual_0" pos="0 0 0" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="RF_bearing_1_1"/>
+      <geom name="RM_bearing_1_1_visual_0" pos="0 0 0" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="RM_bearing_1_1"/>
+      <geom name="RB_bearing_1_1_visual_0" pos="0 0 0" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="RB_bearing_1_1"/>
+      <geom name="LF_bearing_1_1_visual_0" pos="0 0 0" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="LF_bearing_1_1"/>
+      <geom name="LM_bearing_1_1_visual_0" pos="0 0 0" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="LM_bearing_1_1"/>
+      <geom name="LB_bearing_1_1_visual_0" pos="0 0 0" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="LB_bearing_1_1"/>
+      <geom name="base_link_collision_0" pos="0 0 0" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.12 0.12 0.02"/>
+      <geom name="RB_flame4_1_collision_0" pos="-0.08061 0.08061 -0.0008" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.02 0.02 0.0075"/>
+      <geom name="RM_flame4_1_collision_0" pos="-0.114 0 -0.0008" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.02 0.02 0.0075"/>
+      <geom name="RF_flame4_1_collision_0" pos="-0.08061 -0.08061 -0.0008" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.02 0.02 0.0075"/>
+      <geom name="LB_flame4_1_collision_0" pos="0.08061 0.08061 -0.0008" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.02 0.02 0.0075"/>
+      <geom name="LM_flame4_1_collision_0" pos="0.114 0 -0.0008" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.02 0.02 0.0075"/>
+      <geom name="LF_flame4_1_collision_0" pos="0.08061 -0.08061 -0.0008" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.02 0.02 0.0075"/>
+      <geom name="RF_DS51150_270_1_1_collision_0" pos="-0.093692 -0.093692 0.0087" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.0175 0.0125 0.0175"/>
+      <geom name="RM_DS51150_270_1_1_collision_0" pos="-0.1325 0 0.0087" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.0175 0.0125 0.0175"/>
+      <geom name="RB_DS51150_270_1_1_collision_0" pos="-0.093692 0.093692 0.0087" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.0175 0.0125 0.0175"/>
+      <geom name="LF_DS51150_270_1_1_collision_0" pos="0.093692 -0.093692 0.0087" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.0175 0.0125 0.0175"/>
+      <geom name="LM_DS51150_270_1_1_collision_0" pos="0.1325 0 0.0087" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.0175 0.0125 0.0175"/>
+      <geom name="LB_DS51150_270_1_1_collision_0" pos="0.093692 0.093692 0.0087" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.0175 0.0125 0.0175"/>
+      <geom name="RF_bearing_1_1_collision_0" pos="-0.130461 -0.130461 -0.0273" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.01 0.01 0.0075"/>
+      <geom name="RM_bearing_1_1_collision_0" pos="-0.1845 0 -0.0273" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.01 0.01 0.0075"/>
+      <geom name="RB_bearing_1_1_collision_0" pos="-0.130461 0.130461 -0.0273" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.01 0.01 0.0075"/>
+      <geom name="LF_bearing_1_1_collision_0" pos="0.130461 -0.130461 -0.0273" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.01 0.01 0.0075"/>
+      <geom name="LM_bearing_1_1_collision_0" pos="0.1845 0 -0.0273" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.01 0.01 0.0075"/>
+      <geom name="LB_bearing_1_1_collision_0" pos="0.130461 0.130461 -0.0273" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.01 0.01 0.0075"/>
+      <body name="LF_motor_horn_1_1" pos="0.130461 -0.130461 0.0329" quat="1 0 0 0">
+        <joint name="LF_motor_horn_1_joint" type="hinge" pos="0 0 0" axis="0 0 1" range="-2.356194 2.356194" damping="4"/>
+        <inertial pos="0.0260163309548 -0.026309974271 -0.0326923635108" mass="0.0976609194815" fullinertia="0.000122658968933 0.000121229345123 0.000133279116024 1.08349590809e-05 5.74959366541e-07 -5.5725781057e-07"/>
+        <geom name="LF_motor_horn_1_1_visual_0" pos="-0.130461 0.130461 -0.0329" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="LF_motor_horn_1_1"/>
+        <geom name="LF_coxaL_1_visual_0" pos="-0.130461 0.130461 -0.0329" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="LF_coxaL_1"/>
+        <geom name="LF_motor_horn_2_1_visual_0" pos="-0.130461 0.130461 -0.0329" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="LF_motor_horn_2_1"/>
+        <geom name="LF_motor_horn_1_1_collision_0" pos="0 0 0" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.015 0.015 0.0075"/>
+        <geom name="LF_coxaL_1_collision_0" pos="0 0 0.0009" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.02 0.015 0.0075"/>
+        <geom name="LF_motor_horn_2_1_collision_0" pos="0.028426 -0.076226 -0.0329" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.015 0.015 0.0075"/>
+        <body name="LF_DS51150_270_2_1" pos="0.029062 -0.07559 -0.0329" quat="1 0 0 0">
+          <joint name="LF_motor_horn_2_joint" type="hinge" pos="0 0 0" axis="0.707107 0.707107 0" range="-2.356194 2.356194" damping="4"/>
+          <inertial pos="0.0674972028066 -0.020216950011 -8.19104568374e-05" mass="0.390433459243" fullinertia="0.000501369998707 0.000501853582839 0.000935189860172 0.000381188642323 -7.4412909612e-07 -7.43970256454e-07"/>
+          <geom name="LF_DS51150_270_2_1_visual_0" pos="-0.159523 0.206051 0" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="LF_DS51150_270_2_1"/>
+          <geom name="LF_link1_left_1_visual_0" pos="-0.159523 0.206051 0" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="LF_link1_left_1"/>
+          <geom name="LF_DS51150_270_3_1_visual_0" pos="-0.159523 0.206051 0" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="LF_DS51150_270_3_1"/>
+          <geom name="LF_bearing_2_1_visual_0" pos="-0.159523 0.206051 0" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="LF_bearing_2_1"/>
+          <geom name="LF_bearing_3_1_visual_0" pos="-0.159523 0.206051 0" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="LF_bearing_3_1"/>
+          <geom name="LF_DS51150_270_2_1_collision_0" pos="0 0 0" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.0175 0.0125 0.0175"/>
+          <geom name="LF_link1_left_1_collision_0" pos="0.052821 0.025244 0.015" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.03 0.015 0.0075"/>
+          <geom name="LF_DS51150_270_3_1_collision_0" pos="0.112925 -0.03486 0.015" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.0175 0.0125 0.0175"/>
+          <geom name="LF_bearing_2_1_collision_0" pos="0.043982 0.041154 0" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.01 0.01 0.0075"/>
+          <geom name="LF_bearing_3_1_collision_0" pos="0.130249 -0.045113 0" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.01 0.01 0.0075"/>
+          <body name="LF_motor_horn_3_1" pos="0.087682 -0.087681 0" quat="1 0 0 0">
+            <joint name="LF_motor_horn_3_joint" type="hinge" pos="0 0 0" axis="-0.707107 -0.707107 0" range="-2.356194 2.356194" damping="4"/>
+            <inertial pos="0.103357682294 -0.0572709357978 -0.00176243363339" mass="0.12783362378" fullinertia="0.000327801385847 0.000333883441315 0.000620247670026 0.000253565814459 7.99685260537e-06 -7.91898329471e-06"/>
+            <geom name="LF_motor_horn_3_1_visual_0" pos="-0.247205 0.293732 0" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="LF_motor_horn_3_1"/>
+            <geom name="LF_link2_L_front_1_visual_0" pos="-0.247205 0.293732 0" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="LF_link2_L_front_1"/>
+            <geom name="LF_foot_1_visual_0" pos="-0.247205 0.293732 0" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="LF_foot_1"/>
+            <geom name="LF_foot_cover_1_visual_0" pos="-0.247205 0.293732 0" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="LF_foot_cover_1"/>
+            <geom name="LF_link2_L_back_1_visual_0" pos="-0.247205 0.293732 0" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="LF_link2_L_back_1"/>
+            <geom name="LF_motor_horn_3_1_collision_0" pos="0 0 0" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.015 0.015 0.0075"/>
+            <geom name="LF_link2_L_front_1_collision_0" pos="-0.000637 -0.000637 0" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.04 0.01 0.005"/>
+            <geom name="LF_foot_1_collision_0" pos="0.120084 -0.097987 -0.003" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.015 0.015 0.005"/>
+            <geom name="LF_foot_cover_1_collision_0" pos="0.165187 -0.11866 -0.003" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.015 0.015 0.005"/>
+            <geom name="LF_link2_L_back_1_collision_0" pos="0.144486 -0.073523 -0.003" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.04 0.01 0.005"/>
+            <site name="LF_motor_horn_3_1_contact_site" pos="0 0 0" quat="1 0 0 0" type="sphere" size="0.003" rgba="0 1 0 1"/>
+            <geom name="LF_motor_horn_3_1_stance_pad" pos="0 0 -0.09" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.02 0.02 0.004"/>
+          </body>
+        </body>
+      </body>
+      <body name="LM_motor_horn_1_1" pos="0.1845 0 0.0329" quat="1 0 0 0">
+        <joint name="LM_motor_horn_1_joint" type="hinge" pos="0 0 0" axis="0 0 1" range="-2.356194 2.356194" damping="4"/>
+        <inertial pos="0.0370000008203 -0.000207637180164 -0.0326923635108" mass="0.0976609194815" fullinertia="0.000111609197947 0.000133279116109 0.000133279116024 1.2148119051e-06 1.21481200608e-06 1.25168902646e-08"/>
+        <geom name="LM_motor_horn_1_1_visual_0" pos="-0.1845 0 -0.0329" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="LM_motor_horn_1_1"/>
+        <geom name="LM_coxaL_1_visual_0" pos="-0.1845 0 -0.0329" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="LM_coxaL_1"/>
+        <geom name="LM_motor_horn_2_1_visual_0" pos="-0.1845 0 -0.0329" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="LM_motor_horn_2_1"/>
+        <geom name="LM_motor_horn_1_1_collision_0" pos="0 0 0" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.015 0.015 0.0075"/>
+        <geom name="LM_coxaL_1_collision_0" pos="0 0 0.0009" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.02 0.015 0.0075"/>
+        <geom name="LM_motor_horn_2_1_collision_0" pos="0.074 -0.0338 -0.0329" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.015 0.015 0.0075"/>
+        <body name="LM_DS51150_270_2_1" pos="0.074 -0.0329 -0.0329" quat="1 0 0 0">
+          <joint name="LM_motor_horn_2_joint" type="hinge" pos="0 0 0" axis="0 1 0" range="-2.356194 2.356194" damping="4"/>
+          <inertial pos="0.0620231266888 0.0334319230529 -8.19104568388e-05" mass="0.390433459243" fullinertia="0.00012142314845 0.000881800433096 0.000935189860172 -2.41792066175e-07 -1.12316610394e-10 -6.38031580911e-07"/>
+          <geom name="LM_DS51150_270_2_1_visual_0" pos="-0.2585 0.0329 0" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="LM_DS51150_270_2_1"/>
+          <geom name="LM_link1_left_1_visual_0" pos="-0.2585 0.0329 0" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="LM_link1_left_1"/>
+          <geom name="LM_DS51150_270_3_1_visual_0" pos="-0.2585 0.0329 0" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="LM_DS51150_270_3_1"/>
+          <geom name="LM_bearing_2_1_visual_0" pos="-0.2585 0.0329 0" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="LM_bearing_2_1"/>
+          <geom name="LM_bearing_3_1_visual_0" pos="-0.2585 0.0329 0" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="LM_bearing_3_1"/>
+          <geom name="LM_DS51150_270_2_1_collision_0" pos="0 0 0" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.0175 0.0125 0.0175"/>
+          <geom name="LM_link1_left_1_collision_0" pos="0.0195 0.0552 0.015" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.03 0.015 0.0075"/>
+          <geom name="LM_DS51150_270_3_1_collision_0" pos="0.1045 0.0552 0.015" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.0175 0.0125 0.0175"/>
+          <geom name="LM_bearing_2_1_collision_0" pos="0.002 0.0602 0" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.01 0.01 0.0075"/>
+          <geom name="LM_bearing_3_1_collision_0" pos="0.124 0.0602 0" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.01 0.01 0.0075"/>
+          <body name="LM_motor_horn_3_1" pos="0.124 0 0" quat="1 0 0 0">
+            <joint name="LM_motor_horn_3_joint" type="hinge" pos="0 0 0" axis="0 -1 0" range="-2.356194 2.356194" damping="4"/>
+            <inertial pos="0.113581806 0.0325886937623 -0.00170404252062" mass="0.12783362378" fullinertia="7.97577912338e-05 0.000583889420151 0.000620247670026 -2.54102773399e-06 1.21302712496e-05 5.27376210722e-08"/>
+            <geom name="LM_motor_horn_3_1_visual_0" pos="-0.3825 0.0329 0" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="LM_motor_horn_3_1"/>
+            <geom name="LM_link2_L_front_1_visual_0" pos="-0.3825 0.0329 0" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="LM_link2_L_front_1"/>
+            <geom name="LM_foot_1_visual_0" pos="-0.3825 0.0329 0" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="LM_foot_1"/>
+            <geom name="LM_foot_cover_1_visual_0" pos="-0.3825 0.0329 0" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="LM_foot_cover_1"/>
+            <geom name="LM_link2_L_back_1_visual_0" pos="-0.3825 0.0329 0" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="LM_link2_L_back_1"/>
+            <geom name="LM_motor_horn_3_1_collision_0" pos="0 0 0" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.015 0.015 0.0075"/>
+            <geom name="LM_link2_L_front_1_collision_0" pos="0 -0.0009 0" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.04 0.01 0.005"/>
+            <geom name="LM_foot_1_collision_0" pos="0.1542 0.015625 -0.003" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.015 0.015 0.005"/>
+            <geom name="LM_foot_cover_1_collision_0" pos="0.200711 0.0329 -0.002696" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.015 0.015 0.005"/>
+            <geom name="LM_link2_L_back_1_collision_0" pos="0.154156 0.050179 -0.003" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.04 0.01 0.005"/>
+            <site name="LM_motor_horn_3_1_contact_site" pos="0 0 0" quat="1 0 0 0" type="sphere" size="0.003" rgba="0 1 0 1"/>
+            <geom name="LM_motor_horn_3_1_stance_pad" pos="0 0 -0.09" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.02 0.02 0.004"/>
+          </body>
+        </body>
+      </body>
+      <body name="LB_motor_horn_1_1" pos="0.130461 0.130461 0.0329" quat="1 0 0 0">
+        <joint name="LB_motor_horn_1_joint" type="hinge" pos="0 0 0" axis="0 0 1" range="-2.356194 2.356194" damping="4"/>
+        <inertial pos="0.026309974271 0.0260163309547 -0.0326923635108" mass="0.0976609194815" fullinertia="0.000121229345123 0.000122658968933 0.000133279116024 -1.08349590809e-05 5.5725781057e-07 5.7495936654e-07"/>
+        <geom name="LB_motor_horn_1_1_visual_0" pos="-0.130461 -0.130461 -0.0329" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="LB_motor_horn_1_1"/>
+        <geom name="LB_coxaL_1_visual_0" pos="-0.130461 -0.130461 -0.0329" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="LB_coxaL_1"/>
+        <geom name="LB_motor_horn_2_1_visual_0" pos="-0.130461 -0.130461 -0.0329" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="LB_motor_horn_2_1"/>
+        <geom name="LB_motor_horn_1_1_collision_0" pos="0 0 0" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.015 0.015 0.0075"/>
+        <geom name="LB_coxaL_1_collision_0" pos="0 0 0.0009" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.02 0.015 0.0075"/>
+        <geom name="LB_motor_horn_2_1_collision_0" pos="0.076226 0.028426 -0.0329" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.015 0.015 0.0075"/>
+        <body name="LB_DS51150_270_2_1" pos="0.07559 0.029062 -0.0329" quat="1 0 0 0">
+          <joint name="LB_motor_horn_2_joint" type="hinge" pos="0 0 0" axis="-0.707107 0.707107 0" range="-2.356194 2.356194" damping="4"/>
+          <inertial pos="0.020216950011 0.0674972028066 -8.19104568481e-05" mass="0.390433459243" fullinertia="0.000501853582839 0.000501369998707 0.000935189860172 -0.000381188642323 7.4397025646e-07 -7.44129096113e-07"/>
+          <geom name="LB_DS51150_270_2_1_visual_0" pos="-0.206051 -0.159523 0" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="LB_DS51150_270_2_1"/>
+          <geom name="LB_link1_left_1_visual_0" pos="-0.206051 -0.159523 0" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="LB_link1_left_1"/>
+          <geom name="LB_DS51150_270_3_1_visual_0" pos="-0.206051 -0.159523 0" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="LB_DS51150_270_3_1"/>
+          <geom name="LB_bearing_2_1_visual_0" pos="-0.206051 -0.159523 0" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="LB_bearing_2_1"/>
+          <geom name="LB_bearing_3_1_visual_0" pos="-0.206051 -0.159523 0" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="LB_bearing_3_1"/>
+          <geom name="LB_DS51150_270_2_1_collision_0" pos="0 0 0" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.0175 0.0125 0.0175"/>
+          <geom name="LB_link1_left_1_collision_0" pos="-0.025244 0.052821 0.015" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.03 0.015 0.0075"/>
+          <geom name="LB_DS51150_270_3_1_collision_0" pos="0.03486 0.112925 0.015" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.0175 0.0125 0.0175"/>
+          <geom name="LB_bearing_2_1_collision_0" pos="-0.041154 0.043982 0" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.01 0.01 0.0075"/>
+          <geom name="LB_bearing_3_1_collision_0" pos="0.045113 0.130249 0" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.01 0.01 0.0075"/>
+          <body name="LB_motor_horn_3_1" pos="0.087681 0.087682 0" quat="1 0 0 0">
+            <joint name="LB_motor_horn_3_joint" type="hinge" pos="0 0 0" axis="0.707107 -0.707107 0" range="-2.356194 2.356194" damping="4"/>
+            <inertial pos="0.0572709357978 0.103357682294 -0.00176243363341" mass="0.12783362378" fullinertia="0.000333883441315 0.000327801385847 0.000620247670026 -0.000253565814459 7.91898329471e-06 7.99685260537e-06"/>
+            <geom name="LB_motor_horn_3_1_visual_0" pos="-0.293732 -0.247205 0" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="LB_motor_horn_3_1"/>
+            <geom name="LB_link2_L_front_1_visual_0" pos="-0.293732 -0.247205 0" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="LB_link2_L_front_1"/>
+            <geom name="LB_foot_1_visual_0" pos="-0.293732 -0.247205 0" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="LB_foot_1"/>
+            <geom name="LB_foot_cover_1_visual_0" pos="-0.293732 -0.247205 0" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="LB_foot_cover_1"/>
+            <geom name="LB_link2_L_back_1_visual_0" pos="-0.293732 -0.247205 0" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="LB_link2_L_back_1"/>
+            <geom name="LB_motor_horn_3_1_collision_0" pos="0 0 0" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.015 0.015 0.0075"/>
+            <geom name="LB_link2_L_front_1_collision_0" pos="0.000637 -0.000637 0" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.04 0.01 0.005"/>
+            <geom name="LB_foot_1_collision_0" pos="0.097987 0.120084 -0.003" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.015 0.015 0.005"/>
+            <geom name="LB_foot_cover_1_collision_0" pos="0.11866 0.165187 -0.003" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.015 0.015 0.005"/>
+            <geom name="LB_link2_L_back_1_collision_0" pos="0.073523 0.144486 -0.003" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.04 0.01 0.005"/>
+            <site name="LB_motor_horn_3_1_contact_site" pos="0 0 0" quat="1 0 0 0" type="sphere" size="0.003" rgba="0 1 0 1"/>
+            <geom name="LB_motor_horn_3_1_stance_pad" pos="0 0 -0.09" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.02 0.02 0.004"/>
+          </body>
+        </body>
+      </body>
+      <body name="RF_motor_horn_1_1" pos="-0.130461 -0.130461 0.0329" quat="1 0 0 0">
+        <joint name="RF_motor_horn_1_joint" type="hinge" pos="0 0 0" axis="0 0 1" range="-2.356194 2.356194" damping="4"/>
+        <inertial pos="-0.0260163322479 -0.0263099729778 -0.0326923635108" mass="0.0976609194815" fullinertia="0.000122658969046 0.000121229345236 0.000133279116249 -1.08349589683e-05 -5.74959446127e-07 -5.57257731009e-07"/>
+        <geom name="RF_motor_horn_1_1_visual_0" pos="0.130461 0.130461 -0.0329" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="RF_motor_horn_1_1"/>
+        <geom name="RF_coxaR_1_visual_0" pos="0.130461 0.130461 -0.0329" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="RF_coxaR_1"/>
+        <geom name="RF_motor_horn_2_1_visual_0" pos="0.130461 0.130461 -0.0329" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="RF_motor_horn_2_1"/>
+        <geom name="RF_motor_horn_1_1_collision_0" pos="0 0 0" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.015 0.015 0.0075"/>
+        <geom name="RF_coxaR_1_collision_0" pos="0 0 0.0009" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.02 0.015 0.0075"/>
+        <geom name="RF_motor_horn_2_1_collision_0" pos="-0.028426 -0.076226 -0.0329" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.015 0.015 0.0075"/>
+        <body name="RF_DS51150_270_2_1" pos="-0.029062 -0.07559 -0.0329" quat="1 0 0 0">
+          <joint name="RF_motor_horn_2_joint" type="hinge" pos="0 0 0" axis="-0.707107 0.707107 0" range="-2.356194 2.356194" damping="4"/>
+          <inertial pos="-0.0674972028154 -0.0202169500175 -8.19104608878e-05" mass="0.390433459341" fullinertia="0.000501369998662 0.00050185358289 0.000935189860174 -0.000381188642322 7.44129263042e-07 -7.43970064618e-07"/>
+          <geom name="RF_DS51150_270_2_1_visual_0" pos="0.159523 0.206051 0" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="RF_DS51150_270_2_1"/>
+          <geom name="RF_link1_right_1_visual_0" pos="0.159523 0.206051 0" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="RF_link1_right_1"/>
+          <geom name="RF_DS51150_270_3_1_visual_0" pos="0.159523 0.206051 0" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="RF_DS51150_270_3_1"/>
+          <geom name="RF_bearing_2_1_visual_0" pos="0.159523 0.206051 0" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="RF_bearing_2_1"/>
+          <geom name="RF_bearing_3_1_visual_0" pos="0.159523 0.206051 0" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="RF_bearing_3_1"/>
+          <geom name="RF_DS51150_270_2_1_collision_0" pos="0 0 0" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.0175 0.0125 0.0175"/>
+          <geom name="RF_link1_right_1_collision_0" pos="-0.052821 0.025244 0.015" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.03 0.015 0.0075"/>
+          <geom name="RF_DS51150_270_3_1_collision_0" pos="-0.112925 -0.03486 0.015" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.0175 0.0125 0.0175"/>
+          <geom name="RF_bearing_2_1_collision_0" pos="-0.043982 0.041154 0" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.01 0.01 0.0075"/>
+          <geom name="RF_bearing_3_1_collision_0" pos="-0.130249 -0.045113 0" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.01 0.01 0.0075"/>
+          <body name="RF_motor_horn_3_1" pos="-0.087682 -0.087681 0" quat="1 0 0 0">
+            <joint name="RF_motor_horn_3_joint" type="hinge" pos="0 0 0" axis="0.707107 -0.707107 0" range="-2.356194 2.356194" damping="4"/>
+            <inertial pos="-0.10336118361 -0.0572763951177 -0.00176277738435" mass="0.127833623802" fullinertia="0.000327680812304 0.000333836269934 0.000620079843139 -0.000253490002024 -7.9963343591e-06 -7.91767000457e-06"/>
+            <geom name="RF_motor_horn_3_1_visual_0" pos="0.247205 0.293732 0" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="RF_motor_horn_3_1"/>
+            <geom name="RF_link2_R_front_1_visual_0" pos="0.247205 0.293732 0" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="RF_link2_R_front_1"/>
+            <geom name="RF_foot_1_visual_0" pos="0.247205 0.293732 0" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="RF_foot_1"/>
+            <geom name="RF_foot_cover_1_visual_0" pos="0.247205 0.293732 0" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="RF_foot_cover_1"/>
+            <geom name="RF_link2_R_back_1_visual_0" pos="0.247205 0.293732 0" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="RF_link2_R_back_1"/>
+            <geom name="RF_motor_horn_3_1_collision_0" pos="0 0 0" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.015 0.015 0.0075"/>
+            <geom name="RF_link2_R_front_1_collision_0" pos="0.000637 -0.000637 0" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.04 0.01 0.005"/>
+            <geom name="RF_foot_1_collision_0" pos="-0.120045 -0.097955 -0.003" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.015 0.015 0.005"/>
+            <geom name="RF_foot_cover_1_collision_0" pos="-0.165183 -0.118656 -0.003" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.015 0.015 0.005"/>
+            <geom name="RF_link2_R_back_1_collision_0" pos="-0.144509 -0.073552 -0.003" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.04 0.01 0.005"/>
+            <site name="RF_motor_horn_3_1_contact_site" pos="0 0 0" quat="1 0 0 0" type="sphere" size="0.003" rgba="0 1 0 1"/>
+            <geom name="RF_motor_horn_3_1_stance_pad" pos="0 0 -0.09" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.02 0.02 0.004"/>
+          </body>
+        </body>
+      </body>
+      <body name="RM_motor_horn_1_1" pos="-0.1845 0 0.0329" quat="1 0 0 0">
+        <joint name="RM_motor_horn_1_joint" type="hinge" pos="0 0 0" axis="0 0 1" range="-2.356194 2.356194" damping="4"/>
+        <inertial pos="-0.0370000008203 -0.000207635351336 -0.0326923635108" mass="0.0976609194815" fullinertia="0.000111609198172 0.000133279116109 0.000133279116249 -1.21481190512e-06 -1.2148120061e-06 1.25170027988e-08"/>
+        <geom name="RM_motor_horn_1_1_visual_0" pos="0.1845 0 -0.0329" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="RM_motor_horn_1_1"/>
+        <geom name="RM_coxaR_1_visual_0" pos="0.1845 0 -0.0329" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="RM_coxaR_1"/>
+        <geom name="RM_motor_horn_2_1_visual_0" pos="0.1845 0 -0.0329" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="RM_motor_horn_2_1"/>
+        <geom name="RM_motor_horn_1_1_collision_0" pos="0 0 0" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.015 0.015 0.0075"/>
+        <geom name="RM_coxaR_1_collision_0" pos="0 0 0.0009" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.02 0.015 0.0075"/>
+        <geom name="RM_motor_horn_2_1_collision_0" pos="-0.074 -0.0338 -0.0329" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.015 0.015 0.0075"/>
+        <body name="RM_DS51150_270_2_1" pos="-0.074 -0.0329 -0.0329" quat="1 0 0 0">
+          <joint name="RM_motor_horn_2_joint" type="hinge" pos="0 0 0" axis="0 1 0" range="-2.356194 2.356194" damping="4"/>
+          <inertial pos="-0.0620231266997 0.0334319230546 -8.19104608809e-05" mass="0.390433459341" fullinertia="0.000121423148454 0.000881800433097 0.000935189860174 2.41792114017e-07 1.12570283959e-10 -6.38031563295e-07"/>
+          <geom name="RM_DS51150_270_2_1_visual_0" pos="0.2585 0.0329 0" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="RM_DS51150_270_2_1"/>
+          <geom name="RM_link1_right_1_visual_0" pos="0.2585 0.0329 0" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="RM_link1_right_1"/>
+          <geom name="RM_DS51150_270_3_1_visual_0" pos="0.2585 0.0329 0" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="RM_DS51150_270_3_1"/>
+          <geom name="RM_bearing_2_1_visual_0" pos="0.2585 0.0329 0" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="RM_bearing_2_1"/>
+          <geom name="RM_bearing_3_1_visual_0" pos="0.2585 0.0329 0" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="RM_bearing_3_1"/>
+          <geom name="RM_DS51150_270_2_1_collision_0" pos="0 0 0" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.0175 0.0125 0.0175"/>
+          <geom name="RM_link1_right_1_collision_0" pos="-0.0195 0.0552 0.015" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.03 0.015 0.0075"/>
+          <geom name="RM_DS51150_270_3_1_collision_0" pos="-0.1045 0.0552 0.015" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.0175 0.0125 0.0175"/>
+          <geom name="RM_bearing_2_1_collision_0" pos="-0.002 0.0602 0" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.01 0.01 0.0075"/>
+          <geom name="RM_bearing_3_1_collision_0" pos="-0.124 0.0602 0" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.01 0.01 0.0075"/>
+          <body name="RM_motor_horn_3_1" pos="-0.124 0 0" quat="1 0 0 0">
+            <joint name="RM_motor_horn_3_joint" type="hinge" pos="0 0 0" axis="0 -1 0" range="-2.356194 2.356194" damping="4"/>
+            <inertial pos="-0.113588142126 0.0325873092438 -0.00170438627158" mass="0.127833623802" fullinertia="7.97497293362e-05 0.000583729733384 0.000620079843139 2.57772881503e-06 -1.2129071448e-05 5.32936663391e-08"/>
+            <geom name="RM_motor_horn_3_1_visual_0" pos="0.3825 0.0329 0" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="RM_motor_horn_3_1"/>
+            <geom name="RM_link2_R_front_1_visual_0" pos="0.3825 0.0329 0" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="RM_link2_R_front_1"/>
+            <geom name="RM_foot_1_visual_0" pos="0.3825 0.0329 0" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="RM_foot_1"/>
+            <geom name="RM_foot_cover_1_visual_0" pos="0.3825 0.0329 0" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="RM_foot_cover_1"/>
+            <geom name="RM_link2_R_back_1_visual_0" pos="0.3825 0.0329 0" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="RM_link2_R_back_1"/>
+            <geom name="RM_motor_horn_3_1_collision_0" pos="0 0 0" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.015 0.015 0.0075"/>
+            <geom name="RM_link2_R_front_1_collision_0" pos="0 -0.0009 0" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.04 0.01 0.005"/>
+            <geom name="RM_foot_1_collision_0" pos="-0.15415 0.015621 -0.003" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.015 0.015 0.005"/>
+            <geom name="RM_foot_cover_1_collision_0" pos="-0.200705 0.0329 -0.002696" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.015 0.015 0.005"/>
+            <geom name="RM_link2_R_back_1_collision_0" pos="-0.154193 0.050175 -0.003" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.04 0.01 0.005"/>
+            <site name="RM_motor_horn_3_1_contact_site" pos="0 0 0" quat="1 0 0 0" type="sphere" size="0.003" rgba="0 1 0 1"/>
+            <geom name="RM_motor_horn_3_1_stance_pad" pos="0 0 -0.09" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.02 0.02 0.004"/>
+          </body>
+        </body>
+      </body>
+      <body name="RB_motor_horn_1_1" pos="-0.130461 0.130461 0.0329" quat="1 0 0 0">
+        <joint name="RB_motor_horn_1_joint" type="hinge" pos="0 0 0" axis="0 0 1" range="-2.356194 2.356194" damping="4"/>
+        <inertial pos="-0.0263099729778 0.0260163322479 -0.0326923635108" mass="0.0976609194815" fullinertia="0.000121229345236 0.000122658969046 0.000133279116249 1.08349589683e-05 -5.57257731009e-07 5.74959446127e-07"/>
+        <geom name="RB_motor_horn_1_1_visual_0" pos="0.130461 -0.130461 -0.0329" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="RB_motor_horn_1_1"/>
+        <geom name="RB_coxaR_1_visual_0" pos="0.130461 -0.130461 -0.0329" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="RB_coxaR_1"/>
+        <geom name="RB_motor_horn_2_1_visual_0" pos="0.130461 -0.130461 -0.0329" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="RB_motor_horn_2_1"/>
+        <geom name="RB_motor_horn_1_1_collision_0" pos="0 0 0" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.015 0.015 0.0075"/>
+        <geom name="RB_coxaR_1_collision_0" pos="0 0 0.0009" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.02 0.015 0.0075"/>
+        <geom name="RB_motor_horn_2_1_collision_0" pos="-0.076226 0.028426 -0.0329" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.015 0.015 0.0075"/>
+        <body name="RB_DS51150_270_2_1" pos="-0.07559 0.029062 -0.0329" quat="1 0 0 0">
+          <joint name="RB_motor_horn_2_joint" type="hinge" pos="0 0 0" axis="0.707107 0.707107 0" range="-2.356194 2.356194" damping="4"/>
+          <inertial pos="-0.0202169500175 0.0674972028154 -8.19104608739e-05" mass="0.390433459341" fullinertia="0.00050185358289 0.000501369998662 0.000935189860174 0.000381188642322 -7.43970064624e-07 -7.44129263037e-07"/>
+          <geom name="RB_DS51150_270_2_1_visual_0" pos="0.206051 -0.159523 0" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="RB_DS51150_270_2_1"/>
+          <geom name="RB_link1_right_1_visual_0" pos="0.206051 -0.159523 0" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="RB_link1_right_1"/>
+          <geom name="RB_DS51150_270_3_1_visual_0" pos="0.206051 -0.159523 0" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="RB_DS51150_270_3_1"/>
+          <geom name="RB_bearing_2_1_visual_0" pos="0.206051 -0.159523 0" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="RB_bearing_2_1"/>
+          <geom name="RB_bearing_3_1_visual_0" pos="0.206051 -0.159523 0" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="RB_bearing_3_1"/>
+          <geom name="RB_DS51150_270_2_1_collision_0" pos="0 0 0" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.0175 0.0125 0.0175"/>
+          <geom name="RB_link1_right_1_collision_0" pos="0.025244 0.052821 0.015" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.03 0.015 0.0075"/>
+          <geom name="RB_DS51150_270_3_1_collision_0" pos="-0.03486 0.112925 0.015" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.0175 0.0125 0.0175"/>
+          <geom name="RB_bearing_2_1_collision_0" pos="0.041154 0.043982 0" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.01 0.01 0.0075"/>
+          <geom name="RB_bearing_3_1_collision_0" pos="-0.045113 0.130249 0" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.01 0.01 0.0075"/>
+          <body name="RB_motor_horn_3_1" pos="-0.087681 0.087682 0" quat="1 0 0 0">
+            <joint name="RB_motor_horn_3_joint" type="hinge" pos="0 0 0" axis="-0.707107 -0.707107 0" range="-2.356194 2.356194" damping="4"/>
+            <inertial pos="-0.0572763951177 0.10336118361 -0.00170438627157" mass="0.127833623802" fullinertia="0.000333817460175 0.000327662002545 0.000620079843139 0.000253490002024 -7.71043723276e-06 7.78580585848e-06"/>
+            <geom name="RB_motor_horn_3_1_visual_0" pos="0.293732 -0.247205 0" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="RB_motor_horn_3_1"/>
+            <geom name="RB_link2_R_front_1_visual_0" pos="0.293732 -0.247205 0" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="RB_link2_R_front_1"/>
+            <geom name="RB_foot_1_visual_0" pos="0.293732 -0.247205 0" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="RB_foot_1"/>
+            <geom name="RB_foot_cover_1_visual_0" pos="0.293732 -0.247205 0" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="RB_foot_cover_1"/>
+            <geom name="RB_link2_R_back_1_visual_0" pos="0.293732 -0.247205 0" quat="1 0 0 0" class="visual" contype="0" conaffinity="0" user="0 0 0 0" type="mesh" mesh="RB_link2_R_back_1"/>
+            <geom name="RB_motor_horn_3_1_collision_0" pos="0 0 0" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.015 0.015 0.0075"/>
+            <geom name="RB_link2_R_front_1_collision_0" pos="-0.000637 -0.000637 0" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.04 0.01 0.005"/>
+            <geom name="RB_foot_1_collision_0" pos="-0.097955 0.120045 -0.003" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.015 0.015 0.005"/>
+            <geom name="RB_foot_cover_1_collision_0" pos="-0.118656 0.165183 -0.002696" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.015 0.015 0.005"/>
+            <geom name="RB_link2_R_back_1_collision_0" pos="-0.073552 0.144509 -0.003" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.04 0.01 0.005"/>
+            <site name="RB_motor_horn_3_1_contact_site" pos="0 0 0" quat="1 0 0 0" type="sphere" size="0.003" rgba="0 1 0 1"/>
+            <geom name="RB_motor_horn_3_1_stance_pad" pos="0 0 -0.09" quat="1 0 0 0" class="collision" user="0 0 0 0" type="box" size="0.02 0.02 0.004"/>
+          </body>
+        </body>
+      </body>
+    </body>
+  </worldbody>
+  <actuator>
+    <motor name="LF_motor_horn_1_joint" joint="LF_motor_horn_1_joint" gear="1" ctrllimited="true" ctrlrange="-1 1"/>
+    <motor name="LF_motor_horn_2_joint" joint="LF_motor_horn_2_joint" gear="1" ctrllimited="true" ctrlrange="-1 1"/>
+    <motor name="LF_motor_horn_3_joint" joint="LF_motor_horn_3_joint" gear="1" ctrllimited="true" ctrlrange="-1 1"/>
+    <motor name="LM_motor_horn_1_joint" joint="LM_motor_horn_1_joint" gear="1" ctrllimited="true" ctrlrange="-1 1"/>
+    <motor name="LM_motor_horn_2_joint" joint="LM_motor_horn_2_joint" gear="1" ctrllimited="true" ctrlrange="-1 1"/>
+    <motor name="LM_motor_horn_3_joint" joint="LM_motor_horn_3_joint" gear="1" ctrllimited="true" ctrlrange="-1 1"/>
+    <motor name="LB_motor_horn_1_joint" joint="LB_motor_horn_1_joint" gear="1" ctrllimited="true" ctrlrange="-1 1"/>
+    <motor name="LB_motor_horn_2_joint" joint="LB_motor_horn_2_joint" gear="1" ctrllimited="true" ctrlrange="-1 1"/>
+    <motor name="LB_motor_horn_3_joint" joint="LB_motor_horn_3_joint" gear="1" ctrllimited="true" ctrlrange="-1 1"/>
+    <motor name="RF_motor_horn_1_joint" joint="RF_motor_horn_1_joint" gear="1" ctrllimited="true" ctrlrange="-1 1"/>
+    <motor name="RF_motor_horn_2_joint" joint="RF_motor_horn_2_joint" gear="1" ctrllimited="true" ctrlrange="-1 1"/>
+    <motor name="RF_motor_horn_3_joint" joint="RF_motor_horn_3_joint" gear="1" ctrllimited="true" ctrlrange="-1 1"/>
+    <motor name="RM_motor_horn_1_joint" joint="RM_motor_horn_1_joint" gear="1" ctrllimited="true" ctrlrange="-1 1"/>
+    <motor name="RM_motor_horn_2_joint" joint="RM_motor_horn_2_joint" gear="1" ctrllimited="true" ctrlrange="-1 1"/>
+    <motor name="RM_motor_horn_3_joint" joint="RM_motor_horn_3_joint" gear="1" ctrllimited="true" ctrlrange="-1 1"/>
+    <motor name="RB_motor_horn_1_joint" joint="RB_motor_horn_1_joint" gear="1" ctrllimited="true" ctrlrange="-1 1"/>
+    <motor name="RB_motor_horn_2_joint" joint="RB_motor_horn_2_joint" gear="1" ctrllimited="true" ctrlrange="-1 1"/>
+    <motor name="RB_motor_horn_3_joint" joint="RB_motor_horn_3_joint" gear="1" ctrllimited="true" ctrlrange="-1 1"/>
+  </actuator>
+</mujoco>

@@ -1,5 +1,8 @@
-__pycache__/
+*.swp
 *.pyc
+__pycache__/
+.ipynb_checkpoints/
 wandb/
 SW/mjx/artifacts/
 SW/mjx/**/__pycache__/
+tuto/

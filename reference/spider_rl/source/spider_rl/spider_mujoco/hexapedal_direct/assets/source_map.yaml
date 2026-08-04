@@ -1,0 +1,742 @@
+version: 1
+urdfPath: '/home/huro/spider_ws/HEXAPEDAL_URDF_description/urdf/HEXAPEDAL_URDF_fixed.urdf'
+xmlPath: '/home/huro/spider_ws/spider_rl/source/spider_rl/spider_mujoco/hexapedal_direct/assets/hexapedal.xml'
+jointNames:
+  - 'LF_motor_horn_1_joint'
+  - 'LF_motor_horn_2_joint'
+  - 'LF_motor_horn_3_joint'
+  - 'LM_motor_horn_1_joint'
+  - 'LM_motor_horn_2_joint'
+  - 'LM_motor_horn_3_joint'
+  - 'LB_motor_horn_1_joint'
+  - 'LB_motor_horn_2_joint'
+  - 'LB_motor_horn_3_joint'
+  - 'RF_motor_horn_1_joint'
+  - 'RF_motor_horn_2_joint'
+  - 'RF_motor_horn_3_joint'
+  - 'RM_motor_horn_1_joint'
+  - 'RM_motor_horn_2_joint'
+  - 'RM_motor_horn_3_joint'
+  - 'RB_motor_horn_1_joint'
+  - 'RB_motor_horn_2_joint'
+  - 'RB_motor_horn_3_joint'
+desiredContactSiteNames:
+  - 'LF_motor_horn_3_1_contact_site'
+  - 'LM_motor_horn_3_1_contact_site'
+  - 'LB_motor_horn_3_1_contact_site'
+  - 'RF_motor_horn_3_1_contact_site'
+  - 'RM_motor_horn_3_1_contact_site'
+  - 'RB_motor_horn_3_1_contact_site'
+undesiredContactBodyPatterns:
+  - 'base_link'
+  - '*_motor_horn_1_1'
+  - '*_motor_horn_2_1'
+retainedBodies:
+  base_link:
+    urdfLink: 'base_link'
+    parentBody: null
+    jointName: null
+    urdfJointName: null
+    mergedLinks:
+      - 'base_link'
+      - 'DXF_Lipo_3s_7200mah_100c_R_1'
+      - 'DXF_Lipo_2s_7200mah_100c_1'
+      - 'DC_Converter_R_1'
+      - 'DC_Converter_L_1'
+      - 'DXF_Lipo_3s_7200mah_100c_L_1'
+      - 'AMASS_XT60_F_FeMale_1_1'
+      - 'XHP_4_1_1'
+      - 'Volt_Meter_1_1'
+      - 'XHP_4_2_1'
+      - 'AMASS_XT60E_F_FeMale_3_1'
+      - 'XHP_3_1'
+      - 'AMASS_XT60E_F_FeMale_2_1'
+      - 'Volt_Meter_2_1'
+      - 'Volt_Meter_3_1'
+      - 'flame2_1'
+      - 'STM32_F446RE_1'
+      - 'Jetson_Orin_Nano_Super_1'
+      - 'Relay_Module_L_1'
+      - 'Relay_Module_R_1'
+      - 'flame3_1'
+      - 'NEO_M8N_GPS_1'
+      - 'IMU_WT931_1'
+      - 'FrSky_Archer_Plus_SR10_1'
+      - 'LoRa_RYLR998_1'
+      - 'ON_OFF__Switch_1'
+      - 'RB_flame4_1'
+      - 'RM_flame4_1'
+      - 'RF_flame4_1'
+      - 'LB_flame4_1'
+      - 'LM_flame4_1'
+      - 'LF_flame4_1'
+      - 'RF_DS51150_270_1_1'
+      - 'RM_DS51150_270_1_1'
+      - 'RB_DS51150_270_1_1'
+      - 'LF_DS51150_270_1_1'
+      - 'LM_DS51150_270_1_1'
+      - 'LB_DS51150_270_1_1'
+      - 'RF_bearing_1_1'
+      - 'RM_bearing_1_1'
+      - 'RB_bearing_1_1'
+      - 'LF_bearing_1_1'
+      - 'LM_bearing_1_1'
+      - 'LB_bearing_1_1'
+    contactSources:
+      - 'base_link'
+  LF_motor_horn_1_1:
+    urdfLink: 'LF_motor_horn_1_1'
+    parentBody: 'base_link'
+    jointName: 'LF_motor_horn_1_joint'
+    urdfJointName: 'LF_1'
+    mergedLinks:
+      - 'LF_motor_horn_1_1'
+      - 'LF_coxaL_1'
+      - 'LF_motor_horn_2_1'
+    contactSources:
+      - 'LF_motor_horn_1_1'
+      - 'LF_motor_horn_2_1'
+  LM_motor_horn_1_1:
+    urdfLink: 'LM_motor_horn_1_1'
+    parentBody: 'base_link'
+    jointName: 'LM_motor_horn_1_joint'
+    urdfJointName: 'LM_1'
+    mergedLinks:
+      - 'LM_motor_horn_1_1'
+      - 'LM_coxaL_1'
+      - 'LM_motor_horn_2_1'
+    contactSources:
+      - 'LM_motor_horn_1_1'
+      - 'LM_motor_horn_2_1'
+  LB_motor_horn_1_1:
+    urdfLink: 'LB_motor_horn_1_1'
+    parentBody: 'base_link'
+    jointName: 'LB_motor_horn_1_joint'
+    urdfJointName: 'LB_1'
+    mergedLinks:
+      - 'LB_motor_horn_1_1'
+      - 'LB_coxaL_1'
+      - 'LB_motor_horn_2_1'
+    contactSources:
+      - 'LB_motor_horn_1_1'
+      - 'LB_motor_horn_2_1'
+  RF_motor_horn_1_1:
+    urdfLink: 'RF_motor_horn_1_1'
+    parentBody: 'base_link'
+    jointName: 'RF_motor_horn_1_joint'
+    urdfJointName: 'RF_1'
+    mergedLinks:
+      - 'RF_motor_horn_1_1'
+      - 'RF_coxaR_1'
+      - 'RF_motor_horn_2_1'
+    contactSources:
+      - 'RF_motor_horn_1_1'
+      - 'RF_motor_horn_2_1'
+  RM_motor_horn_1_1:
+    urdfLink: 'RM_motor_horn_1_1'
+    parentBody: 'base_link'
+    jointName: 'RM_motor_horn_1_joint'
+    urdfJointName: 'RM_1'
+    mergedLinks:
+      - 'RM_motor_horn_1_1'
+      - 'RM_coxaR_1'
+      - 'RM_motor_horn_2_1'
+    contactSources:
+      - 'RM_motor_horn_1_1'
+      - 'RM_motor_horn_2_1'
+  RB_motor_horn_1_1:
+    urdfLink: 'RB_motor_horn_1_1'
+    parentBody: 'base_link'
+    jointName: 'RB_motor_horn_1_joint'
+    urdfJointName: 'RB_1'
+    mergedLinks:
+      - 'RB_motor_horn_1_1'
+      - 'RB_coxaR_1'
+      - 'RB_motor_horn_2_1'
+    contactSources:
+      - 'RB_motor_horn_1_1'
+      - 'RB_motor_horn_2_1'
+  LF_DS51150_270_2_1:
+    urdfLink: 'LF_DS51150_270_2_1'
+    parentBody: 'LF_motor_horn_1_1'
+    jointName: 'LF_motor_horn_2_joint'
+    urdfJointName: 'LF_2'
+    mergedLinks:
+      - 'LF_DS51150_270_2_1'
+      - 'LF_link1_left_1'
+      - 'LF_DS51150_270_3_1'
+      - 'LF_bearing_2_1'
+      - 'LF_bearing_3_1'
+    contactSources:
+  LM_DS51150_270_2_1:
+    urdfLink: 'LM_DS51150_270_2_1'
+    parentBody: 'LM_motor_horn_1_1'
+    jointName: 'LM_motor_horn_2_joint'
+    urdfJointName: 'LM_2'
+    mergedLinks:
+      - 'LM_DS51150_270_2_1'
+      - 'LM_link1_left_1'
+      - 'LM_DS51150_270_3_1'
+      - 'LM_bearing_2_1'
+      - 'LM_bearing_3_1'
+    contactSources:
+  LB_DS51150_270_2_1:
+    urdfLink: 'LB_DS51150_270_2_1'
+    parentBody: 'LB_motor_horn_1_1'
+    jointName: 'LB_motor_horn_2_joint'
+    urdfJointName: 'LB_2'
+    mergedLinks:
+      - 'LB_DS51150_270_2_1'
+      - 'LB_link1_left_1'
+      - 'LB_DS51150_270_3_1'
+      - 'LB_bearing_2_1'
+      - 'LB_bearing_3_1'
+    contactSources:
+  RF_DS51150_270_2_1:
+    urdfLink: 'RF_DS51150_270_2_1'
+    parentBody: 'RF_motor_horn_1_1'
+    jointName: 'RF_motor_horn_2_joint'
+    urdfJointName: 'RF_2'
+    mergedLinks:
+      - 'RF_DS51150_270_2_1'
+      - 'RF_link1_right_1'
+      - 'RF_DS51150_270_3_1'
+      - 'RF_bearing_2_1'
+      - 'RF_bearing_3_1'
+    contactSources:
+  RM_DS51150_270_2_1:
+    urdfLink: 'RM_DS51150_270_2_1'
+    parentBody: 'RM_motor_horn_1_1'
+    jointName: 'RM_motor_horn_2_joint'
+    urdfJointName: 'RM_2'
+    mergedLinks:
+      - 'RM_DS51150_270_2_1'
+      - 'RM_link1_right_1'
+      - 'RM_DS51150_270_3_1'
+      - 'RM_bearing_2_1'
+      - 'RM_bearing_3_1'
+    contactSources:
+  RB_DS51150_270_2_1:
+    urdfLink: 'RB_DS51150_270_2_1'
+    parentBody: 'RB_motor_horn_1_1'
+    jointName: 'RB_motor_horn_2_joint'
+    urdfJointName: 'RB_2'
+    mergedLinks:
+      - 'RB_DS51150_270_2_1'
+      - 'RB_link1_right_1'
+      - 'RB_DS51150_270_3_1'
+      - 'RB_bearing_2_1'
+      - 'RB_bearing_3_1'
+    contactSources:
+  LF_motor_horn_3_1:
+    urdfLink: 'LF_motor_horn_3_1'
+    parentBody: 'LF_DS51150_270_2_1'
+    jointName: 'LF_motor_horn_3_joint'
+    urdfJointName: 'LF_3'
+    mergedLinks:
+      - 'LF_motor_horn_3_1'
+      - 'LF_link2_L_front_1'
+      - 'LF_foot_1'
+      - 'LF_foot_cover_1'
+      - 'LF_link2_L_back_1'
+    contactSources:
+  LM_motor_horn_3_1:
+    urdfLink: 'LM_motor_horn_3_1'
+    parentBody: 'LM_DS51150_270_2_1'
+    jointName: 'LM_motor_horn_3_joint'
+    urdfJointName: 'LM_3'
+    mergedLinks:
+      - 'LM_motor_horn_3_1'
+      - 'LM_link2_L_front_1'
+      - 'LM_foot_1'
+      - 'LM_foot_cover_1'
+      - 'LM_link2_L_back_1'
+    contactSources:
+  LB_motor_horn_3_1:
+    urdfLink: 'LB_motor_horn_3_1'
+    parentBody: 'LB_DS51150_270_2_1'
+    jointName: 'LB_motor_horn_3_joint'
+    urdfJointName: 'LB_3'
+    mergedLinks:
+      - 'LB_motor_horn_3_1'
+      - 'LB_link2_L_front_1'
+      - 'LB_foot_1'
+      - 'LB_foot_cover_1'
+      - 'LB_link2_L_back_1'
+    contactSources:
+  RF_motor_horn_3_1:
+    urdfLink: 'RF_motor_horn_3_1'
+    parentBody: 'RF_DS51150_270_2_1'
+    jointName: 'RF_motor_horn_3_joint'
+    urdfJointName: 'RF_3'
+    mergedLinks:
+      - 'RF_motor_horn_3_1'
+      - 'RF_link2_R_front_1'
+      - 'RF_foot_1'
+      - 'RF_foot_cover_1'
+      - 'RF_link2_R_back_1'
+    contactSources:
+  RM_motor_horn_3_1:
+    urdfLink: 'RM_motor_horn_3_1'
+    parentBody: 'RM_DS51150_270_2_1'
+    jointName: 'RM_motor_horn_3_joint'
+    urdfJointName: 'RM_3'
+    mergedLinks:
+      - 'RM_motor_horn_3_1'
+      - 'RM_link2_R_front_1'
+      - 'RM_foot_1'
+      - 'RM_foot_cover_1'
+      - 'RM_link2_R_back_1'
+    contactSources:
+  RB_motor_horn_3_1:
+    urdfLink: 'RB_motor_horn_3_1'
+    parentBody: 'RB_DS51150_270_2_1'
+    jointName: 'RB_motor_horn_3_joint'
+    urdfJointName: 'RB_3'
+    mergedLinks:
+      - 'RB_motor_horn_3_1'
+      - 'RB_link2_R_front_1'
+      - 'RB_foot_1'
+      - 'RB_foot_cover_1'
+      - 'RB_link2_R_back_1'
+    contactSources:
+mergedLinks:
+  base_link:
+    retainedBody: 'base_link'
+    contactClass: 'undesired'
+  DXF_Lipo_3s_7200mah_100c_R_1:
+    retainedBody: 'base_link'
+    contactClass: 'neutral'
+  DXF_Lipo_2s_7200mah_100c_1:
+    retainedBody: 'base_link'
+    contactClass: 'neutral'
+  DC_Converter_R_1:
+    retainedBody: 'base_link'
+    contactClass: 'neutral'
+  DC_Converter_L_1:
+    retainedBody: 'base_link'
+    contactClass: 'neutral'
+  DXF_Lipo_3s_7200mah_100c_L_1:
+    retainedBody: 'base_link'
+    contactClass: 'neutral'
+  AMASS_XT60_F_FeMale_1_1:
+    retainedBody: 'base_link'
+    contactClass: 'neutral'
+  XHP_4_1_1:
+    retainedBody: 'base_link'
+    contactClass: 'neutral'
+  Volt_Meter_1_1:
+    retainedBody: 'base_link'
+    contactClass: 'neutral'
+  XHP_4_2_1:
+    retainedBody: 'base_link'
+    contactClass: 'neutral'
+  AMASS_XT60E_F_FeMale_3_1:
+    retainedBody: 'base_link'
+    contactClass: 'neutral'
+  XHP_3_1:
+    retainedBody: 'base_link'
+    contactClass: 'neutral'
+  AMASS_XT60E_F_FeMale_2_1:
+    retainedBody: 'base_link'
+    contactClass: 'neutral'
+  Volt_Meter_2_1:
+    retainedBody: 'base_link'
+    contactClass: 'neutral'
+  Volt_Meter_3_1:
+    retainedBody: 'base_link'
+    contactClass: 'neutral'
+  flame2_1:
+    retainedBody: 'base_link'
+    contactClass: 'neutral'
+  STM32_F446RE_1:
+    retainedBody: 'base_link'
+    contactClass: 'neutral'
+  Jetson_Orin_Nano_Super_1:
+    retainedBody: 'base_link'
+    contactClass: 'neutral'
+  Relay_Module_L_1:
+    retainedBody: 'base_link'
+    contactClass: 'neutral'
+  Relay_Module_R_1:
+    retainedBody: 'base_link'
+    contactClass: 'neutral'
+  flame3_1:
+    retainedBody: 'base_link'
+    contactClass: 'neutral'
+  NEO_M8N_GPS_1:
+    retainedBody: 'base_link'
+    contactClass: 'neutral'
+  IMU_WT931_1:
+    retainedBody: 'base_link'
+    contactClass: 'neutral'
+  FrSky_Archer_Plus_SR10_1:
+    retainedBody: 'base_link'
+    contactClass: 'neutral'
+  LoRa_RYLR998_1:
+    retainedBody: 'base_link'
+    contactClass: 'neutral'
+  ON_OFF__Switch_1:
+    retainedBody: 'base_link'
+    contactClass: 'neutral'
+  RB_flame4_1:
+    retainedBody: 'base_link'
+    contactClass: 'neutral'
+  RM_flame4_1:
+    retainedBody: 'base_link'
+    contactClass: 'neutral'
+  RF_flame4_1:
+    retainedBody: 'base_link'
+    contactClass: 'neutral'
+  LB_flame4_1:
+    retainedBody: 'base_link'
+    contactClass: 'neutral'
+  LM_flame4_1:
+    retainedBody: 'base_link'
+    contactClass: 'neutral'
+  LF_flame4_1:
+    retainedBody: 'base_link'
+    contactClass: 'neutral'
+  RF_DS51150_270_1_1:
+    retainedBody: 'base_link'
+    contactClass: 'neutral'
+  RM_DS51150_270_1_1:
+    retainedBody: 'base_link'
+    contactClass: 'neutral'
+  RB_DS51150_270_1_1:
+    retainedBody: 'base_link'
+    contactClass: 'neutral'
+  LF_DS51150_270_1_1:
+    retainedBody: 'base_link'
+    contactClass: 'neutral'
+  LM_DS51150_270_1_1:
+    retainedBody: 'base_link'
+    contactClass: 'neutral'
+  LB_DS51150_270_1_1:
+    retainedBody: 'base_link'
+    contactClass: 'neutral'
+  RF_bearing_1_1:
+    retainedBody: 'base_link'
+    contactClass: 'neutral'
+  RM_bearing_1_1:
+    retainedBody: 'base_link'
+    contactClass: 'neutral'
+  RB_bearing_1_1:
+    retainedBody: 'base_link'
+    contactClass: 'neutral'
+  LF_bearing_1_1:
+    retainedBody: 'base_link'
+    contactClass: 'neutral'
+  LM_bearing_1_1:
+    retainedBody: 'base_link'
+    contactClass: 'neutral'
+  LB_bearing_1_1:
+    retainedBody: 'base_link'
+    contactClass: 'neutral'
+  LF_motor_horn_1_1:
+    retainedBody: 'LF_motor_horn_1_1'
+    contactClass: 'undesired'
+  LF_coxaL_1:
+    retainedBody: 'LF_motor_horn_1_1'
+    contactClass: 'neutral'
+  LF_motor_horn_2_1:
+    retainedBody: 'LF_motor_horn_1_1'
+    contactClass: 'undesired'
+  LM_motor_horn_1_1:
+    retainedBody: 'LM_motor_horn_1_1'
+    contactClass: 'undesired'
+  LM_coxaL_1:
+    retainedBody: 'LM_motor_horn_1_1'
+    contactClass: 'neutral'
+  LM_motor_horn_2_1:
+    retainedBody: 'LM_motor_horn_1_1'
+    contactClass: 'undesired'
+  LB_motor_horn_1_1:
+    retainedBody: 'LB_motor_horn_1_1'
+    contactClass: 'undesired'
+  LB_coxaL_1:
+    retainedBody: 'LB_motor_horn_1_1'
+    contactClass: 'neutral'
+  LB_motor_horn_2_1:
+    retainedBody: 'LB_motor_horn_1_1'
+    contactClass: 'undesired'
+  RF_motor_horn_1_1:
+    retainedBody: 'RF_motor_horn_1_1'
+    contactClass: 'undesired'
+  RF_coxaR_1:
+    retainedBody: 'RF_motor_horn_1_1'
+    contactClass: 'neutral'
+  RF_motor_horn_2_1:
+    retainedBody: 'RF_motor_horn_1_1'
+    contactClass: 'undesired'
+  RM_motor_horn_1_1:
+    retainedBody: 'RM_motor_horn_1_1'
+    contactClass: 'undesired'
+  RM_coxaR_1:
+    retainedBody: 'RM_motor_horn_1_1'
+    contactClass: 'neutral'
+  RM_motor_horn_2_1:
+    retainedBody: 'RM_motor_horn_1_1'
+    contactClass: 'undesired'
+  RB_motor_horn_1_1:
+    retainedBody: 'RB_motor_horn_1_1'
+    contactClass: 'undesired'
+  RB_coxaR_1:
+    retainedBody: 'RB_motor_horn_1_1'
+    contactClass: 'neutral'
+  RB_motor_horn_2_1:
+    retainedBody: 'RB_motor_horn_1_1'
+    contactClass: 'undesired'
+  LF_DS51150_270_2_1:
+    retainedBody: 'LF_DS51150_270_2_1'
+    contactClass: 'neutral'
+  LF_link1_left_1:
+    retainedBody: 'LF_DS51150_270_2_1'
+    contactClass: 'neutral'
+  LF_DS51150_270_3_1:
+    retainedBody: 'LF_DS51150_270_2_1'
+    contactClass: 'neutral'
+  LF_bearing_2_1:
+    retainedBody: 'LF_DS51150_270_2_1'
+    contactClass: 'neutral'
+  LF_bearing_3_1:
+    retainedBody: 'LF_DS51150_270_2_1'
+    contactClass: 'neutral'
+  LM_DS51150_270_2_1:
+    retainedBody: 'LM_DS51150_270_2_1'
+    contactClass: 'neutral'
+  LM_link1_left_1:
+    retainedBody: 'LM_DS51150_270_2_1'
+    contactClass: 'neutral'
+  LM_DS51150_270_3_1:
+    retainedBody: 'LM_DS51150_270_2_1'
+    contactClass: 'neutral'
+  LM_bearing_2_1:
+    retainedBody: 'LM_DS51150_270_2_1'
+    contactClass: 'neutral'
+  LM_bearing_3_1:
+    retainedBody: 'LM_DS51150_270_2_1'
+    contactClass: 'neutral'
+  LB_DS51150_270_2_1:
+    retainedBody: 'LB_DS51150_270_2_1'
+    contactClass: 'neutral'
+  LB_link1_left_1:
+    retainedBody: 'LB_DS51150_270_2_1'
+    contactClass: 'neutral'
+  LB_DS51150_270_3_1:
+    retainedBody: 'LB_DS51150_270_2_1'
+    contactClass: 'neutral'
+  LB_bearing_2_1:
+    retainedBody: 'LB_DS51150_270_2_1'
+    contactClass: 'neutral'
+  LB_bearing_3_1:
+    retainedBody: 'LB_DS51150_270_2_1'
+    contactClass: 'neutral'
+  RF_DS51150_270_2_1:
+    retainedBody: 'RF_DS51150_270_2_1'
+    contactClass: 'neutral'
+  RF_link1_right_1:
+    retainedBody: 'RF_DS51150_270_2_1'
+    contactClass: 'neutral'
+  RF_DS51150_270_3_1:
+    retainedBody: 'RF_DS51150_270_2_1'
+    contactClass: 'neutral'
+  RF_bearing_2_1:
+    retainedBody: 'RF_DS51150_270_2_1'
+    contactClass: 'neutral'
+  RF_bearing_3_1:
+    retainedBody: 'RF_DS51150_270_2_1'
+    contactClass: 'neutral'
+  RM_DS51150_270_2_1:
+    retainedBody: 'RM_DS51150_270_2_1'
+    contactClass: 'neutral'
+  RM_link1_right_1:
+    retainedBody: 'RM_DS51150_270_2_1'
+    contactClass: 'neutral'
+  RM_DS51150_270_3_1:
+    retainedBody: 'RM_DS51150_270_2_1'
+    contactClass: 'neutral'
+  RM_bearing_2_1:
+    retainedBody: 'RM_DS51150_270_2_1'
+    contactClass: 'neutral'
+  RM_bearing_3_1:
+    retainedBody: 'RM_DS51150_270_2_1'
+    contactClass: 'neutral'
+  RB_DS51150_270_2_1:
+    retainedBody: 'RB_DS51150_270_2_1'
+    contactClass: 'neutral'
+  RB_link1_right_1:
+    retainedBody: 'RB_DS51150_270_2_1'
+    contactClass: 'neutral'
+  RB_DS51150_270_3_1:
+    retainedBody: 'RB_DS51150_270_2_1'
+    contactClass: 'neutral'
+  RB_bearing_2_1:
+    retainedBody: 'RB_DS51150_270_2_1'
+    contactClass: 'neutral'
+  RB_bearing_3_1:
+    retainedBody: 'RB_DS51150_270_2_1'
+    contactClass: 'neutral'
+  LF_motor_horn_3_1:
+    retainedBody: 'LF_motor_horn_3_1'
+    contactClass: 'desired'
+  LF_link2_L_front_1:
+    retainedBody: 'LF_motor_horn_3_1'
+    contactClass: 'neutral'
+  LF_foot_1:
+    retainedBody: 'LF_motor_horn_3_1'
+    contactClass: 'neutral'
+  LF_foot_cover_1:
+    retainedBody: 'LF_motor_horn_3_1'
+    contactClass: 'neutral'
+  LF_link2_L_back_1:
+    retainedBody: 'LF_motor_horn_3_1'
+    contactClass: 'neutral'
+  LM_motor_horn_3_1:
+    retainedBody: 'LM_motor_horn_3_1'
+    contactClass: 'desired'
+  LM_link2_L_front_1:
+    retainedBody: 'LM_motor_horn_3_1'
+    contactClass: 'neutral'
+  LM_foot_1:
+    retainedBody: 'LM_motor_horn_3_1'
+    contactClass: 'neutral'
+  LM_foot_cover_1:
+    retainedBody: 'LM_motor_horn_3_1'
+    contactClass: 'neutral'
+  LM_link2_L_back_1:
+    retainedBody: 'LM_motor_horn_3_1'
+    contactClass: 'neutral'
+  LB_motor_horn_3_1:
+    retainedBody: 'LB_motor_horn_3_1'
+    contactClass: 'desired'
+  LB_link2_L_front_1:
+    retainedBody: 'LB_motor_horn_3_1'
+    contactClass: 'neutral'
+  LB_foot_1:
+    retainedBody: 'LB_motor_horn_3_1'
+    contactClass: 'neutral'
+  LB_foot_cover_1:
+    retainedBody: 'LB_motor_horn_3_1'
+    contactClass: 'neutral'
+  LB_link2_L_back_1:
+    retainedBody: 'LB_motor_horn_3_1'
+    contactClass: 'neutral'
+  RF_motor_horn_3_1:
+    retainedBody: 'RF_motor_horn_3_1'
+    contactClass: 'desired'
+  RF_link2_R_front_1:
+    retainedBody: 'RF_motor_horn_3_1'
+    contactClass: 'neutral'
+  RF_foot_1:
+    retainedBody: 'RF_motor_horn_3_1'
+    contactClass: 'neutral'
+  RF_foot_cover_1:
+    retainedBody: 'RF_motor_horn_3_1'
+    contactClass: 'neutral'
+  RF_link2_R_back_1:
+    retainedBody: 'RF_motor_horn_3_1'
+    contactClass: 'neutral'
+  RM_motor_horn_3_1:
+    retainedBody: 'RM_motor_horn_3_1'
+    contactClass: 'desired'
+  RM_link2_R_front_1:
+    retainedBody: 'RM_motor_horn_3_1'
+    contactClass: 'neutral'
+  RM_foot_1:
+    retainedBody: 'RM_motor_horn_3_1'
+    contactClass: 'neutral'
+  RM_foot_cover_1:
+    retainedBody: 'RM_motor_horn_3_1'
+    contactClass: 'neutral'
+  RM_link2_R_back_1:
+    retainedBody: 'RM_motor_horn_3_1'
+    contactClass: 'neutral'
+  RB_motor_horn_3_1:
+    retainedBody: 'RB_motor_horn_3_1'
+    contactClass: 'desired'
+  RB_link2_R_front_1:
+    retainedBody: 'RB_motor_horn_3_1'
+    contactClass: 'neutral'
+  RB_foot_1:
+    retainedBody: 'RB_motor_horn_3_1'
+    contactClass: 'neutral'
+  RB_foot_cover_1:
+    retainedBody: 'RB_motor_horn_3_1'
+    contactClass: 'neutral'
+  RB_link2_R_back_1:
+    retainedBody: 'RB_motor_horn_3_1'
+    contactClass: 'neutral'
+contractSites:
+  LF_motor_horn_3_1_contact_site:
+    body: 'LF_motor_horn_3_1'
+    rule: 'zero_transform'
+    pos:
+      - 0
+      - 0
+      - 0
+    quat:
+      - 1
+      - 0
+      - 0
+      - 0
+  LM_motor_horn_3_1_contact_site:
+    body: 'LM_motor_horn_3_1'
+    rule: 'zero_transform'
+    pos:
+      - 0
+      - 0
+      - 0
+    quat:
+      - 1
+      - 0
+      - 0
+      - 0
+  LB_motor_horn_3_1_contact_site:
+    body: 'LB_motor_horn_3_1'
+    rule: 'zero_transform'
+    pos:
+      - 0
+      - 0
+      - 0
+    quat:
+      - 1
+      - 0
+      - 0
+      - 0
+  RF_motor_horn_3_1_contact_site:
+    body: 'RF_motor_horn_3_1'
+    rule: 'zero_transform'
+    pos:
+      - 0
+      - 0
+      - 0
+    quat:
+      - 1
+      - 0
+      - 0
+      - 0
+  RM_motor_horn_3_1_contact_site:
+    body: 'RM_motor_horn_3_1'
+    rule: 'zero_transform'
+    pos:
+      - 0
+      - 0
+      - 0
+    quat:
+      - 1
+      - 0
+      - 0
+      - 0
+  RB_motor_horn_3_1_contact_site:
+    body: 'RB_motor_horn_3_1'
+    rule: 'zero_transform'
+    pos:
+      - 0
+      - 0
+      - 0
+    quat:
+      - 1
+      - 0
+      - 0
+      - 0
