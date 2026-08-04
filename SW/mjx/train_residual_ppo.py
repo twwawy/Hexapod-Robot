@@ -11,6 +11,7 @@ This trainer now persists progress incrementally so long runs are recoverable:
 """
 
 import argparse
+import hashlib
 import json
 import signal
 from pathlib import Path
@@ -20,8 +21,9 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
-from hexapod_mjx.model import load_hexapod_model, repo_root_from
+from hexapod_mjx.model import STAND_POSE, load_hexapod_model, repo_root_from
 from hexapod_mjx.residual_controller import ACTION_DIM, ResidualControllerConfig, build_residual_controller
+
 from hexapod_mjx.residual_env import (
     CommandCurriculumConfig,
     ResidualEnvConfig,
@@ -64,6 +66,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--resume-path", type=str, default=None)
     parser.add_argument("--save-every-updates", type=int, default=1)
     parser.add_argument("--termination-contact-z", type=float, default=0.0)
+    parser.add_argument("--contact-model", choices=("mesh", "hybrid"), default="hybrid", help="Collision model for training. `hybrid` is the fast proxy model; `mesh` keeps original mesh collisions but is much heavier.")
+    parser.add_argument("--joint-limit-margin-1", type=float, default=0.0, help="Tighten the joint-1 range by this many radians on each side.")
+    parser.add_argument("--joint-limit-margin-2", type=float, default=0.0, help="Tighten the joint-2 range by this many radians on each side.")
+    parser.add_argument("--joint-limit-margin-3", type=float, default=0.0, help="Tighten the joint-3 range by this many radians on each side.")
     parser.add_argument("--command-curriculum", choices=("staged", "none"), default="staged")
     parser.add_argument("--forward-only-updates", type=int, default=120)
     parser.add_argument("--yaw-stage-updates", type=int, default=120)
@@ -140,6 +146,9 @@ def _init_wandb(repo_root: Path, args: argparse.Namespace, output_path: Path, la
             "learning_rate": args.learning_rate,
             "hidden_size": args.hidden_size,
             "seed": args.seed,
+            "joint_limit_margin_1": args.joint_limit_margin_1,
+            "joint_limit_margin_2": args.joint_limit_margin_2,
+            "joint_limit_margin_3": args.joint_limit_margin_3,
             "output_path": str(output_path),
             "latest_output_path": str(latest_output_path),
             "metrics_path": str(metrics_path),
@@ -163,7 +172,36 @@ def _init_wandb(repo_root: Path, args: argparse.Namespace, output_path: Path, la
 
 
 
+def _stand_pose_hash() -> str:
+    payload = json.dumps(STAND_POSE, sort_keys=True, ensure_ascii=False)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _code_signature(repo_root: Path) -> dict[str, Any]:
+    rel_paths = [
+        Path("SW/mjx/hexapod_mjx/model.py"),
+        Path("SW/mjx/hexapod_mjx/residual_controller.py"),
+        Path("SW/mjx/hexapod_mjx/residual_env.py"),
+        Path("SW/mjx/hexapod_mjx/residual_rl.py"),
+        Path("SW/mjx/train_residual_ppo.py"),
+    ]
+    digest = hashlib.sha256()
+    files: list[str] = []
+    for rel_path in rel_paths:
+        abs_path = (repo_root / rel_path).resolve()
+        files.append(str(rel_path))
+        digest.update(str(rel_path).encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(abs_path.read_bytes())
+        digest.update(b"\0")
+    return {
+        "hash": digest.hexdigest(),
+        "files": files,
+    }
+
+
 def _checkpoint_metadata(
+    repo_root: Path,
     args: argparse.Namespace,
     controller_reset_root_height: float,
     obs_dim: int,
@@ -187,6 +225,9 @@ def _checkpoint_metadata(
         "interrupted": interrupted,
         "completed": completed,
         "wandb": wandb_metadata,
+        "stand_pose": STAND_POSE,
+        "stand_pose_hash": _stand_pose_hash(),
+        "code_signature": _code_signature(repo_root),
         "ppo_config": vars(args),
     }
 
@@ -241,8 +282,14 @@ def main() -> None:
     metrics_path = _resolve_repo_path(repo_root, args.metrics_path)
     assert metrics_path is not None
 
-    bundle = load_hexapod_model(repo_root)
-    controller_config = ResidualControllerConfig()
+    bundle = load_hexapod_model(repo_root, contact_mode=args.contact_model)
+    controller_config = ResidualControllerConfig(
+        joint_limit_margin=(
+            args.joint_limit_margin_1,
+            args.joint_limit_margin_2,
+            args.joint_limit_margin_3,
+        )
+    )
     controller_bundle = build_residual_controller(bundle, controller_config)
     env_config = ResidualEnvConfig(
         episode_steps=args.rollout_steps,
@@ -410,6 +457,7 @@ def main() -> None:
                 "forward_velocity": float(metric_means[7]),
                 "lateral_velocity": float(metric_means[8]),
                 "yaw_rate": float(metric_means[9]),
+                "body_contact": float(metric_means[10]),
             }
             summary.update(update_metrics)
             history.append(summary)
@@ -425,9 +473,11 @@ def main() -> None:
                     output_path,
                     best_train_state,
                     _checkpoint_metadata(
+                        repo_root,
                         args,
                         float(controller_bundle.reset_root_height),
                         obs_dim,
+
                         updates_seen=absolute_update,
                         best_update=best_update,
                         best_mean_reward=best_mean_reward,
@@ -443,9 +493,11 @@ def main() -> None:
                     latest_output_path,
                     train_state,
                     _checkpoint_metadata(
+                        repo_root,
                         args,
                         float(controller_bundle.reset_root_height),
                         obs_dim,
+
                         updates_seen=absolute_update,
                         best_update=best_update,
                         best_mean_reward=best_mean_reward,
@@ -493,9 +545,11 @@ def main() -> None:
             latest_output_path,
             train_state,
             _checkpoint_metadata(
+                repo_root,
                 args,
                 float(controller_bundle.reset_root_height),
                 obs_dim,
+
                 updates_seen=total_updates_seen,
                 best_update=best_update,
                 best_mean_reward=best_mean_reward,
@@ -510,6 +564,7 @@ def main() -> None:
                 output_path,
                 best_train_state,
                 _checkpoint_metadata(
+                    repo_root,
                     args,
                     float(controller_bundle.reset_root_height),
                     obs_dim,

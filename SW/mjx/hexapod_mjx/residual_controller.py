@@ -13,15 +13,17 @@ That still preserves the intended architecture: the policy reasons in foot/body
 space while the controller owns the joint-space conversion and safety clamps.
 """
 
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import NamedTuple
+from typing import Any, NamedTuple
 
 import jax
 import jax.numpy as jnp
 import mujoco
 import numpy as np
 
-from .model import HexapodModelBundle, TRIPOD_A, estimate_standing_root_height
+from .model import FOOT_CONTACT_POINT_COUNT, HexapodModelBundle, TRIPOD_A, estimate_standing_root_height
+
 
 
 
@@ -44,7 +46,9 @@ class ResidualControllerBundle(NamedTuple):
     front_sign: jnp.ndarray
     tripod_is_a: jnp.ndarray
     foot_geom_ids: jnp.ndarray
+    foot_support_geom_ids: jnp.ndarray
     reset_root_height: jnp.ndarray
+
 
 
 @dataclass(frozen=True)
@@ -72,6 +76,20 @@ class ResidualControllerConfig:
     torque_limit: tuple[float, float, float] = (10.0, 30.0, 30.0)
     foot_contact_height: float = 0.03
     startup_duration_sec: float = 0.30
+    joint_limit_margin: tuple[float, float, float] = (0.0, 0.0, 0.0)
+
+
+def controller_config_from_metadata(metadata: Mapping[str, Any] | None) -> "ResidualControllerConfig":
+    ppo_config = metadata.get("ppo_config") if isinstance(metadata, Mapping) else None
+    if not isinstance(ppo_config, Mapping):
+        return ResidualControllerConfig()
+    return ResidualControllerConfig(
+        joint_limit_margin=(
+            float(ppo_config.get("joint_limit_margin_1", 0.0)),
+            float(ppo_config.get("joint_limit_margin_2", 0.0)),
+            float(ppo_config.get("joint_limit_margin_3", 0.0)),
+        )
+    )
 
 
 
@@ -118,13 +136,18 @@ def build_residual_controller(
     front_sign: list[float] = []
     tripod_is_a: list[bool] = []
     foot_geom_ids: list[int] = []
+    foot_support_geom_ids: list[list[int]] = []
     jacobian_pinv: list[np.ndarray] = []
+
 
     name_to_index = {name: idx for idx, name in enumerate(bundle.joint_names)}
     name_to_joint_id = {
         name: mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, name)
         for name in bundle.joint_names
     }
+    joint_limit_margin = np.asarray(config.joint_limit_margin, dtype=np.float64)
+    if np.any(joint_limit_margin < 0.0):
+        raise ValueError(f"joint_limit_margin must be non-negative, got {config.joint_limit_margin}")
 
     neutral_foot_world_z = []
 
@@ -133,8 +156,17 @@ def build_residual_controller(
         leg_joint_indices.append(leg_indices)
         leg_joint_pose.append([float(bundle.default_joint_pose[idx]) for idx in leg_indices])
         leg_joint_ids = [name_to_joint_id[f"{leg}_{suffix}"] for suffix in (1, 2, 3)]
-        joint_lower.append([float(model.jnt_range[joint_id, 0]) for joint_id in leg_joint_ids])
-        joint_upper.append([float(model.jnt_range[joint_id, 1]) for joint_id in leg_joint_ids])
+        raw_joint_lower = np.asarray([float(model.jnt_range[joint_id, 0]) for joint_id in leg_joint_ids], dtype=np.float64)
+        raw_joint_upper = np.asarray([float(model.jnt_range[joint_id, 1]) for joint_id in leg_joint_ids], dtype=np.float64)
+        tightened_joint_lower = raw_joint_lower + joint_limit_margin
+        tightened_joint_upper = raw_joint_upper - joint_limit_margin
+        if np.any(tightened_joint_lower >= tightened_joint_upper):
+            raise ValueError(
+                f"joint_limit_margin {config.joint_limit_margin} collapses the valid range for {leg}: "
+                f"raw_lower={raw_joint_lower.tolist()} raw_upper={raw_joint_upper.tolist()}"
+            )
+        joint_lower.append(tightened_joint_lower.tolist())
+        joint_upper.append(tightened_joint_upper.tolist())
 
         hip_body_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, f"{leg}_motor_horn_1_1")
         hip_world = host_data.xpos[hip_body_id]
@@ -146,10 +178,16 @@ def build_residual_controller(
 
         foot_geom_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_GEOM, f"{leg}_motor_horn_3_1_contact")
         foot_geom_ids.append(foot_geom_id)
+        support_ids = [
+            mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_GEOM, f"{leg}_motor_horn_3_1_contact_{idx}")
+            for idx in range(FOOT_CONTACT_POINT_COUNT)
+        ]
+        foot_support_geom_ids.append([support_id if support_id >= 0 else foot_geom_id for support_id in support_ids])
         foot_world = host_data.geom_xpos[foot_geom_id]
         neutral_foot_world_z.append(float(foot_world[2]))
         foot_body = root_rot.T @ (foot_world - root_pos)
         neutral_foot_body_pos.append(foot_body.astype(np.float32))
+
 
         jacobian = np.zeros((3, 3), dtype=np.float64)
         eps = 1e-4
@@ -181,6 +219,7 @@ def build_residual_controller(
         front_sign=jnp.asarray(np.asarray(front_sign, dtype=np.float32)),
         tripod_is_a=jnp.asarray(np.asarray(tripod_is_a, dtype=bool)),
         foot_geom_ids=jnp.asarray(np.asarray(foot_geom_ids, dtype=np.int32)),
+        foot_support_geom_ids=jnp.asarray(np.asarray(foot_support_geom_ids, dtype=np.int32)),
         reset_root_height=jnp.asarray(reset_root_height),
     )
 

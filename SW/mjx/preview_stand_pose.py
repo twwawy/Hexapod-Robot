@@ -13,7 +13,8 @@ import mujoco.viewer
 import numpy as np
 from PIL import Image
 
-from hexapod_mjx.model import LEG_NAMES, STAND_POSE, _stable_root_height_from_foot_body_z, estimate_standing_root_height, load_hexapod_model, load_hexapod_visual_model, repo_root_from
+from hexapod_mjx.model import LEG_NAMES, STAND_POSE, _leg_support_surface_world_z, _stable_root_height_from_foot_body_z, estimate_standing_root_height, load_hexapod_model, load_hexapod_visual_model, repo_root_from
+
 
 
 
@@ -132,7 +133,7 @@ def _foot_samples(bundle, data: mujoco.MjData) -> tuple[list[float], list[float]
         foot_world = data.geom_xpos[foot_geom_id]
         foot_body = root_rot.T @ (foot_world - root_pos)
         foot_body_z.append(float(foot_body[2]))
-        foot_world_z.append(float(foot_world[2]))
+        foot_world_z.append(_leg_support_surface_world_z(bundle.model, data, leg))
     return foot_body_z, foot_world_z
 
 

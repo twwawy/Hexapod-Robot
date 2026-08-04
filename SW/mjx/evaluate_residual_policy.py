@@ -10,7 +10,7 @@ import jax
 import jax.numpy as jnp
 
 from hexapod_mjx.model import load_hexapod_model, repo_root_from
-from hexapod_mjx.residual_controller import ACTION_DIM, ResidualControllerConfig, build_residual_controller
+from hexapod_mjx.residual_controller import build_residual_controller, controller_config_from_metadata
 from hexapod_mjx.residual_env import ResidualEnvConfig, joint_group_index, reset_env, step_env
 from hexapod_mjx.residual_rl import load_checkpoint, policy_mean
 
@@ -32,12 +32,13 @@ def main() -> None:
     args = parse_args()
     default_root = Path(__file__).resolve().parents[2]
     repo_root = repo_root_from(args.repo_root or default_root)
-    bundle = load_hexapod_model(repo_root)
-    controller_config = ResidualControllerConfig()
-    controller_bundle = build_residual_controller(bundle, controller_config)
-    env_config = ResidualEnvConfig(episode_steps=args.rollout_steps)
     policy_path = (repo_root / args.policy_path).resolve()
     train_state, metadata = load_checkpoint(policy_path)
+    resolved_contact_model = metadata.get("ppo_config", {}).get("contact_model", "hybrid") if isinstance(metadata, dict) else "hybrid"
+    bundle = load_hexapod_model(repo_root, contact_mode=resolved_contact_model)
+    controller_config = controller_config_from_metadata(metadata if isinstance(metadata, dict) else None)
+    controller_bundle = build_residual_controller(bundle, controller_config)
+    env_config = ResidualEnvConfig(episode_steps=args.rollout_steps)
 
     group_index = joint_group_index(bundle)
     key = jax.random.key(args.seed)
@@ -85,6 +86,7 @@ def main() -> None:
         "forward_velocity": float(metric_means[7]),
         "lateral_velocity": float(metric_means[8]),
         "yaw_rate": float(metric_means[9]),
+        "body_contact": float(metric_means[10]),
     }
 
     report_path = (repo_root / args.report_path).resolve()

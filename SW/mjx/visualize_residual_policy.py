@@ -14,9 +14,9 @@ import numpy as np
 
 from hexapod_mjx.model import load_hexapod_model, repo_root_from
 from hexapod_mjx.residual_controller import (
-    ResidualControllerConfig,
     body_velocity_components,
     build_residual_controller,
+    controller_config_from_metadata,
     controller_step,
     policy_dt,
     quat_roll_pitch_yaw,
@@ -33,6 +33,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--lateral-cmd", type=float, default=0.0)
     parser.add_argument("--yaw-cmd", type=float, default=0.0)
     parser.add_argument("--duration-sec", type=float, default=8.0)
+    parser.add_argument("--contact-model", choices=("mesh", "hybrid"), default=None, help="Override the collision/contact model used for replay. Default reads checkpoint metadata and falls back to hybrid.")
     parser.add_argument("--hold-sec", type=float, default=1.5, help="Hold the neutral pose for this many seconds before policy rollout.")
     parser.add_argument("--render-dir", type=str, default=None)
     parser.add_argument("--output-video", type=str, default=None)
@@ -90,11 +91,14 @@ def main() -> None:
     args = parse_args()
     default_root = Path(__file__).resolve().parents[2]
     repo_root = repo_root_from(args.repo_root or default_root)
-    bundle = load_hexapod_model(repo_root)
-    controller_config = ResidualControllerConfig()
-    controller_bundle = build_residual_controller(bundle, controller_config)
     train_state, metadata = load_checkpoint(_resolve_path(repo_root, args.policy_path))
-
+    checkpoint_contact_model = None
+    if isinstance(metadata, dict):
+        checkpoint_contact_model = metadata.get("ppo_config", {}).get("contact_model")
+    resolved_contact_model = args.contact_model or checkpoint_contact_model or "hybrid"
+    bundle = load_hexapod_model(repo_root, contact_mode=resolved_contact_model)
+    controller_config = controller_config_from_metadata(metadata if isinstance(metadata, dict) else None)
+    controller_bundle = build_residual_controller(bundle, controller_config)
     model = bundle.model
     data = mujoco.MjData(model)
     data.qpos[0:3] = np.array([0.0, 0.0, float(controller_bundle.reset_root_height)], dtype=np.float64)

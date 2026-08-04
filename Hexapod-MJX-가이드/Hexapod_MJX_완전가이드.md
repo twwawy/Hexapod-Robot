@@ -534,8 +534,57 @@ env -u LD_LIBRARY_PATH MUJOCO_GL=egl ~/.venvs/hexapod-mjx/bin/python \
   - `--yaw-stage-updates`
   - `--forward-only-scale`
   - `--yaw-stage-scale`
+  - `--joint-limit-margin-1`, `--joint-limit-margin-2`, `--joint-limit-margin-3`
   - `--wandb`, `--wandb-project`, `--wandb-group`
 
+### 관절 제한을 더 빡세게 거는 법
+
+기본 URDF joint limit는 대체로 각 관절당 `-2.356 ~ 2.356 rad` (`-135° ~ 135°`) 이다.
+
+학습 쪽에서는 여기에 **margin 방식**으로 추가 제한을 걸 수 있다.
+
+```text
+원래 제한: [lower, upper]
+margin m 적용 후: [lower + m, upper - m]
+```
+
+즉 `--joint-limit-margin-2 0.20` 을 주면 2번 관절은:
+- 원래: `[-2.356, 2.356] rad`
+- 변경 후: `[-2.156, 2.156] rad`
+
+처럼 **양쪽 끝이 각각 0.20 rad씩 줄어든다.**
+총 가동범위는 `2m` 만큼 줄어든다고 보면 된다.
+
+대략적인 감각:
+- `0.05 rad` → 양끝 각각 약 `2.9°` 감소, 총 약 `5.7°` 감소
+- `0.10 rad` → 양끝 각각 약 `5.7°` 감소, 총 약 `11.5°` 감소
+- `0.20 rad` → 양끝 각각 약 `11.5°` 감소, 총 약 `22.9°` 감소
+- `0.30 rad` → 양끝 각각 약 `17.2°` 감소, 총 약 `34.4°` 감소
+
+예:
+```bash
+~/Desktop/Hexapod-MJX-가이드/큰병렬.sh fresh \
+  --joint-limit-margin-1 0.10 \
+  --joint-limit-margin-2 0.15 \
+  --joint-limit-margin-3 0.20
+```
+
+의미:
+- 1번 관절: 양쪽에서 `0.10 rad`씩 잘라냄
+- 2번 관절: 양쪽에서 `0.15 rad`씩 잘라냄
+- 3번 관절: 양쪽에서 `0.20 rad`씩 잘라냄
+
+underscore 표기도 된다:
+```bash
+~/Desktop/Hexapod-MJX-가이드/큰병렬.sh fresh \
+  --joint_limit_margin_1 0.10 \
+  --joint_limit_margin_2 0.15 \
+  --joint_limit_margin_3 0.20
+```
+
+주의:
+- 관절 제한을 바꾸면 예전 checkpoint와 정책 의미가 달라지므로 **`이어서`보다 `fresh` 권장**
+- 지금 wrapper는 joint limit margin이 달라지면 incompatible resume으로 보고 자동 차단한다
 예를 들어 pose를 바꾼 뒤 정말 처음부터 다시 보고 싶으면:
 ```bash
 ~/Desktop/Hexapod-MJX-가이드/큰병렬.sh \

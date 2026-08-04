@@ -10,7 +10,8 @@ import jax.numpy as jnp
 import numpy as np
 from mujoco import mjx
 
-from .model import BASE_COLLISION_HALF_SIZE, BASE_COLLISION_POS, HexapodModelBundle
+from .model import BASE_COLLISION_HALF_SIZE, BASE_COLLISION_POS, FOOT_PROXY_RADIUS, HexapodModelBundle
+
 from .residual_controller import (
     ACTION_DIM,
     ResidualControllerBundle,
@@ -57,9 +58,11 @@ class ResidualEnvConfig:
     slip_penalty: float = 0.10
     energy_penalty: float = 0.0015
     action_penalty: float = 0.015
+    body_contact_penalty: float = 10.0
     yaw_rate_clip: float = 3.0
     foot_contact_height: float = 0.03
     termination_contact_z: float = 0.0
+
 
 
 @dataclass(frozen=True)
@@ -96,6 +99,25 @@ _BASE_COLLISION_CORNERS = jnp.asarray(
 
 def joint_group_index(bundle: HexapodModelBundle) -> jnp.ndarray:
     return jnp.asarray([int(name.split("_")[-1]) - 1 for name in bundle.joint_names], dtype=jnp.int32)
+
+
+
+def _foot_support_world(data: mjx.Data, controller_bundle: ResidualControllerBundle) -> jnp.ndarray:
+    ids = controller_bundle.foot_support_geom_ids.reshape(-1)
+    supports = jnp.take(data.geom_xpos, ids, axis=1)
+    batch_size = data.geom_xpos.shape[0]
+    leg_count = controller_bundle.foot_support_geom_ids.shape[0]
+    point_count = controller_bundle.foot_support_geom_ids.shape[1]
+    return supports.reshape(batch_size, leg_count, point_count, 3)
+
+
+def _foot_world(data: mjx.Data, controller_bundle: ResidualControllerBundle) -> jnp.ndarray:
+    return jnp.mean(_foot_support_world(data, controller_bundle), axis=2)
+
+
+def _foot_support_height(data: mjx.Data, controller_bundle: ResidualControllerBundle) -> jnp.ndarray:
+    support_world = _foot_support_world(data, controller_bundle)
+    return jnp.min(support_world[:, :, :, 2] - FOOT_PROXY_RADIUS, axis=2)
 
 
 
@@ -204,7 +226,7 @@ def reset_env(
     controller_state = reset_controller_state(batch_size)
     root_pos = data.qpos[:, 0:3]
     _, _, yaw = quat_roll_pitch_yaw(data.qpos[:, 3:7])
-    foot_world = data.geom_xpos[:, controller_bundle.foot_geom_ids, :]
+    foot_world = _foot_world(data, controller_bundle)
     state = ResidualEnvState(
         data=data,
         controller_state=controller_state,
@@ -212,6 +234,7 @@ def reset_env(
         prev_root_pos=root_pos,
         prev_yaw=yaw,
         prev_foot_world=foot_world,
+
         body_velocity_world=jnp.zeros((batch_size, 3), dtype=jnp.float32),
         yaw_rate=jnp.zeros((batch_size,), dtype=jnp.float32),
         terminated=jnp.zeros((batch_size,), dtype=bool),
@@ -274,8 +297,9 @@ def make_observation(
     body_height_error = state.data.qpos[:, 2] - controller_bundle.reset_root_height
     joint_qpos = state.data.qpos[:, 7:]
     joint_qvel = state.data.qvel[:, 6:]
-    foot_world = state.data.geom_xpos[:, controller_bundle.foot_geom_ids, :]
-    contacts = (foot_world[:, :, 2] < controller_config.foot_contact_height).astype(jnp.float32)
+    foot_contact_height = _foot_support_height(state.data, controller_bundle)
+    contacts = (foot_contact_height < controller_config.foot_contact_height).astype(jnp.float32)
+
     phase_angle = state.controller_state.phase * (2.0 * jnp.pi)
     return jnp.concatenate(
         [
@@ -359,8 +383,9 @@ def step_env(
     _, _, yaw = quat_roll_pitch_yaw(data_f.qpos[:, 3:7])
     yaw_delta = jnp.arctan2(jnp.sin(yaw - state.prev_yaw), jnp.cos(yaw - state.prev_yaw))
     yaw_rate = jnp.clip(yaw_delta / step_dt, -env_config.yaw_rate_clip, env_config.yaw_rate_clip)
-    foot_world = data_f.geom_xpos[:, controller_bundle.foot_geom_ids, :]
+    foot_world = _foot_world(data_f, controller_bundle)
     foot_xy_velocity = (foot_world[:, :, 0:2] - state.prev_foot_world[:, :, 0:2]) / step_dt
+
 
     next_state = ResidualEnvState(
         data=data_f,
@@ -412,9 +437,10 @@ def compute_reward(
     attitude_reward = jnp.exp(-(roll * roll + pitch * pitch) / env_config.attitude_reward_sigma)
     height_reward = jnp.exp(-height_error / env_config.height_reward_sigma)
 
-    contacts = (state.prev_foot_world[:, :, 2] < env_config.foot_contact_height).astype(jnp.float32)
+    contacts = (_foot_support_height(state.data, controller_bundle) < env_config.foot_contact_height).astype(jnp.float32)
     slip_cost = jnp.sum(contacts * jnp.sum(foot_xy_velocity * foot_xy_velocity, axis=-1), axis=1)
     action_cost = jnp.mean((action - previous_action) ** 2, axis=1)
+    body_contact = state.terminated.astype(jnp.float32)
 
     reward = (
         1.5 * velocity_reward
@@ -424,7 +450,9 @@ def compute_reward(
         - env_config.slip_penalty * slip_cost
         - env_config.energy_penalty * control_cost
         - env_config.action_penalty * action_cost
+        - env_config.body_contact_penalty * body_contact
     )
+
 
     done = state.terminated
 
@@ -440,6 +468,7 @@ def compute_reward(
             forward_velocity,
             lateral_velocity,
             state.yaw_rate,
+            body_contact,
         ],
         axis=-1,
     )

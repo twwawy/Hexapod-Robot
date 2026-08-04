@@ -34,16 +34,20 @@ LEG_NAMES = ("LF", "LM", "LB", "RF", "RM", "RB")
 # be numerically noisy for locomotion, so training uses a hybrid model:
 # - keep the original mesh geoms as visual-only geometry,
 # - add one coarse collision box for the body,
-# - add explicit foot-contact spheres for ground interaction.
+# - add a small multi-point foot proxy that follows the original foot mesh.
 #
-# This keeps the learning physics simple while making preview/training renders
-# look like the physical robot instead of a box-and-stick proxy.
+# This keeps the learning physics much closer to the source robot than a single
+# red point per foot while still avoiding full mesh-mesh contact in batched MJX.
 BASE_COLLISION_HALF_SIZE = (0.19, 0.11, 0.03)
 BASE_COLLISION_POS = (0.0, 0.0, 0.025)
-FOOT_COLLISION_RADIUS = 0.018
+FOOT_PROXY_RADIUS = 0.010
+FOOT_CONTACT_POINT_COUNT = 3
+FOOT_CONTACT_BAND_Z = 0.0035
+FOOT_CONTACT_NEIGHBOR_COUNT = 18
 LEG_FRAME_RADIUS = 0.0075
 LEFT_FRAME_RGBA = "0.25 0.70 0.95 1"
 RIGHT_FRAME_RGBA = "0.95 0.65 0.25 1"
+
 
 DEFAULT_STAND_ROOT_HEIGHT = 0.06
 FLOOR_VISUAL_HALF_SIZE = (1.15, 1.15, 0.015)
@@ -81,6 +85,13 @@ STAND_POSE = {
     "RB_2": -0.1,
     "RB_3": 1.0
 }
+
+
+@dataclass(frozen=True)
+class FootContactSpec:
+    body_name: str
+    sample_point: tuple[float, float, float]
+    support_points: tuple[tuple[float, float, float], ...]
 
 
 
@@ -126,6 +137,18 @@ def _stable_root_height_from_foot_body_z(foot_z: np.ndarray) -> float:
 
 
 
+def _leg_support_surface_world_z(model: mujoco.MjModel, data: mujoco.MjData, leg: str) -> float:
+    support_z: list[float] = []
+    for idx in range(FOOT_CONTACT_POINT_COUNT):
+        geom_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_GEOM, f"{leg}_motor_horn_3_1_contact_{idx}")
+        if geom_id >= 0:
+            support_z.append(float(data.geom_xpos[geom_id][2]) - FOOT_PROXY_RADIUS)
+    if support_z:
+        return float(min(support_z))
+    marker_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_GEOM, f"{leg}_motor_horn_3_1_contact")
+    return float(data.geom_xpos[marker_id][2])
+
+
 def estimate_standing_root_height(bundle: HexapodModelBundle) -> float:
     """Infer a stable reset height and never let it drop below the 0.06 floor."""
     data = mujoco.MjData(bundle.model)
@@ -134,10 +157,7 @@ def estimate_standing_root_height(bundle: HexapodModelBundle) -> float:
     data.qpos[bundle.joint_qpos_adr] = np.asarray(bundle.default_joint_pose, dtype=np.float64)
     mujoco.mj_forward(bundle.model, data)
 
-    foot_world_z = []
-    for leg in LEG_NAMES:
-        foot_geom_id = mujoco.mj_name2id(bundle.model, mujoco.mjtObj.mjOBJ_GEOM, f"{leg}_motor_horn_3_1_contact")
-        foot_world_z.append(float(data.geom_xpos[foot_geom_id][2]))
+    foot_world_z = [_leg_support_surface_world_z(bundle.model, data, leg) for leg in LEG_NAMES]
     auto_height = _stable_root_height_from_foot_body_z(np.asarray(foot_world_z, dtype=np.float64))
     return float(max(DEFAULT_STAND_ROOT_HEIGHT, auto_height))
 
@@ -257,9 +277,56 @@ def _geom_rotation_matrix(model: mujoco.MjModel, geom_id: int) -> np.ndarray:
     return mat.reshape(3, 3)
 
 
-def _infer_foot_contacts_from_model(model: mujoco.MjModel) -> dict[str, str]:
-    """Infer contact points from the actual foot mesh geometry, not mesh origins."""
-    foot_contacts: dict[str, str] = {}
+def _point_tuple(vec: np.ndarray) -> tuple[float, float, float]:
+    return (float(vec[0]), float(vec[1]), float(vec[2]))
+
+
+def _support_proxy_center(point: tuple[float, float, float]) -> tuple[float, float, float]:
+    return (point[0], point[1], point[2] + FOOT_PROXY_RADIUS)
+
+
+def _infer_support_points(vertices: np.ndarray) -> tuple[tuple[float, float, float], ...]:
+    min_z = float(np.min(vertices[:, 2]))
+    lowest_band = vertices[vertices[:, 2] <= min_z + FOOT_CONTACT_BAND_Z]
+    if lowest_band.shape[0] < FOOT_CONTACT_POINT_COUNT:
+        nearest = np.argsort(vertices[:, 2])[: max(FOOT_CONTACT_POINT_COUNT * 3, FOOT_CONTACT_POINT_COUNT)]
+        lowest_band = vertices[nearest]
+
+    band_xy = lowest_band[:, :2]
+    centered = band_xy - np.mean(band_xy, axis=0, keepdims=True)
+    if centered.shape[0] >= 2 and float(np.max(np.linalg.norm(centered, axis=1))) > 1e-8:
+        _, _, vh = np.linalg.svd(centered, full_matrices=False)
+        axis = vh[0]
+        axis = axis / np.linalg.norm(axis)
+    else:
+        axis = np.array([1.0, 0.0], dtype=np.float64)
+
+    projection = band_xy @ axis
+    if projection.shape[0] == 1:
+        targets = np.repeat(projection[0], FOOT_CONTACT_POINT_COUNT)
+    else:
+        lo, hi = np.quantile(projection, [0.10, 0.90])
+        if abs(float(hi - lo)) < 1e-8:
+            targets = np.repeat(float(np.mean(projection)), FOOT_CONTACT_POINT_COUNT)
+        else:
+            targets = np.linspace(float(lo), float(hi), FOOT_CONTACT_POINT_COUNT)
+
+    support_points: list[tuple[float, float, float]] = []
+    for target in targets:
+        nearest = np.argsort(np.abs(projection - float(target)))[: min(lowest_band.shape[0], FOOT_CONTACT_NEIGHBOR_COUNT)]
+        cluster = lowest_band[nearest]
+        point = np.array([
+            float(np.mean(cluster[:, 0])),
+            float(np.mean(cluster[:, 1])),
+            min_z,
+        ], dtype=np.float64)
+        support_points.append(_point_tuple(point))
+    return tuple(support_points)
+
+
+def _infer_foot_contact_specs_from_model(model: mujoco.MjModel) -> dict[str, FootContactSpec]:
+    """Infer per-foot support proxies from the actual foot mesh geometry."""
+    foot_specs: dict[str, FootContactSpec] = {}
     for leg in LEG_NAMES:
         body_name: str | None = None
         body_vertices: list[np.ndarray] = []
@@ -289,49 +356,65 @@ def _infer_foot_contacts_from_model(model: mujoco.MjModel) -> dict[str, str]:
             continue
 
         vertices = np.concatenate(body_vertices, axis=0)
-        min_z = float(np.min(vertices[:, 2]))
-        lowest_band = vertices[vertices[:, 2] <= min_z + 0.002]
-        contact = np.array([
-            float(np.mean(lowest_band[:, 0])),
-            float(np.mean(lowest_band[:, 1])),
-            min_z,
-        ], dtype=np.float64)
-        foot_contacts[body_name] = _format_pos(contact)
+        support_points = _infer_support_points(vertices)
+        sample_point = np.mean(np.asarray(support_points, dtype=np.float64), axis=0)
+        foot_specs[body_name] = FootContactSpec(
+            body_name=body_name,
+            sample_point=_point_tuple(sample_point),
+            support_points=support_points,
+        )
 
-    if len(foot_contacts) != 6:
-        raise RuntimeError(f"Expected 6 inferred foot contact points, found {len(foot_contacts)}.")
-    return foot_contacts
-
+    if len(foot_specs) != 6:
+        raise RuntimeError(f"Expected 6 inferred foot contact specs, found {len(foot_specs)}.")
+    return foot_specs
 
 
-def _add_foot_contact_geoms(robot_body: ET.Element, foot_contacts: dict[str, str], *, collidable: bool) -> None:
-    for body_name, pos in foot_contacts.items():
-        attrs = {
-            "name": f"{body_name}_contact",
-            "type": "sphere",
-            "pos": pos,
-            "size": f"{FOOT_COLLISION_RADIUS:.4f}",
-            "rgba": "0.98 0.35 0.18 0.55",
-        }
-        if collidable:
-            attrs.update({
-                "friction": "1.8 0.02 0.01",
-                "condim": "3",
-            })
-        else:
-            attrs.update({
+def _add_foot_contact_geoms(robot_body: ET.Element, foot_specs: dict[str, FootContactSpec], *, collidable: bool) -> None:
+    for body_name, spec in foot_specs.items():
+        ET.SubElement(
+            _find_body(robot_body, body_name),
+            "geom",
+            {
+                "name": f"{body_name}_contact",
+                "type": "sphere",
+                "pos": _format_pos(np.asarray(spec.sample_point, dtype=np.float64)),
+                "size": f"{FOOT_PROXY_RADIUS * 0.45:.4f}",
+                "rgba": "0.98 0.35 0.18 0.55",
                 "contype": "0",
                 "conaffinity": "0",
                 "mass": "0",
-            })
-        ET.SubElement(_find_body(robot_body, body_name), "geom", attrs)
+            },
+        )
+        for idx, support_point in enumerate(spec.support_points):
+            attrs = {
+                "name": f"{body_name}_contact_{idx}",
+                "type": "sphere",
+                "pos": _format_pos(np.asarray(_support_proxy_center(support_point), dtype=np.float64)),
+                "size": f"{FOOT_PROXY_RADIUS:.4f}",
+                "rgba": "0.98 0.35 0.18 0.45",
+            }
+            if collidable:
+                attrs.update({
+                    "friction": "1.8 0.02 0.01",
+                    "condim": "3",
+                })
+            else:
+                attrs.update({
+                    "contype": "0",
+                    "conaffinity": "0",
+                    "mass": "0",
+                })
+            ET.SubElement(_find_body(robot_body, body_name), "geom", attrs)
 
 
-def _simplify_training_geoms(robot_body: ET.Element, foot_contacts: dict[str, str]) -> None:
+def _mesh_contact_training_geoms(robot_body: ET.Element, foot_specs: dict[str, FootContactSpec]) -> None:
+    """Keep the original URDF mesh collisions and add only non-colliding foot markers."""
+    _add_foot_contact_geoms(robot_body, foot_specs, collidable=False)
+
+
+def _simplify_training_geoms(robot_body: ET.Element, foot_specs: dict[str, FootContactSpec]) -> None:
     """Keep original mesh visuals but replace their collisions with simple proxies."""
 
-    # Leave URDF-expanded geoms in place for visualization, but make them
-    # visual-only so training contacts come only from the coarse proxies below.
     for body in robot_body.iter("body"):
         for geom in body.findall("geom"):
             geom.set("contype", "0")
@@ -352,16 +435,28 @@ def _simplify_training_geoms(robot_body: ET.Element, foot_contacts: dict[str, st
         },
     )
 
-    _add_foot_contact_geoms(robot_body, foot_contacts, collidable=True)
+    _add_foot_contact_geoms(robot_body, foot_specs, collidable=True)
 
 
 
-def build_floating_base_mjcf(repo_root: str | Path, *, base_height: float = 0.22, simplified: bool = True) -> Path:
+def build_floating_base_mjcf(
+    repo_root: str | Path,
+    *,
+    base_height: float = 0.22,
+    simplified: bool = True,
+    contact_mode: str = "hybrid",
+) -> Path:
     """Generate a free-floating MJCF for either training or mesh-faithful preview."""
     repo_root = repo_root_from(repo_root)
     generated_dir = repo_root / "SW" / "mjx" / "artifacts"
     generated_dir.mkdir(parents=True, exist_ok=True)
-    generated_name = "hexapod_floating_base.xml" if simplified else "hexapod_floating_base_visual.xml"
+    generated_name = (
+        "hexapod_floating_base_visual.xml"
+        if not simplified
+        else "hexapod_floating_base.xml"
+        if contact_mode == "hybrid"
+        else "hexapod_floating_base_mesh_contact.xml"
+    )
     generated_path = generated_dir / generated_name
 
     clean_urdf = _clean_urdf_text(repo_root)
@@ -375,7 +470,7 @@ def build_floating_base_mjcf(repo_root: str | Path, *, base_height: float = 0.22
         # resulting XML tree. That is much simpler than reimplementing the full
         # conversion logic ourselves.
         urdf_model = mujoco.MjModel.from_xml_path(str(urdf_path))
-        foot_contacts = _infer_foot_contacts_from_model(urdf_model)
+        foot_specs = _infer_foot_contact_specs_from_model(urdf_model)
         mujoco.mj_saveLastXML(str(saved_xml_path), urdf_model)
 
         tree = ET.parse(saved_xml_path)
@@ -394,9 +489,14 @@ def build_floating_base_mjcf(repo_root: str | Path, *, base_height: float = 0.22
             robot_body.append(child)
 
         if simplified:
-            _simplify_training_geoms(robot_body, foot_contacts)
+            if contact_mode == "hybrid":
+                _simplify_training_geoms(robot_body, foot_specs)
+            elif contact_mode == "mesh":
+                _mesh_contact_training_geoms(robot_body, foot_specs)
+            else:
+                raise ValueError(f"Unsupported contact_mode: {contact_mode}")
         else:
-            _add_foot_contact_geoms(robot_body, foot_contacts, collidable=False)
+            _add_foot_contact_geoms(robot_body, foot_specs, collidable=False)
 
         ET.SubElement(
             worldbody,
@@ -432,10 +532,10 @@ def build_floating_base_mjcf(repo_root: str | Path, *, base_height: float = 0.22
 
 
 
-def _load_hexapod_model(repo_root: str | Path, *, simplified: bool) -> HexapodModelBundle:
+def _load_hexapod_model(repo_root: str | Path, *, simplified: bool, contact_mode: str = "hybrid") -> HexapodModelBundle:
     """Load a generated MJCF and package all indexing metadata."""
     repo_root = repo_root_from(repo_root)
-    mjcf_path = build_floating_base_mjcf(repo_root, simplified=simplified)
+    mjcf_path = build_floating_base_mjcf(repo_root, simplified=simplified, contact_mode=contact_mode)
     model = mujoco.MjModel.from_xml_path(str(mjcf_path))
     mjx_model = mjx.put_model(model)
 
@@ -479,11 +579,11 @@ def _load_hexapod_model(repo_root: str | Path, *, simplified: bool) -> HexapodMo
     )
 
 
-def load_hexapod_model(repo_root: str | Path) -> HexapodModelBundle:
-    """Load the simplified training/visualization model."""
-    return _load_hexapod_model(repo_root, simplified=True)
+def load_hexapod_model(repo_root: str | Path, contact_mode: str = "hybrid") -> HexapodModelBundle:
+    """Load the training/visualization model with the requested contact simplification."""
+    return _load_hexapod_model(repo_root, simplified=True, contact_mode=contact_mode)
 
 
 def load_hexapod_visual_model(repo_root: str | Path) -> HexapodModelBundle:
     """Load a mesh-faithful preview model that preserves the original visuals."""
-    return _load_hexapod_model(repo_root, simplified=False)
+    return _load_hexapod_model(repo_root, simplified=False, contact_mode="hybrid")
