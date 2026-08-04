@@ -20,7 +20,8 @@ LATERAL_CMD="0.0"
 YAW_CMD="0.0"
 SKIP_TRAIN=0
 FRESH=0
-WANDB_ENABLED=0
+WANDB_ENABLED=1
+
 WANDB_PROJECT="hexapod-residual-rl"
 WANDB_ENTITY=""
 WANDB_GROUP=""
@@ -71,7 +72,7 @@ Wrapper options:
   --forward-cmd N           Forward command used during replay. Default: 0.18
   --lateral-cmd N           Lateral command used during replay. Default: 0.0
   --yaw-cmd N               Yaw command used during replay. Default: 0.0
-  --wandb                   Enable Weights & Biases logging/uploads.
+  --wandb                   Enable Weights & Biases logging/uploads. Default: enabled
   --wandb-project NAME      W&B project. Default: hexapod-residual-rl
   --wandb-entity NAME       W&B entity/team.
   --wandb-group NAME        W&B group label.

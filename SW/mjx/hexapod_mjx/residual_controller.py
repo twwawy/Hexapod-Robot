@@ -21,7 +21,10 @@ import jax.numpy as jnp
 import mujoco
 import numpy as np
 
-from .model import HexapodModelBundle, TRIPOD_A
+from .model import HexapodModelBundle, TRIPOD_A, estimate_standing_root_height
+
+
+
 
 
 LEGS = ("LF", "LM", "LB", "RF", "RM", "RB")
@@ -68,12 +71,15 @@ class ResidualControllerConfig:
     pd_kd: tuple[float, float, float] = (0.9, 2.1, 2.1)
     torque_limit: tuple[float, float, float] = (10.0, 30.0, 30.0)
     foot_contact_height: float = 0.03
+    startup_duration_sec: float = 0.30
+
 
 
 class ResidualControllerState(NamedTuple):
     phase: jnp.ndarray
     filtered_command: jnp.ndarray
     prev_action: jnp.ndarray
+    elapsed_sec: jnp.ndarray
 
 
 class ResidualActionTerms(NamedTuple):
@@ -120,6 +126,8 @@ def build_residual_controller(
         for name in bundle.joint_names
     }
 
+    neutral_foot_world_z = []
+
     for leg in LEGS:
         leg_indices = [name_to_index[f"{leg}_{suffix}"] for suffix in (1, 2, 3)]
         leg_joint_indices.append(leg_indices)
@@ -139,6 +147,7 @@ def build_residual_controller(
         foot_geom_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_GEOM, f"{leg}_motor_horn_3_1_contact")
         foot_geom_ids.append(foot_geom_id)
         foot_world = host_data.geom_xpos[foot_geom_id]
+        neutral_foot_world_z.append(float(foot_world[2]))
         foot_body = root_rot.T @ (foot_world - root_pos)
         neutral_foot_body_pos.append(foot_body.astype(np.float32))
 
@@ -156,7 +165,9 @@ def build_residual_controller(
         jacobian_pinv.append(np.linalg.pinv(jacobian).astype(np.float32))
 
     neutral_foot_body = np.asarray(neutral_foot_body_pos, dtype=np.float32)
-    reset_root_height = np.asarray(-neutral_foot_body[:, 2].mean(), dtype=np.float32)
+    _ = neutral_foot_world_z
+    reset_root_height = np.asarray(float(estimate_standing_root_height(bundle)), dtype=np.float32)
+
     return ResidualControllerBundle(
         neutral_joint_pose=jnp.asarray(np.asarray(bundle.default_joint_pose, dtype=np.float32)),
         neutral_foot_body_pos=jnp.asarray(neutral_foot_body),
@@ -187,7 +198,9 @@ def reset_controller_state(batch_size: int) -> ResidualControllerState:
         phase=jnp.zeros((batch_size,), dtype=jnp.float32),
         filtered_command=jnp.zeros((batch_size, 3), dtype=jnp.float32),
         prev_action=jnp.zeros((batch_size, ACTION_DIM), dtype=jnp.float32),
+        elapsed_sec=jnp.zeros((batch_size,), dtype=jnp.float32),
     )
+
 
 
 def quat_to_rotmat(quat: jnp.ndarray) -> jnp.ndarray:
@@ -303,6 +316,8 @@ def controller_step(
         0.72,
     )
     phase = jnp.mod(state.phase + dt / step_period, 1.0)
+    elapsed_sec = state.elapsed_sec + dt
+    startup_ramp = jnp.clip(elapsed_sec / config.startup_duration_sec, 0.0, 1.0)[:, None]
 
     first_half = phase[:, None] < 0.5
     local_phase = jnp.where(first_half, phase[:, None] * 2.0, (phase[:, None] - 0.5) * 2.0)
@@ -327,22 +342,23 @@ def controller_step(
         ],
         axis=-1,
     )
-    step_offset_xy = translation_xy[:, None, :] * step_period[:, None, None] + yaw_offset * step_period[:, None, None]
+    step_offset_xy = (translation_xy[:, None, :] * step_period[:, None, None] + yaw_offset * step_period[:, None, None]) * startup_ramp[:, :, None]
 
     trim_z = (
         action_terms.body_height[:, None]
         + controller_bundle.side_sign[None, :] * action_terms.roll_trim[:, None]
         + controller_bundle.front_sign[None, :] * action_terms.pitch_trim[:, None]
-    )
+    ) * startup_ramp
 
     neutral = controller_bundle.neutral_foot_body_pos[None, :, :]
     forward_target = neutral + jnp.concatenate([step_offset_xy, trim_z[:, :, None]], axis=-1)
     backward_target = neutral + jnp.concatenate([-step_offset_xy, trim_z[:, :, None]], axis=-1)
 
-    swing_height = config.nominal_swing_height + action_terms.swing_height[:, None, None]
+    swing_height = (config.nominal_swing_height + action_terms.swing_height[:, None, None]) * startup_ramp[:, :, None]
     swing_target = _bezier_cubic(backward_target, forward_target, swing_height, local_phase[:, :, None])
     stance_target = (1.0 - local_phase[:, :, None]) * forward_target + local_phase[:, :, None] * backward_target
     desired_foot_body = jnp.where(swing_mask[:, :, None], swing_target, stance_target)
+
 
     workspace_min = controller_bundle.neutral_foot_body_pos[None, :, :] + jnp.asarray(config.workspace_delta_min, dtype=jnp.float32)
     workspace_max = controller_bundle.neutral_foot_body_pos[None, :, :] + jnp.asarray(config.workspace_delta_max, dtype=jnp.float32)
@@ -365,5 +381,6 @@ def controller_step(
         phase=phase,
         filtered_command=filtered_command,
         prev_action=jnp.tanh(action),
+        elapsed_sec=elapsed_sec,
     )
     return next_state, joint_targets, desired_foot_body

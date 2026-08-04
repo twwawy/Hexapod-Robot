@@ -31,5 +31,7 @@ exec "$SCRIPT_DIR/residual_rl_run.sh" \
   --ppo-epochs 1 \
   --minibatch-size 16 \
   --hidden-size 32 \
+  --wandb \
+  --wandb-group fasttest \
   "${MODE_ARGS[@]}" \
   "$@"

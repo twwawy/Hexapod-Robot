@@ -59,7 +59,7 @@ def _resolve_path(repo_root: Path, value: str) -> Path:
 
 
 def _write_ppm(path: Path, pixels: np.ndarray) -> None:
-    rgb = np.ascontiguousarray(pixels[::-1])
+    rgb = np.ascontiguousarray(pixels)
     header = f"P6\n{rgb.shape[1]} {rgb.shape[0]}\n255\n".encode("ascii")
     path.write_bytes(header + rgb.tobytes())
 
@@ -194,7 +194,7 @@ def main() -> None:
             if render_dir is not None:
                 _write_ppm(render_dir / f"frame_{frame_idx:04d}.ppm", pixels)
             if writer is not None:
-                writer.append_data(np.ascontiguousarray(pixels[::-1]))
+                writer.append_data(np.ascontiguousarray(pixels))
 
         try:
             saved_frames = 0

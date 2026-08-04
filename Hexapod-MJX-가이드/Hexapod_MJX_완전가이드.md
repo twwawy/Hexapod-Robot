@@ -763,29 +763,31 @@ JSON에 들어가는 것:
 이제 자세만 따로 바로 볼 수 있는 스크립트도 있다.
 
 ```bash
-~/Desktop/Hexapod-MJX-가이드/자세튜닝.sh --q2 -1.0 --q3 -0.25
+~/Desktop/Hexapod-MJX-가이드/자세튜닝.sh --front-q1 -0.7 --mid-q1 0.0 --rear-q1 0.7 --q2 -0.85 --q3 -0.55
 ```
 
 기본 동작:
+- 기본 렌더는 이제 **mesh preview**다. 즉 `~/Downloads/hexa.png` 같은 실물 형상에 가깝게 비교할 수 있다.
 - PNG 미리보기 저장: `/tmp/stand_pose_preview.png`
 - pose 값 JSON 저장: `/tmp/stand_pose_preview.json`
 - 바로 붙여넣기 쉬운 `STAND_POSE` 블록도 같이 출력
+- 예전 단순 박스/캡슐 모델로 보고 싶으면 `--visual-style simplified`를 붙이면 된다.
 
 실시간으로 보려면:
 ```bash
-~/Desktop/Hexapod-MJX-가이드/자세튜닝.sh viewer --q2 -1.0 --q3 -0.25
+~/Desktop/Hexapod-MJX-가이드/자세튜닝.sh viewer --front-q1 -0.7 --mid-q1 0.0 --rear-q1 0.7 --q2 -0.85 --q3 -0.55
 ```
 
 자주 쓰는 조절축:
-- `--q1` : 몸통 가까운 첫 관절 각도
-- `--q2` : 가운데 관절 각도
-- `--q3` : 끝 관절 각도
+- `--q1` : 몸통 가까운 yaw/sweep 관절 각도
+- `--q2` : 가운데 pitch 관절 각도
+- `--q3` : 끝 pitch 관절 각도
 - `--front-q1/2/3`, `--mid-q1/2/3`, `--rear-q1/2/3` : 앞/중간/뒤 다리만 따로 조절
 
 예:
 ```bash
-~/Desktop/Hexapod-MJX-가이드/자세튜닝.sh --q1 0.5 --q2 -1.0 --q3 -0.25
-~/Desktop/Hexapod-MJX-가이드/자세튜닝.sh --front-q2 -1.1 --mid-q2 -0.9 --rear-q2 -1.1 --q3 -0.3
+~/Desktop/Hexapod-MJX-가이드/자세튜닝.sh --front-q1 -0.7 --mid-q1 0.0 --rear-q1 0.7 --q2 -0.85 --q3 -0.55
+~/Desktop/Hexapod-MJX-가이드/자세튜닝.sh --visual-style simplified --front-q1 -0.7 --mid-q1 0.0 --rear-q1 0.7 --q2 -0.85 --q3 -0.55
 ```
 
 증상별 조정법:

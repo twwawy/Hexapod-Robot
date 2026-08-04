@@ -19,6 +19,20 @@ if [[ "$USE_EGL" == "1" ]]; then
     "$@"
 fi
 
+if [[ -z "${DISPLAY:-}" ]] && xdpyinfo -display :0 >/dev/null 2>&1; then
+  exec env -u LD_LIBRARY_PATH DISPLAY=:0 "$PY" "$REPO/SW/mjx/preview_stand_pose.py" \
+    --repo-root "$REPO" \
+    "${MODE_ARGS[@]}" \
+    "$@"
+fi
+
+if [[ -z "${DISPLAY:-}" ]] && command -v xvfb-run >/dev/null 2>&1; then
+  exec xvfb-run -a env -u LD_LIBRARY_PATH "$PY" "$REPO/SW/mjx/preview_stand_pose.py" \
+    --repo-root "$REPO" \
+    "${MODE_ARGS[@]}" \
+    "$@"
+fi
+
 exec env -u LD_LIBRARY_PATH "$PY" "$REPO/SW/mjx/preview_stand_pose.py" \
   --repo-root "$REPO" \
   "${MODE_ARGS[@]}" \

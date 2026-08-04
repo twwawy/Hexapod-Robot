@@ -31,47 +31,57 @@ TRIPOD_B = {"RF", "LM", "RB"}
 LEG_NAMES = ("LF", "LM", "LB", "RF", "RM", "RB")
 
 # The original URDF contains many mesh collisions. Those are expensive and can
-# be numerically noisy for a first locomotion search, so we replace them with a
-# coarse body box, six foot spheres, and light-weight visual leg frames that
-# make the gait easier to inspect without reintroducing collision complexity.
+# be numerically noisy for locomotion, so training uses a hybrid model:
+# - keep the original mesh geoms as visual-only geometry,
+# - add one coarse collision box for the body,
+# - add explicit foot-contact spheres for ground interaction.
+#
+# This keeps the learning physics simple while making preview/training renders
+# look like the physical robot instead of a box-and-stick proxy.
 BASE_COLLISION_HALF_SIZE = (0.19, 0.11, 0.03)
 BASE_COLLISION_POS = (0.0, 0.0, 0.025)
 FOOT_COLLISION_RADIUS = 0.018
 LEG_FRAME_RADIUS = 0.0075
 LEFT_FRAME_RGBA = "0.25 0.70 0.95 1"
 RIGHT_FRAME_RGBA = "0.95 0.65 0.25 1"
+
+DEFAULT_STAND_ROOT_HEIGHT = 0.06
 FLOOR_VISUAL_HALF_SIZE = (1.15, 1.15, 0.015)
 FLOOR_VISUAL_POS = (0.0, 0.0, -0.015)
 
 # Standing pose used both at reset and as the sinusoid center point.
 # Suffix ``_1/_2/_3`` corresponds to the three actuated joints in each leg.
-# The left/right values intentionally mirror each other because the URDF uses
-# mirrored joint axes on the two body sides even though the desired world-space
-# posture is the same dome-like stance on both sides.
 #
-# All three joints now bend in one consistent world-space direction from the
-# body toward the floor so the default stance looks slightly extended instead of
-# forming a reverse-knee / zig-zag silhouette.
+# ``*_1`` is the body-nearest yaw/sweep joint, so a photo-like neutral stance
+# needs front/mid/rear legs to use different values instead of one shared sweep.
+# ``*_2`` and ``*_3`` are the two pitch joints that fold the leg downward.
+#
+# The reference hardware photo shows three consistent characteristics we want to
+# preserve in the default pose:
+# 1. the body sits above the legs,
+# 2. the front and rear legs splay fore/aft while the middle legs stay lateral,
+# 3. the pitch joints fold below the body instead of arching up over it.
 STAND_POSE = {
-    "LF_1": 0.50,
-    "LM_1": 0.50,
-    "LB_1": 0.50,
-    "RF_1": -0.50,
-    "RM_1": -0.50,
-    "RB_1": -0.50,
-    "LF_2": -0.90,
-    "LM_2": -0.90,
-    "LB_2": -0.90,
-    "RF_2": 0.90,
-    "RM_2": 0.90,
-    "RB_2": 0.90,
-    "LF_3": -0.40,
-    "LM_3": -0.40,
-    "LB_3": -0.40,
-    "RF_3": 0.40,
-    "RM_3": 0.40,
-    "RB_3": 0.40,
+    "LF_1": -0.7,
+    "LF_2": 0.1,
+    "LF_3": -1.0,
+    "RF_1": 0.7,
+    "RF_2": -0.1,
+    "RF_3": 1.0,
+    "LM_1": -0.4,
+    "LM_2": 0.1,
+    "LM_3": -1.0,
+    "RM_1": 0.4,
+    "RM_2": -0.1,
+    "RM_3": 1.0,
+    "LB_1": 0.7,
+    "LB_2": 0.1,
+    "LB_3": -1.0,
+    "RB_1": -0.7,
+    "RB_2": -0.1,
+    "RB_3": 1.0
 }
+
 
 
 @dataclass(frozen=True)
@@ -105,24 +115,32 @@ def repo_root_from(path: str | Path) -> Path:
         if (parent / "HW").exists() and (parent / "SW").exists():
             return parent
     raise FileNotFoundError(f"Could not locate Hexapod-Robot repo root from: {path}")
+def _stable_root_height_from_foot_body_z(foot_z: np.ndarray) -> float:
+    """Place the root high enough that the lowest modeled foot touches the floor.
+
+    The caller should provide foot/sample Z values measured with the floating base
+    still at world Z=0. The required lift is then simply `-min(z)`, clamped at
+    zero so already-above-ground poses stay unchanged.
+    """
+    return float(max(0.0, -float(np.min(foot_z))))
+
+
+
 def estimate_standing_root_height(bundle: HexapodModelBundle) -> float:
-    """Infer the floating-base reset height that puts the standing feet on the floor."""
+    """Infer a stable reset height and never let it drop below the 0.06 floor."""
     data = mujoco.MjData(bundle.model)
     data.qpos[0:3] = np.array([0.0, 0.0, 0.0], dtype=np.float64)
     data.qpos[3:7] = np.array([1.0, 0.0, 0.0, 0.0], dtype=np.float64)
     data.qpos[bundle.joint_qpos_adr] = np.asarray(bundle.default_joint_pose, dtype=np.float64)
     mujoco.mj_forward(bundle.model, data)
 
-    root_body_id = mujoco.mj_name2id(bundle.model, mujoco.mjtObj.mjOBJ_BODY, "hexapod_root")
-    root_pos = data.xpos[root_body_id].copy()
-    root_rot = data.xmat[root_body_id].reshape(3, 3).copy()
-    foot_body_z = []
+    foot_world_z = []
     for leg in LEG_NAMES:
         foot_geom_id = mujoco.mj_name2id(bundle.model, mujoco.mjtObj.mjOBJ_GEOM, f"{leg}_motor_horn_3_1_contact")
-        foot_world = data.geom_xpos[foot_geom_id]
-        foot_body = root_rot.T @ (foot_world - root_pos)
-        foot_body_z.append(float(foot_body[2]))
-    return float(-np.mean(np.asarray(foot_body_z, dtype=np.float64)))
+        foot_world_z.append(float(data.geom_xpos[foot_geom_id][2]))
+    auto_height = _stable_root_height_from_foot_body_z(np.asarray(foot_world_z, dtype=np.float64))
+    return float(max(DEFAULT_STAND_ROOT_HEIGHT, auto_height))
+
 
 
 def _clean_urdf_text(repo_root: Path) -> str:
@@ -229,33 +247,96 @@ def _add_visual_leg_frames(robot_body: ET.Element, foot_contacts: dict[str, str]
         )
 
 
-def _simplify_training_geoms(robot_body: ET.Element) -> None:
-    """Replace mesh-heavy collision geoms with a training-friendly approximation.
+def _format_pos(vec: np.ndarray) -> str:
+    return " ".join(f"{float(value):.6f}" for value in vec)
 
-    We keep only the information most important for gait search:
-    - a single collision box for the main body,
-    - one collision sphere at each foot contact location,
-    - visual-only leg frames so the gait is readable in viewer/headless renders.
 
-    This drastically reduces contact complexity while preserving the question we
-    care about right now: can a simple open-loop tripod gait keep the robot up
-    and move it forward?
-    """
+def _geom_rotation_matrix(model: mujoco.MjModel, geom_id: int) -> np.ndarray:
+    mat = np.empty(9, dtype=np.float64)
+    mujoco.mju_quat2Mat(mat, np.asarray(model.geom_quat[geom_id], dtype=np.float64))
+    return mat.reshape(3, 3)
+
+
+def _infer_foot_contacts_from_model(model: mujoco.MjModel) -> dict[str, str]:
+    """Infer contact points from the actual foot mesh geometry, not mesh origins."""
     foot_contacts: dict[str, str] = {}
-    for body in robot_body.iter("body"):
-        for geom in body.findall("geom"):
-            mesh_name = geom.get("mesh", "")
-            if mesh_name.endswith("_foot_3_1"):
-                foot_contacts[body.get("name", "")] = geom.get("pos", "0 0 0")
+    for leg in LEG_NAMES:
+        body_name: str | None = None
+        body_vertices: list[np.ndarray] = []
+        for geom_id in range(model.ngeom):
+            if int(model.geom_type[geom_id]) != int(mujoco.mjtGeom.mjGEOM_MESH):
+                continue
+            mesh_id = int(model.geom_dataid[geom_id])
+            if mesh_id < 0:
+                continue
+            mesh_name = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_MESH, mesh_id)
+            if mesh_name is None or not mesh_name.startswith(f"{leg}_foot_"):
+                continue
+
+            geom_body_name = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_BODY, int(model.geom_bodyid[geom_id]))
+            if geom_body_name is None:
+                continue
+            body_name = geom_body_name
+
+            vert_adr = int(model.mesh_vertadr[mesh_id])
+            vert_num = int(model.mesh_vertnum[mesh_id])
+            mesh_vertices = np.asarray(model.mesh_vert[vert_adr : vert_adr + vert_num], dtype=np.float64)
+            rot = _geom_rotation_matrix(model, geom_id)
+            pos = np.asarray(model.geom_pos[geom_id], dtype=np.float64)
+            body_vertices.append(mesh_vertices @ rot.T + pos)
+
+        if body_name is None or not body_vertices:
+            continue
+
+        vertices = np.concatenate(body_vertices, axis=0)
+        min_z = float(np.min(vertices[:, 2]))
+        lowest_band = vertices[vertices[:, 2] <= min_z + 0.002]
+        contact = np.array([
+            float(np.mean(lowest_band[:, 0])),
+            float(np.mean(lowest_band[:, 1])),
+            min_z,
+        ], dtype=np.float64)
+        foot_contacts[body_name] = _format_pos(contact)
 
     if len(foot_contacts) != 6:
-        raise RuntimeError(f"Expected 6 foot contact meshes, found {len(foot_contacts)}.")
+        raise RuntimeError(f"Expected 6 inferred foot contact points, found {len(foot_contacts)}.")
+    return foot_contacts
 
-    # MuJoCo saved XML already contains many geoms expanded from the URDF. We
-    # remove all of them first so the training collision model is explicit.
-    for parent, child in reversed(_iter_parent_child(robot_body)):
-        if child.tag == "geom":
-            parent.remove(child)
+
+
+def _add_foot_contact_geoms(robot_body: ET.Element, foot_contacts: dict[str, str], *, collidable: bool) -> None:
+    for body_name, pos in foot_contacts.items():
+        attrs = {
+            "name": f"{body_name}_contact",
+            "type": "sphere",
+            "pos": pos,
+            "size": f"{FOOT_COLLISION_RADIUS:.4f}",
+            "rgba": "0.98 0.35 0.18 0.55",
+        }
+        if collidable:
+            attrs.update({
+                "friction": "1.8 0.02 0.01",
+                "condim": "3",
+            })
+        else:
+            attrs.update({
+                "contype": "0",
+                "conaffinity": "0",
+                "mass": "0",
+            })
+        ET.SubElement(_find_body(robot_body, body_name), "geom", attrs)
+
+
+def _simplify_training_geoms(robot_body: ET.Element, foot_contacts: dict[str, str]) -> None:
+    """Keep original mesh visuals but replace their collisions with simple proxies."""
+
+    # Leave URDF-expanded geoms in place for visualization, but make them
+    # visual-only so training contacts come only from the coarse proxies below.
+    for body in robot_body.iter("body"):
+        for geom in body.findall("geom"):
+            geom.set("contype", "0")
+            geom.set("conaffinity", "0")
+            geom.set("density", "0")
 
     ET.SubElement(
         robot_body,
@@ -265,42 +346,23 @@ def _simplify_training_geoms(robot_body: ET.Element) -> None:
             "type": "box",
             "pos": " ".join(f"{value:.4f}" for value in BASE_COLLISION_POS),
             "size": " ".join(f"{value:.4f}" for value in BASE_COLLISION_HALF_SIZE),
-            "rgba": "0.58 0.64 0.72 1",
+            "rgba": "0.58 0.64 0.72 0.18",
             "friction": "0.9 0.05 0.02",
             "condim": "3",
         },
     )
 
-    _add_visual_leg_frames(robot_body, foot_contacts)
-
-    for body_name, pos in foot_contacts.items():
-        ET.SubElement(
-            _find_body(robot_body, body_name),
-            "geom",
-            {
-                "name": f"{body_name}_contact",
-                "type": "sphere",
-                "pos": pos,
-                "size": f"{FOOT_COLLISION_RADIUS:.4f}",
-                "rgba": "0.98 0.35 0.18 1",
-                "friction": "1.8 0.02 0.01",
-                "condim": "3",
-            },
-        )
+    _add_foot_contact_geoms(robot_body, foot_contacts, collidable=True)
 
 
-def build_floating_base_mjcf(repo_root: str | Path, *, base_height: float = 0.22) -> Path:
-    """Generate the simplified MJCF used by training and visualization.
 
-    Why rebuild the file instead of editing the URDF in-place?
-    - the repo keeps the original asset authoritative,
-    - generated artifacts are cheap to overwrite,
-    - training-specific simplifications stay isolated from design files.
-    """
+def build_floating_base_mjcf(repo_root: str | Path, *, base_height: float = 0.22, simplified: bool = True) -> Path:
+    """Generate a free-floating MJCF for either training or mesh-faithful preview."""
     repo_root = repo_root_from(repo_root)
     generated_dir = repo_root / "SW" / "mjx" / "artifacts"
     generated_dir.mkdir(parents=True, exist_ok=True)
-    generated_path = generated_dir / "hexapod_floating_base.xml"
+    generated_name = "hexapod_floating_base.xml" if simplified else "hexapod_floating_base_visual.xml"
+    generated_path = generated_dir / generated_name
 
     clean_urdf = _clean_urdf_text(repo_root)
     with tempfile.TemporaryDirectory(prefix="hexapod_mjx_") as tmpdir:
@@ -313,6 +375,7 @@ def build_floating_base_mjcf(repo_root: str | Path, *, base_height: float = 0.22
         # resulting XML tree. That is much simpler than reimplementing the full
         # conversion logic ourselves.
         urdf_model = mujoco.MjModel.from_xml_path(str(urdf_path))
+        foot_contacts = _infer_foot_contacts_from_model(urdf_model)
         mujoco.mj_saveLastXML(str(saved_xml_path), urdf_model)
 
         tree = ET.parse(saved_xml_path)
@@ -330,7 +393,10 @@ def build_floating_base_mjcf(repo_root: str | Path, *, base_height: float = 0.22
             worldbody.remove(child)
             robot_body.append(child)
 
-        _simplify_training_geoms(robot_body)
+        if simplified:
+            _simplify_training_geoms(robot_body, foot_contacts)
+        else:
+            _add_foot_contact_geoms(robot_body, foot_contacts, collidable=False)
 
         ET.SubElement(
             worldbody,
@@ -365,15 +431,11 @@ def build_floating_base_mjcf(repo_root: str | Path, *, base_height: float = 0.22
     return generated_path
 
 
-def load_hexapod_model(repo_root: str | Path) -> HexapodModelBundle:
-    """Load the generated MJCF and package all indexing metadata.
 
-    The returned bundle is the handoff point between model-preparation code and
-    experiment code. After this function, downstream code can think in terms of
-    named joints and compact arrays instead of raw MuJoCo internals.
-    """
+def _load_hexapod_model(repo_root: str | Path, *, simplified: bool) -> HexapodModelBundle:
+    """Load a generated MJCF and package all indexing metadata."""
     repo_root = repo_root_from(repo_root)
-    mjcf_path = build_floating_base_mjcf(repo_root)
+    mjcf_path = build_floating_base_mjcf(repo_root, simplified=simplified)
     model = mujoco.MjModel.from_xml_path(str(mjcf_path))
     mjx_model = mjx.put_model(model)
 
@@ -395,9 +457,6 @@ def load_hexapod_model(repo_root: str | Path) -> HexapodModelBundle:
         joint_qpos_adr.append(int(model.jnt_qposadr[joint_id]))
         joint_dof_adr.append(int(model.jnt_dofadr[joint_id]))
 
-        # Joint names follow ``<leg>_<suffix>``. The suffix tells us which of
-        # the three per-leg controller channels this joint belongs to, while the
-        # leg name tells us which tripod phase it should use.
         suffix = int(name.split("_")[-1])
         joint_group_index.append(suffix - 1)
         leg = name.split("_")[0]
@@ -418,3 +477,13 @@ def load_hexapod_model(repo_root: str | Path) -> HexapodModelBundle:
         joint_group_index=jnp.asarray(joint_group_index, dtype=jnp.int32),
         tripod_phase_offset=jnp.asarray(tripod_phase_offset, dtype=jnp.float32),
     )
+
+
+def load_hexapod_model(repo_root: str | Path) -> HexapodModelBundle:
+    """Load the simplified training/visualization model."""
+    return _load_hexapod_model(repo_root, simplified=True)
+
+
+def load_hexapod_visual_model(repo_root: str | Path) -> HexapodModelBundle:
+    """Load a mesh-faithful preview model that preserves the original visuals."""
+    return _load_hexapod_model(repo_root, simplified=False)

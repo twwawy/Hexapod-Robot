@@ -31,5 +31,7 @@ exec "$SCRIPT_DIR/residual_rl_run.sh" \
   --ppo-epochs 4 \
   --minibatch-size 512 \
   --hidden-size 128 \
+  --wandb \
+  --wandb-group largeparallel \
   "${MODE_ARGS[@]}" \
   "$@"

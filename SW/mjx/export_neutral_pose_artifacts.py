@@ -16,12 +16,14 @@ import mujoco
 import numpy as np
 from PIL import Image
 
-from hexapod_mjx.model import STAND_POSE, estimate_standing_root_height, load_hexapod_model, repo_root_from
+from hexapod_mjx.model import STAND_POSE, estimate_standing_root_height, load_hexapod_model, load_hexapod_visual_model, repo_root_from
+
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Export the Hexapod MJX neutral pose as PNG + JSON.")
     parser.add_argument("--repo-root", type=str, default=None)
+    parser.add_argument("--visual-style", choices=("mesh", "simplified"), default="mesh")
     parser.add_argument("--output-image-path", type=str, required=True)
     parser.add_argument("--output-metadata-path", type=str, required=True)
     parser.add_argument("--width", type=int, default=480)
@@ -33,6 +35,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--lookat-y", type=float, default=0.0)
     parser.add_argument("--lookat-z", type=float, default=0.08)
     return parser.parse_args()
+
 
 
 def _resolve_repo_path(repo_root: Path, value: str) -> Path:
@@ -49,7 +52,9 @@ def main() -> None:
     output_image_path.parent.mkdir(parents=True, exist_ok=True)
     output_metadata_path.parent.mkdir(parents=True, exist_ok=True)
 
-    bundle = load_hexapod_model(repo_root)
+    bundle = load_hexapod_visual_model(repo_root) if args.visual_style == "mesh" else load_hexapod_model(repo_root)
+
+
     reset_root_height = estimate_standing_root_height(bundle)
 
     data = mujoco.MjData(bundle.model)
@@ -66,7 +71,7 @@ def main() -> None:
         camera.elevation = args.camera_elevation
         camera.lookat[:] = [args.lookat_x, args.lookat_y, args.lookat_z]
         renderer.update_scene(data, camera=camera)
-        pixels = renderer.render()[::-1]
+        pixels = renderer.render()
         Image.fromarray(pixels).save(output_image_path)
     finally:
         renderer.close()
@@ -74,6 +79,7 @@ def main() -> None:
     payload = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "repo_root": str(repo_root),
+        "visual_style": args.visual_style,
         "generated_mjcf": str(bundle.generated_mjcf_path),
         "reset_root_height": float(reset_root_height),
         "stand_pose": {name: float(value) for name, value in STAND_POSE.items()},
