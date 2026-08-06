@@ -175,11 +175,17 @@ CS 핀은 GPIO Output으로 직접 제어함.
 
 ## 5. INA / INB / INC
 
+1: 오른쪽 릴레이
+2: 왼쪽 릴레이
+
 | 기능 | STM32 | 설정 |
 |---|---|---|
-| INA | PC2 | GPIO_Output |
-| INB | PC3 | GPIO_Output |
-| INC | PC4 | GPIO_Output |
+| INA1 | PC2  | GPIO_Output |
+| INB1 | PC3  | GPIO_Output |
+| INC1 | PC4  | GPIO_Output |
+| INA2 | PC5  | GPIO_Output |
+| INB2 | PA12 | GPIO_Output |
+| INC2 | PB2  | GPIO_Output |
 
 | 상태 | 릴레이 |
 |---|---|
