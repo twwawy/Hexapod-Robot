@@ -21,9 +21,9 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "gps.h"
-#include "imu.h"
-#include "nav_kalman.h"
+#include "sensor/gps.h"
+#include "sensor/imu.h"
+#include "sensor/nav_kalman.h"
 
 /* USER CODE END Includes */
 
@@ -136,7 +136,9 @@ int main(void)
   MX_USART3_UART_Init();
   MX_USART6_UART_Init();
   /* USER CODE BEGIN 2 */
-  GPS_Init(&g_gps, &huart2);
+  /* Temporary GPS test path: GPS TX -> PD2 / UART5_RX.
+     UART5 is unavailable to the LoRa module while this test is active. */
+  GPS_Init(&g_gps, &huart5);
   IMU_Init(&g_imu, &huart3);
   NavKalman_Init(&g_nav_kalman, NULL);
 
@@ -771,7 +773,7 @@ static void MX_UART5_Init(void)
 
   /* USER CODE END UART5_Init 1 */
   huart5.Instance = UART5;
-  huart5.Init.BaudRate = 115200;
+  huart5.Init.BaudRate = 9600;
   huart5.Init.WordLength = UART_WORDLENGTH_8B;
   huart5.Init.StopBits = UART_STOPBITS_1;
   huart5.Init.Parity = UART_PARITY_NONE;

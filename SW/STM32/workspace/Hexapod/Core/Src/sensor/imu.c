@@ -1,4 +1,4 @@
-#include "imu.h"
+#include "sensor/imu.h"
 
 #include <string.h>
 
