@@ -5,12 +5,18 @@
 
 # Add inputs and outputs from these tool invocations to the build variables 
 C_SRCS += \
+../Core/Src/module/leg6_test.c \
+../Core/Src/module/lora.c \
 ../Core/Src/module/relay.c 
 
 OBJS += \
+./Core/Src/module/leg6_test.o \
+./Core/Src/module/lora.o \
 ./Core/Src/module/relay.o 
 
 C_DEPS += \
+./Core/Src/module/leg6_test.d \
+./Core/Src/module/lora.d \
 ./Core/Src/module/relay.d 
 
 
@@ -21,7 +27,7 @@ Core/Src/module/%.o Core/Src/module/%.su Core/Src/module/%.cyclo: ../Core/Src/mo
 clean: clean-Core-2f-Src-2f-module
 
 clean-Core-2f-Src-2f-module:
-	-$(RM) ./Core/Src/module/relay.cyclo ./Core/Src/module/relay.d ./Core/Src/module/relay.o ./Core/Src/module/relay.su
+	-$(RM) ./Core/Src/module/leg6_test.cyclo ./Core/Src/module/leg6_test.d ./Core/Src/module/leg6_test.o ./Core/Src/module/leg6_test.su ./Core/Src/module/lora.cyclo ./Core/Src/module/lora.d ./Core/Src/module/lora.o ./Core/Src/module/lora.su ./Core/Src/module/relay.cyclo ./Core/Src/module/relay.d ./Core/Src/module/relay.o ./Core/Src/module/relay.su
 
 .PHONY: clean-Core-2f-Src-2f-module
 

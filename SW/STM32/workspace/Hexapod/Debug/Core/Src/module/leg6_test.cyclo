@@ -1,0 +1,5 @@
+../Core/Src/module/leg6_test.c:12:13:Leg6Test_WritePulse	4
+../Core/Src/module/leg6_test.c:22:26:Leg6Test_StartChannel	4
+../Core/Src/module/leg6_test.c:29:19:Leg6Test_Start	7
+../Core/Src/module/leg6_test.c:72:6:Leg6Test_Process	13
+../Core/Src/module/leg6_test.c:142:6:Leg6Test_Stop	4
