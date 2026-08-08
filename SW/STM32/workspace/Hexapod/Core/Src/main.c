@@ -24,6 +24,7 @@
 #include "sensor/gps.h"
 #include "sensor/imu.h"
 #include "sensor/nav_kalman.h"
+#include "module/relay.h"
 
 /* USER CODE END Includes */
 
@@ -136,6 +137,9 @@ int main(void)
   MX_USART3_UART_Init();
   MX_USART6_UART_Init();
   /* USER CODE BEGIN 2 */
+  /* PC2/PC3/PC4 relay inputs are active-high. Start safely with all OFF. */
+  Relay_Init();
+
   /* Temporary GPS test path: GPS TX -> PD2 / UART5_RX.
      UART5 is unavailable to the LoRa module while this test is active. */
   GPS_Init(&g_gps, &huart5);

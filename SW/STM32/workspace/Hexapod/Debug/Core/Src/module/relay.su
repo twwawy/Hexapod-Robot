@@ -1,0 +1,8 @@
+../Core/Src/module/relay.c:18:13:Relay_IsValidChannel	16	static
+../Core/Src/module/relay.c:23:6:Relay_Init	8	static
+../Core/Src/module/relay.c:28:6:Relay_Set	16	static
+../Core/Src/module/relay.c:40:6:Relay_On	16	static
+../Core/Src/module/relay.c:45:6:Relay_Off	16	static
+../Core/Src/module/relay.c:50:6:Relay_AllOn	8	static
+../Core/Src/module/relay.c:57:6:Relay_AllOff	8	static
+../Core/Src/module/relay.c:64:6:Relay_IsOn	16	static
