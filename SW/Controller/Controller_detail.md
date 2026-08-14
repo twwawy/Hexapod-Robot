@@ -2048,14 +2048,48 @@ Late Landing 중에는 다음 Tripod Phase 전환을 정지한다.
 
 ## 18.1 Search Down
 
-현재 몸체 좌표계의 $-z_B$ 방향으로 발끝을 탐색한다.
+현재 몸체 좌표계의 $-z_B$ 방향으로 발끝을 내리는 동시에 각 다리 장착점 방향으로 당겨 지면을 탐색한다. 하강만 수행할 때 발생하는 다리 과신전과 IK 작업공간 부담을 줄이기 위한 동작이다.
+
+다리 $i$의 바깥쪽 방사 단위벡터를
+
+$$
+e_{r,i}
+=
+\begin{bmatrix}
+\cos\alpha_i\\
+\sin\alpha_i\\
+0
+\end{bmatrix}
+$$
+
+로 정의한다. 안쪽 이동 속도는
+
+$$
+\boxed{
+v_{in}
+=
+k_{in}v_{search}
+}
+$$
+
+로 계산한다. 현재 Simulink 검증값은
+
+$$
+v_{search}=0.20\text{ m/s},
+\qquad
+k_{in}=0.8,
+\qquad
+v_{in}=0.16\text{ m/s}
+$$
+
+이다.
 
 $$
 {}^B\dot p_{late}
 =
 \begin{bmatrix}
-0\\
-0\\
+-v_{in}\cos(\alpha_i)\\
+-v_{in}\sin(\alpha_i)\\
 -v_{search}
 \end{bmatrix}
 $$
@@ -2063,11 +2097,19 @@ $$
 따라서
 
 $$
-x_i[k+1]=x_i[k]
+x_i[k+1]
+=
+x_i[k]
+-
+v_{in}\cos(\alpha_i)T_s
 $$
 
 $$
-y_i[k+1]=y_i[k]
+y_i[k+1]
+=
+y_i[k]
+-
+v_{in}\sin(\alpha_i)T_s
 $$
 
 $$
@@ -2106,15 +2148,17 @@ Swing 그룹의 모든 다리가 접촉하면 다음 Tripod Phase로 전환한�
 
 ## 18.3 Late Landing Fault
 
-검색 시작 위치를 $z_{start}$라 하면 검색 거리는
+검색 시작 위치를 $p_{late,start,i}$라 하면 전체 대각 탐색 거리는
 
 $$
 d_{search}
 =
-|z_i-z_{start}|
+\left\|
+p_i-p_{late,start,i}
+\right\|_2
 $$
 
-이다.
+이다. 필요하면 수직 하강 거리 $|z_i-z_{late,start,i}|$와 안쪽 이동 거리를 별도로 제한할 수 있다.
 
 다음 중 하나라도 만족하면 Fault로 전환한다.
 
@@ -3269,7 +3313,7 @@ $$
 State_i=LATE\_LANDING
 $$
 
-으로 전환하여 $-z_B$ 방향 Search Down을 수행한다.
+으로 전환하여 $-z_B$ 방향으로 내리는 동시에 각 다리 장착점 방향으로 당기는 Search Down을 수행한다.
 
 ## Step 16. Coordinate Transform
 
@@ -3465,8 +3509,10 @@ Yaw는 Heading Hold를 기본으로 사용하므로 Roll / Pitch와 동일한 PI
 | Contact | $F_{release}$ | 해제 Threshold |
 | Contact | $N_c, N_r$ | 연속 판정 Sample 수, 200 Hz 기준 |
 | Early | $s_{early,\min}$ | Early Landing 검사 시작 구간 |
-| Late | $v_{search}$ | 지면 탐색 속도 |
-| Late | $d_{search,\max}$ | 최대 탐색 거리 |
+| Late | $v_{search}$ | 하강 탐색 속도, 현재 0.20 m/s |
+| Late | $k_{in}$ | 하강 속도 대비 안쪽 이동 비율, 현재 0.8 |
+| Late | $v_{in}$ | 안쪽 이동 속도, $k_{in}v_{search}$, 현재 0.16 m/s |
+| Late | $d_{search,\max}$ | 최대 대각 탐색 거리 |
 | Late | $T_{search,\max}$ | 최대 탐색 시간 |
 | Joint | $\dot{\theta}_{\max}$ | 최대 관절 각속도 |
 | Joint | $\Delta\theta_{jump,\max}$ | 비정상 목표각 Jump 기준 |

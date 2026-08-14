@@ -155,7 +155,7 @@ Swing Height는 몸체 기준점에 대한 몸체 원점의 z방향 상대 위�
 
 **Early Landing**이 발생하면 해당 다리는 즉시 STANCE로 전환한다.
 
-**Late Landing**이 발생하면 미접촉 발만 `-z_B` 방향으로 Search Down하며, 모든 Swing 다리가 접촉하기 전까지 다음 Tripod Phase로 넘어가지 않는다.
+**Late Landing**이 발생하면 미접촉 발을 `-z_B` 방향으로 내리는 동시에 각 다리 장착점 방향으로 당겨 Search Down한다. 현재 Simulink 검증값은 하강 속도 `0.20 m/s`, 안쪽 이동 비율 `0.8`, 안쪽 이동 속도 `0.16 m/s`이다. 모든 Swing 다리가 접촉하기 전까지 다음 Tripod Phase로 넘어가지 않는다.
 
 ---
 
