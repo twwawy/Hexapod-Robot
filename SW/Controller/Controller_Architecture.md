@@ -42,7 +42,7 @@ Dead Zone + LPF
                          │                     │
                   Stance Trajectory      Target Position
                          │                     │
-                         │            Quintic + Cubic Bezier
+                         │     Quintic + Cubic Bezier + Radial Offset
                          │                     │
                          └──────────┬──────────┘
                                     │
@@ -141,11 +141,13 @@ STANCE 발은 지면에 고정된 상태를 유지하도록 몸체 이동과 회
 
 ### 7. Swing Trajectory
 
-SWING 다리는 다음 착지 목표점을 계산한 뒤 **3차 Bezier Curve**로 발끝 경로를 생성한다.
+SWING 다리는 다음 착지 목표점을 계산한 뒤 **3차 Bezier Curve와 방사 방향 오프셋**으로 발끝 경로를 생성한다.
 
 시간 진행에는 **Quintic Time Scaling**을 사용하여 Swing 시작과 종료를 부드럽게 만든다.
 
 Swing Height는 몸체 기준점에 대한 몸체 원점의 z방향 상대 위치에 따라 보정한다.
+
+방사 방향 오프셋은 Swing 시작점과 착지점에서는 0이고 최고점에서 최대가 되며, 발끝을 각 다리의 장착 방향 바깥쪽으로 이동시켜 IK 관절각을 줄인다. 현재 Simulink 검증값은 Swing Height `0.25 m`, 방사 방향 오프셋 `0.07 m`이다.
 
 ---
 
@@ -212,7 +214,7 @@ Roll 또는 Pitch가 **80° 이상**이면 ROLLOVER FAULT로 판단하고 즉시
 | Position Controller | PI |
 | Attitude Controller | PI |
 | Yaw 제어 | Heading Hold |
-| Swing Path | Cubic Bezier |
+| Swing Path | Cubic Bezier + Radial Offset |
 | Swing Time Scaling | Quintic |
 | Safe Support Polygon | 실제 지지다각형의 90% |
 | Rollover 기준 | Roll 또는 Pitch 80° |

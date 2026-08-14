@@ -8,7 +8,7 @@
 - 기본 보행: **Tripod Gait**
 - 사용자 명령 + Body Position Feedback + Body Attitude Feedback → **Final Body Twist**
 - Stance 다리: Body Twist의 반대 운동으로 **PULL 궤적** 생성
-- Swing 다리: 착지 목표점 + **3차 Bezier Curve**
+- Swing 다리: 착지 목표점 + **3차 Bezier Curve + 방사 방향 오프셋**
 - 발끝 압력센서: **Early / Late Landing**
 - 발끝 목표 위치 → 좌표계 변환 → **3DOF IK**
 - 최종 관절각에 안전 제한 적용 후 Servo Output
@@ -1395,12 +1395,13 @@ $$
 - 관절 제한
 - 몸체와의 충돌 여부
 - 최대 Step Length
+- 방사 방향 오프셋이 적용된 전체 Swing 중간 궤적
 
 를 검사해야 한다.
 
 ---
 
-# 15. Swing Bezier Trajectory
+# 15. Swing Bezier and Radial Offset Trajectory
 
 Swing 시작 위치를
 
@@ -1430,7 +1431,7 @@ P_1
 P_0
 +
 \begin{bmatrix}
-0\\0\\h
+0\\0\\\frac{4}{3}h
 \end{bmatrix}
 $$
 
@@ -1440,7 +1441,7 @@ P_2
 P_3
 +
 \begin{bmatrix}
-0\\0\\h
+0\\0\\\frac{4}{3}h
 \end{bmatrix}
 $$
 
@@ -1536,6 +1537,51 @@ $$
 
 따라서 발끝이 Swing 시작 순간에 갑자기 움직이거나 착지 순간에 갑자기 정지하는 현상을 줄이고, 시작과 종료를 부드럽게 만든다.
 
+## 15.2 Swing Radial Offset
+
+i번 다리의 Body 좌표계 기준 장착 방향을 $\alpha_i$라 하고, 다리 바깥 방향 단위벡터를
+
+$$
+\boxed{
+e_{r,i}
+=
+\begin{bmatrix}
+\cos\alpha_i\\
+\sin\alpha_i\\
+0
+\end{bmatrix}
+}
+$$
+
+로 정의한다. 각 다리의 장착 방향은
+
+$$
+\alpha_i
+=
+\left[
+-45^\circ,
+-90^\circ,
+-135^\circ,
+45^\circ,
+90^\circ,
+135^\circ
+\right]
+$$
+
+이다.
+
+Swing 최고점의 방사 방향 오프셋을 $r_{swing}$이라 하면 진행률에 따른 오프셋은
+
+$$
+\boxed{
+r(s)
+=
+4r_{swing}s(1-s)
+}
+$$
+
+로 계산한다. $r(0)=r(1)=0$이고 $r(0.5)=r_{swing}$이므로 시작점과 착지점은 바뀌지 않고 Swing 최고점에서만 최대 오프셋이 적용된다.
+
 최종 Swing 발끝 목표 위치는
 
 $$
@@ -1543,10 +1589,20 @@ $$
 p_i^{ref}
 =
 B\left(s(\tau)\right)
++
+r\left(s(\tau)\right)e_{r,i}
 }
 $$
 
-로 계산한다.
+로 계산한다. 현재 Simulink 구현에서는 모든 Swing 다리에
+
+$$
+\boxed{
+r_{swing}=0.07\text{ m}
+}
+$$
+
+를 동일하게 적용한다.
 
 즉, 매 제어 주기에서
 
@@ -1560,15 +1616,27 @@ s = 10τ³ - 15τ⁴ + 6τ⁵
    ↓
 Bezier Curve B(s)
    ↓
+방사 방향 오프셋 r(s)e_r,i 추가
+   ↓
 발끝 목표 위치 p_i^ref
 ```
 
 순서로 Swing 궤적을 생성한다.
 
 
-## 15.2 Swing Height
+## 15.3 Swing Height
 
 Swing 다리의 기본 발끝 상승 높이를 $h_0$로 정의한다.
+
+현재 Simulink 검증에서는
+
+$$
+\boxed{
+h_0=0.25\text{ m}
+}
+$$
+
+를 사용한다.
 
 몸체 기준점 $O_R$에 대한 현재 몸체 원점 $O_B$의 z방향 상대 변위를
 
@@ -1662,7 +1730,7 @@ P_0
 \begin{bmatrix}
 0\\
 0\\
-h
+\frac{4}{3}h
 \end{bmatrix}
 $$
 
@@ -1674,11 +1742,37 @@ P_3
 \begin{bmatrix}
 0\\
 0\\
-h
+\frac{4}{3}h
 \end{bmatrix}
 $$
 
 로 생성한다.
+
+
+## 15.4 현재 Simulink 검증값
+
+현재 구현의 보행 및 초기자세 파라미터는 다음과 같다.
+
+| 항목 | 값 |
+|---|---:|
+| 제어 주기 | `0.005 s` |
+| Tripod Phase 시간 | `0.5 s` |
+| 전진 시험 속도 | `0.14 m/s` |
+| 한 Phase 발 이동량 | `0.07 m` |
+| Swing Height | `0.25 m` |
+| Swing Radial Offset | `0.07 m` |
+| 초기 관절각 | $q_1=0^\circ$, $q_2=30^\circ$, $q_3=50^\circ$ |
+
+6개 다리의 전체 Swing 및 Stance 궤적을 검사한 결과는 다음과 같다.
+
+| 항목 | 범위 또는 결과 |
+|---|---:|
+| $q_1$ | $-17.75^\circ \sim 16.30^\circ$ |
+| $q_2$ | $-79.79^\circ \sim 47.08^\circ$ |
+| $q_3$ | $12.53^\circ \sim 125.53^\circ$ |
+| 전체 최대 관절각 | $125.53^\circ$ |
+| $\pm135^\circ$ 제한 여유 | $9.47^\circ$ |
+| IK 작업공간 초과 | 없음 |
 
 
 # 16. 발 접촉 판단
@@ -3143,14 +3237,16 @@ p_{0,i}
 (v_B+\omega_B\times p_{0,i})
 $$
 
-## Step 14. Swing Bezier
+## Step 14. Swing Bezier and Radial Offset
 
-현재 발끝 위치에서 착지 목표점까지 부드럽게 이동하도록 Bezier 곡선을 이용해 SWING 발끝 궤적을 생성한다.
+현재 발끝 위치에서 착지 목표점까지 부드럽게 이동하도록 Bezier 곡선을 생성하고, Swing 중간에는 다리 바깥 방향의 방사 오프셋을 추가한다.
 
 $$
 p_i^{ref}
 =
 B(s)
++
+4r_{swing}s(1-s)e_{r,i}
 $$
 
 ## Step 15. Early / Late Landing
@@ -3363,6 +3459,7 @@ Yaw는 Heading Hold를 기본으로 사용하므로 Roll / Pitch와 동일한 PI
 | Gait | $T_{stance}$ | Stance 예상 시간 |
 | Swing | $T_{swing}$ | Swing 시간 |
 | Swing | $h_0$ | 기본 Swing Height |
+| Swing | $r_{swing}$ | Swing 최고점의 방사 방향 오프셋, 현재 0.07 m |
 | Swing | $h_{\min}, h_{\max}$ | Swing Height 제한 |
 | Contact | $F_{contact}$ | 접촉 Threshold |
 | Contact | $F_{release}$ | 해제 Threshold |
@@ -3462,6 +3559,8 @@ Bezier
 (
 P_0,P_1,P_2,P_3,s
 )
++
+4r_{swing}s(1-s)e_{r,i}
 }
 $$
 

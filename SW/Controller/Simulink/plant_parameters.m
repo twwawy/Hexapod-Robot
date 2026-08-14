@@ -14,7 +14,7 @@ L2 = 0.121;
 L3 = 0.230;
 
 % 지면에서 몸체의 기준점 까지의 길이
-Reference_point = L2*cosd(45) + L3*cosd(30);
+Reference_point = L2*cosd(90 - 30) + L3*cosd(90 - 30 - 50);
 
 
 Kp_J1 = 800;    % 1번 관절 비례 게인을 설정한다.
