@@ -22,8 +22,10 @@
 좌표계 정의는 좌표축 README 및 `Controller_Architecture.md`의 정의를 따른다.
 
 - $\{B\}$: 현재 몸체 원점 좌표계
+- $\{W\}$: 지면에 고정된 절대 좌표계
 - $\{R\}$: 몸체 기준점 좌표계
 - $\{L_i\}$: i번 다리 좌표계
+- $O_W$: 최초 관절각 0° 착지 상태에서 정의한 절대 원점
 - $O_B$: 현재 몸체 원점
 - $O_R$: 몸체 기준점
 - $F_i$: i번 다리 발끝
@@ -37,6 +39,8 @@ $$
 $$
 
 으로 정의한다.
+
+절대 좌표계 $\{W\}$는 로봇의 이동과 무관하게 지면에 고정한다. 최초 관절각 0° 착지 상태에서 $O_W=O_B$로 초기화하며, 기본 자세로 일어서면 ${}^Wp_B=[0,0,h_{stand}]^T$가 된다. 몸체 좌표계 $\{B\}$와 몸체 기준 좌표계 $\{R\}$는 로봇의 명목 이동을 따라가지만, Body Position Estimator와 Position PI의 위치·목표·오차는 모두 절대 좌표계 $\{W\}$에서 계산한다.
 
 ## 1.2 벡터
 
@@ -260,13 +264,69 @@ $$
 
 ---
 
+## 3.3 Control Priority Manager와 Drone Controller
+
+조종기 입력 처리와 동작 모드 생성은 다음 순서를 따른다.
+
+```text
+USER 또는 실제 RC 입력
+        ↓
+ControlPriorityManager
+        ↓
+DroneController
+        ↓
+기능별 Enable, 진행률 및 사용자 명령
+```
+
+`ControlPriorityManager`는 조종기 스위치, 서기·착지 완료 신호와 Fault 신호를 이용하여 현재 허용할 `Active_Mode`를 먼저 결정한다. `DroneController`는 전달받은 `Active_Mode`에 해당하는 기능만 갱신한다. 이 순서를 사용하면 우선순위에서 차단된 서기·착지 또는 보행 진행률이 내부에서 미리 진행되는 것을 방지할 수 있다.
+
+상위 제어 상태의 우선순위는 다음과 같다.
+
+$$
+\boxed{
+KILL
+>
+ROLLOVER\_FAULT
+>
+CONTROLLER\_FAULT
+>
+LANDING
+>
+STANDING
+>
+READY(MANUAL/CORRECTION)
+}
+$$
+
+`Motion_Armed`는 READY 진입 직후 남아 있는 조종기 입력으로 갑작스러운 동작이 발생하는 것을 방지하는 내부 허가 상태이다. READY가 아니면 즉시 해제하고, READY 진입 후 Throttle·Yaw·Roll·Pitch가 연속 0.2초 동안 중립 범위에 있을 때 활성화한다. 활성화 전에는 수동 조종 및 보정 명령을 출력하지 않는다.
+
+수동 조종 모드에서는 실제 이동 명령이 다음 조건 중 하나를 만족할 때만 Tripod 보행을 활성화한다.
+
+$$
+\boxed{
+Tripod\_Enable
+=
+\left(
+|v_{x,user}|\ge V_{gait,th}
+\right)
+\lor
+\left(
+|\omega_{z,user}|\ge \Omega_{gait,th}
+\right)
+}
+$$
+
+따라서 READY 또는 MANUAL 상태에 진입했다는 이유만으로 Tripod 보행을 시작하지 않는다.
+
+---
+
 # 4. 사용자 Body Command
 
 `Controller_Architecture.md`의 정의에 따라 현재 조종 모드에서는
 
 - Throttle → 전진·후진 속도
-- Roll → 몸체 Roll 각속도
-- Pitch → 몸체 Pitch 각속도
+- Roll → 몸체 Roll 목표각
+- Pitch → 몸체 Pitch 목표각
 - Yaw → 몸체 Yaw 각속도
 
 를 명령한다.
@@ -276,9 +336,9 @@ $$
 $$
 V_{x,\max},
 \quad
-\Omega_{x,\max},
+\phi_{\max},
 \quad
-\Omega_{y,\max},
+\theta_{\max},
 \quad
 \Omega_{z,\max}
 $$
@@ -292,15 +352,15 @@ V_{x,\max}u_{T,f}
 $$
 
 $$
-\omega_{x,user}
+\phi_{ref}
 =
-\Omega_{x,\max}u_{R,f}
+\phi_{\max}u_{R,f}
 $$
 
 $$
-\omega_{y,user}
+\theta_{ref}
 =
-\Omega_{y,\max}u_{P,f}
+\theta_{\max}u_{P,f}
 $$
 
 $$
@@ -333,8 +393,8 @@ $$
 v_{x,user}\\
 0\\
 0\\
-\omega_{x,user}\\
-\omega_{y,user}\\
+0\\
+0\\
 \omega_{z,user}
 \end{bmatrix}
 }
@@ -346,25 +406,21 @@ $$
 
 # 5. 몸체 자세 목표값 생성
 
-Roll, Pitch, Yaw 조이스틱 입력은 **각속도 명령**이므로 자세 PI의 목표 자세는 각속도 명령을 적분하여 생성한다.
-
-Euler Angle 기반의 단순 구현은
+Roll과 Pitch 조이스틱 입력은 **목표각 명령**으로 사용한다. 필터링된 입력을 각 축의 최대 목표각에 직접 대응시킨다.
 
 $$
-\phi_{ref}[k+1]
-=
 \phi_{ref}[k]
-+
-\omega_{x,user}[k]T_s
+=
+\phi_{\max}u_{R,f}[k]
 $$
 
 $$
-\theta_{ref}[k+1]
-=
 \theta_{ref}[k]
-+
-\omega_{y,user}[k]T_s
+=
+\theta_{\max}u_{P,f}[k]
 $$
+
+Yaw 조이스틱 입력만 **각속도 명령**으로 사용한다. Heading Reference는
 
 $$
 \psi_{ref}[k+1]
@@ -377,7 +433,7 @@ $$
 \right)
 $$
 
-로 계산한다.
+로 갱신한다.
 
 Roll과 Pitch의 최대 허용 자세를 각각
 
@@ -413,7 +469,7 @@ $$
 
 를 적용한다.
 
-> 이 구조는 조이스틱이 중앙으로 복귀하면 각속도 명령이 0이 되고, Roll/Pitch/Yaw 모두 그 순간의 목표 자세를 유지하는 구조이다. 특히 Yaw는 Heading Hold를 통해 보행 중 발생하는 방향 오차를 지속적으로 보정한다.
+> Roll·Pitch 조이스틱이 중앙으로 복귀하면 목표각은 0으로 복귀한다. Yaw 조이스틱이 중앙으로 복귀하면 Yaw 각속도 명령만 0이 되고, 목표 Heading은 그 순간의 값을 유지한다.
 
 Yaw 축은 **Heading Hold를 기본으로 사용한다.**
 
@@ -485,8 +541,8 @@ $$
 
 몸체 상태 Feedback에 필요한 상태는 크게 $\hat p_B$와 $\hat R_B$이다.
 
-- $\hat p_B$: 몸체 기준점에 대한 몸체 원점의 상대 위치
-- $\hat R_B$: IMU로 추정한 몸체 자세
+- $\hat p_B$: 절대 좌표계에 대한 몸체 원점의 추정 위치
+- $\hat R_B$: 절대 좌표계에 대한 IMU 기반 몸체 추정 자세
 
 ---
 
@@ -524,23 +580,23 @@ Stance 상태이며 압력센서로 접촉이 확인된 다리만 위치 추정�
 지면에 미끄럼이 없다고 가정하면 Stance 발끝은 기준 좌표계에서 고정되어 있다.
 
 $$
-{}^R\dot p_{F_i}\approx0
+{}^W\dot p_{F_i}\approx0
 $$
 
 몸체 자세 회전행렬을
 
 $$
-{}^RR_B
+{}^WR_B
 $$
 
 라 하면 발끝의 위치 관계는
 
 $$
-{}^Rp_{F_i}
+{}^Wp_{F_i}
 =
-{}^Rp_B
+{}^Wp_B
 +
-{}^RR_B
+{}^WR_B
 {}^Bp_{F_i}
 $$
 
@@ -550,11 +606,11 @@ $$
 
 $$
 \boxed{
-{}^R\hat p_{B,i}
+{}^W\hat p_{B,i}
 =
-{}^Rp_{F_i}^{anchor}
+{}^Wp_{F_i}^{anchor}
 -
-{}^RR_B
+{}^WR_B
 {}^Bp_{F_i}^{meas}
 }
 $$
@@ -564,7 +620,7 @@ $$
 여기서
 
 $$
-{}^Rp_{F_i}^{anchor}
+{}^Wp_{F_i}^{anchor}
 $$
 
 는 해당 발이 Stance를 시작할 때 저장한 지면 고정 발끝 위치이다.
@@ -576,11 +632,11 @@ $$
 Swing → Stance 전환 순간을 $k_s$라 하면
 
 $$
-{}^Rp_{F_i}^{anchor}
+{}^Wp_{F_i}^{anchor}
 =
-{}^R\hat p_B[k_s]
+{}^W\hat p_B[k_s]
 +
-{}^RR_B[k_s]
+{}^WR_B[k_s]
 {}^Bp_{F_i}^{meas}[k_s]
 $$
 
@@ -597,11 +653,11 @@ Tripod Gait에서는 일반적으로 세 개의 Stance 다리가 지면을 지�
 각 Stance 다리의 관절각과 Forward Kinematics를 이용하면 각 다리로부터 몸체 위치 추정값을 각각 계산할 수 있다.
 
 $$
-{}^R\hat p_{B,i}
+{}^W\hat p_{B,i}
 =
-{}^Rp_{F_i}^{anchor}
+{}^Wp_{F_i}^{anchor}
 -
-{}^RR_B
+{}^WR_B
 {}^Bp_{F_i}^{meas}
 $$
 
@@ -613,11 +669,11 @@ $$
 
 $$
 \boxed{
-{}^R\hat p_B
+{}^W\hat p_B
 =
 \frac{1}{N_S}
 \sum_{i\in\mathcal S}
-{}^R\hat p_{B,i}
+{}^W\hat p_{B,i}
 }
 $$
 
@@ -627,14 +683,14 @@ $$
 
 $$
 \boxed{
-{}^R\hat p_B
+{}^W\hat p_B
 =
 \frac{
-{}^R\hat p_{B,1}
+{}^W\hat p_{B,1}
 +
-{}^R\hat p_{B,3}
+{}^W\hat p_{B,3}
 +
-{}^R\hat p_{B,5}
+{}^W\hat p_{B,5}
 }{3}
 }
 $$
@@ -643,14 +699,14 @@ $$
 
 $$
 \boxed{
-{}^R\hat p_B
+{}^W\hat p_B
 =
 \frac{
-{}^R\hat p_{B,2}
+{}^W\hat p_{B,2}
 +
-{}^R\hat p_{B,4}
+{}^W\hat p_{B,4}
 +
-{}^R\hat p_{B,6}
+{}^W\hat p_{B,6}
 }{3}
 }
 $$
@@ -676,9 +732,9 @@ $$
 r_i
 =
 \left\|
-{}^R\hat p_{B,i}
+{}^W\hat p_{B,i}
 -
-{}^R\hat p_B
+{}^W\hat p_B
 \right\|
 $$
 
@@ -692,7 +748,51 @@ $$
 
 # 8. Body Position PI Controller
 
-몸체 기준점에 대한 목표 상대 위치를
+보행 중 몸체 목표 위치는 사용자 선속도 명령을 적분하여 생성한다.
+
+## 8.1 Position Reference Generator
+
+사용자 Body 선속도 명령을
+
+$$
+v_{user}[k]
+=
+\begin{bmatrix}
+v_{x,user}[k]\\
+v_{y,user}[k]\\
+v_{z,user}[k]
+\end{bmatrix}
+$$
+
+라 하면, 목표 몸체 위치는
+
+$$
+\boxed{
+p_{B,ref}[k]
+=
+p_{B,ref}[k-1]
++
+{}^W\hat R_B[k]v_{user}[k]T_s
+}
+$$
+
+로 갱신한다.
+
+$v_{user}$는 몸체 좌표계 선속도이므로, 참조 좌표계의 위치를 적분할 때는 현재 추정 자세 ${}^W\hat R_B$로 회전한다. 자세 보정을 적용하지 않는 초기 구현에서는 ${}^W\hat R_B=I$로 두고 축별 속도를 바로 적분한다.
+
+Position Reference Generator를 활성화할 때는 명령 점프를 방지하기 위해
+
+$$
+\boxed{
+p_{B,ref}[k_0]
+=
+{}^W\hat p_B[k_0]
+}
+$$
+
+로 초기화한다.
+
+$v_{user}=0$이면 $p_{B,ref}$는 현재 목표 위치에 고정되므로 정지 위치 유지 모드가 된다. 참조 좌표계 원점을 몸체 위치에 설정한 정지 시험에서만
 
 $$
 p_{B,ref}
@@ -702,7 +802,11 @@ p_{B,ref}
 \end{bmatrix}
 $$
 
-으로 둔다.
+을 사용할 수 있다. 일반 보행 중에 $p_{B,ref}=0$을 고정하면 Position PI가 사용자의 이동 명령을 반대로 보정하므로 사용하지 않는다.
+
+## 8.2 Position Error
+
+PI에 입력하는 위치는 개별 다리의 FK 발끝 좌표가 아니라, FK와 Stance Anchor를 이용해 계산한 Body Position Estimate ${}^W\hat p_B$이다.
 
 위치 오차는
 
@@ -712,7 +816,7 @@ e_p[k]
 =
 p_{B,ref}
 -
-{}^R\hat p_B[k]
+{}^W\hat p_B[k]
 }
 $$
 
@@ -741,7 +845,7 @@ $$
 
 ---
 
-## 8.1 적분항
+## 8.3 적분항
 
 $$
 I_p[k]
@@ -769,7 +873,7 @@ $$
 ---
 
 
-## 8.2 PI 출력
+## 8.4 PI 출력
 
 포화 전 위치 보정 속도는
 
@@ -814,7 +918,7 @@ $$
 
 ---
 
-## 8.3 Anti-Windup
+## 8.5 Anti-Windup
 
 출력 포화 시 적분항이 계속 증가하지 않도록 Back-Calculation Anti-Windup을 적용할 수 있다.
 
@@ -1684,9 +1788,23 @@ $$
 
 즉, 몸체 원점이 기준점보다 높아지면 Swing Height를 증가시키고, 몸체 원점이 기준점보다 낮아지면 Swing Height를 감소시킨다.
 
-이때 $\Delta z_B$는 **Body Position PI에 입력되는 z축 위치 오차 자체가 아니라 몸체 기준점에 대한 현재 몸체 원점의 상대 변위**이다.
+이때 $\Delta z_B$는 **Body Position PI에 입력되는 z축 위치 오차 자체가 아니라 Swing Height 보정 기준에 대한 현재 몸체 원점의 상대 변위**이다.
 
-Body Position PI의 기준 위치를
+Body Position PI의 일반적인 z축 오차는
+
+$$
+\boxed{
+e_z[k]
+=
+z_{B,ref}[k]
+-
+{}^W\hat z_B[k]
+}
+$$
+
+이다. $z_{B,ref}$는 $v_{z,user}$를 적분하여 갱신하거나, 일정한 몸체 높이를 유지할 때는 고정한다.
+
+정지 유지 시험에서 참조 좌표계 원점과 Swing Height 보정 기준을 같게 두고
 
 $$
 p_{B,ref}
@@ -1698,7 +1816,7 @@ p_{B,ref}
 \end{bmatrix}
 $$
 
-로 두는 경우 z축 위치 오차는
+로 두는 특수한 경우에만 z축 위치 오차는
 
 $$
 \boxed{
@@ -1710,7 +1828,7 @@ $$
 
 가 된다.
 
-따라서
+따라서 일반 보행 중에는
 
 $$
 \Delta z_B
@@ -1718,7 +1836,7 @@ $$
 e_z
 $$
 
-이며, 두 값의 부호 관계를 혼동하지 않도록 구분해서 사용한다.
+이며, $z_{B,ref}=0$인 정지 유지 조건에서만 $e_z=-\Delta z_B$가 된다. 두 값을 혼동하지 않도록 구분해서 사용한다.
 
 최종적으로 Swing Bezier Curve의 제어점은 계산된 $h$를 이용하여
 
@@ -2259,7 +2377,7 @@ $$
 라 하면 Z-Y-X 순서의 몸체 회전행렬은
 
 $$
-{}^RR_B
+{}^WR_B
 =
 R_z(\psi)R_y(\theta)R_x(\phi)
 $$
@@ -3014,7 +3132,31 @@ $$
 
 # 29. 제어 상태별 우선순위
 
-발끝 명령과 안전 상태는 다음 우선순위를 따른다.
+## 29.1 상위 제어 상태 우선순위
+
+조종기 명령과 로봇의 상위 제어 상태는 다음 우선순위를 따른다.
+
+$$
+\boxed{
+KILL
+>
+ROLLOVER\_FAULT
+>
+CONTROLLER\_FAULT
+>
+LANDING
+>
+STANDING
+>
+READY(MANUAL/CORRECTION)
+}
+$$
+
+상위 상태에서 허용되지 않은 기능의 Enable과 사용자 명령은 0으로 차단한다.
+
+## 29.2 다리 궤적 상태 우선순위
+
+발끝 명령과 다리별 안전 상태는 다음 우선순위를 따른다.
 
 $$
 \boxed{
@@ -3130,24 +3272,47 @@ $$
 
 ## Step 3. User Command
 
-필터링된 조종기 입력을 몸체의 이동 속도와 회전 속도 명령으로 변환한다.
+필터링된 조종기 입력을 몸체의 이동 속도, Roll·Pitch 목표각과 Yaw 각속도 명령으로 변환한다.
 
 $$
-\xi_{user}[k]
+v_{user}[k],
+\quad
+\phi_{ref}[k],
+\quad
+\theta_{ref}[k],
+\quad
+\omega_{z,user}[k]
 $$
 
 을 계산한다.
 
 ## Step 4. Attitude Reference Update
 
-사용자가 명령한 각속도를 적분하여 Roll, Pitch, Yaw의 목표 자세를 갱신한다.
+필터링된 Roll·Pitch 입력을 각 축의 목표각에 직접 대응시킨다.
 
 $$
-\eta_{ref}[k+1]
+\phi_{ref}[k]
 =
-\eta_{ref}[k]
+\phi_{\max}u_{R,f}[k]
+$$
+
+$$
+\theta_{ref}[k]
+=
+\theta_{\max}u_{P,f}[k]
+$$
+
+Yaw 각속도 명령만 적분하여 Heading Reference를 갱신한다.
+
+$$
+\psi_{ref}[k+1]
+=
+\operatorname{wrap}_{\pi}
+\left(
+\psi_{ref}[k]
 +
-\omega_{user}[k]T_s
+\omega_{z,user}[k]T_s
+\right)
 $$
 
 ## Step 5. Forward Kinematics
@@ -3177,25 +3342,37 @@ STANCE이면서 실제 접촉 중인 다리들의 정보를 이용해 현재 몸
 STANCE 상태이면서 CONTACT가 확인된 유효 다리 집합을 $\mathcal S$라 하고 $N_S=|\mathcal S|$라 하면
 
 $$
-{}^R\hat p_B
+{}^W\hat p_B
 =
 \frac{1}{N_S}
 \sum_{i\in\mathcal S}
-{}^R\hat p_{B,i}
+{}^W\hat p_{B,i}
 $$
 
 로 단순 평균한다.
 
 ## Step 8. Position Feedback
 
-목표 몸체 위치와 추정된 현재 위치의 차이를 PI 제어기에 넣어 위치 보정 속도를 계산한다.
+사용자 선속도 명령을 적분하여 목표 몸체 위치를 생성한다.
+
+$$
+p_{B,ref}[k]
+=
+p_{B,ref}[k-1]
++
+{}^W\hat R_B[k]v_{user}[k]T_s
+$$
+
+Position Reference Generator를 활성화할 때는 $p_{B,ref}[k_0]={}^W\hat p_B[k_0]$로 초기화한다.
+
+목표 몸체 위치와 FK·Stance Anchor로 추정한 현재 Body Position의 차이를 PI 제어기에 넣어 위치 보정 속도를 계산한다.
 
 $$
 e_p
 =
 p_{B,ref}
 -
-{}^R\hat p_B
+{}^W\hat p_B
 $$
 
 $$
@@ -3203,6 +3380,8 @@ v_{feedback}
 =
 PI_p(e_p)
 $$
+
+$v_{user}$는 목표 위치 생성에 사용되는 동시에 Final Body Twist의 Feedforward 선속도로 사용된다. $v_{feedback}$은 목표 깸이와 FK 기반 추정 깸이 사이의 오차만 보정한다.
 
 ## Step 9. Attitude Feedback
 
@@ -3490,11 +3669,9 @@ Yaw는 Heading Hold를 기본으로 사용하므로 Roll / Pitch와 동일한 PI
 | RC | $\delta$ | 조이스틱 Dead Zone |
 | RC | $f_c$ | 입력 LPF Cutoff |
 | RC | $V_{x,\max}$ | 최대 전진 속도 |
-| RC | $\Omega_{x,\max}$ | 최대 Roll 각속도 |
-| RC | $\Omega_{y,\max}$ | 최대 Pitch 각속도 |
 | RC | $\Omega_{z,\max}$ | 최대 Yaw 각속도 |
-| 자세 | $\phi_{\max}$ | 최대 Roll 목표각 |
-| 자세 | $\theta_{\max}$ | 최대 Pitch 목표각 |
+| RC / 자세 | $\phi_{\max}$ | 최대 Roll 목표각 |
+| RC / 자세 | $\theta_{\max}$ | 최대 Pitch 목표각 |
 | Position PI | $K_{P,p}, K_{I,p}$ | 위치 PI Gain |
 | Attitude PI | $K_{P,R}, K_{I,R}$ | 자세 PI Gain |
 | Feedback | $v_{fb,\max}$ | 최대 위치 보정 속도 |
@@ -3530,10 +3707,30 @@ Yaw는 Heading Hold를 기본으로 사용하므로 Roll / Pitch와 동일한 PI
 사용자 명령:
 
 $$
-\xi_{user}
-=
-f_{RC}(u)
+\begin{aligned}
+v_{user},\;\phi_{ref},\;\theta_{ref},\;\omega_{z,user}
+&= f_{RC}(u),\\
+\omega_{user}
+&=
+\begin{bmatrix}
+0 & 0 & \omega_{z,user}
+\end{bmatrix}^{T}
+\end{aligned}
 $$
+
+몸체 목표 위치:
+
+$$
+\boxed{
+p_{B,ref}[k]
+=
+p_{B,ref}[k-1]
++
+{}^W\hat R_B[k]v_{user}[k]T_s
+}
+$$
+
+Position Reference Generator 활성화 시에는 $p_{B,ref}[k_0]={}^W\hat p_B[k_0]$로 초기화한다.
 
 몸체 위치 Feedback:
 
