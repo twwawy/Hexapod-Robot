@@ -43,6 +43,34 @@ abs(vx_user) >= Gait_Vx_Threshold
 abs(wz_user) >= Gait_Wz_Threshold
 ```
 
+`Body_Control_Enable`은 Final Gait Body Twist, Stance 발끝 궤적과 몸체 자세 오버레이를 허용하고, `Tripod_Enable`은 Tripod 위상과 Swing 궤적만 허용한다. READY에서 `Motion_Armed=1`이면 조종 모드와 보정 모드의 `Body_Control_Enable`을 활성화한다. `Tripod_Enable=0`일 때도 발끝 목표를 0으로 만들지 않고 6개 다리의 기본 또는 직전 안전 STANCE 목표를 계속 출력한다. 따라서 정지 상태에서도 위치·자세 PI 또는 보정 모드 명령을 수행할 수 있다. 보정 모드에서는 항상 `Tripod_Enable=0`으로 둔다.
+
+## PI 제어 적용 범위
+
+PI 제어기는 기준값과 측정 출력값의 오차를 사용한다.
+
+```text
+오차 = 기준값 - 측정값
+```
+
+모드별 적용 범위는 다음과 같다.
+
+| 모드 | 입력 | PI 적용 |
+|---|---|---|
+| 조종 모드 | Throttle | 절대좌표계 x·y Position Reference와 Position PI |
+| 조종 모드 | Yaw | Yaw Reference 적분과 Gait Heading Yaw PI를 보행 회전에 적용 |
+| 조종 모드 | Roll | Roll 목표각과 단일 몸체 자세 PI를 자세 오버레이에 적용 |
+| 조종 모드 | Pitch | Pitch 목표각과 단일 몸체 자세 PI를 자세 오버레이에 적용 |
+| 보정 모드 | Yaw | Yaw 보정 목표각과 단일 몸체 자세 PI를 자세 오버레이에 적용 |
+| 보정 모드 | x·y·z 이동속도 | PI를 적용하지 않음 |
+| 암 모드 | 전체 입력 | PI를 적용하지 않음 |
+
+LANDED, STANDING, LANDING, FAULT, KILL 상태에서는 Position/자세 PI 출력을 0으로 만들고 적분항을 누적하지 않는다. PI가 활성화될 때는 x·y Position Reference와 조종 모드 Yaw Reference를 현재 측정값으로 초기화하고, 보정 모드 Yaw의 기준 Heading도 현재 Yaw로 저장한다. 모든 PI 적분항은 0으로 초기화하여 갑작스러운 명령을 방지한다.
+
+조종 모드 Yaw PI는 보행 Heading을 유지하는 경로이며, 그 출력은 사용자 Yaw 각속도와 합쳐 Tripod 회전 보행에 사용한다. 조종 모드 Roll·Pitch와 보정 모드 Yaw는 이 경로와 분리된 하나의 단일 몸체 자세 PI를 사용한다. 이중 PI나 내부 각속도 PI는 사용하지 않는다.
+
+단일 몸체 자세 PI 출력은 자세 보정 각속도이며, 200 Hz로 적분한 뒤 IK 직전에 6개 발끝 목표에 몸체 원점 기준 역회전으로 적용한다. 따라서 보행 중에도 Roll·Pitch 또는 보정 Yaw 명령이 Tripod 위상, 보폭, Swing 착지점을 변경하지 않고 몸체 자세만 변경한다.
+
 ## 짐벌 입력
 
 스위치 SC를 사용하여 짐벌 입력을 조종 모드와 보정 모드 사이에서 전환한다.
@@ -71,14 +99,16 @@ abs(wz_user) >= Gait_Wz_Threshold
 
 ### 보정 모드
 
-보정 모드에서는 몸체 기준 좌표계를 기준으로 몸체 원점의 이동 속도와 몸체의 yaw 각속도를 명령한다.
+보정 모드에서는 몸체 기준 좌표계를 기준으로 몸체 원점의 이동 속도와 몸체의 yaw 보정 목표각을 명령한다.
 
 | 입력 채널 | 기능 |
 |---|---|
 | 스로틀 | 몸체 기준 좌표계의 z축 방향으로 몸체 원점의 이동 속도를 명령한다. |
-| yaw | 몸체 원점 좌표계를 기준으로 몸체의 yaw 각속도를 명령한다. |
+| yaw | 몸체 원점 좌표계를 기준으로 몸체의 yaw 보정 목표각을 명령한다. 조이스틱 입력을 적분하지 않고 최대 보정각에 직접 대응시킨다. |
 | roll | 몸체 기준 좌표계의 y축 방향으로 몸체 원점의 이동 속도를 명령한다. |
 | pitch | 몸체 기준 좌표계의 x축 방향으로 몸체 원점의 이동 속도를 명령한다. |
+
+보정 모드의 yaw 조이스틱이 중앙으로 복귀하면 yaw 보정 목표각도 0°로 복귀한다. 조종 모드의 Yaw Heading Hold와 달리 보정 모드에서는 조이스틱 입력을 각속도로 적분하지 않는다.
 
 ## 스위치 입력
 

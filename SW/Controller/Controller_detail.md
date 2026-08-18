@@ -6,8 +6,9 @@
 
 - 전체 제어 주기: **200 Hz**
 - 기본 보행: **Tripod Gait**
-- 사용자 명령 + Body Position Feedback + Body Attitude Feedback → **Final Body Twist**
-- Stance 다리: Body Twist의 반대 운동으로 **PULL 궤적** 생성
+- 사용자 명령 + Body Position Feedback + Gait Heading Yaw Feedback → **Final Gait Body Twist**
+- 조종 Roll·Pitch + 보정 Yaw 단일 자세 PI → **IK 직전 몸체 자세 오버레이**
+- Stance 다리: Final Gait Body Twist의 반대 운동으로 **PULL 궤적** 생성
 - Swing 다리: 착지 목표점 + **3차 Bezier Curve + 방사 방향 오프셋**
 - 발끝 압력센서: **Early / Late Landing**
 - 발끝 목표 위치 → 좌표계 변환 → **3DOF IK**
@@ -40,7 +41,7 @@ $$
 
 으로 정의한다.
 
-절대 좌표계 $\{W\}$는 로봇의 이동과 무관하게 지면에 고정한다. 최초 관절각 0° 착지 상태에서 $O_W=O_B$로 초기화하며, 기본 자세로 일어서면 ${}^Wp_B=[0,0,h_{stand}]^T$가 된다. 몸체 좌표계 $\{B\}$와 몸체 기준 좌표계 $\{R\}$는 로봇의 명목 이동을 따라가지만, Body Position Estimator와 Position PI의 위치·목표·오차는 모두 절대 좌표계 $\{W\}$에서 계산한다.
+절대 좌표계 $\{W\}$는 로봇의 이동과 무관하게 지면에 고정한다. 최초 관절각 0° 착지 상태에서 $O_W=O_B$로 초기화하며, 기본 자세로 일어서면 ${}^Wp_B=[0,0,h_{stand}]^T$가 된다. 몸체 좌표계 $\{B\}$와 몸체 기준 좌표계 $\{R\}$는 로봇의 명목 이동을 따라간다. Body Position Estimator는 절대좌표계의 x·y·z 위치를 추정하고, Position PI의 x·y 목표·측정·오차는 절대 좌표계 $\{W\}$에서 계산한다.
 
 ## 1.2 벡터
 
@@ -402,6 +403,18 @@ $$
 
 이다.
 
+보정 모드의 Yaw 입력은 조종 모드의 $\omega_{z,user}$와 구분하여 yaw 보정 목표각으로 사용한다. 최대 yaw 보정각을 $\psi_{corr,max}$라 하면
+
+$$
+\boxed{
+\psi_{corr,ref}[k]
+=
+\psi_{corr,max}u_{Y,f}[k]
+}
+$$
+
+로 직접 변환한다. $\psi_{corr,ref}$는 각속도 명령이 아니므로 시간 적분하지 않는다. 보정 모드의 yaw 조이스틱이 중앙으로 복귀하면 $\psi_{corr,ref}=0$으로 복귀하며, 필요한 실제 보정 각속도는 이후 자세 오차 제어에서 생성한다.
+
 ---
 
 # 5. 몸체 자세 목표값 생성
@@ -420,7 +433,7 @@ $$
 \theta_{\max}u_{P,f}[k]
 $$
 
-Yaw 조이스틱 입력만 **각속도 명령**으로 사용한다. Heading Reference는
+조종 모드의 Yaw 조이스틱 입력만 **각속도 명령**으로 사용한다. Heading Reference는
 
 $$
 \psi_{ref}[k+1]
@@ -469,11 +482,11 @@ $$
 
 를 적용한다.
 
-> Roll·Pitch 조이스틱이 중앙으로 복귀하면 목표각은 0으로 복귀한다. Yaw 조이스틱이 중앙으로 복귀하면 Yaw 각속도 명령만 0이 되고, 목표 Heading은 그 순간의 값을 유지한다.
+> 조종 모드에서 Roll·Pitch 조이스틱이 중앙으로 복귀하면 목표각은 0으로 복귀한다. Yaw 조이스틱이 중앙으로 복귀하면 Yaw 각속도 명령만 0이 되고, 목표 Heading은 그 순간의 값을 유지한다.
 
-Yaw 축은 **Heading Hold를 기본으로 사용한다.**
+조종 모드의 Yaw 축은 **Heading Hold를 기본으로 사용한다.**
 
-Yaw 조이스틱 입력은 목표 Yaw 각도 자체가 아니라 목표 Yaw 각속도 $\omega_{z,user}$를 명령한다. 따라서 Yaw 조이스틱을 움직이는 동안에는 목표 Heading을 다음과 같이 적분하여 갱신한다.
+조종 모드의 Yaw 조이스틱 입력은 목표 Yaw 각도 자체가 아니라 목표 Yaw 각속도 $\omega_{z,user}$를 명령한다. 따라서 조종 모드에서 Yaw 조이스틱을 움직이는 동안에는 목표 Heading을 다음과 같이 적분하여 갱신한다. 보정 모드의 $\psi_{corr,ref}$에는 이 적분식을 적용하지 않는다.
 
 $$
 \psi_{ref}[k+1]
@@ -486,7 +499,7 @@ $$
 \right)
 $$
 
-Yaw 조이스틱이 중앙으로 복귀하면
+조종 모드에서 Yaw 조이스틱이 중앙으로 복귀하면
 
 $$
 \omega_{z,user}=0
@@ -748,75 +761,73 @@ $$
 
 # 8. Body Position PI Controller
 
-보행 중 몸체 목표 위치는 사용자 선속도 명령을 적분하여 생성한다.
+Body Position Estimator는 절대좌표계의 x·y·z 위치를 계산하지만, 현재 Position PI는 조종 모드의 Throttle 명령에 대해 x·y 위치만 제어한다. z 위치는 추정과 검증에 사용하며 Position PI에는 입력하지 않는다.
 
 ## 8.1 Position Reference Generator
 
-사용자 Body 선속도 명령을
+조종 모드의 전진·후진 선속도 명령을
 
 $$
-v_{user}[k]
-=
-\begin{bmatrix}
-v_{x,user}[k]\\
-v_{y,user}[k]\\
-v_{z,user}[k]
-\end{bmatrix}
+v_{x,user}[k]
 $$
 
-라 하면, 목표 몸체 위치는
+라 하고 현재 Yaw Reference를 $\psi_{ref}[k]$라 하면, 절대좌표계의 목표 x·y 위치는
 
 $$
 \boxed{
-p_{B,ref}[k]
+p_{B,ref}^{xy}[k]
 =
-p_{B,ref}[k-1]
+p_{B,ref}^{xy}[k-1]
 +
-{}^W\hat R_B[k]v_{user}[k]T_s
+\begin{bmatrix}
+\cos\psi_{ref}[k]\\
+\sin\psi_{ref}[k]
+\end{bmatrix}
+v_{x,user}[k]T_s
 }
 $$
 
 로 갱신한다.
 
-$v_{user}$는 몸체 좌표계 선속도이므로, 참조 좌표계의 위치를 적분할 때는 현재 추정 자세 ${}^W\hat R_B$로 회전한다. 자세 보정을 적용하지 않는 초기 구현에서는 ${}^W\hat R_B=I$로 두고 축별 속도를 바로 적분한다.
+Throttle 선속도는 몸체 전진축 명령이므로 Yaw Reference를 이용하여 절대좌표계의 x·y 속도로 변환한다.
 
 Position Reference Generator를 활성화할 때는 명령 점프를 방지하기 위해
 
 $$
 \boxed{
-p_{B,ref}[k_0]
+p_{B,ref}^{xy}[k_0]
 =
-{}^W\hat p_B[k_0]
+{}^W\hat p_B^{xy}[k_0]
 }
 $$
 
 로 초기화한다.
 
-$v_{user}=0$이면 $p_{B,ref}$는 현재 목표 위치에 고정되므로 정지 위치 유지 모드가 된다. 참조 좌표계 원점을 몸체 위치에 설정한 정지 시험에서만
+$v_{x,user}=0$이면 $p_{B,ref}^{xy}$는 현재 목표 위치에 고정되므로 조종 모드에서 정지 위치 유지가 가능하다. 절대 원점 유지 시험에서만
 
 $$
-p_{B,ref}
+p_{B,ref}^{xy}
 =
 \begin{bmatrix}
-0\\0\\0
+0\\0
 \end{bmatrix}
 $$
 
-을 사용할 수 있다. 일반 보행 중에 $p_{B,ref}=0$을 고정하면 Position PI가 사용자의 이동 명령을 반대로 보정하므로 사용하지 않는다.
+을 사용할 수 있다. 일반 보행 중에 $p_{B,ref}^{xy}=0$을 고정하면 Position PI가 사용자의 이동 명령을 반대로 보정하므로 사용하지 않는다.
 
 ## 8.2 Position Error
 
-PI에 입력하는 위치는 개별 다리의 FK 발끝 좌표가 아니라, FK와 Stance Anchor를 이용해 계산한 Body Position Estimate ${}^W\hat p_B$이다.
+PI에 입력하는 위치는 개별 다리의 FK 발끝 좌표가 아니라, FK와 Stance Anchor를 이용해 계산한 Body Position Estimate의 x·y 성분 ${}^W\hat p_B^{xy}$이다.
 
 위치 오차는
 
 $$
 \boxed{
-e_p[k]
+e_p^{xy}[k]
 =
-p_{B,ref}
+p_{B,ref}^{xy}[k]
 -
-{}^W\hat p_B[k]
+{}^W\hat p_B^{xy}[k]
 }
 $$
 
@@ -829,7 +840,7 @@ K_{P,p}
 =
 \operatorname{diag}
 (
-K_{Px},K_{Py},K_{Pz}
+K_{Px},K_{Py}
 )
 $$
 
@@ -838,7 +849,7 @@ K_{I,p}
 =
 \operatorname{diag}
 (
-K_{Ix},K_{Iy},K_{Iz}
+K_{Ix},K_{Iy}
 )
 $$
 
@@ -852,7 +863,7 @@ I_p[k]
 =
 I_p[k-1]
 +
-e_p[k]T_s
+e_p^{xy}[k]T_s
 $$
 
 적분 포화를 막기 위해
@@ -880,7 +891,7 @@ $$
 $$
 v_{feedback}^{raw}
 =
-K_{P,p}e_p
+K_{P,p}e_p^{xy}
 +
 K_{I,p}I_p
 $$
@@ -894,8 +905,7 @@ v_{fb,max}
 =
 \begin{bmatrix}
 v_{x,fb,max}\\
-v_{y,fb,max}\\
-v_{z,fb,max}
+v_{y,fb,max}
 \end{bmatrix}
 $$
 
@@ -916,9 +926,29 @@ $$
 
 를 적용한다.
 
+$v_{feedback}$은 절대좌표계의 x·y 보정 속도이다. 발끝 궤적에 입력하기 전에 현재 몸체 Yaw를 이용하여 몸체 좌표계 속도로 변환하고, z축 보정 속도는 0으로 둔다.
+
 ---
 
-## 8.5 Anti-Windup
+## 8.5 모드별 활성 조건
+
+Position PI는 `Motion_Armed`가 활성화된 조종 모드에서만 사용한다. 보정 모드의 x·y·z 이동속도와 암 모드 입력에는 Position PI를 적용하지 않는다.
+
+Position PI는 `Tripod_Enable`과 독립적으로 동작한다. `Body_Control_Enable=1`, `Tripod_Enable=0`인 조종 모드에서는 6개 발을 모두 STANCE로 유지한 상태에서 x·y 위치 오차를 보정한다.
+
+LANDED, STANDING, LANDING, CORRECTION, ARM, FAULT, KILL 상태에서는 Position PI 출력을 0으로 만들고 적분항을 누적하지 않는다. 조종 모드에 새로 진입할 때는
+
+$$
+p_{B,ref}^{xy}[k_0]
+=
+{}^W\hat p_B^{xy}[k_0]
+$$
+
+로 목표 위치를 현재 추정 위치에 맞추고 적분항을 0으로 초기화하여 명령 점프를 방지한다.
+
+---
+
+## 8.6 Anti-Windup
 
 출력 포화 시 적분항이 계속 증가하지 않도록 Back-Calculation Anti-Windup을 적용할 수 있다.
 
@@ -970,20 +1000,22 @@ $$
 
 # 10. Body Attitude PI Controller
 
+몸체 자세 제어는 **단일 자세 PI**를 사용한다. 내부 각속도 PI를 추가한 이중 PI 구조는 사용하지 않는다. 조종 모드에서는 Roll·Pitch를 제어하고, 보정 모드에서는 Yaw만 제어한다. 조종 모드 Yaw는 이 자세 PI가 아니라 5장의 Gait Heading Yaw PI에서 보행 방향을 제어한다.
+
 ## 10.1 Euler Angle 자세 오차
 
 본 로봇은 $|Roll|\ge80^\circ$ 또는 $|Pitch|\ge80^\circ$인 경우를 안전장치에서 전복 상태로 처리하므로, 정상 자세 제어에서는 Pitch가 짐벌락이 발생하는 $\pm90^\circ$에 도달하지 않는다. 따라서 Body Attitude PI의 자세 오차는 Roll, Pitch, Yaw Euler Angle을 직접 사용한다.
 
 
-Body Attitude PI Controller의 자세 오차는 Roll, Pitch, Yaw Euler Angle을 사용하여
+조종 모드의 자세 오차는 Roll과 Pitch만 사용하여
 
 $$
-e_R
+e_{posture}
 =
 \begin{bmatrix}
 e_\phi\\
 e_\theta\\
-e_\psi
+0
 \end{bmatrix}
 $$
 
@@ -1005,21 +1037,52 @@ e_\theta
 )
 $$
 
+로 계산한다.
+
+보정 모드에서는 Roll·Pitch 성분을 0으로 두고 Yaw 자세 PI만 사용한다. 보정 모드 진입 시의 기준 Heading을 $\psi_{corr,0}$, 조종기에서 직접 생성한 상대 Yaw 보정 목표각을 $\psi_{corr,ref}$라 하면 절대 목표각은
+
 $$
-e_\psi
+\psi_{corr,target}
 =
 \operatorname{wrap}_{\pi}
-(
-\psi_{ref}-\psi
-)
+\left(
+\psi_{corr,0}
++
+\psi_{corr,ref}
+\right)
+$$
+
+이고 Yaw 오차는
+
+$$
+\boxed{
+e_{\psi,corr}
+=
+\operatorname{wrap}_{\pi}
+\left(
+\psi_{corr,target}-\psi
+\right)
+}
 $$
 
 로 계산한다.
 
+따라서 보정 모드의 자세 오차 벡터는
+
+$$
+e_{posture}
+=
+\begin{bmatrix}
+0\\0\\e_{\psi,corr}
+\end{bmatrix}
+$$
+
+로 둔다.
+
 ---
 
 
-## 10.2 자세 PI
+## 10.2 단일 자세 PI
 
 Gain 행렬을
 
@@ -1055,17 +1118,17 @@ I_R[k]
 =
 I_R[k-1]
 +
-e_R[k]T_s
+e_{posture}[k]T_s
 $$
 
 이다.
 
-포화 전 출력은
+포화 전 출력은 몸체 각속도 보정 명령이며
 
 $$
-\omega_{feedback}^{raw}
+\omega_{posture}^{raw}
 =
-K_{P,R}e_R
+K_{P,R}e_{posture}
 +
 K_{I,R}I_R
 $$
@@ -1075,12 +1138,12 @@ $$
 최대 자세 보정 각속도를
 
 $$
-\omega_{fb,max}
+\omega_{posture,max}
 =
 \begin{bmatrix}
-\omega_{x,fb,max}\\
-\omega_{y,fb,max}\\
-\omega_{z,fb,max}
+\omega_{x,posture,max}\\
+\omega_{y,posture,max}\\
+\omega_{z,posture,max}
 \end{bmatrix}
 $$
 
@@ -1088,30 +1151,70 @@ $$
 
 $$
 \boxed{
-\omega_{feedback}
+\omega_{posture}
 =
 \operatorname{sat}
 (
-\omega_{feedback}^{raw},
--\omega_{fb,max},
-\omega_{fb,max}
+\omega_{posture}^{raw},
+-\omega_{posture,max},
+\omega_{posture,max}
 )
 }
 $$
 
 로 제한한다.
 
+단일 자세 PI가 직접 몸체 회전각을 출력하는 것은 아니다. 출력 $\omega_{posture}$는 몸체 자세 오버레이에 사용할 보정 각속도이다. 별도의 내부 각속도 PI는 두지 않고, Saturation과 Rate Limiter를 거친 값을 200 Hz로 적분한다.
+
+$$
+\eta_{posture,cmd}[k+1]
+=
+\operatorname{clamp}
+\left(
+\eta_{posture,cmd}[k]
++
+\omega_{posture}[k]T_s,
+-\eta_{posture,max},
+\eta_{posture,max}
+\right)
+$$
+
+자세 명령으로 몸체 기준 좌표계 $\{R\}$에서 실제 몸체 좌표계 $\{B\}$로의 회전행렬을 만든다.
+
+$$
+{}^RR_B
+=
+R_z(\psi_{posture,cmd})
+R_y(\theta_{posture,cmd})
+R_x(\phi_{posture,cmd})
+$$
+
+`Tripod_Enable`에 따라 기준 좌표계 발끝 목표를 먼저 선택한다. `Tripod_Enable=1`이면 Tripod와 Contact Adaptation이 만든 Stance/Swing 목표를 사용하고, `Tripod_Enable=0`이면 6개 다리의 기본 또는 직전 안전 STANCE 목표를 계속 출력한다. 선택된 기준 발끝 목표를 IK 직전에 다음과 같이 역회전한다.
+
+$$
+\boxed{
+{}^Bp_{F_i}^{cmd}
+=
+({}^RR_B)^T
+{}^Rp_{F_i}^{base}
+}
+$$
+
+$\{R\}$과 $\{B\}$는 같은 몸체 원점을 사용하므로 평행이동 없이 원점 기준 회전만 적용된다. 자세 오버레이는 Final Gait Body Twist, Tripod Phase, 보폭, Swing 착지점 계산에 입력하지 않는다. 따라서 보행 중에도 명목 Stance/Swing 궤적은 유지되고 몸체 자세만 변경된다.
+
+조종 모드에서는 Roll·Pitch 자세 PI만 사용하고, 보정 모드에서는 Yaw 자세 PI만 사용한다. `Body_Control_Enable=1`, `Tripod_Enable=0`이면 6개 발을 모두 STANCE로 유지하여 보행 없이 몸체 자세만 보정한다. 암 모드와 LANDED, STANDING, LANDING, FAULT, KILL 상태에서는 자세 PI 출력과 자세 오버레이를 0으로 만들고 적분항을 누적하지 않는다. PI가 다시 활성화될 때는 해당 적분항과 자세 명령 상태를 초기화한다.
+
 ---
 
-# 11. Final Body Twist
+# 11. Final Gait Body Twist
 
-사용자 명령과 Feedback을 합한다.
+조종 모드에서는 사용자 Feedforward 명령과 x·y Position PI 및 Gait Heading Yaw PI Feedback을 합한다. Roll·Pitch 자세 PI와 보정 모드 Yaw 자세 PI는 이 Body Twist에 합하지 않는다.
 
 선속도는
 
 $$
 \boxed{
-v_{final}
+v_{gait}
 =
 v_{user}
 +
@@ -1123,11 +1226,11 @@ $$
 
 $$
 \boxed{
-\omega_{final}
+\omega_{gait}
 =
 \omega_{user}
 +
-\omega_{feedback}
+\omega_{heading,feedback}
 }
 $$
 
@@ -1137,11 +1240,11 @@ $$
 
 $$
 \boxed{
-\xi_{final}
+\xi_{gait}
 =
 \begin{bmatrix}
-v_{final}\\
-\omega_{final}
+v_{gait}\\
+\omega_{gait}
 \end{bmatrix}
 }
 $$
@@ -1151,40 +1254,89 @@ $$
 즉,
 
 $$
-\xi_{final}
+\xi_{gait}
 =
 \xi_{user}
 +
 \xi_{position}
 +
-\xi_{attitude}
+\xi_{heading}
 $$
 
 의 구조이다.
+
+조종 모드에서 현재 사용하는 성분을 직접 쓰면
+
+$$
+v_{gait}^{B}
+=
+\begin{bmatrix}
+v_{x,user}\\0\\0
+\end{bmatrix}
++
+{}^BR_W
+\begin{bmatrix}
+v_{x,feedback}^{W}\\
+v_{y,feedback}^{W}\\
+0
+\end{bmatrix}
+$$
+
+이고
+
+$$
+\omega_{gait}^{B}
+=
+\begin{bmatrix}
+0\\
+0\\
+\omega_{z,user}+\omega_{z,heading,feedback}
+\end{bmatrix}
+$$
+
+이다.
+
+보정 모드의 x·y·z 이동속도는 PI 없이 발 고정 몸체 이동 경로에 직접 사용한다. 보정 모드 Yaw 자세 PI는 이 Body Twist에 합하지 않고 IK 직전 자세 오버레이에만 사용한다.
+
+$$
+v_{gait}^{B}
+=
+v_{correction}^{B}
+$$
+
+$$
+\omega_{gait}^{B}
+=
+\begin{bmatrix}
+0\\0\\0
+\end{bmatrix}
+$$
+
+암 모드에는 Position PI와 자세 PI를 적용하지 않고 암 제어 명령만 해당 기능 블록으로 전달한다. LANDED, STANDING, LANDING, FAULT, KILL 상태에서는 Final Gait Body Twist를 0으로 만든다.
 
 ---
 
 ## 11.1 최종 Saturation
 
-최종 Body Twist에도 물리적인 제한을 둔다.
+Final Gait Body Twist에도 물리적인 제한을 둔다.
 
 $$
-v_{final,j}
+v_{gait,j}
 =
 \operatorname{clamp}
 (
-v_{final,j},
+v_{gait,j},
 -v_{j,max},
 v_{j,max}
 )
 $$
 
 $$
-\omega_{final,j}
+\omega_{gait,j}
 =
 \operatorname{clamp}
 (
-\omega_{final,j},
+\omega_{gait,j},
 -\omega_{j,max},
 \omega_{j,max}
 )
@@ -1217,7 +1369,7 @@ v_{cmd}[k-1]
 +
 \operatorname{clamp}
 \left(
-v_{final}[k]-v_{cmd}[k-1],
+v_{gait}[k]-v_{cmd}[k-1],
 -\Delta v_{max},
 \Delta v_{max}
 \right)
@@ -1230,7 +1382,7 @@ $$
 +
 \operatorname{clamp}
 \left(
-\omega_{final}[k]-\omega_{cmd}[k-1],
+\omega_{gait}[k]-\omega_{cmd}[k-1],
 -\Delta\omega_{max},
 \Delta\omega_{max}
 \right)
@@ -1238,11 +1390,21 @@ $$
 
 로 실제 Gait Generator에 전달할 Twist를 생성한다.
 
-이후 식에서 $v_B$, $\omega_B$는 이 최종 제한을 통과한 값을 의미한다.
+이후 Gait 식에서 $v_B$, $\omega_B$는 이 최종 제한을 통과한 보행 명령을 의미한다. 현재 $\omega_B$에는 조종 모드의 사용자 Yaw 각속도와 Gait Heading Yaw PI 보정만 포함하며 Roll·Pitch 및 보정 모드 Yaw 자세 PI는 포함하지 않는다.
 
 ---
 
 # 12. Tripod Gait Manager
+
+`Body_Control_Enable`은 Final Gait Body Twist와 Stance 궤적 갱신을 허용하는 상위 Enable이다. `Tripod_Enable`은 Tripod 위상 진행과 Swing 궤적을 허용하는 보행 Enable이다.
+
+| Body_Control_Enable | Tripod_Enable | 동작 |
+|---:|---:|---|
+| 0 | 0 | 보행용 Body Twist와 자세 오버레이를 정지하고 상위 안전·서기·착지 블록의 발끝 목표를 사용한다. |
+| 1 | 0 | 6개 다리의 기본 또는 직전 안전 STANCE 목표를 계속 출력하고 몸체 위치·자세 또는 보정 모드 명령을 수행한다. |
+| 1 | 1 | Tripod 위상에 따라 STANCE와 SWING을 반복한다. |
+
+`Body_Control_Enable=0`, `Tripod_Enable=1` 조합은 사용하지 않는다. `Tripod_Enable=0`은 발끝 목표 0을 의미하지 않으며, Tripod 위상만 정지하고 6개 STANCE 기준 목표를 유지한다. 조종 모드에서는 `Motion_Armed=1`일 때 `Body_Control_Enable=1`로 두고, 전진·후진 또는 Yaw 회전 명령이 임계값을 넘을 때만 `Tripod_Enable=1`로 둔다. 보정 모드에서는 `Body_Control_Enable=1`, `Tripod_Enable=0`으로 둔다.
 
 Tripod 그룹은
 
@@ -1315,7 +1477,7 @@ $$
 
 # 13. Stance Leg Trajectory
 
-몸체 좌표계에서 Stance 발끝 위치를
+몸체 기준 좌표계 $\{R\}$에서 Stance 발끝 위치를
 
 $$
 p_i=
@@ -1324,9 +1486,9 @@ x_i\\y_i\\z_i
 \end{bmatrix}
 $$
 
-라 한다.
+라 한다. 13장부터 Contact Adaptation까지의 $p_i$는 별도 표기가 없으면 기준 좌표계 $\{R\}$에서 표현한 명목 보행 발끝 위치를 의미한다.
 
-지면 기준으로 발끝이 정지해 있다면 몸체 좌표계에서 관측되는 발끝 속도는 강체 운동학에 의해
+지면 기준으로 발끝이 정지해 있다면 몸체 기준 좌표계에서 관측되는 발끝 속도는 강체 운동학에 의해
 
 $$
 \boxed{
@@ -1418,7 +1580,7 @@ $$
 
 # 14. Swing Landing Target
 
-Swing 다리의 기준 발끝 위치를
+몸체 기준 좌표계 $\{R\}$에서 Swing 다리의 기준 발끝 위치를
 
 $$
 p_{0,i}
@@ -1788,55 +1950,7 @@ $$
 
 즉, 몸체 원점이 기준점보다 높아지면 Swing Height를 증가시키고, 몸체 원점이 기준점보다 낮아지면 Swing Height를 감소시킨다.
 
-이때 $\Delta z_B$는 **Body Position PI에 입력되는 z축 위치 오차 자체가 아니라 Swing Height 보정 기준에 대한 현재 몸체 원점의 상대 변위**이다.
-
-Body Position PI의 일반적인 z축 오차는
-
-$$
-\boxed{
-e_z[k]
-=
-z_{B,ref}[k]
--
-{}^W\hat z_B[k]
-}
-$$
-
-이다. $z_{B,ref}$는 $v_{z,user}$를 적분하여 갱신하거나, 일정한 몸체 높이를 유지할 때는 고정한다.
-
-정지 유지 시험에서 참조 좌표계 원점과 Swing Height 보정 기준을 같게 두고
-
-$$
-p_{B,ref}
-=
-\begin{bmatrix}
-0\\
-0\\
-0
-\end{bmatrix}
-$$
-
-로 두는 특수한 경우에만 z축 위치 오차는
-
-$$
-\boxed{
-e_z
-=
--\Delta z_B
-}
-$$
-
-가 된다.
-
-따라서 일반 보행 중에는
-
-$$
-\Delta z_B
-\neq
-e_z
-$$
-
-이며, $z_{B,ref}=0$인 정지 유지 조건에서만 $e_z=-\Delta z_B$가 된다. 두 값을 혼동하지 않도록 구분해서 사용한다.
+현재 Position PI는 x·y 위치에만 적용하므로 z축 위치 오차와 z축 Position PI는 사용하지 않는다. $\Delta z_B$는 Position PI와 독립적인 Swing Height 보정값으로만 사용한다. 보정 모드의 z축 이동속도 명령에도 Position PI를 적용하지 않는다.
 
 최종적으로 Swing Bezier Curve의 제어점은 계산된 $h$를 이용하여
 
@@ -2166,7 +2280,7 @@ Late Landing 중에는 다음 Tripod Phase 전환을 정지한다.
 
 ## 18.1 Search Down
 
-현재 몸체 좌표계의 $-z_B$ 방향으로 발끝을 내리는 동시에 각 다리 장착점 방향으로 당겨 지면을 탐색한다. 하강만 수행할 때 발생하는 다리 과신전과 IK 작업공간 부담을 줄이기 위한 동작이다.
+현재 몸체 기준 좌표계의 $-z_R$ 방향으로 발끝을 내리는 동시에 각 다리 장착점 방향으로 당겨 지면을 탐색한다. 하강만 수행할 때 발생하는 다리 과신전과 IK 작업공간 부담을 줄이기 위한 동작이다.
 
 다리 $i$의 바깥쪽 방사 단위벡터를
 
@@ -2364,9 +2478,49 @@ $$
 ---
 
 
-# 20. 몸체 좌표계 → 다리 좌표계 변환
+# 20. 몸체 자세 오버레이 및 다리 좌표계 변환
 
-자세 PI Controller에서는 Euler Angle을 사용하지만, **서로 다른 좌표계 사이의 벡터와 점을 변환할 때는 회전행렬을 사용한다.**
+## 20.1 몸체 원점 기준 자세 오버레이
+
+자세 오버레이 앞의 Foot Target Selector는 몸체 기준 좌표계 $\{R\}$의 기준 발끝 목표 ${}^Rp_{F_i}^{base}$를 선택한다.
+
+$$
+{}^Rp_{F_i}^{base}
+=
+\begin{cases}
+{}^Rp_{F_i}^{tripod}, & Tripod\_Enable=1\\
+{}^Rp_{F_i}^{stance\_hold}, & Tripod\_Enable=0
+\end{cases}
+$$
+
+$p_{F_i}^{stance\_hold}$는 기본 자세 발끝 위치 또는 직전 안전 STANCE 위치이다. `Tripod_Enable=0`이어도 이 목표를 매 주기 출력하므로 정지 상태의 Roll·Pitch 또는 보정 Yaw 자세 명령도 정상적으로 적용된다. 조종 모드 Roll·Pitch와 보정 모드 Yaw 자세 PI는 선택 전의 Tripod 궤적을 직접 수정하지 않는다.
+
+단일 자세 PI의 보정 각속도를 적분한 $\eta_{posture,cmd}$로
+
+$$
+{}^RR_B
+=
+R_z(\psi_{posture,cmd})
+R_y(\theta_{posture,cmd})
+R_x(\phi_{posture,cmd})
+$$
+
+를 만들고, IK에 넣을 몸체 좌표계 발끝 목표를
+
+$$
+\boxed{
+{}^Bp_{F_i}^{cmd}
+=
+({}^RR_B)^T
+{}^Rp_{F_i}^{base}
+}
+$$
+
+로 계산한다. $O_R$과 $O_B$를 같은 회전 중심으로 사용하므로 평행이동 없이 몸체 원점 기준 Roll·Pitch·Yaw 회전만 적용된다. 자세 오버레이는 Stance/Swing 상태, 보폭, 진행률, Swing 착지점을 변경하지 않는다.
+
+## 20.2 몸체 좌표계 → 다리 좌표계 변환
+
+자세 PI에서는 Euler Angle 오차를 사용하지만, **서로 다른 좌표계 사이의 벡터와 점을 변환할 때는 회전행렬을 사용한다.**
 
 IMU에서 얻은 Roll, Pitch, Yaw를
 
@@ -2382,7 +2536,7 @@ $$
 R_z(\psi)R_y(\theta)R_x(\phi)
 $$
 
-로 생성하여 좌표변환에 사용한다.
+로 생성하여 절대좌표계의 상태 추정과 벡터 변환에 사용한다. 이 실제 자세행렬 ${}^WR_B$는 몸체 자세 오버레이용 상대 회전행렬 ${}^RR_B$와 구분한다.
 
 
 i번 다리 좌표계 원점의 몸체 좌표계 위치를
@@ -2412,7 +2566,7 @@ $$
 
 이다.
 
-따라서 몸체 좌표계에서 계산된 발끝 목표 위치를 다리 좌표계로 변환하면
+따라서 자세 오버레이가 적용된 몸체 좌표계 발끝 목표 위치를 다리 좌표계로 변환하면
 
 $$
 \boxed{
@@ -2420,7 +2574,7 @@ $$
 =
 ({}^BR_{L_i})^T
 \left(
-{}^Bp_F^{ref}
+{}^Bp_F^{cmd}
 -
 {}^Bp_{L_i}
 \right)
@@ -3272,7 +3426,7 @@ $$
 
 ## Step 3. User Command
 
-필터링된 조종기 입력을 몸체의 이동 속도, Roll·Pitch 목표각과 Yaw 각속도 명령으로 변환한다.
+조종 모드에서는 필터링된 입력을 전진·후진 선속도, Roll·Pitch 목표각과 Yaw 각속도 명령으로 변환한다.
 
 $$
 v_{user}[k],
@@ -3285,6 +3439,8 @@ v_{user}[k],
 $$
 
 을 계산한다.
+
+보정 모드에서는 x·y·z 이동속도와 Yaw 보정 목표각 $\psi_{corr,ref}$를 생성한다. 암 모드 입력은 몸체 Position PI와 자세 PI 경로로 보내지 않는다.
 
 ## Step 4. Attitude Reference Update
 
@@ -3302,7 +3458,7 @@ $$
 \theta_{\max}u_{P,f}[k]
 $$
 
-Yaw 각속도 명령만 적분하여 Heading Reference를 갱신한다.
+조종 모드에서는 Yaw 각속도 명령을 적분하여 Heading Reference를 갱신한다.
 
 $$
 \psi_{ref}[k+1]
@@ -3314,6 +3470,8 @@ $$
 \omega_{z,user}[k]T_s
 \right)
 $$
+
+보정 모드의 Yaw 입력은 적분하지 않고 $\psi_{corr,ref}$에 직접 대응시킨다.
 
 ## Step 5. Forward Kinematics
 
@@ -3353,57 +3511,69 @@ $$
 
 ## Step 8. Position Feedback
 
-사용자 선속도 명령을 적분하여 목표 몸체 위치를 생성한다.
+조종 모드에서 Throttle 선속도를 Yaw Reference 방향으로 적분하여 절대좌표계의 목표 x·y 위치를 생성한다.
 
 $$
-p_{B,ref}[k]
+p_{B,ref}^{xy}[k]
 =
-p_{B,ref}[k-1]
+p_{B,ref}^{xy}[k-1]
 +
-{}^W\hat R_B[k]v_{user}[k]T_s
+\begin{bmatrix}
+\cos\psi_{ref}[k]\\
+\sin\psi_{ref}[k]
+\end{bmatrix}
+v_{x,user}[k]T_s
 $$
 
-Position Reference Generator를 활성화할 때는 $p_{B,ref}[k_0]={}^W\hat p_B[k_0]$로 초기화한다.
+Position Reference Generator를 활성화할 때는 $p_{B,ref}^{xy}[k_0]={}^W\hat p_B^{xy}[k_0]$로 초기화한다.
 
 목표 몸체 위치와 FK·Stance Anchor로 추정한 현재 Body Position의 차이를 PI 제어기에 넣어 위치 보정 속도를 계산한다.
 
 $$
-e_p
+e_p^{xy}
 =
-p_{B,ref}
+p_{B,ref}^{xy}
 -
-{}^W\hat p_B
+{}^W\hat p_B^{xy}
 $$
 
 $$
-v_{feedback}
+v_{feedback}^{xy}
 =
-PI_p(e_p)
+PI_p(e_p^{xy})
 $$
 
-$v_{user}$는 목표 위치 생성에 사용되는 동시에 Final Body Twist의 Feedforward 선속도로 사용된다. $v_{feedback}$은 목표 깸이와 FK 기반 추정 깸이 사이의 오차만 보정한다.
+$v_{x,user}$는 목표 위치 생성에 사용되는 동시에 Final Gait Body Twist의 Feedforward 선속도로 사용된다. $v_{feedback}^{xy}$는 목표 위치와 FK 기반 추정 위치 사이의 x·y 오차만 보정한다. 보정 모드의 x·y·z 이동속도와 암 모드에는 Position PI를 적용하지 않는다.
 
-## Step 9. Attitude Feedback
+## Step 9. Gait Heading and Body Posture Feedback
 
-목표 자세와 현재 자세의 차이를 PI 제어기에 넣어 자세 보정 각속도를 계산한다.
+조종 모드 Yaw는 적분된 Heading Reference와 IMU Yaw를 비교하여 Gait Heading Yaw PI 보정값을 만든다.
 
 $$
-e_R
+\omega_{z,heading,feedback}
 =
-\eta_{ref}
--
-\eta
+PI_\psi
+\left(
+\operatorname{wrap}_{\pi}(\psi_{ref}-\psi_{IMU})
+\right)
 $$
 
+조종 모드 Roll·Pitch와 보정 모드 Yaw는 별도의 단일 자세 PI로 처리한다.
+
 $$
-\omega_{feedback}
+\omega_{posture}
 =
-PI_R(e_R)
+PI_R
+\left(
+\eta_{posture,target}-\eta_{IMU}
+\right)
 $$
 
-## Step 10. Final Body Twist
+조종 모드 자세 PI에는 Roll·Pitch 오차만 사용하고, 보정 모드 자세 PI에는 $\psi_{corr,target}$과 IMU Yaw의 오차만 사용한다. 내부 각속도 PI는 추가하지 않는다. 자세 PI 출력은 200 Hz로 적분하여 IK 직전 몸체 자세 오버레이에 사용한다.
 
-사용자 명령과 위치·자세 보정값을 합쳐 실제 보행에 사용할 최종 몸체 선속도와 각속도를 만든다.
+## Step 10. Final Gait Body Twist
+
+조종 모드에서는 사용자 Feedforward 명령과 x·y Position PI 및 Gait Heading Yaw PI 보정값을 합쳐 실제 보행에 사용할 선속도와 Yaw 각속도를 만든다. 자세 PI 출력은 합하지 않는다.
 
 $$
 v_B
@@ -3418,14 +3588,16 @@ $$
 =
 \omega_{user}
 +
-\omega_{feedback}
+\omega_{heading,feedback}
 $$
 
 이후 Saturation 및 Rate Limit을 적용한다.
 
+보정 모드에서는 x·y·z 이동속도를 PI 없이 직접 사용하고 보정 Yaw는 자세 오버레이에만 사용한다. 암 모드에는 Position PI와 자세 PI를 적용하지 않는다.
+
 ## Step 11. Gait Manager
 
-현재 보행 위상을 기준으로 각 다리가 STANCE인지 SWING인지 결정하고 위상 전환 조건을 관리한다.
+`Body_Control_Enable=0`이면 보행용 Body Twist와 자세 오버레이를 정지하고 상위 안전·서기·착지 블록의 발끝 목표를 사용한다. `Body_Control_Enable=1`, `Tripod_Enable=0`이면 Tripod 위상을 정지하고 6개 다리의 기본 또는 직전 안전 STANCE 목표를 계속 출력한다. 두 Enable이 모두 1일 때만 현재 보행 위상을 기준으로 각 다리가 STANCE인지 SWING인지 결정하고 위상 전환 조건을 관리한다.
 
 현재 Tripod Phase와 각 다리의
 
@@ -3494,22 +3666,35 @@ $$
 
 으로 전환하여 $-z_B$ 방향으로 내리는 동시에 각 다리 장착점 방향으로 당기는 Search Down을 수행한다.
 
-## Step 16. Coordinate Transform
+## Step 16. Body Posture Overlay
 
-몸체 좌표계에서 계산된 발끝 목표 위치를 각 다리의 로컬 좌표계로 변환한다.
+Foot Target Selector가 선택한 STANCE Hold 또는 Tripod 기준 발끝 목표에 단일 자세 PI가 만든 몸체 자세의 역회전을 적용한다.
+
+$$
+{}^Bp_{F_i}^{cmd}
+=
+({}^RR_B(\eta_{posture,cmd}))^T
+{}^Rp_{F_i}^{base}
+$$
+
+이 단계는 보행 위상, 보폭, Swing 착지점을 변경하지 않고 몸체 원점 기준 자세만 변경한다.
+
+## Step 17. Coordinate Transform
+
+자세 오버레이로 몸체 좌표계에 변환된 발끝 목표 위치를 각 다리의 로컬 좌표계로 변환한다.
 
 $$
 {}^{L_i}p_F^{ref}
 =
 ({}^BR_{L_i})^T
 (
-{}^Bp_F^{ref}
+{}^Bp_F^{cmd}
 -
 {}^Bp_{L_i}
 )
 $$
 
-## Step 17. Inverse Kinematics
+## Step 18. Inverse Kinematics
 
 각 다리 로컬 좌표계의 발끝 목표 위치를 실제 3개 관절의 목표각으로 변환한다.
 
@@ -3519,7 +3704,7 @@ $$
 q_i^{ref}
 $$
 
-## Step 18. Safety
+## Step 19. Safety
 
 계산된 자세·발끝 위치·관절각이 안전 범위를 벗어나는지 검사하고 필요한 제한 또는 정지를 적용한다.
 
@@ -3542,7 +3727,7 @@ $$
 |\theta|\ge80^\circ
 $$
 
-## Step 19. Servo Output
+## Step 20. Servo Output
 
 최종 관절 명령각을 DS51150-270 서보용 PWM Pulse Width로 변환하여 18개 서보에 출력한다.
 
@@ -3610,6 +3795,8 @@ $F_{contact}$, $F_{release}$, $N_c$, $N_r$를 먼저 튜닝한다.
 
 ## 31.4 Body Position PI
 
+Position PI는 조종 모드의 절대좌표계 x·y 위치에 대해서만 튜닝한다. z축과 보정 모드 x·y·z 이동속도에는 적용하지 않는다.
+
 처음에는
 
 $$
@@ -3628,14 +3815,13 @@ $$
 
 ## 31.5 Body Attitude PI
 
-Roll / Pitch를 먼저 튜닝한다.
+조종 모드의 Roll / Pitch를 먼저 튜닝한다.
 
 권장 순서는
 
 $$
 P
-
-ightarrow
+\rightarrow
 I
 $$
 
@@ -3643,7 +3829,7 @@ $$
 
 먼저 $K_P$를 조정하여 자세 복원 성능을 확보하고, 정상상태 자세 오차가 남는 경우에만 작은 $K_I$를 추가한다.
 
-Yaw는 Heading Hold를 기본으로 사용하므로 Roll / Pitch와 동일한 PI 구조로 튜닝한다.
+조종 모드 Yaw는 Gait Heading Hold PI로 먼저 별도 튜닝한다. 보정 모드 Yaw는 Roll·Pitch와 같은 단일 몸체 자세 PI 구조를 사용하되 직접 목표각으로 처리한다. 두 Yaw PI는 목적과 출력 경로가 다르므로 Gain과 적분 상태를 분리하고, 모드 전환 시 목표각과 적분항을 각각 초기화한다. 내부 각속도 PI는 추가하지 않는다.
 
 ---
 
@@ -3672,10 +3858,13 @@ Yaw는 Heading Hold를 기본으로 사용하므로 Roll / Pitch와 동일한 PI
 | RC | $\Omega_{z,\max}$ | 최대 Yaw 각속도 |
 | RC / 자세 | $\phi_{\max}$ | 최대 Roll 목표각 |
 | RC / 자세 | $\theta_{\max}$ | 최대 Pitch 목표각 |
-| Position PI | $K_{P,p}, K_{I,p}$ | 위치 PI Gain |
-| Attitude PI | $K_{P,R}, K_{I,R}$ | 자세 PI Gain |
-| Feedback | $v_{fb,\max}$ | 최대 위치 보정 속도 |
-| Feedback | $\omega_{fb,\max}$ | 최대 자세 보정 각속도 |
+| 보정 | $\psi_{corr,max}$ | 최대 Yaw 보정 목표각 |
+| Position PI | $K_{P,p}^{xy}, K_{I,p}^{xy}$ | 조종 모드 x·y 위치 PI Gain |
+| Heading Yaw PI | $K_{P,\psi,h}, K_{I,\psi,h}$ | 조종 모드 보행 Heading PI Gain |
+| Posture PI | $K_{P,R}, K_{I,R}$ | 조종 모드 Roll·Pitch 및 보정 모드 Yaw 단일 자세 PI Gain |
+| Feedback | $v_{fb,\max}^{xy}$ | 최대 x·y 위치 보정 속도 |
+| Feedback | $\omega_{heading,fb,max}$ | 최대 보행 Heading 보정 각속도 |
+| Feedback | $\omega_{posture,max}$ | 최대 몸체 자세 보정 각속도 |
 | Gait | $T_{phase}$ | Tripod Phase 시간 |
 | Gait | $T_{stance}$ | Stance 예상 시간 |
 | Swing | $T_{swing}$ | Swing 시간 |
@@ -3718,51 +3907,68 @@ v_{user},\;\phi_{ref},\;\theta_{ref},\;\omega_{z,user}
 \end{aligned}
 $$
 
-몸체 목표 위치:
+조종 모드의 몸체 x·y 목표 위치:
 
 $$
 \boxed{
-p_{B,ref}[k]
+p_{B,ref}^{xy}[k]
 =
-p_{B,ref}[k-1]
+p_{B,ref}^{xy}[k-1]
 +
-{}^W\hat R_B[k]v_{user}[k]T_s
+\begin{bmatrix}
+\cos\psi_{ref}[k]\\
+\sin\psi_{ref}[k]
+\end{bmatrix}
+v_{x,user}[k]T_s
 }
 $$
 
-Position Reference Generator 활성화 시에는 $p_{B,ref}[k_0]={}^W\hat p_B[k_0]$로 초기화한다.
+Position Reference Generator 활성화 시에는 $p_{B,ref}^{xy}[k_0]={}^W\hat p_B^{xy}[k_0]$로 초기화한다.
 
 몸체 위치 Feedback:
 
 $$
-v_{feedback}
+v_{feedback}^{xy}
 =
 PI_p
 \left(
-p_{B,ref}-\hat p_B
+p_{B,ref}^{xy}-{}^W\hat p_B^{xy}
 \right)
 $$
 
-몸체 자세 Feedback:
+조종 모드의 Gait Heading Yaw Feedback:
 
 $$
-\omega_{feedback}
+\omega_{z,heading,feedback}
+=
+PI_{\psi,h}
+\left(
+\operatorname{wrap}_{\pi}(\psi_{ref}-\psi_{IMU})
+\right)
+$$
+
+조종 모드 Roll·Pitch 및 보정 모드 Yaw 단일 자세 PI:
+
+$$
+\omega_{posture}
 =
 PI_R
 \left(
-R_{ref},R
+\eta_{posture,target}-\eta_{IMU}
 \right)
 $$
 
-최종 Body Twist:
+Final Gait Body Twist:
 
 $$
 \boxed{
-\xi_{final}
+\xi_{gait}
 =
 \begin{bmatrix}
 v_{user}+v_{feedback}\\
-\omega_{user}+\omega_{feedback}
+0\\
+0\\
+\omega_{z,user}+\omega_{z,heading,feedback}
 \end{bmatrix}
 }
 $$
@@ -3807,6 +4013,8 @@ P_0,P_1,P_2,P_3,s
 }
 $$
 
+위 합산식은 조종 모드의 보행 경로에 적용한다. 보정 모드는 x·y·z 이동속도를 PI 없이 직접 사용하고 보정 Yaw 자세 PI는 보행 Body Twist에 합하지 않는다. 암 모드에는 Position PI와 자세 PI를 적용하지 않는다.
+
 발 접촉 보정:
 
 $$
@@ -3815,10 +4023,34 @@ p_i^{ref}
 Early/LateLanding
 $$
 
+기준 발끝 목표 선택:
+
+$$
+{}^Rp_i^{base}
+=
+\begin{cases}
+{}^Rp_i^{tripod}, & Tripod\_Enable=1\\
+{}^Rp_i^{stance\_hold}, & Tripod\_Enable=0
+\end{cases}
+$$
+
+`Tripod_Enable=0`일 때도 $p_i^{stance\_hold}$를 매 주기 출력한다.
+
+몸체 자세 오버레이:
+
+$$
+{}^Bp_i^{cmd}
+=
+({}^RR_B(\eta_{posture,cmd}))^T
+{}^Rp_i^{base}
+$$
+
+자세 오버레이는 Tripod 위상, 보폭, Stance/Swing 궤적과 착지점을 변경하지 않는다.
+
 좌표 변환:
 
 $$
-{}^Bp_i^{ref}
+{}^Bp_i^{cmd}
 \rightarrow
 {}^{L_i}p_i^{ref}
 $$

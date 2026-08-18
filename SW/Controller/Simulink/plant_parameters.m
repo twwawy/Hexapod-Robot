@@ -34,3 +34,5 @@ N_J3  = 120;    % 3번 관절 미분 필터 계수를 설정한다.
 
 
 Sampling_Time = 0.005;    % 제어 주기를 설정한다.
+
+servo_disturbance = 1e-5;   % 0.003 rad, 0.172°
