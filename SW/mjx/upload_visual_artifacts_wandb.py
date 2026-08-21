@@ -19,6 +19,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--metrics-path", required=True)
     parser.add_argument("--run-metadata-path", required=True)
     parser.add_argument("--video-path", required=True)
+    parser.add_argument("--stage-video-path", action="append", default=[], help="Upload a curriculum-stage best video; may be repeated.")
+    parser.add_argument("--stage-checkpoint-path", action="append", default=[], help="Upload a curriculum-stage best checkpoint; may be repeated.")
     parser.add_argument("--neutral-pose-image-path", default=None)
     parser.add_argument("--neutral-pose-metadata-path", default=None)
     return parser.parse_args()
@@ -42,8 +44,15 @@ def main() -> None:
     metrics_path = Path(args.metrics_path).resolve()
     run_metadata_path = Path(args.run_metadata_path).resolve()
     video_path = Path(args.video_path).resolve()
+    stage_video_paths = [Path(path).resolve() for path in args.stage_video_path]
+    stage_checkpoint_paths = [Path(path).resolve() for path in args.stage_checkpoint_path]
     neutral_pose_image_path = Path(args.neutral_pose_image_path).resolve() if args.neutral_pose_image_path else None
     neutral_pose_metadata_path = Path(args.neutral_pose_metadata_path).resolve() if args.neutral_pose_metadata_path else None
+    required_paths = [checkpoint_path, latest_checkpoint_path, metrics_path, run_metadata_path, video_path, *stage_video_paths, *stage_checkpoint_paths]
+    missing_paths = [path for path in required_paths if not path.exists()]
+    if missing_paths:
+        missing = ", ".join(str(path) for path in missing_paths)
+        raise FileNotFoundError(f"wandb upload aborted; required artifact(s) missing: {missing}")
 
     metadata = _read_checkpoint_metadata(checkpoint_path)
     wandb_meta = metadata.get("wandb")
@@ -71,6 +80,8 @@ def main() -> None:
 
     artifact = wandb.Artifact(f"{run.name}-outputs", type="mjx-run")
     artifact_paths = [checkpoint_path, latest_checkpoint_path, metrics_path, run_metadata_path, video_path]
+    artifact_paths.extend(stage_video_paths)
+    artifact_paths.extend(stage_checkpoint_paths)
     if neutral_pose_image_path is not None:
         artifact_paths.append(neutral_pose_image_path)
     if neutral_pose_metadata_path is not None:
@@ -80,6 +91,8 @@ def main() -> None:
             artifact.add_file(str(path), name=path.name)
     run.log_artifact(artifact)
     run.summary["render_video"] = str(video_path)
+    run.summary["stage_best_videos"] = [str(path) for path in stage_video_paths if path.exists()]
+    run.summary["stage_best_checkpoints"] = [str(path) for path in stage_checkpoint_paths if path.exists()]
     run.summary["run_metadata_path"] = str(run_metadata_path)
     if neutral_pose_image_path is not None and neutral_pose_image_path.exists():
         run.summary["neutral_pose_image"] = str(neutral_pose_image_path)

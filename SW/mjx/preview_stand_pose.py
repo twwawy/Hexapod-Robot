@@ -47,6 +47,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--save-to-model", action="store_true", help="Persist the resolved STAND_POSE into SW/mjx/hexapod_mjx/model.py.")
     parser.add_argument("--root-height", type=float, default=None, help="Override the resolved floating-base height directly.")
     parser.add_argument("--root-height-offset", type=float, default=0.0, help="Add an offset on top of the auto-resolved floating-base height.")
+    parser.add_argument("--joint-step", type=float, default=0.05, help="Interactive viewer joint increment in radians.")
+    parser.add_argument("--root-height-step", type=float, default=0.01, help="Interactive viewer root-height increment in meters.")
     parser.add_argument("--output-image-path", type=str, default="/tmp/stand_pose_preview.png")
     parser.add_argument("--output-json-path", type=str, default="/tmp/stand_pose_preview.json")
     parser.add_argument("--width", type=int, default=960)
@@ -189,6 +191,21 @@ def _save_pose_to_model(repo_root: Path, pose: dict[str, float]) -> Path:
     return model_path
 
 
+def _write_preview_json(repo_root: Path, args: argparse.Namespace, payload: dict[str, object]) -> Path:
+    output_json_path = _resolve_path(repo_root, args.output_json_path)
+    output_json_path.parent.mkdir(parents=True, exist_ok=True)
+    output_json_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
+    return output_json_path
+
+
+def _viewer_status(values: dict[str, tuple[float, float, float]], selected_group: str, selected_joint: int, root_height: float) -> str:
+    selected_value = values[selected_group][selected_joint]
+    return (
+        f"selected={selected_group}.q{selected_joint + 1} value={selected_value:+.3f} rad, "
+        f"root_height={root_height:.3f} m"
+    )
+
+
 
 
 def main() -> None:
@@ -206,12 +223,76 @@ def main() -> None:
 
     print(json.dumps(payload, indent=2, ensure_ascii=False))
 
-    output_json_path = _resolve_path(repo_root, args.output_json_path)
-    output_json_path.parent.mkdir(parents=True, exist_ok=True)
-    output_json_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
+    output_json_path = _write_preview_json(repo_root, args, payload)
 
     if args.viewer:
-        with mujoco.viewer.launch_passive(bundle.model, data) as viewer:
+        live_state = {
+            "values": {group: tuple(joints) for group, joints in values.items()},
+            "selected_group": "front",
+            "selected_joint": 0,
+            "root_height": float(resolved_root_height),
+        }
+
+        print("viewer_controls: F/M/R=group  1/2/3=joint  [ and ]=joint--/++  - and ==height--/++  P=save  O=print")
+        print(_viewer_status(live_state["values"], live_state["selected_group"], live_state["selected_joint"], live_state["root_height"]))
+
+        def refresh_viewer(save_to_model: bool = False) -> None:
+            build_args = argparse.Namespace(**vars(args))
+            build_args.root_height = float(live_state["root_height"])
+            build_args.root_height_offset = 0.0
+            pose_now = _build_pose(live_state["values"])
+            refreshed, auto_height, _, foot_body_z_now = _build_pose_data(bundle, pose_now, build_args)
+            data.qpos[:] = refreshed.qpos
+            data.qvel[:] = 0.0
+            if data.act.size:
+                data.act[:] = 0.0
+            mujoco.mj_forward(bundle.model, data)
+            payload_now = _payload(repo_root, pose_now, auto_height, float(live_state["root_height"]), foot_body_z_now, build_args)
+            if save_to_model:
+                model_path = _save_pose_to_model(repo_root, pose_now)
+                payload_now["saved_model_path"] = str(model_path)
+                print(f"saved_model_path: {model_path}")
+            _write_preview_json(repo_root, args, payload_now)
+            print(_viewer_status(live_state["values"], live_state["selected_group"], live_state["selected_joint"], live_state["root_height"]))
+
+        def key_callback(keycode: int) -> None:
+            try:
+                key = chr(keycode)
+            except ValueError:
+                return
+            lower = key.lower()
+            changed = False
+            save_now = False
+            if lower in ("f", "m", "r"):
+                live_state["selected_group"] = {"f": "front", "m": "mid", "r": "rear"}[lower]
+            elif lower in ("1", "2", "3"):
+                live_state["selected_joint"] = int(lower) - 1
+            elif key == "[":
+                joints = list(live_state["values"][live_state["selected_group"]])
+                joints[live_state["selected_joint"]] -= float(args.joint_step)
+                live_state["values"][live_state["selected_group"]] = tuple(float(v) for v in joints)
+                changed = True
+            elif key == "]":
+                joints = list(live_state["values"][live_state["selected_group"]])
+                joints[live_state["selected_joint"]] += float(args.joint_step)
+                live_state["values"][live_state["selected_group"]] = tuple(float(v) for v in joints)
+                changed = True
+            elif key == "-":
+                live_state["root_height"] = float(live_state["root_height"]) - float(args.root_height_step)
+                changed = True
+            elif key == "=":
+                live_state["root_height"] = float(live_state["root_height"]) + float(args.root_height_step)
+                changed = True
+            elif lower == "p":
+                save_now = True
+                changed = True
+            elif lower == "o":
+                print(_viewer_status(live_state["values"], live_state["selected_group"], live_state["selected_joint"], live_state["root_height"]))
+            else:
+                return
+            refresh_viewer(save_to_model=save_now) if changed else print(_viewer_status(live_state["values"], live_state["selected_group"], live_state["selected_joint"], live_state["root_height"]))
+
+        with mujoco.viewer.launch_passive(bundle.model, data, key_callback=key_callback) as viewer:
             _configure_camera(viewer.cam, args)
             viewer.sync()
             while viewer.is_running():

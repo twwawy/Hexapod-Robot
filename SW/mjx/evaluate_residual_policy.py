@@ -82,11 +82,12 @@ def main() -> None:
         "height_reward": float(metric_means[3]),
         "slip_cost": float(metric_means[4]),
         "control_cost": float(metric_means[5]),
-        "action_cost": float(metric_means[6]),
-        "forward_velocity": float(metric_means[7]),
-        "lateral_velocity": float(metric_means[8]),
-        "yaw_rate": float(metric_means[9]),
-        "body_contact": float(metric_means[10]),
+        "residual_cost": float(metric_means[6]),
+        "action_rate_cost": float(metric_means[7]),
+        "forward_velocity": float(metric_means[8]),
+        "lateral_velocity": float(metric_means[9]),
+        "yaw_rate": float(metric_means[10]),
+        "body_contact": float(metric_means[11]),
     }
 
     report_path = (repo_root / args.report_path).resolve()

@@ -1,38 +1,40 @@
-# mujoco_tuto / Hexapod-Robot
+# Hexapod-Robot
 
-이 저장소에는 두 흐름이 함께 들어 있다.
+6족 로봇의 하드웨어 자산과 MuJoCo MJX 기반 보행 실험을 함께 관리하는 저장소다. 현재 강화학습의 기준 경로는 **classical tripod gait + Cartesian residual RL**이다.
 
-1. 원격 `mujoco_tuto`에 있던 MuJoCo/MJCF 공부용 자료
-2. 현재 `Hexapod-Robot`의 URDF/MJX 기반 hexapod 실험 코드와 가이드
+## 현재 기준 경로
 
-## Hexapod MJX 작업물
-
-- 메인 코드: `SW/mjx/`
-- 가이드/실행 스크립트: `Hexapod-MJX-가이드/`
-- 하드웨어/URDF 자산: `HW/urdf/`
-
-빠른 실행 예시:
-
-```bash
-~/Desktop/Hexapod-MJX-가이드/빠른학습.sh fresh
-~/Desktop/Hexapod-MJX-가이드/큰병렬.sh fresh --num-envs 512 --rollout-steps 128 --num-updates 500 --minibatch-size 2048
-~/Desktop/Hexapod-MJX-가이드/자세튜닝.sh viewer
+```text
+command → nominal tripod gait → nominal foot targets
+        → RL Δz (swing legs only) → contact/safety → posture layer
+        → linearized IK → joint limits → PD torque
 ```
 
-## 기존 mujoco_tuto 공부 자료
+- RL action: 다리 순서 `LF, LM, LB, RF, RM, RB`의 6차원 swing-foot `Δz`
+- RL은 stance 발, 보폭, 착지 XY, gait timing, body pose를 직접 바꾸지 않는다.
+- early landing은 contact/safety 계층이 현재 발 위치를 유지해 RL residual을 무시한다.
+- 기존 7-D residual checkpoint는 action/observation 계약이 달라 재사용할 수 없다. `fresh`로 새 학습을 시작해야 한다.
 
-- `00_mjx_minimal.py`
-- `mjx_tutorial.ipynb`
-- `SPIDER_MUJOCO_STUDY_GUIDE.md`
-- `reference/spider_rl/`
-- `reference/mujoco_playground/tutorials/mjx_pendulum.py`
+설계·관측·보상·실행 방법은 [docs/RESIDUAL_RL.md](docs/RESIDUAL_RL.md)에만 최신 기준으로 정리한다.
 
-## 원격에 있던 기존 설명
+## 주요 위치
 
-MuJoCo/MJCF 공부용 메모 저장소다. 이번에 실제로 돌아가게 만든 HEXAPEDAL 변환 스택의 소스 오브 트루스는 이 폴더가 아니라 아래 repo다.
+- `SW/mjx/hexapod_mjx/residual_controller.py`: nominal gait, residual, contact safety, IK
+- `SW/mjx/hexapod_mjx/residual_env.py`: MJX observation, reward, termination
+- `SW/mjx/train_residual_ppo.py`: PPO 학습 및 checkpoint 계약
+- `SW/mjx/visualize_residual_policy.py`: policy replay/render
+- `Hexapod-MJX-가이드/residual_rl_run.sh`: 학습·재개·영상 생성 wrapper
+- `HW/`: 실제 로봇의 URDF, CAD, PCB, 부품 자료
 
-- 실제 코드 repo: `/home/huro/spider_ws/spider_rl`
-- MuJoCo 패키지: `/home/huro/spider_ws/spider_rl/source/spider_rl/spider_mujoco`
-- 학습/검증 스크립트: `/home/huro/spider_ws/spider_rl/scripts/mujoco`
-- 원본 URDF 기본 경로: `/home/huro/spider_ws/HEXAPEDAL_URDF_description/urdf/HEXAPEDAL_URDF_fixed.urdf`
-- 이 repo 안에도 업로드용 슬림 코드 사본을 `reference/spider_rl/` 아래 넣어뒀다. 공부/열람용이고, 수정 소스 오브 트루스는 여전히 위 `spider_rl` repo다.
+## 빠른 시작
+
+```bash
+cd ~/Hexapod-Robot
+./Hexapod-MJX-가이드/빠른학습.sh fresh
+```
+
+작은 검증 실행 후 본 학습으로 확장한다. 자세한 명령과 평가 기준은 [Residual RL 가이드](docs/RESIDUAL_RL.md)를 따른다.
+
+## 참고 자료
+
+`완전 튜토리얼.md`는 초기 MuJoCo/Isaac 학습을 위한 배경 자료다. 현재 MJX residual 구현의 명세나 실행 기준은 [docs/RESIDUAL_RL.md](docs/RESIDUAL_RL.md)다.

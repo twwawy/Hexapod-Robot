@@ -11,6 +11,7 @@ This trainer now persists progress incrementally so long runs are recoverable:
 """
 
 import argparse
+from dataclasses import dataclass, field
 import hashlib
 import json
 import signal
@@ -70,11 +71,16 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--joint-limit-margin-1", type=float, default=0.0, help="Tighten the joint-1 range by this many radians on each side.")
     parser.add_argument("--joint-limit-margin-2", type=float, default=0.0, help="Tighten the joint-2 range by this many radians on each side.")
     parser.add_argument("--joint-limit-margin-3", type=float, default=0.0, help="Tighten the joint-3 range by this many radians on each side.")
-    parser.add_argument("--command-curriculum", choices=("staged", "none"), default="staged")
-    parser.add_argument("--forward-only-updates", type=int, default=120)
-    parser.add_argument("--yaw-stage-updates", type=int, default=120)
+    parser.add_argument("--command-curriculum", choices=("reward", "staged", "none"), default="reward", help="Use reward-gated, legacy update-gated, or disabled command curriculum.")
+    parser.add_argument("--forward-only-updates", type=int, default=120, help="Legacy staged curriculum duration for stage 0.")
+    parser.add_argument("--yaw-stage-updates", type=int, default=120, help="Legacy staged curriculum duration for stage 1.")
     parser.add_argument("--forward-only-scale", type=float, default=0.60)
     parser.add_argument("--yaw-stage-scale", type=float, default=0.35)
+    parser.add_argument("--curriculum-reward-threshold-0", type=float, default=0.95, help="Recent mean reward required to leave forward-only stage.")
+    parser.add_argument("--curriculum-reward-threshold-1", type=float, default=0.90, help="Recent mean reward required to leave limited-yaw stage.")
+    parser.add_argument("--curriculum-reward-window", type=int, default=20, help="Number of updates used for the stage reward mean.")
+    parser.add_argument("--curriculum-success-updates", type=int, default=5, help="Consecutive qualifying updates required for a stage transition.")
+    parser.add_argument("--curriculum-ramp-updates", type=int, default=30, help="Updates over which command limits expand after a transition.")
     parser.add_argument("--wandb", action="store_true")
     parser.add_argument("--wandb-project", type=str, default="hexapod-residual-rl")
     parser.add_argument("--wandb-entity", type=str, default=None)
@@ -86,6 +92,94 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--wandb-run-id", type=str, default=None)
     return parser.parse_args()
 
+
+
+@dataclass
+class CurriculumRuntimeState:
+    stage: int = 0
+    success_count: int = 0
+    recent_rewards: list[float] = field(default_factory=list)
+    ema_reward: float | None = None
+    ramp_from_stage: int | None = None
+    ramp_elapsed_updates: int = 0
+    stage_best_rewards: dict[int, float] = field(
+        default_factory=lambda: {0: float("-inf"), 1: float("-inf"), 2: float("-inf")}
+    )
+
+    @classmethod
+    def from_metadata(cls, metadata: dict[str, Any], config: CommandCurriculumConfig) -> "CurriculumRuntimeState":
+        payload = metadata.get("curriculum_state")
+        if not isinstance(payload, dict):
+            return cls()
+        state = cls(
+            stage=max(0, min(2, int(payload.get("stage", 0)))),
+            success_count=max(0, int(payload.get("success_count", 0))),
+            recent_rewards=[float(value) for value in payload.get("recent_rewards", [])][-max(1, config.reward_window):],
+            ema_reward=(float(payload["ema_reward"]) if payload.get("ema_reward") is not None else None),
+            ramp_from_stage=(int(payload["ramp_from_stage"]) if payload.get("ramp_from_stage") is not None else None),
+            ramp_elapsed_updates=max(0, int(payload.get("ramp_elapsed_updates", 0))),
+        )
+        saved_best = payload.get("stage_best_rewards", {})
+        if isinstance(saved_best, dict):
+            for stage, reward in saved_best.items():
+                state.stage_best_rewards[int(stage)] = float(reward)
+        return state
+
+    def to_metadata(self) -> dict[str, Any]:
+        return {
+            "stage": self.stage,
+            "success_count": self.success_count,
+            "recent_rewards": list(self.recent_rewards),
+            "ema_reward": self.ema_reward,
+            "ramp_from_stage": self.ramp_from_stage,
+            "ramp_elapsed_updates": self.ramp_elapsed_updates,
+            "stage_best_rewards": {str(stage): reward for stage, reward in self.stage_best_rewards.items()},
+        }
+
+    def ramp_progress(self, config: CommandCurriculumConfig) -> float:
+        if self.ramp_from_stage is None:
+            return 1.0
+        return min(1.0, (self.ramp_elapsed_updates + 1) / max(1, config.ramp_updates))
+
+    def advance_ramp(self, config: CommandCurriculumConfig) -> None:
+        if self.ramp_from_stage is None:
+            return
+        self.ramp_elapsed_updates += 1
+        if self.ramp_elapsed_updates >= max(1, config.ramp_updates):
+            self.ramp_from_stage = None
+            self.ramp_elapsed_updates = 0
+
+    def observe(self, reward: float, config: CommandCurriculumConfig) -> tuple[float, bool]:
+        self.recent_rewards.append(float(reward))
+        self.recent_rewards = self.recent_rewards[-max(1, config.reward_window):]
+        recent_mean = float(np.mean(self.recent_rewards))
+        self.ema_reward = recent_mean if self.ema_reward is None else 0.9 * self.ema_reward + 0.1 * float(reward)
+        transitioned = False
+        if config.mode == "reward" and self.stage < 2:
+            threshold = (
+                config.reward_threshold_stage0
+                if self.stage == 0
+                else config.reward_threshold_stage1
+            )
+            if len(self.recent_rewards) >= max(1, config.reward_window) and recent_mean >= threshold:
+                self.success_count += 1
+            else:
+                self.success_count = 0
+            if self.success_count >= max(1, config.success_updates):
+                previous_stage = self.stage
+                self.stage += 1
+                self.success_count = 0
+                self.recent_rewards = []
+                self.ema_reward = None
+                self.ramp_from_stage = previous_stage
+                self.ramp_elapsed_updates = 0
+                self.stage_best_rewards.setdefault(self.stage, float("-inf"))
+                transitioned = True
+        return recent_mean, transitioned
+
+
+def _stage_best_path(output_path: Path, stage: int) -> Path:
+    return output_path.with_name(f"{output_path.stem}_stage{stage}_best{output_path.suffix}")
 
 
 def _resolve_repo_path(repo_root: Path, path_str: str | None) -> Path | None:
@@ -146,6 +240,12 @@ def _init_wandb(repo_root: Path, args: argparse.Namespace, output_path: Path, la
             "learning_rate": args.learning_rate,
             "hidden_size": args.hidden_size,
             "seed": args.seed,
+            "command_curriculum": args.command_curriculum,
+            "curriculum_reward_threshold_0": args.curriculum_reward_threshold_0,
+            "curriculum_reward_threshold_1": args.curriculum_reward_threshold_1,
+            "curriculum_reward_window": args.curriculum_reward_window,
+            "curriculum_success_updates": args.curriculum_success_updates,
+            "curriculum_ramp_updates": args.curriculum_ramp_updates,
             "joint_limit_margin_1": args.joint_limit_margin_1,
             "joint_limit_margin_2": args.joint_limit_margin_2,
             "joint_limit_margin_3": args.joint_limit_margin_3,
@@ -200,6 +300,7 @@ def _code_signature(repo_root: Path) -> dict[str, Any]:
     }
 
 
+
 def _checkpoint_metadata(
     repo_root: Path,
     args: argparse.Namespace,
@@ -213,6 +314,8 @@ def _checkpoint_metadata(
     interrupted: bool,
     completed: bool,
     wandb_metadata: dict[str, Any] | None,
+    curriculum_state: dict[str, Any] | None = None,
+    curriculum_stage: int | None = None,
 ) -> dict[str, Any]:
     return {
         "updates_seen": updates_seen,
@@ -220,6 +323,8 @@ def _checkpoint_metadata(
         "best_mean_reward": best_mean_reward,
         "obs_dim": obs_dim,
         "action_dim": ACTION_DIM,
+        "residual_interface": "swing_delta_z_v1",
+        "action_semantics": "six bounded per-leg swing-foot vertical residuals in metres",
         "controller_reset_root_height": controller_reset_root_height,
         "checkpoint_kind": checkpoint_kind,
         "interrupted": interrupted,
@@ -229,7 +334,33 @@ def _checkpoint_metadata(
         "stand_pose_hash": _stand_pose_hash(),
         "code_signature": _code_signature(repo_root),
         "ppo_config": vars(args),
+        "curriculum_stage": curriculum_stage,
+        "curriculum_state": curriculum_state,
     }
+
+
+def _validate_resume_interface(metadata: dict[str, Any], obs_dim: int) -> None:
+    """Fail clearly instead of loading weights from a different policy contract."""
+    saved_action_dim = metadata.get("action_dim")
+    saved_obs_dim = metadata.get("obs_dim")
+    saved_interface = metadata.get("residual_interface")
+    if saved_action_dim is not None and int(saved_action_dim) != ACTION_DIM:
+        raise ValueError(
+            "Checkpoint action interface is incompatible: "
+            f"checkpoint has {saved_action_dim} actions, current controller requires {ACTION_DIM} "
+            "per-leg swing Δz actions. Start a fresh run."
+        )
+    if saved_obs_dim is not None and int(saved_obs_dim) != obs_dim:
+        raise ValueError(
+            "Checkpoint observation interface is incompatible: "
+            f"checkpoint has {saved_obs_dim} inputs, current environment requires {obs_dim}. "
+            "Start a fresh run."
+        )
+    if saved_interface is not None and saved_interface != "swing_delta_z_v1":
+        raise ValueError(
+            f"Checkpoint residual interface {saved_interface!r} is incompatible with swing_delta_z_v1. "
+            "Start a fresh run."
+        )
 
 
 
@@ -301,6 +432,11 @@ def main() -> None:
         yaw_stage_updates=args.yaw_stage_updates,
         forward_only_scale=args.forward_only_scale,
         yaw_stage_scale=args.yaw_stage_scale,
+        reward_threshold_stage0=args.curriculum_reward_threshold_0,
+        reward_threshold_stage1=args.curriculum_reward_threshold_1,
+        reward_window=args.curriculum_reward_window,
+        success_updates=args.curriculum_success_updates,
+        ramp_updates=args.curriculum_ramp_updates,
     )
     ppo_config = PPOConfig(
         num_envs=args.num_envs,
@@ -332,7 +468,7 @@ def main() -> None:
         controller_config,
         key,
         1,
-        command_sampling_config(controller_config, curriculum_config, 1),
+        command_sampling_config(controller_config, curriculum_config, 1, curriculum_stage=0),
     )
     obs_dim = int(warmup_obs.shape[-1])
 
@@ -345,12 +481,16 @@ def main() -> None:
         resume_path = _resolve_repo_path(repo_root, args.resume_path)
         assert resume_path is not None
         train_state, resume_metadata = load_checkpoint(resume_path)
+        _validate_resume_interface(resume_metadata, obs_dim)
         completed_updates = int(resume_metadata.get("updates_seen", 0))
         print(f"resume_path: {resume_path}")
         print(f"resume_updates_seen: {completed_updates}")
     else:
         train_state = init_train_state(obs_dim, ACTION_DIM, ppo_config)
         resume_metadata = {}
+    curriculum_state = CurriculumRuntimeState.from_metadata(resume_metadata, curriculum_config)
+    if args.resume_path and "curriculum_state" not in resume_metadata:
+        print("resume_curriculum_state: legacy checkpoint; starting reward curriculum at stage 0")
 
     if output_path.exists():
         best_train_state, best_metadata = load_checkpoint(output_path)
@@ -385,11 +525,19 @@ def main() -> None:
     value_fn = jax.jit(value_predict)
 
     def sampling_for_update(update_index: int):
-        return command_sampling_config(controller_config, curriculum_config, update_index)
+        return command_sampling_config(
+            controller_config,
+            curriculum_config,
+            update_index,
+            curriculum_stage=curriculum_state.stage,
+            ramp_progress=curriculum_state.ramp_progress(curriculum_config),
+            ramp_from_stage=curriculum_state.ramp_from_stage,
+        )
 
     try:
         for update_idx in range(args.num_updates):
             absolute_update = completed_updates + update_idx + 1
+            rollout_stage = curriculum_state.stage
             key, reset_key = jax.random.split(key)
             state, obs = reset_env(
                 bundle,
@@ -442,6 +590,14 @@ def main() -> None:
 
             mean_reward = float(jnp.mean(rollout.rewards))
             mean_done = float(jnp.mean(rollout.dones))
+            stage_best_reward = curriculum_state.stage_best_rewards.get(rollout_stage, float("-inf"))
+            stage_best_path = _stage_best_path(output_path, rollout_stage)
+            stage_best_improved = mean_reward > stage_best_reward or not stage_best_path.exists()
+            if stage_best_improved:
+                curriculum_state.stage_best_rewards[rollout_stage] = mean_reward
+            recent_reward, curriculum_transitioned = curriculum_state.observe(mean_reward, curriculum_config)
+            if not curriculum_transitioned:
+                curriculum_state.advance_ramp(curriculum_config)
             metric_means = jnp.mean(rollout.metrics.reshape(-1, rollout.metrics.shape[-1]), axis=0)
             summary = {
                 "update": float(absolute_update),
@@ -453,11 +609,19 @@ def main() -> None:
                 "height_reward": float(metric_means[3]),
                 "slip_cost": float(metric_means[4]),
                 "control_cost": float(metric_means[5]),
-                "action_cost": float(metric_means[6]),
-                "forward_velocity": float(metric_means[7]),
-                "lateral_velocity": float(metric_means[8]),
-                "yaw_rate": float(metric_means[9]),
-                "body_contact": float(metric_means[10]),
+                "residual_cost": float(metric_means[6]),
+                "action_rate_cost": float(metric_means[7]),
+                "forward_velocity": float(metric_means[8]),
+                "lateral_velocity": float(metric_means[9]),
+                "yaw_rate": float(metric_means[10]),
+                "body_contact": float(metric_means[11]),
+                "curriculum_stage": float(rollout_stage),
+                "curriculum_stage_after_update": float(curriculum_state.stage),
+                "curriculum_recent_reward": recent_reward,
+                "curriculum_ema_reward": float(curriculum_state.ema_reward or 0.0),
+                "curriculum_success_count": float(curriculum_state.success_count),
+                "curriculum_ramp_progress": curriculum_state.ramp_progress(curriculum_config),
+                "curriculum_transitioned": float(curriculum_transitioned),
             }
             summary.update(update_metrics)
             history.append(summary)
@@ -467,6 +631,26 @@ def main() -> None:
                 best_mean_reward = mean_reward
                 best_update = absolute_update
                 best_train_state = train_state
+            if stage_best_improved:
+                save_checkpoint(
+                    stage_best_path,
+                    train_state,
+                    _checkpoint_metadata(
+                        repo_root,
+                        args,
+                        float(controller_bundle.reset_root_height),
+                        obs_dim,
+                        updates_seen=absolute_update,
+                        best_update=best_update,
+                        best_mean_reward=best_mean_reward,
+                        checkpoint_kind=f"stage_{rollout_stage}_best",
+                        interrupted=False,
+                        completed=False,
+                        wandb_metadata=wandb_metadata,
+                        curriculum_state=curriculum_state.to_metadata(),
+                        curriculum_stage=rollout_stage,
+                    ),
+                )
 
             if best_improved or not output_path.exists():
                 save_checkpoint(
@@ -485,6 +669,8 @@ def main() -> None:
                         interrupted=False,
                         completed=False,
                         wandb_metadata=wandb_metadata,
+                        curriculum_state=curriculum_state.to_metadata(),
+                        curriculum_stage=curriculum_state.stage,
                     ),
                 )
 
@@ -505,6 +691,8 @@ def main() -> None:
                         interrupted=stop_state["requested"],
                         completed=False,
                         wandb_metadata=wandb_metadata,
+                        curriculum_state=curriculum_state.to_metadata(),
+                        curriculum_stage=curriculum_state.stage,
                     ),
                 )
                 _write_progress_metrics(
@@ -529,6 +717,7 @@ def main() -> None:
 
             print(
                 f"update={absolute_update} mean_reward={summary['mean_reward']:.4f} "
+                f"stage={rollout_stage}->{curriculum_state.stage} recent_reward={recent_reward:.4f} "
                 f"done_rate={summary['mean_done']:.4f} actor_loss={summary.get('actor_loss', 0.0):.4f} "
                 f"value_loss={summary.get('value_loss', 0.0):.4f}"
             )
@@ -557,6 +746,8 @@ def main() -> None:
                 interrupted=interrupted,
                 completed=completed,
                 wandb_metadata=wandb_metadata,
+                curriculum_state=curriculum_state.to_metadata(),
+                curriculum_stage=curriculum_state.stage,
             ),
         )
         if history:
@@ -575,6 +766,8 @@ def main() -> None:
                     interrupted=interrupted,
                     completed=completed,
                     wandb_metadata=wandb_metadata,
+                    curriculum_state=curriculum_state.to_metadata(),
+                    curriculum_stage=curriculum_state.stage,
                 ),
             )
         _write_progress_metrics(

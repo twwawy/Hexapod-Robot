@@ -13,6 +13,8 @@ training-oriented MuJoCo model with three explicit goals:
 """
 
 from dataclasses import dataclass
+import json
+import os
 from pathlib import Path
 import re
 import tempfile
@@ -44,6 +46,7 @@ FOOT_PROXY_RADIUS = 0.010
 FOOT_CONTACT_POINT_COUNT = 3
 FOOT_CONTACT_BAND_Z = 0.0035
 FOOT_CONTACT_NEIGHBOR_COUNT = 18
+CONTACT_OVERRIDE_REL_PATH = Path("SW/mjx/contact_points_override.json")
 LEG_FRAME_RADIUS = 0.0075
 LEFT_FRAME_RGBA = "0.25 0.70 0.95 1"
 RIGHT_FRAME_RGBA = "0.95 0.65 0.25 1"
@@ -66,24 +69,24 @@ FLOOR_VISUAL_POS = (0.0, 0.0, -0.015)
 # 2. the front and rear legs splay fore/aft while the middle legs stay lateral,
 # 3. the pitch joints fold below the body instead of arching up over it.
 STAND_POSE = {
-    "LF_1": -0.7,
-    "LF_2": 0.1,
-    "LF_3": -1.0,
-    "RF_1": 0.7,
-    "RF_2": -0.1,
-    "RF_3": 1.0,
-    "LM_1": -0.4,
-    "LM_2": 0.1,
-    "LM_3": -1.0,
-    "RM_1": 0.4,
-    "RM_2": -0.1,
-    "RM_3": 1.0,
-    "LB_1": 0.7,
-    "LB_2": 0.1,
-    "LB_3": -1.0,
-    "RB_1": -0.7,
-    "RB_2": -0.1,
-    "RB_3": 1.0
+    "LF_1": -0.49999999999999983,
+    "LF_2": 0.44999999999999996,
+    "LF_3": -0.8499999999999999,
+    "RF_1": 0.49999999999999983,
+    "RF_2": -0.44999999999999996,
+    "RF_3": 0.8499999999999999,
+    "LM_1": -4.163336342344337e-17,
+    "LM_2": 0.44999999999999996,
+    "LM_3": -0.7499999999999998,
+    "RM_1": 4.163336342344337e-17,
+    "RM_2": -0.44999999999999996,
+    "RM_3": 0.7499999999999998,
+    "LB_1": 0.44999999999999984,
+    "LB_2": 0.5499999999999999,
+    "LB_3": -0.6999999999999997,
+    "RB_1": -0.44999999999999984,
+    "RB_2": -0.5499999999999999,
+    "RB_3": 0.6999999999999997
 }
 
 
@@ -324,6 +327,90 @@ def _infer_support_points(vertices: np.ndarray) -> tuple[tuple[float, float, flo
     return tuple(support_points)
 
 
+def _serialize_foot_specs(foot_specs: dict[str, FootContactSpec]) -> dict[str, dict[str, object]]:
+    payload: dict[str, dict[str, object]] = {}
+    for body_name, spec in foot_specs.items():
+        leg = _leg_prefix(body_name)
+        if leg is None:
+            continue
+        payload[leg] = {
+            "body_name": spec.body_name,
+            "sample_point": list(spec.sample_point),
+            "support_points": [list(point) for point in spec.support_points],
+        }
+    return payload
+
+
+def contact_override_path(repo_root: str | Path) -> Path:
+    repo_root = repo_root_from(repo_root)
+    env_path = os.environ.get("HEXAPOD_CONTACT_OVERRIDE_PATH")
+    if env_path:
+        raw = Path(env_path)
+        return raw if raw.is_absolute() else (repo_root / raw).resolve()
+    return (repo_root / CONTACT_OVERRIDE_REL_PATH).resolve()
+
+
+def _coerce_point(raw_point: object, *, label: str) -> tuple[float, float, float]:
+    if not isinstance(raw_point, (list, tuple)) or len(raw_point) != 3:
+        raise ValueError(f"{label} must be a 3-item list, got {raw_point!r}")
+    return (float(raw_point[0]), float(raw_point[1]), float(raw_point[2]))
+
+
+def _apply_contact_overrides(repo_root: Path, foot_specs: dict[str, FootContactSpec]) -> dict[str, FootContactSpec]:
+    override_path = contact_override_path(repo_root)
+    if not override_path.exists():
+        return foot_specs
+    payload = json.loads(override_path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError(f"Contact override file must contain an object: {override_path}")
+
+    leg_to_body = {leg: f"{leg}_motor_horn_3_1" for leg in LEG_NAMES}
+    updated = dict(foot_specs)
+    for raw_key, raw_spec in payload.items():
+        if not isinstance(raw_spec, dict):
+            raise ValueError(f"Contact override for {raw_key!r} must be an object")
+        key = str(raw_key)
+        body_name = leg_to_body.get(key, key)
+        if body_name not in foot_specs:
+            raise KeyError(f"Unknown contact override target {raw_key!r}; expected one of {sorted(leg_to_body)}")
+        base_spec = foot_specs[body_name]
+        support_points_raw = raw_spec.get("support_points")
+        if support_points_raw is None:
+            support_points = base_spec.support_points
+        else:
+            if not isinstance(support_points_raw, list) or len(support_points_raw) != FOOT_CONTACT_POINT_COUNT:
+                raise ValueError(
+                    f"support_points for {raw_key!r} must contain exactly {FOOT_CONTACT_POINT_COUNT} points"
+                )
+            support_points = tuple(
+                _coerce_point(point, label=f"{raw_key}.support_points[{idx}]")
+                for idx, point in enumerate(support_points_raw)
+            )
+        sample_point_raw = raw_spec.get("sample_point")
+        if sample_point_raw is None:
+            sample_point = _point_tuple(np.mean(np.asarray(support_points, dtype=np.float64), axis=0))
+        else:
+            sample_point = _coerce_point(sample_point_raw, label=f"{raw_key}.sample_point")
+        updated[body_name] = FootContactSpec(body_name=body_name, sample_point=sample_point, support_points=support_points)
+    return updated
+
+
+def export_contact_override_template(repo_root: str | Path, output_path: str | Path | None = None) -> Path:
+    repo_root = repo_root_from(repo_root)
+    output = contact_override_path(repo_root) if output_path is None else Path(output_path)
+    if not output.is_absolute():
+        output = (repo_root / output).resolve()
+    clean_urdf = _clean_urdf_text(repo_root)
+    with tempfile.TemporaryDirectory(prefix="hexapod_contact_override_") as tmpdir:
+        urdf_path = Path(tmpdir) / "hexapod_clean.urdf"
+        urdf_path.write_text(clean_urdf, encoding="utf-8")
+        urdf_model = mujoco.MjModel.from_xml_path(str(urdf_path))
+        payload = _serialize_foot_specs(_infer_foot_contact_specs_from_model(urdf_model))
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
+    return output
+
+
 def _infer_foot_contact_specs_from_model(model: mujoco.MjModel) -> dict[str, FootContactSpec]:
     """Infer per-foot support proxies from the actual foot mesh geometry."""
     foot_specs: dict[str, FootContactSpec] = {}
@@ -446,7 +533,12 @@ def build_floating_base_mjcf(
     simplified: bool = True,
     contact_mode: str = "hybrid",
 ) -> Path:
-    """Generate a free-floating MJCF for either training or mesh-faithful preview."""
+    """Generate a free-floating MJCF for either training or mesh-faithful preview.
+
+    Contact points are inferred from the foot meshes by default. If
+    `SW/mjx/contact_points_override.json` exists, per-leg overrides from that file
+    replace the inferred support points so contact tuning can be done by hand.
+    """
     repo_root = repo_root_from(repo_root)
     generated_dir = repo_root / "SW" / "mjx" / "artifacts"
     generated_dir.mkdir(parents=True, exist_ok=True)
@@ -470,7 +562,7 @@ def build_floating_base_mjcf(
         # resulting XML tree. That is much simpler than reimplementing the full
         # conversion logic ourselves.
         urdf_model = mujoco.MjModel.from_xml_path(str(urdf_path))
-        foot_specs = _infer_foot_contact_specs_from_model(urdf_model)
+        foot_specs = _apply_contact_overrides(repo_root, _infer_foot_contact_specs_from_model(urdf_model))
         mujoco.mj_saveLastXML(str(saved_xml_path), urdf_model)
 
         tree = ET.parse(saved_xml_path)

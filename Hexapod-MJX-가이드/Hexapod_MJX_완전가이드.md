@@ -293,12 +293,14 @@ env -u LD_LIBRARY_PATH MUJOCO_GL=egl ~/.venvs/hexapod-mjx/bin/python \
 ```
 
 ### Residual RL 학습
-이제 MJX 쪽에는 **고전 제어기 + residual RL 정책** 경로도 추가되어 있다.
+MJX 쪽에는 **고전 제어기 + Cartesian residual RL 정책** 경로가 있다. Residual의 현재 명세는 [docs/RESIDUAL_RL.md](../docs/RESIDUAL_RL.md)가 유일한 기준이며, 아래 실행 wrapper 설명은 그 명세를 따른다.
 
-핵심 아이디어는:
-- tripod gait, command filtering, safety projection, joint-space 제어는 명시적 로직
-- RL은 작은 action space로 **착지/보폭/몸체 높이/roll-pitch trim**만 보정
-- 즉, 정책이 18개 관절 전체를 직접 내뱉지 않는다
+현재 1차 action은 `LF, LM, LB, RF, RM, RB` 순서의 **6-D swing-foot Δz**다.
+
+- tripod gait, command filtering, nominal foot target, IK, joint limit, PD torque는 classical controller가 소유한다.
+- RL은 swing 발의 수직 보정만 `±3 cm` 범위에서 출력한다.
+- stance action은 mask로 제거되고, swing 중 early contact는 contact/safety 계층이 현재 발 위치를 유지한다.
+- 보폭, 착지 XY, gait timing, body-height/roll/pitch trim은 RL action이 아니다.
 
 학습/시각화는 이제 번호형 스크립트 대신 아래 3개 단축 명령을 쓴다.
 - `~/Desktop/Hexapod-MJX-가이드/빠른학습.sh`
@@ -309,16 +311,16 @@ env -u LD_LIBRARY_PATH MUJOCO_GL=egl ~/.venvs/hexapod-mjx/bin/python \
 
 - residual RL 학습 진행
 - 기존 checkpoint가 있으면 그 latest checkpoint에서 이어서 학습
-- 학습 중 **가장 높은 mean_reward를 만든 policy는 즉시 best checkpoint로 저장**
+- 학습 중 **가장 높은 mean_reward를 만든 policy는 즉시 overall best checkpoint로 저장**
 - 학습 중 **현재 optimizer state는 latest checkpoint로 계속 저장**
 - metrics JSON도 update마다 계속 다시 저장
-- 그 best policy를 바로 headless 렌더해서 **MP4 하나만 저장**
+- overall best policy를 headless 렌더해서 `<run-stem>.mp4`로 저장
+- reward curriculum에서는 각 단계의 최고 policy도 별도로 저장하고, 단계별 MP4도 생성
 - MP4는 시작하자마자 바로 policy를 먹이지 않고 **neutral pose를 약 1.5초 먼저 보여준 뒤** rollout을 시작
 - 학습 환경에서는 로봇의 **등/몸통 collision box가 바닥에 닿을 때만 done 처리**하고, 기본 threshold도 예전보다 덜 빡세게 `0.0` 기준으로 맞춰져 있다
 - 그리고 매 실행마다 **`SW/mjx/artifacts/residual_rl_runs/YYYYMMDD/<run-stem>/`** 폴더를 새로 만들어 산출물을 그 안에 따로 저장
 
-즉, 예전처럼 frame 폴더를 기본 산출물로 남기지 않고,
-**최고 점수 정책의 MP4만 바로 남기는 흐름**으로 바뀌었다.
+즉, 기본 산출물은 overall best MP4 1개와 reward curriculum 단계별 best MP4들이다. frame 폴더는 기본 산출물로 남기지 않는다.
 
 기본 저장 경로:
 
@@ -329,6 +331,8 @@ env -u LD_LIBRARY_PATH MUJOCO_GL=egl ~/.venvs/hexapod-mjx/bin/python \
 - metrics JSON: `<run-folder>/<run-stem>_metrics.json`
 - run metadata JSON: `<run-folder>/<run-stem>_run.json`
 - best-policy MP4: `<run-folder>/<run-stem>.mp4`
+- stage best checkpoint: `<run-folder>/<run-stem>_stage0_best.pkl` 등
+- stage best MP4: `<run-folder>/<run-stem>_stage0_best.mp4` 등
 
 `_run.json` 안에는 아래가 남는다.
 
@@ -483,6 +487,17 @@ env -u LD_LIBRARY_PATH MUJOCO_GL=egl ~/.venvs/hexapod-mjx/bin/python \
 - 2단계: forward + small yaw
 - 3단계: full command range
 
+기본 전환 방식은 **보상 기반**이다. 각 단계에서 최근 보상 평균이 기준을 넘고, 그 상태가 연속 update 동안 유지될 때만 다음 단계로 넘어간다.
+
+- stage 0 → stage 1: `--curriculum-reward-threshold-0 0.95`
+- stage 1 → stage 2: `--curriculum-reward-threshold-1 0.90`
+- 판정 창: 최근 `20`개 update (`--curriculum-reward-window`)
+- 연속 성공 조건: `5`개 update (`--curriculum-success-updates`)
+- 전환 직후 명령 범위는 `30`개 update에 걸쳐 점진적으로 확대 (`--curriculum-ramp-updates`)
+
+reward 모드에서는 각 단계에서 그 단계의 최고 보상 checkpoint가 `*_stage0_best.pkl`, `*_stage1_best.pkl`, `*_stage2_best.pkl`로 저장되고, 학습 종료 후 대응하는 `*_stage0_best.mp4` 같은 영상도 자동 생성된다. 일반 MP4는 전체 학습 중 최고 보상 checkpoint를 사용한다.
+
+
 ### 2. 시각화
 ```bash
 ~/Desktop/Hexapod-MJX-가이드/시각화.sh [latest|checkpoint-path] [추가 옵션...]
@@ -495,8 +510,9 @@ env -u LD_LIBRARY_PATH MUJOCO_GL=egl ~/.venvs/hexapod-mjx/bin/python \
 ```
 
 설명:
-- `latest` 또는 생략: run 폴더 전체를 뒤져서 가장 최근 best checkpoint를 찾아 바로 렌더
+- `latest` 또는 생략: run 폴더 전체를 뒤져서 `*_stageN_best.pkl`을 제외한 가장 최근 overall best checkpoint를 찾아 바로 렌더
 - `checkpoint-path`: 특정 checkpoint를 지정해서 렌더
+- stage checkpoint를 직접 지정해도 metrics/latest 같은 공용 동반 파일은 원래 run의 overall stem에서 찾는다
 - 내부적으로는 `--skip-train` 모드라 학습은 안 하고 MP4만 만든다
 - MP4는 기본적으로 **neutral pose 1.5초 hold + rollout** 순서로 저장된다
 
@@ -519,6 +535,8 @@ env -u LD_LIBRARY_PATH MUJOCO_GL=egl ~/.venvs/hexapod-mjx/bin/python \
 - `fresh` : 기존 checkpoint를 무시하고 처음부터 다시 시작
 - `이어서` : 같은 라벨 계열에서 가장 최근 checkpoint를 자동으로 찾아 이어서 학습
 - 새 실행은 매번 **새 날짜/run 폴더**를 만들고, 이어서여도 새 폴더에 현재 런 결과를 저장한다
+- reward 모드의 stage/최근 보상/연속 성공/ramp 상태를 checkpoint에서 함께 복원한다
+- 이전 run 폴더에 있던 `*_stageN_best.pkl`도 새 run 폴더로 이어받아, resume 후에도 stage별 MP4와 W&B artifact를 계속 생성한다
 - 추가 옵션은 뒤에 그대로 붙이면 된다
   - `--num-envs`
   - `--rollout-steps`
@@ -534,8 +552,13 @@ env -u LD_LIBRARY_PATH MUJOCO_GL=egl ~/.venvs/hexapod-mjx/bin/python \
   - `--yaw-stage-updates`
   - `--forward-only-scale`
   - `--yaw-stage-scale`
+  - `--curriculum-reward-threshold-0`, `--curriculum-reward-threshold-1`
+  - `--curriculum-reward-window`, `--curriculum-success-updates`, `--curriculum-ramp-updates`
   - `--joint-limit-margin-1`, `--joint-limit-margin-2`, `--joint-limit-margin-3`
   - `--wandb`, `--wandb-project`, `--wandb-group`
+
+`--forward-only-updates`와 `--yaw-stage-updates`는 legacy `--command-curriculum staged`에서만 사용한다.
+`staged`는 기존 update-count 기반 호환 모드다. 단계별 best artifact가 필요한 새 학습은 기본 `reward` 모드를 사용한다.
 
 ### 관절 제한을 더 빡세게 거는 법
 

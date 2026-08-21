@@ -14,13 +14,14 @@ import numpy as np
 
 from hexapod_mjx.model import load_hexapod_model, repo_root_from
 from hexapod_mjx.residual_controller import (
-    body_velocity_components,
     build_residual_controller,
     controller_config_from_metadata,
     controller_step,
     policy_dt,
     quat_roll_pitch_yaw,
+    quat_to_rotmat,
     reset_controller_state,
+    world_to_body,
 )
 from hexapod_mjx.residual_rl import load_checkpoint, policy_mean
 
@@ -109,6 +110,7 @@ def main() -> None:
     controller_state = reset_controller_state(1)
     command = jnp.asarray([[args.forward_cmd, args.lateral_cmd, args.yaw_cmd]], dtype=jnp.float32)
     body_velocity_world = jnp.zeros((1, 3), dtype=jnp.float32)
+    body_angular_velocity_world = jnp.zeros((1, 3), dtype=jnp.float32)
     yaw_rate = jnp.zeros((1,), dtype=jnp.float32)
     prev_root_pos = jnp.asarray(data.qpos[0:3][None, :], dtype=jnp.float32)
     _, _, prev_yaw = quat_roll_pitch_yaw(jnp.asarray(data.qpos[3:7][None, :], dtype=jnp.float32))
@@ -121,18 +123,24 @@ def main() -> None:
     kd = np.asarray(controller_config.pd_kd, dtype=np.float32)[group_index]
     tau_limit = np.asarray(controller_config.torque_limit, dtype=np.float32)[group_index]
 
+    def world_vector_to_body(quat: jnp.ndarray, vector: jnp.ndarray) -> jnp.ndarray:
+        rot_t = jnp.swapaxes(quat_to_rotmat(quat), -1, -2)
+        return jnp.einsum("bij,bj->bi", rot_t, vector)
+
     def make_obs() -> jnp.ndarray:
         quat = jnp.asarray(data.qpos[3:7][None, :], dtype=jnp.float32)
         roll, pitch, _ = quat_roll_pitch_yaw(quat)
-        forward_velocity, lateral_velocity = body_velocity_components(quat, body_velocity_world)
+        body_linear_velocity = world_vector_to_body(quat, body_velocity_world)
+        body_angular_velocity = world_vector_to_body(quat, body_angular_velocity_world)
         body_height_error = jnp.asarray([[data.qpos[2] - float(controller_bundle.reset_root_height)]], dtype=jnp.float32)
         contacts = jnp.asarray((data.geom_xpos[controller_bundle.foot_geom_ids, 2] < controller_config.foot_contact_height).astype(np.float32)[None, :])
         phase_angle = controller_state.phase * (2.0 * jnp.pi)
         return jnp.concatenate(
             [
                 command,
-                jnp.stack([forward_velocity, lateral_velocity, yaw_rate], axis=-1),
+                body_linear_velocity,
                 jnp.concatenate([roll[:, None], pitch[:, None], body_height_error], axis=-1),
+                body_angular_velocity,
                 jnp.asarray(data.qpos[qpos_adr][None, :], dtype=jnp.float32),
                 jnp.asarray(data.qvel[dof_adr][None, :], dtype=jnp.float32),
                 contacts,
@@ -143,10 +151,17 @@ def main() -> None:
         )
 
     def step_policy() -> None:
-        nonlocal controller_state, body_velocity_world, yaw_rate, prev_root_pos, prev_yaw, prev_foot_world
+        nonlocal controller_state, body_velocity_world, body_angular_velocity_world, yaw_rate, prev_root_pos, prev_yaw, prev_foot_world
         obs = make_obs()
         action = np.asarray(policy_mean(train_state.params, obs))[0]
         for _ in range(controller_config.policy_controls_per_action):
+            current_foot_world = jnp.asarray(data.geom_xpos[controller_bundle.foot_geom_ids][None, :, :], dtype=jnp.float32)
+            root_pos_before = jnp.asarray(data.qpos[0:3][None, :], dtype=jnp.float32)
+            root_quat_before = jnp.asarray(data.qpos[3:7][None, :], dtype=jnp.float32)
+            current_foot_body = world_to_body(root_pos_before, root_quat_before, current_foot_world)
+            contacts = jnp.asarray(
+                (data.geom_xpos[controller_bundle.foot_geom_ids, 2] < controller_config.foot_contact_height).astype(np.float32)[None, :]
+            )
             controller_state, joint_targets, _ = controller_step(
                 bundle,
                 controller_bundle,
@@ -154,6 +169,8 @@ def main() -> None:
                 controller_state,
                 command,
                 jnp.asarray(action[None, :], dtype=jnp.float32),
+                foot_contacts=contacts,
+                current_foot_body=current_foot_body,
             )
             joint_targets_np = np.asarray(joint_targets)[0]
             qj = data.qpos[qpos_adr]
@@ -167,6 +184,7 @@ def main() -> None:
 
         root_pos = jnp.asarray(data.qpos[0:3][None, :], dtype=jnp.float32)
         body_velocity_world = (root_pos - prev_root_pos) / policy_dt(bundle, controller_config)
+        body_angular_velocity_world = jnp.asarray(data.qvel[3:6][None, :], dtype=jnp.float32)
         _, _, yaw = quat_roll_pitch_yaw(jnp.asarray(data.qpos[3:7][None, :], dtype=jnp.float32))
         yaw_delta = jnp.arctan2(jnp.sin(yaw - prev_yaw), jnp.cos(yaw - prev_yaw))
         yaw_rate = yaw_delta / policy_dt(bundle, controller_config)

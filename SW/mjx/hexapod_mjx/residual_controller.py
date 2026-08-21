@@ -1,16 +1,21 @@
 from __future__ import annotations
 
-"""Classical locomotion controller with a small residual-RL action interface.
+"""Tripod nominal controller with a Cartesian foot-height residual interface.
 
-The controller follows the design split requested in the brief:
-- command filtering, gait timing, safety projection, and inverse-kinematics-like
-  mapping stay explicit and deterministic,
-- RL only nudges foothold/gait/body parameters through a tiny residual action.
+The controller owns the complete nominal locomotion path:
 
-To keep MJX training cheap, the IK layer is a *linearized* per-leg Jacobian
-inverse around the standing pose instead of a heavy nonlinear solve every tick.
-That still preserves the intended architecture: the policy reasons in foot/body
-space while the controller owns the joint-space conversion and safety clamps.
+``command -> tripod gait -> nominal feet -> RL residual -> contact safety
+   -> posture overlay -> IK -> joint limits``.
+
+The first residual-RL curriculum deliberately exposes only one scalar per leg:
+the swing-foot vertical correction ``Δz``.  It therefore cannot change the
+nominal step length, gait timing, landing XY location, or body attitude.  The
+policy action is masked to zero for stance legs, and early swing contact holds
+the current foot target instead of allowing RL to pull it through the ground.
+
+To keep MJX training cheap, the IK layer is a linearized per-leg Jacobian
+inverse around the standing pose.  The policy still acts in Cartesian foot
+space; the controller alone owns conversion to joint targets and all clamps.
 """
 
 from collections.abc import Mapping
@@ -30,7 +35,8 @@ from .model import FOOT_CONTACT_POINT_COUNT, HexapodModelBundle, TRIPOD_A, estim
 
 
 LEGS = ("LF", "LM", "LB", "RF", "RM", "RB")
-ACTION_DIM = 7
+# One swing-foot vertical residual per leg: [LF, LM, LB, RF, RM, RB].
+ACTION_DIM = len(LEGS)
 
 
 class ResidualControllerBundle(NamedTuple):
@@ -42,8 +48,6 @@ class ResidualControllerBundle(NamedTuple):
     joint_lower: jnp.ndarray
     joint_upper: jnp.ndarray
     hip_body_pos: jnp.ndarray
-    side_sign: jnp.ndarray
-    front_sign: jnp.ndarray
     tripod_is_a: jnp.ndarray
     foot_geom_ids: jnp.ndarray
     foot_support_geom_ids: jnp.ndarray
@@ -62,21 +66,22 @@ class ResidualControllerConfig:
     translation_step_gain: tuple[float, float] = (0.65, 0.55)
     turn_step_gain: float = 0.35
     nominal_swing_height: float = 0.055
-    residual_step_x: float = 0.055
-    residual_step_y: float = 0.040
-    residual_swing_height: float = 0.040
-    residual_step_period: float = 0.12
-    residual_body_height: float = 0.025
-    residual_roll_trim: float = 0.030
-    residual_pitch_trim: float = 0.030
+    # Initial residual curriculum: RL may only lift/lower a swing foot by ±3 cm.
+    # Larger Cartesian residuals and XY foothold changes are deliberately out of
+    # scope until this 6-D policy is stable.
+    residual_swing_z: float = 0.030
     workspace_delta_min: tuple[float, float, float] = (-0.14, -0.10, -0.10)
     workspace_delta_max: tuple[float, float, float] = (0.14, 0.10, 0.08)
     pd_kp: tuple[float, float, float] = (16.0, 42.0, 42.0)
     pd_kd: tuple[float, float, float] = (0.9, 2.1, 2.1)
     torque_limit: tuple[float, float, float] = (10.0, 30.0, 30.0)
     foot_contact_height: float = 0.03
+    # Ignore the normal contact at swing take-off; only later contact is an
+    # early landing that should override the residual and hold the foot.
+    early_contact_phase_min: float = 0.25
     startup_duration_sec: float = 0.30
     joint_limit_margin: tuple[float, float, float] = (0.0, 0.0, 0.0)
+    bezier_control_fraction: float = 0.35
 
 
 def controller_config_from_metadata(metadata: Mapping[str, Any] | None) -> "ResidualControllerConfig":
@@ -101,13 +106,9 @@ class ResidualControllerState(NamedTuple):
 
 
 class ResidualActionTerms(NamedTuple):
-    step_x: jnp.ndarray
-    step_y: jnp.ndarray
-    swing_height: jnp.ndarray
-    step_period: jnp.ndarray
-    body_height: jnp.ndarray
-    roll_trim: jnp.ndarray
-    pitch_trim: jnp.ndarray
+    """Bounded Cartesian residual in metres, one vertical term per leg."""
+
+    swing_z: jnp.ndarray
 
 
 def build_residual_controller(
@@ -132,8 +133,6 @@ def build_residual_controller(
     joint_upper: list[list[float]] = []
     neutral_foot_body_pos: list[np.ndarray] = []
     hip_body_pos: list[np.ndarray] = []
-    side_sign: list[float] = []
-    front_sign: list[float] = []
     tripod_is_a: list[bool] = []
     foot_geom_ids: list[int] = []
     foot_support_geom_ids: list[list[int]] = []
@@ -148,8 +147,6 @@ def build_residual_controller(
     joint_limit_margin = np.asarray(config.joint_limit_margin, dtype=np.float64)
     if np.any(joint_limit_margin < 0.0):
         raise ValueError(f"joint_limit_margin must be non-negative, got {config.joint_limit_margin}")
-
-    neutral_foot_world_z = []
 
     for leg in LEGS:
         leg_indices = [name_to_index[f"{leg}_{suffix}"] for suffix in (1, 2, 3)]
@@ -172,8 +169,6 @@ def build_residual_controller(
         hip_world = host_data.xpos[hip_body_id]
         hip_body = root_rot.T @ (hip_world - root_pos)
         hip_body_pos.append(hip_body.astype(np.float32))
-        side_sign.append(float(np.sign(hip_body[0])))
-        front_sign.append(float(np.sign(-hip_body[1])))
         tripod_is_a.append(leg in TRIPOD_A)
 
         foot_geom_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_GEOM, f"{leg}_motor_horn_3_1_contact")
@@ -184,7 +179,6 @@ def build_residual_controller(
         ]
         foot_support_geom_ids.append([support_id if support_id >= 0 else foot_geom_id for support_id in support_ids])
         foot_world = host_data.geom_xpos[foot_geom_id]
-        neutral_foot_world_z.append(float(foot_world[2]))
         foot_body = root_rot.T @ (foot_world - root_pos)
         neutral_foot_body_pos.append(foot_body.astype(np.float32))
 
@@ -203,7 +197,6 @@ def build_residual_controller(
         jacobian_pinv.append(np.linalg.pinv(jacobian).astype(np.float32))
 
     neutral_foot_body = np.asarray(neutral_foot_body_pos, dtype=np.float32)
-    _ = neutral_foot_world_z
     reset_root_height = np.asarray(float(estimate_standing_root_height(bundle)), dtype=np.float32)
 
     return ResidualControllerBundle(
@@ -215,8 +208,6 @@ def build_residual_controller(
         joint_lower=jnp.asarray(np.asarray(joint_lower, dtype=np.float32)),
         joint_upper=jnp.asarray(np.asarray(joint_upper, dtype=np.float32)),
         hip_body_pos=jnp.asarray(np.asarray(hip_body_pos, dtype=np.float32)),
-        side_sign=jnp.asarray(np.asarray(side_sign, dtype=np.float32)),
-        front_sign=jnp.asarray(np.asarray(front_sign, dtype=np.float32)),
         tripod_is_a=jnp.asarray(np.asarray(tripod_is_a, dtype=bool)),
         foot_geom_ids=jnp.asarray(np.asarray(foot_geom_ids, dtype=np.int32)),
         foot_support_geom_ids=jnp.asarray(np.asarray(foot_support_geom_ids, dtype=np.int32)),
@@ -303,27 +294,75 @@ def _apply_deadzone(command: jnp.ndarray, deadzone: float) -> jnp.ndarray:
 
 
 def _scale_action(action: jnp.ndarray, config: ResidualControllerConfig) -> ResidualActionTerms:
-    bounded = jnp.tanh(action)
-    return ResidualActionTerms(
-        step_x=bounded[:, 0] * config.residual_step_x,
-        step_y=bounded[:, 1] * config.residual_step_y,
-        swing_height=bounded[:, 2] * config.residual_swing_height,
-        step_period=bounded[:, 3] * config.residual_step_period,
-        body_height=bounded[:, 4] * config.residual_body_height,
-        roll_trim=bounded[:, 5] * config.residual_roll_trim,
-        pitch_trim=bounded[:, 6] * config.residual_pitch_trim,
-    )
+    if action.shape[-1] != ACTION_DIM:
+        raise ValueError(f"Residual action must have {ACTION_DIM} terms, got {action.shape[-1]}.")
+    bounded = jnp.clip(action, -1.0, 1.0)
+    return ResidualActionTerms(swing_z=bounded * config.residual_swing_z)
 
 
-def _bezier_cubic(start: jnp.ndarray, end: jnp.ndarray, height: jnp.ndarray, s: jnp.ndarray) -> jnp.ndarray:
+def residual_action_metres(action: jnp.ndarray, config: ResidualControllerConfig) -> jnp.ndarray:
+    """Return the bounded physical residual (metres) used by the controller."""
+    return _scale_action(action, config).swing_z
+
+
+def _apply_contact_adaptation(
+    nominal_foot_body: jnp.ndarray,
+    swing_z_residual: jnp.ndarray,
+    swing_mask: jnp.ndarray,
+    foot_contacts: jnp.ndarray | None,
+    current_foot_body: jnp.ndarray | None,
+) -> tuple[jnp.ndarray, jnp.ndarray]:
+    """Apply RL only in swing, then let contact safety override it.
+
+    ``foot_contacts`` and ``current_foot_body`` are measured at the start of
+    the control tick.  A contact detected during nominal swing is an early
+    landing.  In that case the foot is held at its measured position, which
+    prevents the residual from penetrating or dragging the contact point.
+    """
+    residual_z = jnp.where(swing_mask, swing_z_residual, 0.0)
+    corrected = nominal_foot_body.at[:, :, 2].add(residual_z)
+
+    if foot_contacts is None or current_foot_body is None:
+        return corrected, residual_z
+
+    early_landing = swing_mask & foot_contacts.astype(bool)
+    corrected = jnp.where(early_landing[:, :, None], current_foot_body, corrected)
+    applied_residual_z = jnp.where(early_landing, 0.0, residual_z)
+    return corrected, applied_residual_z
+
+
+def _apply_nominal_posture_overlay(foot_body: jnp.ndarray) -> jnp.ndarray:
+    """Reserved deterministic posture layer.
+
+    The current MJX baseline has no calibrated posture PI gains yet, so this
+    layer is intentionally an identity transform.  Keeping it explicit fixes
+    the control ordering and makes future IMU-based roll/pitch compensation a
+    classical-controller addition rather than an RL action dimension.
+    """
+    return foot_body
+
+
+
+
+def _bezier_cubic(
+    start: jnp.ndarray,
+    end: jnp.ndarray,
+    height: jnp.ndarray,
+    s: jnp.ndarray,
+    control_fraction: float,
+) -> jnp.ndarray:
+    """Generate a lifted cubic Bezier swing arc between two foot poses."""
     height = jnp.asarray(height, dtype=start.dtype)
     while height.ndim > start.ndim - 1:
         height = jnp.squeeze(height, axis=-1)
     height = jnp.broadcast_to(height, start[..., 2].shape)
     lift = jnp.zeros_like(start)
     lift = lift.at[..., 2].set(height)
-    p1 = start + lift
-    p2 = end + lift
+    fraction = jnp.asarray(control_fraction, dtype=start.dtype)
+    fraction = jnp.clip(fraction, 0.0, 0.5)
+    delta = end - start
+    p1 = start + fraction * delta + lift
+    p2 = end - fraction * delta + lift
     one_minus = 1.0 - s
     return (
         (one_minus**3) * start
@@ -340,8 +379,18 @@ def controller_step(
     state: ResidualControllerState,
     command_target: jnp.ndarray,
     action: jnp.ndarray,
+    *,
+    foot_contacts: jnp.ndarray | None = None,
+    current_foot_body: jnp.ndarray | None = None,
 ) -> tuple[ResidualControllerState, jnp.ndarray, jnp.ndarray]:
-    """Advance the deterministic gait controller by one control tick."""
+    """Advance one tick of the nominal gait plus its bounded foot residual.
+
+    Args:
+        foot_contacts: Measured ``(batch, 6)`` contacts before this tick.
+        current_foot_body: Measured ``(batch, 6, 3)`` foot positions in the
+            body frame.  Together with ``foot_contacts`` this enables the
+            early-landing safety override after the RL residual.
+    """
     dt = control_dt(model_bundle, config)
     command_limit = jnp.asarray(config.command_limits, dtype=jnp.float32)
     command_rate_limit = jnp.asarray(config.command_rate_limit, dtype=jnp.float32)
@@ -349,14 +398,13 @@ def controller_step(
     filtered_command = _slew_limit(state.filtered_command, command_target, command_rate_limit, dt)
 
     action_terms = _scale_action(action, config)
-    step_period = jnp.clip(
-        config.base_step_period + action_terms.step_period,
-        0.22,
-        0.72,
-    )
+    step_period = jnp.full((action.shape[0],), config.base_step_period, dtype=jnp.float32)
     phase = jnp.mod(state.phase + dt / step_period, 1.0)
-    elapsed_sec = state.elapsed_sec + dt
-    startup_ramp = jnp.clip(elapsed_sec / config.startup_duration_sec, 0.0, 1.0)[:, None]
+    trajectory_elapsed_sec = state.elapsed_sec
+    elapsed_sec = trajectory_elapsed_sec + dt
+    # The first control tick targets the configured STAND_POSE exactly. Motion
+    # and the Bezier swing arc ramp in only after the initialized pose is held.
+    startup_ramp = jnp.clip(trajectory_elapsed_sec / config.startup_duration_sec, 0.0, 1.0)[:, None]
 
     first_half = phase[:, None] < 0.5
     local_phase = jnp.where(first_half, phase[:, None] * 2.0, (phase[:, None] - 0.5) * 2.0)
@@ -367,8 +415,8 @@ def controller_step(
     command_yaw = filtered_command[:, 2]
     translation_xy = jnp.stack(
         [
-            config.translation_step_gain[1] * command_lateral + action_terms.step_x,
-            -config.translation_step_gain[0] * command_forward + action_terms.step_y,
+            config.translation_step_gain[1] * command_lateral,
+            -config.translation_step_gain[0] * command_forward,
         ],
         axis=-1,
     )
@@ -383,21 +431,34 @@ def controller_step(
     )
     step_offset_xy = (translation_xy[:, None, :] * step_period[:, None, None] + yaw_offset * step_period[:, None, None]) * startup_ramp[:, :, None]
 
-    trim_z = (
-        action_terms.body_height[:, None]
-        + controller_bundle.side_sign[None, :] * action_terms.roll_trim[:, None]
-        + controller_bundle.front_sign[None, :] * action_terms.pitch_trim[:, None]
-    ) * startup_ramp
-
     neutral = controller_bundle.neutral_foot_body_pos[None, :, :]
-    forward_target = neutral + jnp.concatenate([step_offset_xy, trim_z[:, :, None]], axis=-1)
-    backward_target = neutral + jnp.concatenate([-step_offset_xy, trim_z[:, :, None]], axis=-1)
+    zero_z = jnp.zeros_like(step_offset_xy[:, :, :1])
+    forward_target = neutral + jnp.concatenate([step_offset_xy, zero_z], axis=-1)
+    backward_target = neutral + jnp.concatenate([-step_offset_xy, zero_z], axis=-1)
 
-    swing_height = (config.nominal_swing_height + action_terms.swing_height[:, None, None]) * startup_ramp[:, :, None]
-    swing_target = _bezier_cubic(backward_target, forward_target, swing_height, local_phase[:, :, None])
+    swing_height = config.nominal_swing_height * startup_ramp[:, :, None]
+    swing_target = _bezier_cubic(
+        backward_target,
+        forward_target,
+        swing_height,
+        local_phase[:, :, None],
+        config.bezier_control_fraction,
+    )
     stance_target = (1.0 - local_phase[:, :, None]) * forward_target + local_phase[:, :, None] * backward_target
-    desired_foot_body = jnp.where(swing_mask[:, :, None], swing_target, stance_target)
-
+    nominal_foot_body = jnp.where(swing_mask[:, :, None], swing_target, stance_target)
+    corrected_foot_body, _ = _apply_contact_adaptation(
+        nominal_foot_body,
+        action_terms.swing_z,
+        swing_mask,
+        (
+            foot_contacts.astype(bool) & (local_phase >= config.early_contact_phase_min)
+            if foot_contacts is not None
+            else None
+        ),
+        current_foot_body,
+    )
+    # The posture layer follows contact safety and stays deterministic.
+    desired_foot_body = _apply_nominal_posture_overlay(corrected_foot_body)
 
     workspace_min = controller_bundle.neutral_foot_body_pos[None, :, :] + jnp.asarray(config.workspace_delta_min, dtype=jnp.float32)
     workspace_max = controller_bundle.neutral_foot_body_pos[None, :, :] + jnp.asarray(config.workspace_delta_max, dtype=jnp.float32)
@@ -419,7 +480,7 @@ def controller_step(
     next_state = ResidualControllerState(
         phase=phase,
         filtered_command=filtered_command,
-        prev_action=jnp.tanh(action),
+        prev_action=jnp.clip(action, -1.0, 1.0),
         elapsed_sec=elapsed_sec,
     )
     return next_state, joint_targets, desired_foot_body

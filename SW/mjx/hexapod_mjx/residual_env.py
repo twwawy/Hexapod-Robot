@@ -13,7 +13,6 @@ from mujoco import mjx
 from .model import BASE_COLLISION_HALF_SIZE, BASE_COLLISION_POS, FOOT_PROXY_RADIUS, HexapodModelBundle
 
 from .residual_controller import (
-    ACTION_DIM,
     ResidualControllerBundle,
     ResidualControllerConfig,
     ResidualControllerState,
@@ -22,7 +21,10 @@ from .residual_controller import (
     controller_step,
     policy_dt,
     quat_roll_pitch_yaw,
+    quat_to_rotmat,
+    residual_action_metres,
     reset_controller_state,
+    world_to_body,
 )
 
 
@@ -34,18 +36,9 @@ class ResidualEnvState(NamedTuple):
     prev_yaw: jnp.ndarray
     prev_foot_world: jnp.ndarray
     body_velocity_world: jnp.ndarray
+    body_angular_velocity_world: jnp.ndarray
     yaw_rate: jnp.ndarray
     terminated: jnp.ndarray
-
-
-class ResidualTransition(NamedTuple):
-    obs: jnp.ndarray
-    action: jnp.ndarray
-    log_prob: jnp.ndarray
-    reward: jnp.ndarray
-    done: jnp.ndarray
-    value: jnp.ndarray
-    metrics: jnp.ndarray
 
 
 @dataclass(frozen=True)
@@ -57,7 +50,8 @@ class ResidualEnvConfig:
     height_reward_sigma: float = 0.03
     slip_penalty: float = 0.10
     energy_penalty: float = 0.0015
-    action_penalty: float = 0.015
+    residual_penalty: float = 24.0
+    action_rate_penalty: float = 12.0
     body_contact_penalty: float = 10.0
     yaw_rate_clip: float = 3.0
     foot_contact_height: float = 0.03
@@ -75,11 +69,19 @@ class CommandSamplingConfig:
 
 @dataclass(frozen=True)
 class CommandCurriculumConfig:
-    mode: str = "staged"
+    mode: str = "reward"
     forward_only_updates: int = 120
     yaw_stage_updates: int = 120
     forward_only_scale: float = 0.60
     yaw_stage_scale: float = 0.35
+    reward_threshold_stage0: float = 0.95
+    reward_threshold_stage1: float = 0.90
+    reward_window: int = 20
+    success_updates: int = 5
+    ramp_updates: int = 30
+
+
+_STAGE_COUNT = 3
 
 
 _BASE_COLLISION_CORNERS = jnp.asarray(
@@ -120,6 +122,12 @@ def _foot_support_height(data: mjx.Data, controller_bundle: ResidualControllerBu
     return jnp.min(support_world[:, :, :, 2] - FOOT_PROXY_RADIUS, axis=2)
 
 
+def _world_vector_to_body(root_quat: jnp.ndarray, world_vector: jnp.ndarray) -> jnp.ndarray:
+    """Rotate a batch of world-frame vectors into the body frame."""
+    rot_t = jnp.swapaxes(quat_to_rotmat(root_quat), -1, -2)
+    return jnp.einsum("bij,bj->bi", rot_t, world_vector)
+
+
 
 def _make_batched_data(
     bundle: HexapodModelBundle,
@@ -141,6 +149,10 @@ def command_sampling_config(
     controller_config: ResidualControllerConfig,
     curriculum_config: CommandCurriculumConfig | None,
     update_index: int,
+    *,
+    curriculum_stage: int = 0,
+    ramp_progress: float = 1.0,
+    ramp_from_stage: int | None = None,
 ) -> CommandSamplingConfig:
     forward_limit, lateral_limit, yaw_limit = map(float, controller_config.command_limits)
     if curriculum_config is None or curriculum_config.mode == "none":
@@ -149,6 +161,40 @@ def command_sampling_config(
             forward_max=forward_limit,
             lateral_limit=lateral_limit,
             yaw_limit=yaw_limit,
+        )
+
+    if curriculum_config.mode == "reward":
+        stage = int(np.clip(curriculum_stage, 0, _STAGE_COUNT - 1))
+        stage_configs = (
+            CommandSamplingConfig(
+                forward_min=0.0,
+                forward_max=forward_limit * curriculum_config.forward_only_scale,
+                lateral_limit=0.0,
+                yaw_limit=0.0,
+            ),
+            CommandSamplingConfig(
+                forward_min=0.0,
+                forward_max=forward_limit,
+                lateral_limit=0.0,
+                yaw_limit=yaw_limit * curriculum_config.yaw_stage_scale,
+            ),
+            CommandSamplingConfig(
+                forward_min=-forward_limit,
+                forward_max=forward_limit,
+                lateral_limit=lateral_limit,
+                yaw_limit=yaw_limit,
+            ),
+        )
+        target = stage_configs[stage]
+        if ramp_from_stage is None or stage == 0:
+            return target
+        source = stage_configs[int(np.clip(ramp_from_stage, 0, _STAGE_COUNT - 1))]
+        alpha = float(np.clip(ramp_progress, 0.0, 1.0))
+        return CommandSamplingConfig(
+            forward_min=(1.0 - alpha) * source.forward_min + alpha * target.forward_min,
+            forward_max=(1.0 - alpha) * source.forward_max + alpha * target.forward_max,
+            lateral_limit=(1.0 - alpha) * source.lateral_limit + alpha * target.lateral_limit,
+            yaw_limit=(1.0 - alpha) * source.yaw_limit + alpha * target.yaw_limit,
         )
 
     if update_index <= curriculum_config.forward_only_updates:
@@ -236,6 +282,7 @@ def reset_env(
         prev_foot_world=foot_world,
 
         body_velocity_world=jnp.zeros((batch_size, 3), dtype=jnp.float32),
+        body_angular_velocity_world=jnp.zeros((batch_size, 3), dtype=jnp.float32),
         yaw_rate=jnp.zeros((batch_size,), dtype=jnp.float32),
         terminated=jnp.zeros((batch_size,), dtype=bool),
     )
@@ -293,7 +340,8 @@ def make_observation(
 ) -> jnp.ndarray:
     quat = state.data.qpos[:, 3:7]
     roll, pitch, _ = quat_roll_pitch_yaw(quat)
-    forward_velocity, lateral_velocity = body_velocity_components(quat, state.body_velocity_world)
+    body_linear_velocity = _world_vector_to_body(quat, state.body_velocity_world)
+    body_angular_velocity = _world_vector_to_body(quat, state.body_angular_velocity_world)
     body_height_error = state.data.qpos[:, 2] - controller_bundle.reset_root_height
     joint_qpos = state.data.qpos[:, 7:]
     joint_qvel = state.data.qvel[:, 6:]
@@ -304,8 +352,9 @@ def make_observation(
     return jnp.concatenate(
         [
             state.command,
-            jnp.stack([forward_velocity, lateral_velocity, state.yaw_rate], axis=-1),
+            body_linear_velocity,
             jnp.stack([roll, pitch, body_height_error], axis=-1),
+            body_angular_velocity,
             joint_qpos,
             joint_qvel,
             contacts,
@@ -337,6 +386,9 @@ def step_env(
 
     def control_tick(carry, _):
         data, controller_state, torque_accum, terminated = carry
+        current_foot_world = _foot_world(data, controller_bundle)
+        current_foot_body = world_to_body(data.qpos[:, 0:3], data.qpos[:, 3:7], current_foot_world)
+        contacts = (_foot_support_height(data, controller_bundle) < controller_config.foot_contact_height).astype(jnp.float32)
         next_controller_state, joint_targets, _ = controller_step(
             bundle,
             controller_bundle,
@@ -344,6 +396,8 @@ def step_env(
             controller_state,
             state.command,
             action,
+            foot_contacts=contacts,
+            current_foot_body=current_foot_body,
         )
         next_controller_state = _masked_tree(terminated, controller_state, next_controller_state)
         tau = _pd_torque(bundle, joint_targets, data, group_index, controller_config)
@@ -395,6 +449,7 @@ def step_env(
         prev_yaw=yaw,
         prev_foot_world=foot_world,
         body_velocity_world=world_velocity,
+        body_angular_velocity_world=data_f.qvel[:, 3:6],
         yaw_rate=yaw_rate,
         terminated=terminated_f,
     )
@@ -439,7 +494,12 @@ def compute_reward(
 
     contacts = (_foot_support_height(state.data, controller_bundle) < env_config.foot_contact_height).astype(jnp.float32)
     slip_cost = jnp.sum(contacts * jnp.sum(foot_xy_velocity * foot_xy_velocity, axis=-1), axis=1)
-    action_cost = jnp.mean((action - previous_action) ** 2, axis=1)
+    residual = residual_action_metres(action, controller_config)
+    # Controller state stores the previous action after clipping, so rescaling
+    # it directly keeps the rate penalty in the same physical units.
+    previous_residual = previous_action * controller_config.residual_swing_z
+    residual_cost = jnp.mean(residual * residual, axis=1)
+    action_rate_cost = jnp.mean((residual - previous_residual) ** 2, axis=1)
     body_contact = state.terminated.astype(jnp.float32)
 
     reward = (
@@ -449,7 +509,8 @@ def compute_reward(
         + 0.5 * height_reward
         - env_config.slip_penalty * slip_cost
         - env_config.energy_penalty * control_cost
-        - env_config.action_penalty * action_cost
+        - env_config.residual_penalty * residual_cost
+        - env_config.action_rate_penalty * action_rate_cost
         - env_config.body_contact_penalty * body_contact
     )
 
@@ -464,7 +525,8 @@ def compute_reward(
             height_reward,
             slip_cost,
             control_cost,
-            action_cost,
+            residual_cost,
+            action_rate_cost,
             forward_velocity,
             lateral_velocity,
             state.yaw_rate,

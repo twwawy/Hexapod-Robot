@@ -12,6 +12,7 @@ METADATA_PATH=""
 POSE_IMAGE_PATH=""
 POSE_METADATA_PATH=""
 OUTPUT_VIDEO=""
+STAGE_VIDEO_PATHS=()
 DURATION_SEC="12"
 RUN_DATE_DIR=""
 RUN_OUTPUT_DIR=""
@@ -86,10 +87,12 @@ Wrapper options:
 
 Everything else is forwarded to SW/mjx/train_residual_ppo.py.
 The wrapper writes every new run into `ARTIFACTS_DIR/YYYYMMDD/<run-stem>/`, keeps a
-latest checkpoint during training, renders one best-policy MP4 at the end, and when
-`--fresh` is used also saves a separate neutral-pose PNG + JSON artifact for that exact
-run. In `--skip-train` mode, omitting `--policy-path` automatically picks the newest
-saved best-policy checkpoint anywhere under the run artifact root.
+latest checkpoint during training, renders the overall-best MP4 plus one
+`*_stageN_best.mp4` for every curriculum stage checkpoint, and when `--fresh` is used
+also saves a separate neutral-pose PNG + JSON artifact for that exact run. In
+`--skip-train` mode, omitting `--policy-path` automatically picks the newest
+overall best-policy checkpoint (stage-best files are excluded) anywhere under the
+run artifact root.
 EOF
 }
 
@@ -114,12 +117,13 @@ find_latest_best_checkpoint() {
   env REPO="$REPO" ARTIFACTS_DIR="$ARTIFACTS_DIR" "$PY" - <<'PY'
 from pathlib import Path
 import os
+import re
 import sys
 repo = Path(os.environ["REPO"]).resolve()
 artifacts_dir = Path(os.environ["ARTIFACTS_DIR"])
 if not artifacts_dir.is_absolute():
     artifacts_dir = (repo / artifacts_dir).resolve()
-candidates = [path for path in artifacts_dir.rglob("*.pkl") if not path.name.endswith("_latest.pkl")]
+candidates = [path for path in artifacts_dir.rglob("*.pkl") if not path.name.endswith("_latest.pkl") and not re.search(r"_stage\d+_best\.pkl$", path.name)]
 if not candidates:
     sys.exit(1)
 latest = max(candidates, key=lambda path: path.stat().st_mtime)
@@ -155,6 +159,35 @@ for pattern, latest_only in patterns:
         print(latest)
         sys.exit(0)
 sys.exit(1)
+PY
+}
+inherit_stage_checkpoints() {
+  local resume_path="$1"
+  env REPO="$REPO" RESUME_PATH="$resume_path" RUN_OUTPUT_DIR="$RUN_OUTPUT_DIR" RUN_STEM="$RUN_STEM" "$PY" - <<'PY'
+from pathlib import Path
+import os
+import re
+import shutil
+
+repo = Path(os.environ["REPO"]).resolve()
+def resolve(value):
+    path = Path(value)
+    return path if path.is_absolute() else (repo / path).resolve()
+
+source_dir = resolve(os.environ["RESUME_PATH"]).parent
+output_dir = resolve(os.environ["RUN_OUTPUT_DIR"])
+if source_dir == output_dir:
+    raise SystemExit(0)
+output_dir.mkdir(parents=True, exist_ok=True)
+run_stem = os.environ["RUN_STEM"]
+for source in sorted(source_dir.glob("*_stage*_best.pkl")):
+    match = re.search(r"_stage(\d+)_best\.pkl$", source.name)
+    if not match:
+        continue
+    target = output_dir / f"{run_stem}_stage{match.group(1)}_best.pkl"
+    if not target.exists():
+        shutil.copy2(source, target)
+        print(f"inherited_stage_checkpoint: {target}")
 PY
 }
 
@@ -243,6 +276,10 @@ parse_train_overrides() {
 
 write_run_metadata() {
   local status="$1"
+  local stage_video_paths_nl=""
+  if ((${#STAGE_VIDEO_PATHS[@]})); then
+    stage_video_paths_nl="$(printf '%s\n' "${STAGE_VIDEO_PATHS[@]}")"
+  fi
   env \
     METADATA_PATH="$METADATA_PATH" \
     STATUS="$status" \
@@ -257,6 +294,7 @@ write_run_metadata() {
     LATEST_POLICY_PATH="$LATEST_POLICY_PATH" \
     METRICS_PATH="$METRICS_PATH" \
     OUTPUT_VIDEO="$OUTPUT_VIDEO" \
+    STAGE_VIDEO_PATHS_NL="$stage_video_paths_nl" \
     POSE_IMAGE_PATH="$POSE_IMAGE_PATH" \
     POSE_METADATA_PATH="$POSE_METADATA_PATH" \
     SKIP_TRAIN="$SKIP_TRAIN" \
@@ -292,6 +330,9 @@ from pathlib import Path
 def resolve(path_str: str) -> Path:
     path = Path(path_str)
     return path if path.is_absolute() else (Path(os.environ["REPO"]) / path)
+run_output_dir = resolve(os.environ["RUN_OUTPUT_DIR"]) if os.environ.get("RUN_OUTPUT_DIR") else None
+stage_video_paths = [Path(line) for line in os.environ.get("STAGE_VIDEO_PATHS_NL", "").splitlines() if line]
+stage_checkpoint_paths = sorted(run_output_dir.glob("*_stage*_best.pkl")) if run_output_dir and run_output_dir.exists() else []
 
 payload = {
     "status": os.environ["STATUS"],
@@ -346,6 +387,10 @@ payload = {
         "neutral_pose_image_abs": str(resolve(os.environ["POSE_IMAGE_PATH"])) if os.environ["POSE_IMAGE_PATH"] else None,
         "neutral_pose_metadata_abs": str(resolve(os.environ["POSE_METADATA_PATH"])) if os.environ["POSE_METADATA_PATH"] else None,
         "output_video_abs": str(resolve(os.environ["OUTPUT_VIDEO"])),
+        "stage_best_checkpoints": [str(path) for path in stage_checkpoint_paths],
+        "stage_best_checkpoints_abs": [str(path.resolve()) for path in stage_checkpoint_paths],
+        "stage_best_videos": [str(path) for path in stage_video_paths],
+        "stage_best_videos_abs": [str(resolve(str(path))) for path in stage_video_paths],
         "run_output_dir_abs": str(resolve(os.environ["RUN_OUTPUT_DIR"])) if os.environ.get("RUN_OUTPUT_DIR") else None,
     },
 }
@@ -495,15 +540,20 @@ fi
 if [[ -z "$POLICY_PATH" ]]; then
   POLICY_PATH="$RUN_OUTPUT_DIR/${RUN_STEM}.pkl"
 fi
-if [[ -z "$METRICS_PATH" ]]; then
-  METRICS_PATH="$RUN_OUTPUT_DIR/${RUN_STEM}_metrics.json"
-fi
 policy_dir="$(dirname "$POLICY_PATH")"
 RUN_OUTPUT_DIR="$policy_dir"
 policy_stem="$(basename "$POLICY_PATH")"
 policy_stem="${policy_stem%.*}"
+artifact_stem="$policy_stem"
+if [[ "$policy_stem" =~ ^(.+)_stage[0-9]+_best$ ]]; then
+  artifact_stem="${BASH_REMATCH[1]}"
+fi
+
+if [[ -z "$METRICS_PATH" ]]; then
+  METRICS_PATH="$policy_dir/${artifact_stem}_metrics.json"
+fi
 if [[ -z "$LATEST_POLICY_PATH" ]]; then
-  LATEST_POLICY_PATH="$policy_dir/${policy_stem}_latest.pkl"
+  LATEST_POLICY_PATH="$policy_dir/${artifact_stem}_latest.pkl"
 fi
 if [[ "$SKIP_TRAIN" == "1" && -z "$METADATA_PATH" ]]; then
   METADATA_PATH="$policy_dir/${policy_stem}_view.json"
@@ -526,13 +576,21 @@ INVOCATION_CMD="$(join_cmd "$0" "${ORIGINAL_ARGS[@]}")"
 cd "$REPO"
 trap on_error ERR
 
-TRAIN_CMD=(env -u LD_LIBRARY_PATH "$PY" SW/mjx/train_residual_ppo.py --output-path "$POLICY_PATH" --latest-output-path "$LATEST_POLICY_PATH" --metrics-path "$METRICS_PATH")
+RESUME_SOURCE_PATH=""
 if [[ -n "$USER_RESUME_PATH" ]]; then
-  TRAIN_CMD+=(--resume-path "$USER_RESUME_PATH")
+  RESUME_SOURCE_PATH="$USER_RESUME_PATH"
 elif [[ "$FRESH" != "1" ]]; then
   if AUTO_RESUME_PATH="$(find_latest_resume_checkpoint)"; then
-    TRAIN_CMD+=(--resume-path "$AUTO_RESUME_PATH")
+    RESUME_SOURCE_PATH="$AUTO_RESUME_PATH"
   fi
+fi
+if [[ "$SKIP_TRAIN" != "1" && -n "$RESUME_SOURCE_PATH" ]]; then
+  inherit_stage_checkpoints "$RESUME_SOURCE_PATH"
+fi
+
+TRAIN_CMD=(env -u LD_LIBRARY_PATH "$PY" SW/mjx/train_residual_ppo.py --output-path "$POLICY_PATH" --latest-output-path "$LATEST_POLICY_PATH" --metrics-path "$METRICS_PATH")
+if [[ -n "$RESUME_SOURCE_PATH" ]]; then
+  TRAIN_CMD+=(--resume-path "$RESUME_SOURCE_PATH")
 fi
 if [[ "$WANDB_ENABLED" == "1" ]]; then
   TRAIN_CMD+=(
@@ -590,11 +648,31 @@ fi
 
 printf '[save-mp4] %s\n' "$VIEW_CMD_STR"
 "${VIEW_CMD[@]}"
+for stage_checkpoint in "$RUN_OUTPUT_DIR"/*_stage*_best.pkl; do
+  [[ -f "$stage_checkpoint" ]] || continue
+  if [[ "$stage_checkpoint" =~ _stage([0-9]+)_best\.pkl$ ]]; then
+    stage="${BASH_REMATCH[1]}"
+  else
+    continue
+  fi
+  stage_video="$RUN_OUTPUT_DIR/${policy_stem}_stage${stage}_best.mp4"
+  stage_view_cmd=(env -u LD_LIBRARY_PATH MUJOCO_GL=egl "$PY" SW/mjx/visualize_residual_policy.py --policy-path "$stage_checkpoint" --output-video "$stage_video" --duration-sec "$DURATION_SEC" --forward-cmd "$FORWARD_CMD" --lateral-cmd "$LATERAL_CMD" --yaw-cmd "$YAW_CMD")
+  printf '[save-stage-mp4] stage=%s %s\n' "$stage" "$(join_cmd "${stage_view_cmd[@]}")"
+  "${stage_view_cmd[@]}"
+  STAGE_VIDEO_PATHS+=("$stage_video")
+  if [[ "$WANDB_ENABLED" == "1" ]]; then
+    WANDB_UPLOAD_CMD+=(--stage-video-path "$stage_video")
+    WANDB_UPLOAD_CMD+=(--stage-checkpoint-path "$stage_checkpoint")
+  fi
+done
+if [[ "$WANDB_ENABLED" == "1" ]]; then
+  WANDB_UPLOAD_CMD_STR="$(join_cmd "${WANDB_UPLOAD_CMD[@]}")"
+fi
+
+write_run_metadata completed
 
 if [[ "$WANDB_ENABLED" == "1" ]]; then
   printf '[wandb-artifacts] %s\n' "$WANDB_UPLOAD_CMD_STR"
   "${WANDB_UPLOAD_CMD[@]}"
 fi
-
-write_run_metadata completed
 trap - ERR
