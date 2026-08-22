@@ -8,10 +8,18 @@ from datetime import datetime, timezone
 import functools
 import json
 import math
+import os
 from pathlib import Path
 import re
 import subprocess
 import time
+
+# MuJoCo defaults to GLFW, which needs an X11 DISPLAY.  Training is normally
+# launched in tmux/SSH without one, but the best-policy GIF still needs an
+# offscreen OpenGL context.  Select EGL *before* importing MuJoCo (directly or
+# through the environment modules).  An explicit user choice always wins.
+if not os.environ.get("DISPLAY") and not os.environ.get("MUJOCO_GL"):
+    os.environ["MUJOCO_GL"] = "egl"
 
 import jax
 import jax.numpy as jp

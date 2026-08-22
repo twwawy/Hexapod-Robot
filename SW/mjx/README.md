@@ -116,4 +116,7 @@ python SW/mjx/train_command_curriculum.py \
 영상은 기본 `10초 / 20 fps / 640x360`이고 `--best-video-duration`,
 `--best-video-fps`, `--best-video-width`, `--best-video-height`로 바꿉니다. 영상이
 필요 없는 짧은 debug run에는 `--no-best-video`를 사용합니다. 렌더링 실패는
-`best_video_error`만 출력하며 학습·checkpoint 저장을 멈추지 않습니다.
+`best_video_error`만 출력하며 학습·checkpoint 저장을 멈추지 않습니다. X11 DISPLAY가
+없는 tmux/SSH 실행에서는 trainer가 `MUJOCO_GL=egl`을 자동 선택해 GPU offscreen
+렌더링으로 GIF를 저장합니다. 설치/드라이버가 다른 경우에만 실행 전에 명시적으로
+`MUJOCO_GL=egl`(GPU) 또는 사용 가능한 다른 MuJoCo backend를 지정합니다.
