@@ -39,22 +39,23 @@ canonical_source: /home/huro/Downloads/mjx
 | 계단 terrain scene | `SW/mjx/generated/hexapod_rl.xml`, mesh 0개 |
 | RL collider | torso box, leg capsule, foot sphere, terrain box |
 | Nominal controller | tripod + quintic timing + analytical 3-DOF IK + position actuator |
-| Policy | 18 foot residual + 4 gait residual |
+| Policy | 18 raw foot actions → swing XYZ / stance Z-only + 4 bounded gait residual |
+| Action contract | `cartesian_gait_residual_v2`; old v1 checkpoint resume 금지 |
 | Action / observation | `22 / 110` |
 | Physics | MuJoCo 3.12, MJX, `sim_dt=0.0025`, `ctrl_dt=0.02` |
 | PPO | Brax PPO + `mujoco_playground` |
 | 평지 학습 | `train_command_curriculum.py --wandb` |
 | 계단 학습 | `train_rough_terrain.py --wandb` |
-| 실시간 최고 점수 | `SW/mjx/artifacts/<task>/monitor/best_score.txt` |
-| 최고 policy 영상 | `SW/mjx/artifacts/<task>/monitor/best_policy.gif` (새 best마다 자동 교체) |
+| 실시간 최고 점수 | `SW/mjx/runs/<task>/<run-id>/monitor/best_score.txt` |
+| 최고 policy 영상 | `SW/mjx/runs/<task>/<run-id>/best_policy.gif` (새 best마다 자동 교체) |
 
 핵심 식:
 
 ```text
-p_cmd,i(local) = p_base,i(local) + residual_scale ⊙ Δp_RL,i
+p_cmd,i = Π_workspace(contact_adapter(p_nominal,i + M_phase/contact Δp_RL,i))
 ```
 
-RL은 관절 토크를 직접 만들지 않는다. 기존 tripod gait가 만든 발끝 목표를 local Cartesian 공간에서 조금 보정한 뒤, controller가 analytical IK와 좌우 관절축 변환을 수행한다.
+RL은 관절 토크를 직접 만들지 않는다. classical tripod가 phase·stance/swing·IK를 소유하고, RL은 swing XYZ 또는 stance의 작은 Z만 보정한다. 안전 우선순위는 `joint/rate safety > contact adaptation > RL > nominal`이다.
 
 ## 레포 지도
 
@@ -66,6 +67,7 @@ Hexapod-Robot/
 │   ├── prepare_scene.py             # CAD mesh/home pose/actuator scene
 │   ├── prepare_rl_scene.py          # mesh 제거 + primitive collider + flat/stairs
 │   ├── tripod_controller.py         # nominal tripod/IK
+│   ├── tripod_core.py               # pure-JAX nominal/residual/contact/workspace/IK contract
 │   ├── view_robot.py                # CAD scene viewer
 │   ├── run_controller.py            # 평지 nominal gait demo
 │   ├── view_rl_scene.py             # 계단 zero-residual viewer/GIF
@@ -119,38 +121,40 @@ STEP_COUNT   = 7
 강화학습 정책은 기존 Tripod 제어기를 대체하지 않고 다음과 같이 보정한다.
 
 ```text
-목표 속도 [vx, yaw rate] + 로봇 상태 + 전방 지형 높이
-                         ↓
-                 Residual Policy
-            ┌────────────┴────────────┐
-     다리별 발끝 Δp(6×3)       Gait 보정(4)
-            └────────────┬────────────┘
-                         ↓
-기본 Stance/Swing 궤적 + 보정 → 3DOF IK → 18개 위치 actuator
+command → Classical Tripod Controller → nominal local foot target
+                                           ↓
+                         RL: swing XYZ / stance Z-only + bounded gait residual
+                                           ↓
+                   Contact adaptation → workspace projection → analytical IK
+                                           ↓
+                                joint/rate limit → position actuator
 ```
 
-기존 제어기의 발끝 목표를 `p_base`라 하면 최종 목표는 다음과 같다.
+우선순위는 `Safety > Contact adaptation > RL > Nominal gait`다. swing early landing은
+현재 foot을 hold하고, stance lost contact는 작은 downward search만 한다. 이 두 계층은
+policy가 override할 수 없다.
 
 ```text
-p_cmd,i = p_base,i + scale * Δp_RL,i
+p_cmd,i = Π_workspace(C_contact(p_nominal,i + M_i(phase, contact) Δp_RL,i))
 ```
 
-정책이 출력하는 발끝 보정 한계는 다리 좌표계 기준으로 각각 ±40 mm, ±30 mm,
-±90 mm이다. 따라서 학습 초기의 임의 행동이 기본 제어기를 완전히 무너뜨리지
-않는다.
+`M_i`는 stance XY를 정확히 0으로 하는 authority mask다. command task의 swing
+권한은 ±10/±8 mm, Z −5/+20 mm이고 terrain task는 ±25/±15 mm, Z −10/+50 mm다.
+기존 v1 `(±40, ±30, ±90 mm)` checkpoint는 재개하지 않는다.
 
 ## Action 22차원
 
 | 범위 | 의미 |
 |---|---|
-| 0:18 | RF, RM, RB, LF, LM, LB 발끝 XYZ residual |
-| 18 | 보폭 scale: 0.5~1.5 |
-| 19 | gait frequency scale: 0.65~1.35 |
-| 20 | Swing Height: 0.025~0.17 m |
-| 21 | Swing 방사/stance 폭 offset: 0~0.06 m |
+| 0:18 | RF, RM, RB, LF, LM, LB raw local foot action → swing XYZ / stance Z-only |
+| 18 | 보폭 scale: 0.8~1.2 |
+| 19 | gait frequency scale: 0.85~1.15 |
+| 20 | global swing height: command 65~90 mm / terrain 50~110 mm |
+| 21 | radial offset: command 5~18 mm / terrain 5~25 mm |
 
 정책 행동은 `[-1, 1]`로 제한한다. 위상 자체를 매 주기 직접 출력하게 하지 않고
-주파수만 제한적으로 바꾸므로 Tripod A/B 순서와 기본 안정성은 유지된다.
+주파수만 제한적으로 바꾸므로 Tripod A/B 순서와 기본 안정성은 유지된다. `a=0`은
+nominal gait와 동일한 target을 만든다.
 
 ## Observation
 
@@ -165,8 +169,8 @@ p_cmd,i = p_base,i + scale * Δp_RL,i
 ## Reward와 종료
 
 주 보상은 목표 선속도·Yaw rate 추종이다. Upright, 몸체 높이 및 전진 진행을
-보상하고 action 변화, 큰 residual, 수직·횡방향 속도, 관절 속도와 IK workspace
-초과를 페널티로 둔다. 몸체가 지면에 너무 가까워지거나 크게 기울면 episode를
+보상하고 swing/stance/gait residual과 각각의 action-rate, torque, slip, body contact,
+workspace projection을 분리된 penalty로 둔다. 몸체가 지면에 너무 가까워지거나 크게 기울면 episode를
 종료한다.
 
 ## 학습 분기와 curriculum
@@ -320,17 +324,15 @@ python SW/mjx/train_command_curriculum.py \
   --num-envs 2048 \
   --num-evals 50 \
   --seed 0 \
-  --output SW/mjx/checkpoints/command_curriculum \
-  --monitor-dir SW/mjx/artifacts/command/seed0 \
+  --run-name command-v2-seed0 \
   --best-video \
-  --best-video-path SW/mjx/artifacts/command/seed0/best_policy.gif \
   --wandb \
   --wandb-project hexapod-command-curriculum \
   --wandb-name flat-walk-turn-seed0
 ```
 
 W&B에서 이름에 `curriculum_stage`가 들어간 metric이 `0 → 1 → 2`로 진행하는지와 `reward/velocity`,
-`reward/yaw`, `reward/residual`, `workspace_error`를 함께 본다.
+`reward/yaw`, `reward/swing_residual`, `reward/stance_residual`, `projection_cost`를 함께 본다.
 
 ### B. 계단 지형 task
 
@@ -342,10 +344,10 @@ python SW/mjx/train_rough_terrain.py \
   --num-envs 2048 \
   --num-evals 50 \
   --seed 0 \
-  --output SW/mjx/checkpoints/rough_terrain \
-  --monitor-dir SW/mjx/artifacts/terrain/seed0 \
+  --run-name terrain-v2-level3-seed0 \
+  --terrain-level 3 \
+  --terrain-randomize \
   --best-video \
-  --best-video-path SW/mjx/artifacts/terrain/seed0/best_policy.gif \
   --wandb \
   --wandb-project hexapod-rough-terrain \
   --wandb-name stairs-22d-seed0
@@ -353,7 +355,7 @@ python SW/mjx/train_rough_terrain.py \
 
 ### MJX smoke test
 
-PPO 없이 JIT reset/step 10회를 실행한다.
+PPO 없이 JIT reset/step과 bounded random action 10회를 실행한다. NaN이 나오면 즉시 실패한다.
 
 ```bash
 # flat walk + turn curriculum
@@ -372,24 +374,35 @@ JAX_PLATFORMS=cpu python SW/mjx/train_rough_terrain.py --smoke
 
 정상 출력의 핵심은 `obs=110 action=22 ... done=0`이다.
 
-작은 CPU debugging run은 task마다 output을 분리해서 실행한다.
+작은 CPU debugging run도 자동 run directory를 만들도록 이름만 분리한다.
 
 ```bash
 python SW/mjx/train_command_curriculum.py \
   --allow-cpu \
   --timesteps 20000 \
   --num-envs 32 \
-  --output SW/mjx/checkpoints/command_cpu_debug \
+  --run-name command-v2-cpu-debug \
   --wandb --wandb-mode offline
 ```
 
 > [!warning]
 > 기본 학습은 GPU backend가 아니면 종료된다. `--allow-cpu`는 작은 debug run에만 사용한다.
 
-### 최고 점수: checkpoint와 별도 실시간 monitor
+### Run directory, checkpoint, 최고 policy 영상
 
-trainer는 checkpoint와 독립적으로 evaluation마다 아래 파일을 갱신한다. `--monitor-dir`를
-run마다 다르게 지정하면 다른 seed/ablation의 최고 기록이 섞이지 않는다.
+trainer는 `--run-name`을 받으면 `SW/mjx/runs/<task>/<run-name>/`을 만들고, 생략하면
+`<UTC timestamp>_seed<seed>`를 만든다. 다른 seed/ablation은 run directory가 자동 분리된다.
+
+```text
+runs/terrain/terrain-v2-level3-seed0/
+├── checkpoints/
+├── monitor/
+├── best_policy.gif
+├── config.json
+└── run_metadata.json     # git SHA, v2 action contract, config, PPO, version
+```
+
+`monitor/` 안에서 trainer는 evaluation마다 아래 파일을 갱신한다.
 
 | 파일 | 갱신 시점 | 용도 |
 | --- | --- | --- |
@@ -397,17 +410,17 @@ run마다 다르게 지정하면 다른 seed/ablation의 최고 기록이 섞이
 | `metrics_history.jsonl` | 매 evaluation | 시간 순서 전체 metric 이력 |
 | `best_score.json` | `--score-key`가 최고 기록일 때 | 프로그램/분석용 best record |
 | `best_score.txt` | `--score-key`가 최고 기록일 때 | terminal에서 바로 확인할 요약 |
-| `best_policy.gif` | `--score-key`가 최고 기록일 때 | 해당 policy의 deterministic 10초 보행 영상; 새 best로 자동 교체 |
+| `../best_policy.gif` | `--score-key`가 최고 기록일 때 | 해당 policy의 deterministic 10초 보행 영상; 새 best로 자동 교체 |
 | `best_video.json` | `best_policy.gif` 저장 성공 시 | 영상에 해당하는 step, score, 실제 절대 경로 |
 
 기본 최고 점수 기준은 `eval/episode_reward`다. 학습 중 다른 terminal에서 다음을 실행한다.
 
 ```bash
 # 평지 curriculum의 현재 최고 점수만 계속 표시
-watch -n 2 cat SW/mjx/artifacts/command/seed0/best_score.txt
+watch -n 2 cat SW/mjx/runs/command/command-v2-seed0/monitor/best_score.txt
 
 # 각 evaluation의 전체 metric을 실시간으로 본다.
-tail -f SW/mjx/artifacts/command/seed0/metrics_history.jsonl
+tail -f SW/mjx/runs/command/command-v2-seed0/monitor/metrics_history.jsonl
 ```
 
 `--num-evals 50`이면 5천만 step run에서 약 100만 step마다 평가·monitor가 갱신된다.
@@ -415,7 +428,7 @@ tail -f SW/mjx/artifacts/command/seed0/metrics_history.jsonl
 run에서는 새 최고점이 `best/score`, `best/step`, `best/score_key` summary에도 기록된다.
 
 기본값으로 `--best-video`가 켜져 있다. 새 최고점이 나오면 동일한 policy를 deterministic하게
-10초·20 fps로 다시 rollout하여 `<monitor-dir>/best_policy.gif`에 **자동 저장하고 기존 최고 영상은
+10초·20 fps로 다시 rollout하여 `<run-dir>/best_policy.gif`에 **자동 저장하고 기존 최고 영상은
 교체**한다. `--wandb` run이면 같은 GIF가 W&B의 `best/video`에도 올라간다. 별도 ffmpeg process가
 아닌 Pillow GIF writer를 쓰므로 JAX 학습 worker가 실행된 뒤에도 fork하지 않는다. 영상 렌더링 오류는
 `best_video_error`로만 출력하며 PPO 학습이나 checkpoint를 중단시키지 않는다.
@@ -434,12 +447,15 @@ run에서는 새 최고점이 `best/score`, `best/step`, `best/score_key` summar
 | optimizer | `--learning-rate --entropy-cost --discounting` | 기본 `3e-4 0.01 0.97` |
 | network | `--network-layers` | 기본 `256 256 128`; OOM이면 `192 128` |
 | nominal gait | `--phase-time --base-swing-height --base-radial-offset` | controller 자체가 바뀌므로 기존 run과 직접 비교하지 않음 |
-| RL 권한 | `--residual-scale X Y Z` | metre 단위; 기본 `0.04 0.03 0.09`, 키우면 불안정해질 수 있음 |
+| RL foot 권한 | `--swing-x --swing-y --swing-z-low --swing-z-high --stance-z` | active task만 override; stance XY는 항상 0 |
+| RL gait 권한 | `--stride-half-range --frequency-half-range --swing-height-min --swing-height-max --radial-min --radial-max` | 기본 stride `0.8…1.2×`, frequency `0.85…1.15×` |
 | terrain command 범위 | `--terrain-speed-min --terrain-speed-max --terrain-yaw-limit` | 계단 task에서만 사용 |
+| terrain 난이도 | `--terrain-level --terrain-randomize` | level 0→4를 순서대로; randomize는 run-level scene/model sample |
+| run 관리 | `--run-name --run-root` | checkpoint/monitor/video/config/metadata를 한 run directory에 저장 |
 | 평지 curriculum 길이 | `--curriculum-forward-only-steps --curriculum-limited-yaw-steps` | 기본 `250 250`, 마지막 stage는 episode 끝까지 |
 | 평지 curriculum 범위 | `--curriculum-speed-min`, `--curriculum-speed-max`, `--curriculum-yaw-limit` | 각 stage 순서의 값 3개 |
 | 최고점 기준/경로 | `--score-key --monitor-dir` | 기본 score key는 `eval/episode_reward` |
-| 최고 정책 영상 | `--best-video --best-video-path` | 기본 켜짐; `<monitor-dir>/best_policy.gif`를 새 best마다 교체 |
+| 최고 정책 영상 | `--best-video --best-video-path` | 기본 켜짐; `<run-dir>/best_policy.gif`를 새 best마다 교체 |
 | 영상 품질/비용 | `--best-video-duration --best-video-fps --best-video-width --best-video-height` | 기본 `10 s, 20 fps, 640×360`; 평가 직후 한 번만 렌더링 |
 | W&B | `--wandb-*` | project·name·group을 실험 단위로 분리 |
 
@@ -463,20 +479,21 @@ python SW/mjx/train_command_curriculum.py \
 
 | index | 수량 | 의미 | 변환 후 범위 |
 | --- | ---: | --- | --- |
-| `0:18` | 6×3 | `RF, RM, RB, LF, LM, LB` local foot `(x,y,z)` | `(±0.04, ±0.03, ±0.09) m` |
-| `18` | 1 | stride scale | `0.5 … 1.5` |
-| `19` | 1 | gait frequency scale | `0.65 … 1.35` |
-| `20` | 1 | swing height residual | final `0.025 … 0.17 m` |
-| `21` | 1 | radial / stance-width residual | final `0.00 … 0.06 m` |
+| `0:18` | 6×3 | `RF, RM, RB, LF, LM, LB` local foot `(x,y,z)` | swing XYZ; stance `(0,0,Δz)` only |
+| `18` | 1 | stride scale | `0.8 … 1.2` |
+| `19` | 1 | gait frequency scale | `0.85 … 1.15` |
+| `20` | 1 | global swing height | command `65…90 mm`, terrain `50…110 mm` |
+| `21` | 1 | radial offset | command `5…18 mm`, terrain `5…25 mm` |
 
 발 residual의 실제 계산은 다음과 같다.
 
 ```text
-residual_i = action[3i:3i+3] ⊙ [0.04, 0.03, 0.09]
-feet_local = nominal_local + blend × residual
+raw_i = clip(action[3i:3i+3], -1, 1)
+Δp_i = swing ? [Δx, Δy, Δz_asymmetric] : [0, 0, Δz_stance]
+p_cmd = workspace_projection(contact_adapter(p_nominal + blend × Δp_i))
 ```
 
-`blend`는 reset 후 약 0.75초 동안 0에서 1로 증가한다. 이 startup blend와 actuator target rate limit가 처음의 무작위 action이 home pose를 즉시 무너뜨리는 것을 막는다.
+`blend`는 reset 후 약 0.75초 동안 0에서 1로 증가한다. `a=0`이면 residual/gait correction도 0이므로 nominal controller와 일치한다. early landing hold, lost-contact search, workspace projection, joint/rate limit은 RL보다 우선한다.
 
 ---
 
@@ -494,9 +511,9 @@ curriculum에서도 shape 호환성을 위해 같은 110D observation을 쓰되,
 | local gravity | 3 | IMU attitude 대체값 |
 | joint position error | 18 | home pose 대비 관절각 |
 | scaled joint velocity | 18 | `0.1 × qvel` |
-| foot relative position | 18 | 6 foot site의 base-relative XYZ |
-| contact | 6 | terrain clearance 기반 추정 |
-| terrain scan | 15 | 앞쪽 5×3 grid의 상대 지형 높이 |
+| foot body position | 18 | `R_WBᵀ(p_foot^W-p_base^W)`; world yaw 불변 |
+| contact | 6 | foot collision 우선, clearance fallback |
+| terrain scan | 15 | body heading 기준 forward/lateral 5×3 grid의 상대 지형 높이 |
 | phase | 2 | `sin/cos(2πphase)` |
 | last action | 22 | 이전 policy action |
 | **합계** | **110** | policy input |
@@ -560,11 +577,16 @@ cos(θ3) = (ρ² + z² - L2² - L3²) / (2 L2 L3)
 | upright | 보상 | body up direction 유지 |
 | height | 보상 | terrain 위 body clearance 유지 |
 | progress | 보상 | 실제 전진 진행 |
-| action_rate | penalty | action이 매 step 튀는 것 억제 |
-| residual | penalty | nominal gait를 과도하게 덮는 것 억제 |
+| swing_residual | penalty | swing에서만 필요한 Cartesian 보정 사용 |
+| stance_residual | penalty | nominal stance를 덮는 Z 보정; swing보다 더 비쌈 |
+| gait_residual | penalty | stride/frequency/height/radial deviation 분리 |
+| foot/gait_action_rate | penalty | foot 보정 및 gait parameter의 50 Hz 흔들림 억제 |
 | vertical/lateral velocity | penalty | bounce, sideways drift 억제 |
 | joint_velocity | penalty | 불필요한 관절 고속 운동 억제 |
-| workspace | penalty | IK workspace 밖 target 억제 |
+| torque | penalty | `mean((actuator_force / 8 Nm)^2)` |
+| slip | penalty | contact foot의 normalized XY velocity |
+| projection | penalty | requested target이 safe workspace에서 밀려난 거리² |
+| body_contact | penalty | torso collision; recovery를 위해 즉시 terminate하지 않음 |
 | termination | penalty | 낙상 종료 비용 |
 
 episode는 아래 조건에서 끝난다.
@@ -575,7 +597,7 @@ or base clearance above terrain < 0.14 m
 or qpos/qvel contains NaN
 ```
 
-reward만 높다고 좋은 정책은 아니다. `residual`, `action_rate`, `workspace_error`, termination 빈도와 zero-residual baseline 동영상을 함께 비교한다.
+reward만 높다고 좋은 정책은 아니다. `swing_residual`, `stance_residual`, `gait_residual`, `slip`, `torque`, `projection_cost`, torso contact와 termination 빈도를 zero-residual baseline 동영상과 함께 비교한다.
 
 ---
 
@@ -621,7 +643,7 @@ python SW/mjx/train_command_curriculum.py \
 
 영상은 W&B의 기본 설정이 아니라 trainer가 직접 기록하는 artifact다. 따라서 `--wandb`만 켜면 추가 login이나 별도 video 인수 없이 자동 업로드된다. local 저장만 원하면 `--wandb`를 빼면 되고, 영상까지 끄려면 `--no-best-video`를 준다.
 
-W&B dashboard에서 최소한 `eval/episode_reward`, `train/global_step`, `reward/velocity`, `reward/upright`, `reward/residual`, `reward/action_rate`, `workspace_error`를 함께 본다.
+W&B dashboard에서 최소한 `eval/episode_reward`, `train/global_step`, `reward/velocity`, `reward/upright`, `reward/swing_residual`, `reward/stance_residual`, `reward/gait_residual`, `reward/slip`, `reward/torque`, `projection_cost`를 함께 본다.
 
 ---
 
@@ -629,13 +651,13 @@ W&B dashboard에서 최소한 `eval/episode_reward`, `train/global_step`, `rewar
 
 1. `prepare_urdf.py`: ROS/Xacro 의존성을 제거하고 mesh path를 standalone으로 바꾸는 과정
 2. `prepare_scene.py`: home pose와 18 position actuator 생성
-3. `tripod_controller.py`: gait timing, local foot target, IK, 좌우 sign
-4. `prepare_rl_scene.py`: `_strip_cad_meshes`, primitive collider, stairs
-5. `view_rl_scene.py`: action=0 계단 baseline
-6. `rough_terrain_env.py`: `_controller_targets`, `_get_obs`, `reset`, `step`
+3. `tripod_controller.py`: viewer용 documented gait timing, local foot target, IK, 좌우 sign
+4. `tripod_core.py`: pure-JAX nominal target, phase mask, contact adapter, workspace projection, IK
+5. `prepare_rl_scene.py`: `_strip_cad_meshes`, primitive collider, parameterized stairs
+6. `rough_terrain_env.py`: body-frame observation, heading scan, authority/reward/safety integration
 7. `command_curriculum_env.py`: flat scene과 walk→turn stage를 선택하는 얇은 task wrapper
 8. `best_policy_video.py`: new-best policy를 MJX에서 deterministic rollout하고 GIF로 저장
-9. `train_command_curriculum.py`, `train_rough_terrain.py`: 같은 PPO/W&B trainer의 별도 entry point
+9. `train_command_curriculum.py`, `train_rough_terrain.py`: run directory/metadata + PPO/W&B entry point
 
 읽으며 답해야 할 질문:
 

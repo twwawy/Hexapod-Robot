@@ -57,10 +57,11 @@ MUJOCO_GL=egl python SW/mjx/run_controller.py --headless --duration 5
 
 ## MJX Residual RL: 평지 명령 커리큘럼과 계단 지형
 
-기본 Tripod/IK 제어기 위에서 다리별 발끝 목표와 gait 파라미터만 제한적으로
-보정하는 22차원 residual 환경입니다. 평지에서 **보행 → 완만한 회전 → 전체
-보행+회전**을 하나의 1,000-step curriculum으로 먼저 학습하고, 계단 지형은 별도
-명령으로 학습합니다. 자세한 구조는
+기본 Tripod/IK 제어기 위에서 **swing XYZ / stance Z-only** 권한으로만 보정하는
+`cartesian_gait_residual_v2` 22차원 residual 환경입니다. contact adaptation과
+workspace projection이 policy보다 먼저 적용됩니다. 평지에서 **보행 → 완만한 회전
+→ 전체 보행+회전**을 하나의 1,000-step curriculum으로 먼저 학습하고, 계단 지형은
+별도 명령으로 학습합니다. 기존 v1 22-D checkpoint는 resume하지 않습니다. 자세한 구조는
 [`RL_DESIGN.md`](RL_DESIGN.md)와 Obsidian 가이드를 참고합니다.
 
 학습 전에 계단 장면과 residual이 0인 기본 보행을 눈으로 확인합니다. 기본
@@ -83,31 +84,32 @@ python -m pip install --upgrade "jax[cuda12]==0.6.2"
 # pip CUDA와 /usr/local/cuda 라이브러리가 섞이지 않도록 현재 셸에서 제거
 unset LD_LIBRARY_PATH
 python -c "import jax; print(jax.devices())"
-python SW/mjx/train_command_curriculum.py --smoke
-python SW/mjx/train_command_curriculum.py --num-evals 50 --wandb
+python SW/mjx/train_command_curriculum.py --smoke --run-name command-v2-smoke
+python SW/mjx/train_command_curriculum.py --run-name command-v2-seed0 --num-evals 50 --wandb
 
 # 계단 지형은 평지 커리큘럼과 별도 run/checkpoint로 실행한다.
-python SW/mjx/train_rough_terrain.py --smoke
-python SW/mjx/train_rough_terrain.py --num-evals 50 --wandb
+python SW/mjx/train_rough_terrain.py --smoke --run-name terrain-v2-smoke
+python SW/mjx/train_rough_terrain.py \
+  --run-name terrain-v2-level3-seed0 --terrain-level 3 --terrain-randomize \
+  --num-evals 50 --wandb
 ```
 
 실제 학습 전 장치 출력에 `GpuDevice`가 있어야 합니다. 이 프로젝트가 고정한 JAX
 0.6.2 조합은 위 CUDA 12 wheel을 사용합니다. 기본 학습 설정은 2048개 병렬 환경과
 5천만 environment step입니다.
 
-각 evaluation의 최신 score와 최고 score는 checkpoint와 별개로
-`SW/mjx/artifacts/<task>/monitor/`에 저장됩니다. run마다 `--monitor-dir`를 별도로
-지정하면 최고 기록을 terminal/W&B에서 안전하게 비교할 수 있습니다. 기본으로
+각 run은 `SW/mjx/runs/<task>/<timestamp>_seed<seed>/`에 checkpoint, `monitor/`,
+`config.json`, `run_metadata.json`을 함께 저장합니다. 기본으로
 `--best-video`가 켜져 있어 `eval/episode_reward`가 새 최고점일 때마다 그 policy의
-deterministic 10초 GIF를 `<monitor-dir>/best_policy.gif`에 자동으로 저장하고 이전
+deterministic 10초 GIF를 `<run-dir>/best_policy.gif`에 자동으로 저장하고 이전
 최고 영상을 교체합니다. W&B run에서는 같은 파일을 `best/video`로도 업로드합니다.
 
 ```bash
-# 예: run별 최고 policy 영상의 위치를 명시한다. (생략하면 monitor-dir/best_policy.gif)
+# 예: run별 최고 policy 영상의 위치를 명시한다. (생략하면 run-dir/best_policy.gif)
 python SW/mjx/train_command_curriculum.py \
-  --monitor-dir SW/mjx/artifacts/command/seed0 \
+  --run-name command-v2-seed0 \
   --best-video \
-  --best-video-path SW/mjx/artifacts/command/seed0/best_policy.gif \
+  --best-video-path SW/mjx/runs/command/command-v2-seed0/best_policy.gif \
   --wandb
 ```
 

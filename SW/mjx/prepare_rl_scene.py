@@ -60,7 +60,7 @@ def _strip_cad_meshes(root: ET.Element) -> None:
                 body.remove(geom)
 
 
-def _add_robot_colliders(root: ET.Element) -> None:
+def _add_robot_colliders(root: ET.Element, *, foot_friction: float = 1.2) -> None:
     robot = root.find("./worldbody/body[@name='hexapod']")
     if robot is None:
         raise ValueError("Missing hexapod body")
@@ -142,7 +142,7 @@ def _add_robot_colliders(root: ET.Element) -> None:
                     "type": "sphere",
                     "pos": _numbers(segment3),
                     "size": "0.032",
-                    "friction": "1.2 0.01 0.001",
+                    "friction": f"{foot_friction:.6g} 0.01 0.001",
                     "rgba": "0.85 0.45 0.12 1",
                 },
             )
@@ -160,13 +160,21 @@ def _add_robot_colliders(root: ET.Element) -> None:
         )
 
 
-def _add_stairs(root: ET.Element) -> None:
+def _add_stairs(
+    root: ET.Element,
+    *,
+    step_start_x: float = STEP_START_X,
+    step_depth: float = STEP_DEPTH,
+    step_height: float = STEP_HEIGHT,
+    step_count: int = STEP_COUNT,
+    friction: float = 1.1,
+) -> None:
     worldbody = root.find("worldbody")
     if worldbody is None:
         raise ValueError("Missing worldbody")
-    for index in range(STEP_COUNT):
-        height = STEP_HEIGHT * (index + 1)
-        center_x = STEP_START_X + STEP_DEPTH * index
+    for index in range(step_count):
+        height = step_height * (index + 1)
+        center_x = step_start_x + step_depth * index
         worldbody.insert(
             2 + index,
             ET.Element(
@@ -175,8 +183,8 @@ def _add_stairs(root: ET.Element) -> None:
                     "name": f"stair_{index + 1}",
                     "type": "box",
                     "pos": f"{center_x:.6g} 0 {height / 2:.6g}",
-                    "size": f"{STEP_DEPTH / 2:.6g} 1.0 {height / 2:.6g}",
-                    "friction": "1.1 0.01 0.001",
+                    "size": f"{step_depth / 2:.6g} 1.0 {height / 2:.6g}",
+                    "friction": f"{friction:.6g} 0.01 0.001",
                     "rgba": "0.34 0.42 0.50 1",
                 },
             ),
@@ -184,7 +192,14 @@ def _add_stairs(root: ET.Element) -> None:
 
 
 def prepare_rl_scene(
-    output: Path = RL_SCENE_OUTPUT, *, terrain: str = "stairs"
+    output: Path = RL_SCENE_OUTPUT,
+    *,
+    terrain: str = "stairs",
+    step_start_x: float = STEP_START_X,
+    step_depth: float = STEP_DEPTH,
+    step_height: float = STEP_HEIGHT,
+    step_count: int = STEP_COUNT,
+    friction: float = 1.0,
 ) -> Path:
     """Create a mesh-free RL scene for either ``flat`` or ``stairs`` terrain.
 
@@ -206,11 +221,26 @@ def prepare_rl_scene(
     if option is not None:
         option.set("timestep", "0.0025")
 
+    if step_depth <= 0.0 or step_height < 0.0 or step_count < 0:
+        raise ValueError("terrain dimensions must satisfy depth > 0, height >= 0, count >= 0")
+    if friction <= 0.0:
+        raise ValueError("terrain friction must be positive")
+
     _replace_inertials(root, source_model)
     _strip_cad_meshes(root)
-    _add_robot_colliders(root)
+    _add_robot_colliders(root, foot_friction=1.2 * friction)
+    for geom in root.findall("./worldbody/geom"):
+        if geom.get("type") == "plane":
+            geom.set("friction", f"{friction:.6g} 0.01 0.001")
     if terrain == "stairs":
-        _add_stairs(root)
+        _add_stairs(
+            root,
+            step_start_x=step_start_x,
+            step_depth=step_depth,
+            step_height=step_height,
+            step_count=step_count,
+            friction=1.1 * friction,
+        )
 
     output.parent.mkdir(parents=True, exist_ok=True)
     ET.indent(tree, space="  ")
@@ -221,9 +251,11 @@ def prepare_rl_scene(
     return output
 
 
-def prepare_flat_rl_scene(output: Path = FLAT_RL_SCENE_OUTPUT) -> Path:
+def prepare_flat_rl_scene(
+    output: Path = FLAT_RL_SCENE_OUTPUT, *, friction: float = 1.0
+) -> Path:
     """Create the mesh-free plane scene for walking-and-turning curriculum."""
-    return prepare_rl_scene(output, terrain="flat")
+    return prepare_rl_scene(output, terrain="flat", friction=friction)
 
 
 def main() -> None:
