@@ -35,7 +35,9 @@ class PPOConfig:
     clip_epsilon: float = 0.20
     learning_rate: float = 3e-4
     value_coef: float = 0.5
-    entropy_coef: float = 0.01
+    entropy_coef: float = 0.002
+    min_policy_log_std: float = -3.0
+    max_policy_log_std: float = -1.0
     hidden_size: int = 128
     seed: int = 0
     output_path: str = "SW/mjx/artifacts/residual_rl_policy.pkl"
@@ -99,7 +101,10 @@ def init_train_state(obs_dim: int, action_dim: int, config: PPOConfig) -> TrainS
     policy_key, value_key = jax.random.split(key)
     params = {
         "policy_layers": init_mlp(policy_key, (obs_dim, config.hidden_size, config.hidden_size, action_dim), scale=0.8),
-        "policy_log_std": jnp.full((action_dim,), -0.6, dtype=jnp.float32),
+        # The residual is only ±3 cm.  Start with a conservative 0.37
+        # normalized-action standard deviation and never let PPO turn it into
+        # a saturated bang-bang foot-height controller.
+        "policy_log_std": jnp.full((action_dim,), -1.0, dtype=jnp.float32),
         "value_layers": init_mlp(value_key, (obs_dim, config.hidden_size, config.hidden_size, 1), scale=0.8),
     }
     optimizer_state = adam_init(params)
@@ -128,9 +133,18 @@ def gaussian_entropy(log_std: jnp.ndarray) -> jnp.ndarray:
 
 
 
-def sample_action(params: dict[str, Any], obs: jnp.ndarray, key: jax.Array) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+def _bounded_policy_log_std(params: dict[str, Any], config: PPOConfig) -> jnp.ndarray:
+    return jnp.clip(params["policy_log_std"], config.min_policy_log_std, config.max_policy_log_std)
+
+
+def sample_action(
+    params: dict[str, Any],
+    obs: jnp.ndarray,
+    key: jax.Array,
+    config: PPOConfig,
+) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
     mean = policy_mean(params, obs)
-    log_std = params["policy_log_std"][None, :]
+    log_std = _bounded_policy_log_std(params, config)[None, :]
     noise = jax.random.normal(key, mean.shape, dtype=jnp.float32)
     action = mean + noise * jnp.exp(log_std)
     log_prob = gaussian_log_prob(mean, log_std, action)
@@ -182,7 +196,7 @@ def compute_gae(rewards: jnp.ndarray, dones: jnp.ndarray, values: jnp.ndarray, l
 
 def _ppo_loss(params: dict[str, Any], batch: PolicyBatch, config: PPOConfig) -> tuple[jnp.ndarray, tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]]:
     mean = policy_mean(params, batch.obs)
-    log_std = params["policy_log_std"][None, :]
+    log_std = _bounded_policy_log_std(params, config)[None, :]
     new_log_prob = gaussian_log_prob(mean, log_std, batch.actions)
     ratio = jnp.exp(new_log_prob - batch.old_log_prob)
     clipped_ratio = jnp.clip(ratio, 1.0 - config.clip_epsilon, 1.0 + config.clip_epsilon)

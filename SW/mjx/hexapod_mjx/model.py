@@ -56,38 +56,29 @@ DEFAULT_STAND_ROOT_HEIGHT = 0.06
 FLOOR_VISUAL_HALF_SIZE = (1.15, 1.15, 0.015)
 FLOOR_VISUAL_POS = (0.0, 0.0, -0.015)
 
-# Standing pose used both at reset and as the sinusoid center point.
-# Suffix ``_1/_2/_3`` corresponds to the three actuated joints in each leg.
+# Standing pose copied from ``~/Downloads/mjx/prepare_scene.py``.  It is the
+# pose for which the documented analytical tripod IK was written.  Keeping this
+# exact pose matters: a gait can look plausible when generated around an
+# arbitrary photo pose but still command the wrong branch of the leg IK.
 #
-# ``*_1`` is the body-nearest yaw/sweep joint, so a photo-like neutral stance
-# needs front/mid/rear legs to use different values instead of one shared sweep.
-# ``*_2`` and ``*_3`` are the two pitch joints that fold the leg downward.
-#
-# The reference hardware photo shows three consistent characteristics we want to
-# preserve in the default pose:
-# 1. the body sits above the legs,
-# 2. the front and rear legs splay fore/aft while the middle legs stay lateral,
-# 3. the pitch joints fold below the body instead of arching up over it.
+# The raw URDF axes are mirrored between left and right legs, hence the signs
+# differ even though all six documented servo configurations are identical.
 STAND_POSE = {
-    "LF_1": -0.49999999999999983,
-    "LF_2": 0.44999999999999996,
-    "LF_3": -0.8499999999999999,
-    "RF_1": 0.49999999999999983,
-    "RF_2": -0.44999999999999996,
-    "RF_3": 0.8499999999999999,
-    "LM_1": -4.163336342344337e-17,
-    "LM_2": 0.44999999999999996,
-    "LM_3": -0.7499999999999998,
-    "RM_1": 4.163336342344337e-17,
-    "RM_2": -0.44999999999999996,
-    "RM_3": 0.7499999999999998,
-    "LB_1": 0.44999999999999984,
-    "LB_2": 0.5499999999999999,
-    "LB_3": -0.6999999999999997,
-    "RB_1": -0.44999999999999984,
-    "RB_2": -0.5499999999999999,
-    "RB_3": 0.6999999999999997
+    "RB_1": 0.0, "RB_2": -0.523598776, "RB_3": 0.872664626,
+    "RM_1": 0.0, "RM_2": -0.523598776, "RM_3": 0.872664626,
+    "RF_1": 0.0, "RF_2": -0.523598776, "RF_3": 0.872664626,
+    "LB_1": 0.0, "LB_2": 0.523598776, "LB_3": -0.872664626,
+    "LM_1": 0.0, "LM_2": 0.523598776, "LM_3": -0.872664626,
+    "LF_1": 0.0, "LF_2": 0.523598776, "LF_3": -0.872664626,
 }
+
+# The original documented controller uses MuJoCo position actuators rather
+# than an ad-hoc external torque loop.  Use exactly its actuator tuning so the
+# same target angle has the same closed-loop meaning in preview and MJX.
+POSITION_ACTUATOR_KP = 120.0
+POSITION_ACTUATOR_KV = 3.0
+POSITION_ACTUATOR_FORCE_LIMIT = 8.0
+ACTUATOR_LEG_ORDER = ("RB", "RM", "RF", "LB", "LM", "LF")
 
 
 @dataclass(frozen=True)
@@ -525,6 +516,36 @@ def _simplify_training_geoms(robot_body: ET.Element, foot_specs: dict[str, FootC
     _add_foot_contact_geoms(robot_body, foot_specs, collidable=True)
 
 
+def _add_documented_position_actuators(root: ET.Element) -> None:
+    """Install the exact position actuators used by Downloads/mjx.
+
+    The upstream URDF has no MuJoCo actuator block, which previously made the
+    residual environment synthesize a second, differently tuned PD loop with
+    ``qfrc_applied``.  Keeping the controller in MuJoCo's native position
+    actuator matches the known-good standalone tripod controller and keeps
+    host preview/MJX rollout semantics identical.
+    """
+    existing = root.find("actuator")
+    if existing is not None:
+        root.remove(existing)
+    actuator = ET.SubElement(root, "actuator")
+    for leg in ACTUATOR_LEG_ORDER:
+        for joint_number in (1, 2, 3):
+            joint_name = f"{leg}_{joint_number}"
+            ET.SubElement(
+                actuator,
+                "position",
+                {
+                    "name": f"{joint_name}_position",
+                    "joint": joint_name,
+                    "kp": str(POSITION_ACTUATOR_KP),
+                    "kv": str(POSITION_ACTUATOR_KV),
+                    "ctrlrange": "-2.356194 2.356194",
+                    "forcerange": f"{-POSITION_ACTUATOR_FORCE_LIMIT:g} {POSITION_ACTUATOR_FORCE_LIMIT:g}",
+                },
+            )
+
+
 
 def build_floating_base_mjcf(
     repo_root: str | Path,
@@ -567,6 +588,15 @@ def build_floating_base_mjcf(
 
         tree = ET.parse(saved_xml_path)
         root = tree.getroot()
+        option = root.find("option")
+        if option is None:
+            option = ET.Element("option")
+            root.insert(1, option)
+        # Match the known-good standalone scene instead of silently inheriting
+        # converter defaults that vary between MuJoCo versions.
+        option.set("timestep", "0.002")
+        option.set("integrator", "implicitfast")
+        option.set("gravity", "0 0 -9.81")
         worldbody = root.find("worldbody")
         if worldbody is None:
             raise RuntimeError("MuJoCo-exported XML is missing <worldbody>.")
@@ -617,6 +647,7 @@ def build_floating_base_mjcf(
             },
         )
         worldbody.append(robot_body)
+        _add_documented_position_actuators(root)
 
         tree.write(generated_path, encoding="unicode")
 
@@ -656,6 +687,17 @@ def _load_hexapod_model(repo_root: str | Path, *, simplified: bool, contact_mode
             raise KeyError(f"Unexpected leg prefix in joint name: {name}")
         tripod_phase_offset.append(0.0 if leg in TRIPOD_A else np.pi)
         default_joint_pose.append(STAND_POSE[name])
+
+    expected_actuators = tuple(f"{name}_position" for name in joint_names)
+    actual_actuators = tuple(
+        mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_ACTUATOR, actuator_id)
+        for actuator_id in range(model.nu)
+    )
+    if actual_actuators != expected_actuators:
+        raise RuntimeError(
+            "Position actuator ordering must match joint_names for direct "
+            f"controller targets: expected={expected_actuators}, actual={actual_actuators}"
+        )
 
     return HexapodModelBundle(
         repo_root=repo_root,

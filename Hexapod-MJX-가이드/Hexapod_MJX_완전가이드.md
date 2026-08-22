@@ -1,5 +1,9 @@
 # Hexapod-Robot MuJoCo MJX 완전 가이드
 
+> [!warning] 2026-08-22 현재 보행/RL 기준 경로
+>
+> 이 문서의 기존 6D Cartesian residual 설명과 고정 버전 정보는 이전 실험 기록이다. 현재는 `SW/mjx/`에 반영한 최신 `Downloads/mjx` 구성을 기준으로 한다. RL 씬은 [`SW/mjx/prepare_rl_scene.py`](../SW/mjx/prepare_rl_scene.py)에서 CAD mesh를 의도적으로 제거하고 primitive collision geometry로 다시 만들며, 학습은 22D action / 110D observation을 공유하는 **평지 보행+회전 curriculum** ([`train_command_curriculum.py`](../SW/mjx/train_command_curriculum.py))과 **계단 terrain task** ([`train_rough_terrain.py`](../SW/mjx/train_rough_terrain.py))로 분리한다. 실행·튜닝·W&B·코드 학습은 [Obsidian 스터디 볼트](../docs/Hexapod_MJX_Obsidian_Study_Vault.md)를 우선 따른다.
+
 이 문서는 **지금 네 컴퓨터 상태에 맞춰서**, Hexapod-Robot의 MuJoCo MJX 학습 환경을 **장기적으로 덜 깨지고, 재현 가능하고, 디버깅하기 쉬운 방식**으로 정리한 문서다.
 
 목표는 4개다.
@@ -297,7 +301,7 @@ MJX 쪽에는 **고전 제어기 + Cartesian residual RL 정책** 경로가 있�
 
 현재 1차 action은 `LF, LM, LB, RF, RM, RB` 순서의 **6-D swing-foot Δz**다.
 
-- tripod gait, command filtering, nominal foot target, IK, joint limit, PD torque는 classical controller가 소유한다.
+- command filtering, position/heading PI, roll/pitch/height posture PI, tripod gait, nominal foot target, IK, joint limit, PD torque는 classical controller가 소유한다.
 - RL은 swing 발의 수직 보정만 `±3 cm` 범위에서 출력한다.
 - stance action은 mask로 제거되고, swing 중 early contact는 contact/safety 계층이 현재 발 위치를 유지한다.
 - 보폭, 착지 XY, gait timing, body-height/roll/pitch trim은 RL action이 아니다.

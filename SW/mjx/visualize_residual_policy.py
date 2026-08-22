@@ -14,6 +14,7 @@ import numpy as np
 
 from hexapod_mjx.model import load_hexapod_model, repo_root_from
 from hexapod_mjx.residual_controller import (
+    ACTION_DIM,
     build_residual_controller,
     controller_config_from_metadata,
     controller_step,
@@ -21,6 +22,7 @@ from hexapod_mjx.residual_controller import (
     quat_roll_pitch_yaw,
     quat_to_rotmat,
     reset_controller_state,
+    validate_residual_interface,
     world_to_body,
 )
 from hexapod_mjx.residual_rl import load_checkpoint, policy_mean
@@ -36,6 +38,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--duration-sec", type=float, default=8.0)
     parser.add_argument("--contact-model", choices=("mesh", "hybrid"), default=None, help="Override the collision/contact model used for replay. Default reads checkpoint metadata and falls back to hybrid.")
     parser.add_argument("--hold-sec", type=float, default=1.5, help="Hold the neutral pose for this many seconds before policy rollout.")
+    parser.add_argument("--zero-residual", action="store_true", help="Replay only the nominal position/heading/posture PI controller with zero learned residual.")
     parser.add_argument("--render-dir", type=str, default=None)
     parser.add_argument("--output-video", type=str, default=None)
     parser.add_argument("--frame-stride", type=int, default=2)
@@ -92,7 +95,11 @@ def main() -> None:
     args = parse_args()
     default_root = Path(__file__).resolve().parents[2]
     repo_root = repo_root_from(args.repo_root or default_root)
-    train_state, metadata = load_checkpoint(_resolve_path(repo_root, args.policy_path))
+    train_state = None
+    metadata: dict = {}
+    if not args.zero_residual:
+        train_state, metadata = load_checkpoint(_resolve_path(repo_root, args.policy_path))
+        validate_residual_interface(metadata if isinstance(metadata, dict) else None)
     checkpoint_contact_model = None
     if isinstance(metadata, dict):
         checkpoint_contact_model = metadata.get("ppo_config", {}).get("contact_model")
@@ -118,10 +125,6 @@ def main() -> None:
 
     qpos_adr = np.asarray(bundle.joint_qpos_adr, dtype=np.int32)
     dof_adr = np.asarray(bundle.joint_dof_adr, dtype=np.int32)
-    group_index = np.asarray([int(name.split('_')[-1]) - 1 for name in bundle.joint_names], dtype=np.int32)
-    kp = np.asarray(controller_config.pd_kp, dtype=np.float32)[group_index]
-    kd = np.asarray(controller_config.pd_kd, dtype=np.float32)[group_index]
-    tau_limit = np.asarray(controller_config.torque_limit, dtype=np.float32)[group_index]
 
     def world_vector_to_body(quat: jnp.ndarray, vector: jnp.ndarray) -> jnp.ndarray:
         rot_t = jnp.swapaxes(quat_to_rotmat(quat), -1, -2)
@@ -153,7 +156,11 @@ def main() -> None:
     def step_policy() -> None:
         nonlocal controller_state, body_velocity_world, body_angular_velocity_world, yaw_rate, prev_root_pos, prev_yaw, prev_foot_world
         obs = make_obs()
-        action = np.asarray(policy_mean(train_state.params, obs))[0]
+        action = (
+            np.zeros((ACTION_DIM,), dtype=np.float32)
+            if args.zero_residual
+            else np.asarray(policy_mean(train_state.params, obs))[0]
+        )
         for _ in range(controller_config.policy_controls_per_action):
             current_foot_world = jnp.asarray(data.geom_xpos[controller_bundle.foot_geom_ids][None, :, :], dtype=jnp.float32)
             root_pos_before = jnp.asarray(data.qpos[0:3][None, :], dtype=jnp.float32)
@@ -171,14 +178,12 @@ def main() -> None:
                 jnp.asarray(action[None, :], dtype=jnp.float32),
                 foot_contacts=contacts,
                 current_foot_body=current_foot_body,
+                body_position_world=root_pos_before,
+                body_quat=root_quat_before,
             )
             joint_targets_np = np.asarray(joint_targets)[0]
-            qj = data.qpos[qpos_adr]
-            qv = data.qvel[dof_adr]
-            tau = kp * (joint_targets_np - qj) - kd * qv
-            tau = np.clip(tau, -tau_limit, tau_limit)
             data.qfrc_applied[:] = 0.0
-            data.qfrc_applied[dof_adr] = tau
+            data.ctrl[:] = joint_targets_np
             for _ in range(controller_config.physics_steps_per_control):
                 mujoco.mj_step(model, data)
 
@@ -195,7 +200,7 @@ def main() -> None:
     step_dt = policy_dt(bundle, controller_config)
     total_steps = max(1, int(args.duration_sec / step_dt))
     print(f"repo_root: {repo_root}")
-    print(f"policy_metadata: {metadata}")
+    print(f"policy_metadata: {metadata if not args.zero_residual else 'zero-residual nominal controller'}")
 
     if args.render_dir or args.output_video:
         render_dir = _resolve_path(repo_root, args.render_dir) if args.render_dir else None

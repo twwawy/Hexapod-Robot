@@ -398,16 +398,21 @@ def step_env(
             action,
             foot_contacts=contacts,
             current_foot_body=current_foot_body,
+            body_position_world=data.qpos[:, 0:3],
+            body_quat=data.qpos[:, 3:7],
         )
         next_controller_state = _masked_tree(terminated, controller_state, next_controller_state)
+        # Position actuators are part of the MJCF, copied from Downloads/mjx.
+        # Keep the matching PD estimate only for the reward's effort metric;
+        # never inject it as a second qfrc_applied controller.
         tau = _pd_torque(bundle, joint_targets, data, group_index, controller_config)
         active = (~terminated).astype(jnp.float32)
 
         def physics_step(inner_carry, _):
             inner_data, inner_terminated = inner_carry
+            ctrl = inner_data.ctrl.at[:, :].set(joint_targets)
             qfrc = inner_data.qfrc_applied.at[:, :].set(0.0)
-            qfrc = qfrc.at[:, jnp.asarray(bundle.joint_dof_adr)].set(tau)
-            inner_data = inner_data.replace(qfrc_applied=qfrc)
+            inner_data = inner_data.replace(ctrl=ctrl, qfrc_applied=qfrc)
             stepped_data = jax.vmap(mjx.step, in_axes=(None, 0))(bundle.mjx_model, inner_data)
             updated_terminated = jnp.logical_or(inner_terminated, _termination_mask(env_config, stepped_data))
             kept_data = _masked_tree(inner_terminated, inner_data, stepped_data)

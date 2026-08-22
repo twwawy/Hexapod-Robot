@@ -23,7 +23,7 @@ import jax.numpy as jnp
 import numpy as np
 
 from hexapod_mjx.model import STAND_POSE, load_hexapod_model, repo_root_from
-from hexapod_mjx.residual_controller import ACTION_DIM, ResidualControllerConfig, build_residual_controller
+from hexapod_mjx.residual_controller import ACTION_DIM, RESIDUAL_INTERFACE, ResidualControllerConfig, build_residual_controller
 
 from hexapod_mjx.residual_env import (
     CommandCurriculumConfig,
@@ -59,6 +59,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--ppo-epochs", type=int, default=3)
     parser.add_argument("--minibatch-size", type=int, default=96)
     parser.add_argument("--learning-rate", type=float, default=3e-4)
+    parser.add_argument("--entropy-coef", type=float, default=0.002, help="PPO exploration weight for the bounded residual policy.")
     parser.add_argument("--hidden-size", type=int, default=128)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--output-path", type=str, default="SW/mjx/artifacts/residual_rl_policy.pkl")
@@ -71,6 +72,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--joint-limit-margin-1", type=float, default=0.0, help="Tighten the joint-1 range by this many radians on each side.")
     parser.add_argument("--joint-limit-margin-2", type=float, default=0.0, help="Tighten the joint-2 range by this many radians on each side.")
     parser.add_argument("--joint-limit-margin-3", type=float, default=0.0, help="Tighten the joint-3 range by this many radians on each side.")
+    parser.add_argument("--residual-swing-z", type=float, default=0.030, help="Maximum learned swing-foot vertical residual in metres.")
+    parser.add_argument("--translation-pi-kp", type=float, nargs=2, metavar=("FORWARD", "LATERAL"), default=(0.0, 0.0), help="Optional body-position PI proportional gains; source tripod baseline uses zero.")
+    parser.add_argument("--translation-pi-ki", type=float, nargs=2, metavar=("FORWARD", "LATERAL"), default=(0.0, 0.0), help="Optional body-position PI integral gains; source tripod baseline uses zero.")
+    parser.add_argument("--heading-pi-kp", type=float, default=0.0, help="Optional heading PI proportional gain; source tripod baseline uses zero.")
+    parser.add_argument("--heading-pi-ki", type=float, default=0.0, help="Optional heading PI integral gain; source tripod baseline uses zero.")
+    parser.add_argument("--posture-pi-kp", type=float, nargs=3, metavar=("ROLL", "PITCH", "HEIGHT"), default=(0.0, 0.0, 0.0), help="Optional roll, pitch, height posture PI proportional gains; source tripod baseline uses zero.")
+    parser.add_argument("--posture-pi-ki", type=float, nargs=3, metavar=("ROLL", "PITCH", "HEIGHT"), default=(0.0, 0.0, 0.0), help="Optional roll, pitch, height posture PI integral gains; source tripod baseline uses zero.")
+    parser.add_argument("--posture-foot-z-limit", type=float, default=0.020, help="Maximum deterministic posture foot-height correction in metres.")
     parser.add_argument("--command-curriculum", choices=("reward", "staged", "none"), default="reward", help="Use reward-gated, legacy update-gated, or disabled command curriculum.")
     parser.add_argument("--forward-only-updates", type=int, default=120, help="Legacy staged curriculum duration for stage 0.")
     parser.add_argument("--yaw-stage-updates", type=int, default=120, help="Legacy staged curriculum duration for stage 1.")
@@ -238,6 +247,7 @@ def _init_wandb(repo_root: Path, args: argparse.Namespace, output_path: Path, la
             "ppo_epochs": args.ppo_epochs,
             "minibatch_size": args.minibatch_size,
             "learning_rate": args.learning_rate,
+            "entropy_coef": args.entropy_coef,
             "hidden_size": args.hidden_size,
             "seed": args.seed,
             "command_curriculum": args.command_curriculum,
@@ -249,6 +259,14 @@ def _init_wandb(repo_root: Path, args: argparse.Namespace, output_path: Path, la
             "joint_limit_margin_1": args.joint_limit_margin_1,
             "joint_limit_margin_2": args.joint_limit_margin_2,
             "joint_limit_margin_3": args.joint_limit_margin_3,
+            "residual_swing_z": args.residual_swing_z,
+            "translation_pi_kp": args.translation_pi_kp,
+            "translation_pi_ki": args.translation_pi_ki,
+            "heading_pi_kp": args.heading_pi_kp,
+            "heading_pi_ki": args.heading_pi_ki,
+            "posture_pi_kp": args.posture_pi_kp,
+            "posture_pi_ki": args.posture_pi_ki,
+            "posture_foot_z_limit": args.posture_foot_z_limit,
             "output_path": str(output_path),
             "latest_output_path": str(latest_output_path),
             "metrics_path": str(metrics_path),
@@ -323,7 +341,7 @@ def _checkpoint_metadata(
         "best_mean_reward": best_mean_reward,
         "obs_dim": obs_dim,
         "action_dim": ACTION_DIM,
-        "residual_interface": "swing_delta_z_v1",
+        "residual_interface": RESIDUAL_INTERFACE,
         "action_semantics": "six bounded per-leg swing-foot vertical residuals in metres",
         "controller_reset_root_height": controller_reset_root_height,
         "checkpoint_kind": checkpoint_kind,
@@ -356,9 +374,9 @@ def _validate_resume_interface(metadata: dict[str, Any], obs_dim: int) -> None:
             f"checkpoint has {saved_obs_dim} inputs, current environment requires {obs_dim}. "
             "Start a fresh run."
         )
-    if saved_interface is not None and saved_interface != "swing_delta_z_v1":
+    if saved_interface is not None and saved_interface != RESIDUAL_INTERFACE:
         raise ValueError(
-            f"Checkpoint residual interface {saved_interface!r} is incompatible with swing_delta_z_v1. "
+            f"Checkpoint residual interface {saved_interface!r} is incompatible with {RESIDUAL_INTERFACE}. "
             "Start a fresh run."
         )
 
@@ -419,7 +437,15 @@ def main() -> None:
             args.joint_limit_margin_1,
             args.joint_limit_margin_2,
             args.joint_limit_margin_3,
-        )
+        ),
+        residual_swing_z=args.residual_swing_z,
+        translation_pi_kp=tuple(args.translation_pi_kp),
+        translation_pi_ki=tuple(args.translation_pi_ki),
+        heading_pi_kp=args.heading_pi_kp,
+        heading_pi_ki=args.heading_pi_ki,
+        posture_pi_kp=tuple(args.posture_pi_kp),
+        posture_pi_ki=tuple(args.posture_pi_ki),
+        posture_foot_z_limit=args.posture_foot_z_limit,
     )
     controller_bundle = build_residual_controller(bundle, controller_config)
     env_config = ResidualEnvConfig(
@@ -445,6 +471,7 @@ def main() -> None:
         minibatch_size=args.minibatch_size,
         ppo_epochs=args.ppo_epochs,
         learning_rate=args.learning_rate,
+        entropy_coef=args.entropy_coef,
         hidden_size=args.hidden_size,
         seed=args.seed,
         output_path=args.output_path,
@@ -521,7 +548,7 @@ def main() -> None:
             action,
         )
     )
-    sample_fn = jax.jit(sample_action)
+    sample_fn = jax.jit(lambda params, obs, key: sample_action(params, obs, key, ppo_config))
     value_fn = jax.jit(value_predict)
 
     def sampling_for_update(update_index: int):

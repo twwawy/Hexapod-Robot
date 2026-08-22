@@ -10,7 +10,7 @@ import jax
 import jax.numpy as jnp
 
 from hexapod_mjx.model import load_hexapod_model, repo_root_from
-from hexapod_mjx.residual_controller import build_residual_controller, controller_config_from_metadata
+from hexapod_mjx.residual_controller import ACTION_DIM, build_residual_controller, controller_config_from_metadata, validate_residual_interface
 from hexapod_mjx.residual_env import ResidualEnvConfig, joint_group_index, reset_env, step_env
 from hexapod_mjx.residual_rl import load_checkpoint, policy_mean
 
@@ -24,6 +24,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--rollout-steps", type=int, default=64)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--report-path", type=str, default="SW/mjx/artifacts/residual_rl_eval.json")
+    parser.add_argument("--zero-residual", action="store_true", help="Evaluate the nominal position/heading/posture PI controller with all RL residual actions fixed at zero.")
     return parser.parse_args()
 
 
@@ -33,7 +34,11 @@ def main() -> None:
     default_root = Path(__file__).resolve().parents[2]
     repo_root = repo_root_from(args.repo_root or default_root)
     policy_path = (repo_root / args.policy_path).resolve()
-    train_state, metadata = load_checkpoint(policy_path)
+    train_state = None
+    metadata: dict = {}
+    if not args.zero_residual:
+        train_state, metadata = load_checkpoint(policy_path)
+        validate_residual_interface(metadata if isinstance(metadata, dict) else None)
     resolved_contact_model = metadata.get("ppo_config", {}).get("contact_model", "hybrid") if isinstance(metadata, dict) else "hybrid"
     bundle = load_hexapod_model(repo_root, contact_mode=resolved_contact_model)
     controller_config = controller_config_from_metadata(metadata if isinstance(metadata, dict) else None)
@@ -59,7 +64,11 @@ def main() -> None:
     metric_history = []
     done_history = []
     for _ in range(args.rollout_steps):
-        action = policy_mean(train_state.params, obs)
+        action = (
+            jnp.zeros((args.num_envs, ACTION_DIM), dtype=jnp.float32)
+            if args.zero_residual
+            else policy_mean(train_state.params, obs)
+        )
         state, obs, reward, done, metrics = step_fn(state, action)
         reward_history.append(reward)
         done_history.append(done)
@@ -70,7 +79,8 @@ def main() -> None:
     metrics = jnp.stack(metric_history, axis=0)
     metric_means = jnp.mean(metrics.reshape(-1, metrics.shape[-1]), axis=0)
     report = {
-        "policy_path": str(policy_path),
+        "policy_path": None if args.zero_residual else str(policy_path),
+        "zero_residual": args.zero_residual,
         "metadata": metadata,
         "num_envs": args.num_envs,
         "rollout_steps": args.rollout_steps,

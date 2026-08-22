@@ -6,3 +6,5 @@ wandb/
 SW/mjx/artifacts/
 SW/mjx/**/__pycache__/
 tuto/
+.gjc/
+MUJOCO_LOG.TXT
