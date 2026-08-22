@@ -142,6 +142,66 @@ class TripodGaitController:
             (np.dot(relative, outward), np.dot(relative, tangent), relative[2])
         )
 
+    def nominal_targets(
+        self,
+        phase: float,
+        command: tuple[float, float] | np.ndarray,
+        *,
+        step_scale: float = 1.0,
+        swing_height: float | None = None,
+        radial_offset: float | None = None,
+    ) -> np.ndarray:
+        """Independent NumPy reference for the JAX nominal gait contract.
+
+        ``phase`` spans the complete A/B cycle in ``[0, 1)`` and ``command``
+        is ``(forward_speed, yaw_rate)``.  This deliberately does not call the
+        JAX core: contract tests use it to detect drift between standalone
+        classical control and residual-RL's nominal policy.
+        """
+        phase = float(phase) % 1.0
+        command = np.asarray(command, dtype=float)
+        first_half = phase < 0.5
+        tau = phase * 2.0 if first_half else (phase - 0.5) * 2.0
+        smooth = self._quintic(tau)
+        height = self.config.swing_height if swing_height is None else swing_height
+        radial_limit = self.config.radial_offset if radial_offset is None else radial_offset
+        desired = np.zeros(self.model.nu)
+
+        for prefix in LEG_PREFIXES:
+            swing = (prefix in TRIPOD_A) == first_half
+            phase_position = smooth - 0.5 if swing else 0.5 - tau
+            lift = 4.0 * height * smooth * (1.0 - smooth) if swing else 0.0
+            radial = 4.0 * radial_limit * smooth * (1.0 - smooth) if swing else 0.0
+            origin = self._origins[prefix]
+            outward = self._outward[prefix]
+            nominal_body = origin + outward * self.NOMINAL_FOOT[0]
+            nominal_body[2] = origin[2] + self.NOMINAL_FOOT[2]
+            yaw_velocity = np.cross(
+                np.array((0.0, 0.0, command[1])), nominal_body
+            )
+            foot_velocity = self.MODEL_FORWARD * command[0] + yaw_velocity
+            target_body = (
+                nominal_body
+                + foot_velocity
+                * (self.config.phase_time * step_scale * phase_position)
+                + outward * radial
+                + np.array((0.0, 0.0, lift))
+            )
+            tangent = np.array((-outward[1], outward[0], 0.0))
+            relative = target_body - origin
+            foot = np.array(
+                (
+                    np.dot(relative, outward),
+                    np.dot(relative, tangent),
+                    relative[2],
+                )
+            )
+            raw = self._servo_to_model(prefix, self._inverse_kinematics(foot))
+            for index, value in enumerate(raw, start=1):
+                desired[self._actuator_ids[(prefix, index)]] = value
+
+        return np.clip(desired, -self.config.joint_limit, self.config.joint_limit)
+
     def targets(self, simulation_time: float) -> np.ndarray:
         if simulation_time < self.config.stand_time:
             desired = self.home_targets()

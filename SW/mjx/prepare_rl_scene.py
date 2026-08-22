@@ -14,10 +14,33 @@ from tripod_controller import LEG_PREFIXES
 
 RL_SCENE_OUTPUT = Path(__file__).resolve().parent / "generated/hexapod_rl.xml"
 FLAT_RL_SCENE_OUTPUT = Path(__file__).resolve().parent / "generated/hexapod_flat_rl.xml"
+MIXED_RL_SCENE_OUTPUT = Path(__file__).resolve().parent / "generated/hexapod_mixed_rl.xml"
 STEP_START_X = 0.55
 STEP_DEPTH = 0.25
 STEP_HEIGHT = 0.05
 STEP_COUNT = 7
+MIXED_PATCH_NAMES = ("flat", "curb", "ramp", "blocks", "stairs", "rough")
+MIXED_PATCH_Y = (0.0, 3.0, 6.0, 9.0, 12.0, 15.0)
+MIXED_LANE_HALF_WIDTH = 0.9
+MIXED_CURB = (0.55, 0.55, 0.04)  # start, length, height
+MIXED_RAMP = (0.45, 1.20, 0.10)  # start, length, rise
+MIXED_BLOCKS = (
+    (0.50, -0.28, 0.22, 0.22, 0.035),
+    (0.82, 0.20, 0.20, 0.28, 0.060),
+    (1.14, -0.12, 0.24, 0.22, 0.045),
+    (1.47, 0.30, 0.20, 0.20, 0.075),
+    (1.78, -0.26, 0.26, 0.24, 0.050),
+)
+MIXED_ROUGH = (
+    (0.42, -0.42, 0.24, 0.32, 0.018),
+    (0.42, 0.02, 0.24, 0.32, 0.032),
+    (0.42, 0.46, 0.24, 0.32, 0.012),
+    (0.78, -0.40, 0.24, 0.30, 0.040),
+    (0.78, 0.00, 0.24, 0.30, 0.020),
+    (0.78, 0.40, 0.24, 0.30, 0.052),
+    (1.14, -0.30, 0.26, 0.42, 0.028),
+    (1.14, 0.28, 0.26, 0.42, 0.044),
+)
 
 
 def _numbers(values) -> str:
@@ -168,6 +191,8 @@ def _add_stairs(
     step_height: float = STEP_HEIGHT,
     step_count: int = STEP_COUNT,
     friction: float = 1.1,
+    center_y: float = 0.0,
+    name_prefix: str = "stair",
 ) -> None:
     worldbody = root.find("worldbody")
     if worldbody is None:
@@ -180,14 +205,127 @@ def _add_stairs(
             ET.Element(
                 "geom",
                 {
-                    "name": f"stair_{index + 1}",
+                    "name": f"{name_prefix}_{index + 1}",
                     "type": "box",
-                    "pos": f"{center_x:.6g} 0 {height / 2:.6g}",
-                    "size": f"{step_depth / 2:.6g} 1.0 {height / 2:.6g}",
+                    "pos": f"{center_x:.6g} {center_y:.6g} {height / 2:.6g}",
+                    "size": f"{step_depth / 2:.6g} {MIXED_LANE_HALF_WIDTH:.6g} {height / 2:.6g}",
                     "friction": f"{friction:.6g} 0.01 0.001",
                     "rgba": "0.34 0.42 0.50 1",
                 },
             ),
+        )
+
+
+def _add_patch_box(
+    worldbody: ET.Element,
+    *,
+    name: str,
+    center_x: float,
+    center_y: float,
+    length: float,
+    width: float,
+    height: float,
+    friction: float,
+    rgba: str,
+) -> None:
+    worldbody.append(
+        ET.Element(
+            "geom",
+            {
+                "name": name,
+                "type": "box",
+                "pos": f"{center_x:.6g} {center_y:.6g} {height / 2:.6g}",
+                "size": f"{length / 2:.6g} {width / 2:.6g} {height / 2:.6g}",
+                "friction": f"{friction:.6g} 0.01 0.001",
+                "rgba": rgba,
+            },
+        )
+    )
+
+
+def _add_mixed_patches(root: ET.Element, *, friction: float) -> None:
+    """Add several terrain families as parallel lanes in one MJX model."""
+    worldbody = root.find("worldbody")
+    if worldbody is None:
+        raise ValueError("Missing worldbody")
+
+    curb_start, curb_length, curb_height = MIXED_CURB
+    _add_patch_box(
+        worldbody,
+        name="mixed_curb",
+        center_x=curb_start + curb_length / 2,
+        center_y=MIXED_PATCH_Y[1],
+        length=curb_length,
+        width=2 * MIXED_LANE_HALF_WIDTH,
+        height=curb_height,
+        friction=friction,
+        rgba="0.35 0.48 0.58 1",
+    )
+
+    ramp_start, ramp_length, ramp_rise = MIXED_RAMP
+    angle = float(np.arctan2(ramp_rise, ramp_length))
+    thickness = 0.04
+    worldbody.append(
+        ET.Element(
+            "geom",
+            {
+                "name": "mixed_ramp",
+                "type": "box",
+                "pos": f"{ramp_start + ramp_length / 2:.6g} {MIXED_PATCH_Y[2]:.6g} {ramp_rise / 2 - thickness / 2:.6g}",
+                "size": f"{np.hypot(ramp_length, ramp_rise) / 2:.6g} {MIXED_LANE_HALF_WIDTH:.6g} {thickness / 2:.6g}",
+                "euler": f"0 {-angle:.9g} 0",
+                "friction": f"{friction:.6g} 0.01 0.001",
+                "rgba": "0.38 0.52 0.38 1",
+            },
+        )
+    )
+    _add_patch_box(
+        worldbody,
+        name="mixed_ramp_plateau",
+        center_x=ramp_start + ramp_length + 0.45,
+        center_y=MIXED_PATCH_Y[2],
+        length=0.9,
+        width=2 * MIXED_LANE_HALF_WIDTH,
+        height=ramp_rise,
+        friction=friction,
+        rgba="0.38 0.52 0.38 1",
+    )
+
+    for index, (x, y_offset, length, width, height) in enumerate(MIXED_BLOCKS):
+        _add_patch_box(
+            worldbody,
+            name=f"mixed_block_{index}",
+            center_x=x,
+            center_y=MIXED_PATCH_Y[3] + y_offset,
+            length=length,
+            width=width,
+            height=height,
+            friction=friction,
+            rgba="0.52 0.42 0.30 1",
+        )
+
+    _add_stairs(
+        root,
+        step_start_x=0.50,
+        step_depth=0.28,
+        step_height=0.035,
+        step_count=6,
+        friction=friction,
+        center_y=MIXED_PATCH_Y[4],
+        name_prefix="mixed_stair",
+    )
+
+    for index, (x, y_offset, length, width, height) in enumerate(MIXED_ROUGH):
+        _add_patch_box(
+            worldbody,
+            name=f"mixed_rough_{index}",
+            center_x=x,
+            center_y=MIXED_PATCH_Y[5] + y_offset,
+            length=length,
+            width=width,
+            height=height,
+            friction=friction,
+            rgba="0.42 0.36 0.30 1",
         )
 
 
@@ -201,7 +339,7 @@ def prepare_rl_scene(
     step_count: int = STEP_COUNT,
     friction: float = 1.0,
 ) -> Path:
-    """Create a mesh-free RL scene for either ``flat`` or ``stairs`` terrain.
+    """Create a mesh-free RL scene for ``flat``, ``stairs``, or ``mixed`` terrain.
 
     Both variants use exactly the same robot collision geometry and position
     actuators.  Keeping that contract makes the flat command curriculum and
@@ -209,8 +347,8 @@ def prepare_rl_scene(
     """
     import mujoco
 
-    if terrain not in {"flat", "stairs"}:
-        raise ValueError(f"terrain must be 'flat' or 'stairs', got {terrain!r}")
+    if terrain not in {"flat", "stairs", "mixed"}:
+        raise ValueError(f"terrain must be 'flat', 'stairs', or 'mixed', got {terrain!r}")
 
     prepare_scene(SCENE_OUTPUT)
     source_model = mujoco.MjModel.from_xml_path(str(SCENE_OUTPUT))
@@ -241,12 +379,14 @@ def prepare_rl_scene(
             step_count=step_count,
             friction=1.1 * friction,
         )
+    elif terrain == "mixed":
+        _add_mixed_patches(root, friction=1.1 * friction)
 
     output.parent.mkdir(parents=True, exist_ok=True)
     ET.indent(tree, space="  ")
     tree.write(output, encoding="utf-8", xml_declaration=True)
     model = mujoco.MjModel.from_xml_path(str(output))
-    if model.ngeom >= 60:
+    if model.ngeom >= 80:
         raise ValueError(f"RL collision model is unexpectedly large: {model.ngeom}")
     return output
 

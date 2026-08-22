@@ -10,12 +10,13 @@ from rough_terrain_env import HexapodRoughTerrainEnv, default_config
 
 
 class HexapodCommandCurriculumEnv(HexapodRoughTerrainEnv):
-    """Train walk and yaw tracking as one ordered flat-ground curriculum.
+    """Train walk and yaw tracking as one randomized flat-ground curriculum.
 
-    A 1,000-step episode progresses through straight walking, limited yaw,
-    then the full walking-and-turning command range.  The policy still sees
-    the current `[forward_speed, yaw_rate]` command and always controls the
-    same 22-D Cartesian/gait residual action.
+    Difficulty expands from straight walking to limited and then full yaw,
+    but an exact command is sampled every 1.5--4.0 seconds inside the active
+    bounds.  There is no deterministic forward/turn command script for the
+    policy to memorize.  The policy sees `[forward_speed, yaw_rate]` and
+    always controls the same 22-D Cartesian/gait residual action.
     """
 
     def __init__(

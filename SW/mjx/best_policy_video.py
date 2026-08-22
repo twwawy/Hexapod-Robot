@@ -12,7 +12,7 @@ import numpy as np
 def _camera(camera: Any, data: Any, *, terrain: str) -> None:
     """Follow the base while keeping the next staircase visible."""
     base = np.asarray(data.qpos[:3], dtype=float)
-    lookahead = 0.55 if terrain == "stairs" else 0.35
+    lookahead = 0.55 if terrain in {"stairs", "mixed"} else 0.35
     camera.lookat[:] = (base[0] + lookahead, base[1], max(base[2] - 0.16, 0.12))
     camera.distance = 1.75
     camera.azimuth = 135

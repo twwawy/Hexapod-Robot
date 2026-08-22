@@ -1,165 +1,212 @@
-# Hexapod Cartesian Residual RL
+# Hexapod Classical-first Residual RL
 
-> [!warning] Legacy 6-D research path
-> 이 문서는 `hexapod_mjx/`와 `train_residual_ppo.py`를 사용하던 이전 custom 6-D `Δz` residual 실험의 기록이다. 현재 canonical 경로는 `SW/mjx/command_curriculum_env.py` + `train_command_curriculum.py`의 평지 보행·회전 curriculum과 `rough_terrain_env.py` + `train_rough_terrain.py`의 계단 terrain task다. 두 task는 mesh가 제거된 scene, action 22, observation 110을 기준으로 하되 scene·checkpoint·W&B project를 분리한다. 새 학습·viewer·checkpoint에는 [Obsidian study guide](Hexapod_MJX_Obsidian_Study_Vault.md)와 `SW/mjx/RL_DESIGN.md`를 따른다.
+> Canonical contract: `cartesian_gait_residual_v2` action +
+> `body_state_coarse9_touchdown6_v1` observation
 
-이 문서는 legacy custom path의 설계 기록이다. 이 경로에서도 목표는 기존 tripod 보행기를 버리는 것이 아니라, 그 보행기가 실패하기 쉬운 순간만 작은 학습 보정으로 다루는 것이었다.
+이 문서가 현재 MJX residual RL의 설계·관측·보상·학습·실행 방법에 대한 최신 기준이다.
+이전 6-D/7-D custom policy와 현재 Brax PPO checkpoint는 호환되지 않는다.
 
-## 제어 계약
-
-```text
-RC / velocity command
-  → command filter (optional position/heading PI)
-  → Downloads/mjx tripod gait (quintic stance/swing + radial swing arc)
-  → nominal foot targets p_nom
-  → RL foot residual Δp_RL
-  → contact adaptation / hard safety
-  → optional deterministic roll/pitch/height posture PI
-  → documented analytical IK + joint hard limits
-  → MuJoCo position actuator (kp=120, kv=3, ±8 Nm)
-```
-
-우선순위는 다음과 같다.
+## 1. 제어 계약
 
 ```text
-joint/workspace safety > contact adaptation > RL residual > nominal gait
+command
+  -> classical tripod nominal foot targets
+  -> phase-masked 22-D residual
+  -> airborne/contact adaptation
+  -> reachable-workspace projection
+  -> analytical IK
+  -> joint speed/position + fixed ±8 Nm actuator safety
 ```
 
-현재 MJX baseline은 `~/Downloads/mjx/tripod_controller.py`의 검증된
-tripod controller를 기준으로 한다. 동일한 home pose, `0.5 s` phase,
-quintic timing, `0.06 m` swing lift, `0.01 m` radial swing clearance,
-좌우 mirrored analytical IK를 사용한다. 기존 Jacobian 선형화 IK와 외부
-`qfrc_applied` PD 제어는 nominal path에서 제거했다. Early landing foot hold는
-posture overlay보다도 다시 우선 적용된다.
-
-baseline 안정성 확인 전에는 PI를 기본으로 **사용하지 않는다**. source
-tripod gait가 zero residual에서 안정적으로 걷는 것을 먼저 확인하고, 필요한
-경우에만 training CLI에서 PI를 별도 실험으로 켠다.
+우선순위는 `safety > contact > RL residual > nominal gait`다. Action은 22-D를
+유지한다.
 
 ```text
-translation PI Kp/Ki: (0.00, 0.00) / (0.00, 0.00)
-heading PI Kp/Ki:     0.00 / 0.00
-posture PI Kp:        (roll=0.00, pitch=0.00, height=0.00)
-posture PI Ki:        (roll=0.00, 0.00, 0.00)
-posture overlay cap:  ±0.020 m per foot
+[Δx, Δy, Δz] × 6 legs + stride + frequency + swing-height + radial
 ```
 
-학습 명령에서 이 gain을 바꿀 수 있다. `translation`의 두 값은 `(forward, lateral)`, `posture`의 세 값은 `(roll, pitch, height)` 순서다.
+- swing: XYZ residual 허용
+- stance: Z-only, X/Y는 정확히 0
+- action physical range는 curriculum 중 바꾸지 않는다.
+- 쉬운 stage에서는 residual penalty를 강하게 하고 어려워질수록 완화한다.
+- action=0이면 NumPy classical nominal과 JAX nominal target이 `1e-4 rad` 이내로
+  일치해야 한다.
 
-```bash
-./Hexapod-MJX-가이드/큰병렬.sh fresh \
-  --translation-pi-kp 0.50 0.50 \
-  --translation-pi-ki 0.05 0.05 \
-  --heading-pi-kp 1.00 --heading-pi-ki 0.05 \
-  --posture-pi-kp 0.50 0.50 0.80 \
-  --posture-pi-ki 0.03 0.03 0.05 \
-  --posture-foot-z-limit 0.020
-```
+## 2. Contact와 body-height safety
 
-## 1차 action space: 6-D swing Δz
-
-정책 action은 아래 순서의 6차원이다.
+Swing 시작 직후 남아 있는 접촉은 early landing이 아니다. Leg마다 `airborne`을
+latched state로 보관한다.
 
 ```text
-a = [Δz_LF, Δz_LM, Δz_LB, Δz_RF, Δz_RM, Δz_RB]
+stance -> swing/contact -> swing/no-contact(airborne=true)
+       -> swing/contact(early landing, measured foot hold)
 ```
-
-정규화 정책 값은 `[-1, 1]`로 clamp한 뒤 실제 길이 단위로 변환된다.
 
 ```text
-Δz_i = 0.03 m × clip(a_i, -1, 1)
-p_cmd,i = p_nom,i + [0, 0, Δz_i]ᵀ
+early_landing = swing & airborne & contact
 ```
 
-- 허용 범위: leg당 ±3 cm
-- swing leg에만 적용한다. stance leg의 residual은 정확히 0이다.
-- XY foothold, step period, swing phase, body-height/roll/pitch trim에는 RL 권한이 없다.
-- swing 시작 직후의 정상적인 접촉은 25% phase까지 허용하고, 그 이후 early landing이 감지되면 현재 foot body-frame 위치를 유지한다. 이 경우 해당 RL residual은 적용되지 않는다.
-- 그 뒤에도 workspace clamp, documented analytical IK, joint hard limit가 항상 적용된다.
+접촉 추정기는 실제 collision과 clearance를 함께 사용한다. Clearance contact는
+35 mm에서 진입하고 45 mm에서 해제하는 hysteresis를 사용한다.
 
-따라서 action의 물리적 의미는 단순하다. `+0.03 m`는 “해당 swing 발을 3 cm 더 들어라”다. 이 6-D 버전이 안정된 다음에만 `Δx, Δy, Δz`의 18-D Cartesian residual을 별도 실험으로 확장한다.
-
-## Observation
-
-현재 관측은 62차원이다.
-
-| 항목 | 차원 | 내용 |
-|---|---:|---|
-| command | 3 | `[vx_cmd, vy_cmd, wz_cmd]` |
-| body linear velocity | 3 | body frame 선속도 |
-| IMU-like attitude | 3 | roll, pitch, root-height error |
-| body angular velocity | 3 | body frame 각속도 |
-| joint position | 18 | 18개 관절각 |
-| joint velocity | 18 | 18개 관절속도 |
-| foot contact | 6 | 발별 binary contact |
-| gait phase | 2 | global phase의 `sin`, `cos` |
-| previous action | 6 | 이전 bounded-action 입력 |
-
-`phase`와 `contact`는 반드시 유지한다. 같은 관절 자세라도 swing/stance 문맥에 따라 residual의 의미가 달라지고, contact layer가 policy보다 우선해야 하기 때문이다.
-
-## Reward
-
-기본 reward는 velocity/yaw tracking, attitude, height, slip, torque cost, body contact를 사용한다. Residual policy가 nominal gait를 덮어쓰지 않도록 물리 길이 단위의 두 penalty를 포함한다.
+Body height/reward/termination은 root XY 바로 아래 높이가 아니다. 현재 contact 중인
+stance feet 아래 지형 높이의 median을 support height로 사용한다.
 
 ```text
-r_residual = -λ_r mean_i(Δz_i²)
-r_rate     = -λ_rate mean_i((Δz_i - Δz_i,prev)²)
+h_support = median(terrain_height(contact & stance feet))
+h_body = root_z - h_support
 ```
 
-현재 계수는 `residual_penalty=24`, `action_rate_penalty=12`다. 이는 초기값이며, 명령 추종을 망치지 않는 선에서 residual을 0 근처로 유지하도록 둔 값이다. 실험 로그에서는 아래 두 항목을 함께 본다.
+유효한 stance contact가 하나도 없을 때만 root XY terrain을 fallback으로 사용한다.
 
-- `residual_cost`: 평균 `Δz²`
-- `action_rate_cost`: 연속 action의 평균 차이 제곱
+## 3. Observation 110-D
 
-PPO exploration도 residual controller의 안전 계약에 맞춰 제한한다. 기본 `entropy_coef=0.002`이며 Gaussian policy의 `log_std`는 `[-3.0, -1.0]`으로 clamp된다. 따라서 학습 중 entropy가 커져 raw action이 계속 `[-1, 1]` saturation되는 현상을 막는다. 필요하면 `--entropy-coef`만 별도 실험에서 조정한다.
+전체 크기는 110으로 유지하지만 terrain 15-D의 의미가 개선됐다.
 
-## Checkpoint 호환성
+| 구성 | 차원 |
+| --- | ---: |
+| command | 2 |
+| body local velocity / angular velocity / gravity | 9 |
+| joint position / scaled velocity | 36 |
+| body-frame foot positions | 18 |
+| hysteretic foot contacts | 6 |
+| heading-aligned coarse terrain grid | 9 |
+| six nominal-touchdown terrain heights | 6 |
+| gait sin/cos | 2 |
+| previous applied action | 22 |
+| 합계 | 110 |
 
-이 명세 이전의 7-D policy는 보폭·주기·몸체 trim을 조절했다. 현재 policy는 action 6-D, observation 62-D, residual interface `downloads_tripod_ik_swing_delta_z_v3`이므로 이전 checkpoint를 resume할 수 없다. 학습기는 불일치를 명시적으로 거부한다.
+Coarse grid는 `forward=(0.05, 0.35, 0.65) m`,
+`lateral=(-0.22, 0, 0.22) m`의 3×3이다. 나머지 6개는 classical controller가
+계산한 각 leg의 nominal touchdown 위치에서 지형 높이를 직접 샘플한다. 두 feature
+모두 support height에 대한 상대 높이다.
 
-새 실험은 반드시 `fresh`로 시작한다. Downloads tripod analytical-IK 기반 현재 controller interface는 `downloads_tripod_ik_swing_delta_z_v3`이며 이전 v1/v2 checkpoint와 호환되지 않는다.
+Observation 크기가 이전과 같아도 의미가 달라졌으므로
+`body_state_coarse9_touchdown6_v1` metadata가 없는 checkpoint는 transfer하지 않는다.
+
+## 4. Multi-terrain model
+
+기본 terrain layout은 `mixed`다. 하나의 mesh-free XML에 평행한 여섯 lane을 둔다.
+
+```text
+flat | curb | ramp | irregular blocks | stairs | rough patch
+```
+
+각 vectorized env는 reset마다 lane을 다시 샘플한다. Training wrapper는
+`full_reset=True`라 episode reset 때 새 patch와 새 command를 실제로 뽑는다. XML을
+재생성하지 않으므로 GPU batching은 그대로 유지된다.
+
+| Level | flat | curb | ramp | blocks | stairs | rough |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 0 | .70 | .20 | .10 | 0 | 0 | 0 |
+| 1 | .40 | .20 | .20 | .10 | .05 | .05 |
+| 2 | .25 | .15 | .20 | .15 | .15 | .10 |
+| 3 | .15 | .15 | .20 | .20 | .15 | .15 |
+| 4 | .10 | .15 | .20 | .20 | .20 | .15 |
+
+`--terrain-layout stairs`는 비교 실험용 기존 stairs-only scene이다.
+
+## 5. Command sampling
+
+Command는 episode의 고정 순서를 암기하지 못하도록 1.5–4.0초마다 무작위로 다시
+샘플한다. Curriculum stage는 허용 가능한 speed/yaw 범위만 정하며, stage 안의
+command 순서는 고정하지 않는다.
+
+## 6. Reward와 competence
+
+Tracking/upright/height/progress와 residual/action-rate/slip/torque/projection/contact
+cost를 각각 W&B에 기록한다. `terrain_success`는 episode 종료 시 다음 조건을 모두
+만족하면 1이다.
+
+- 조기 termination 없음
+- forward velocity error < 0.08 m/s
+- world-forward progress > 0.5 m
+
+Adaptive launcher는 evaluation success가 0.8보다 높으면 다음 level로 올리고,
+0.5보다 낮으면 level을 내린다. 각 stage는 동일한 action/observation 계약을 쓰며
+직전 Brax checkpoint로 policy/normalizer/value를 초기화한다.
+
+## 7. Domain randomization
+
+Level 4의 `--terrain-randomize`는 vectorized env마다 friction, mass/inertia,
+joint damping, position-servo realization을 다르게 만든다. Actuator gain/bias만
+`0.85–1.0×`로 바꾸며 `actuator_forcerange`는 항상 `[-8, 8] Nm`로 고정한다.
+
+## 8. PPO 기본값
+
+| Task | γ | unroll |
+| --- | ---: | ---: |
+| flat command | 0.97 | 20 (0.4 s) |
+| mixed terrain | 0.99 | 32 (0.64 s) |
+
+비교 실험은 `--discounting 0.97|0.99`와 `--unroll-length 20|32|50`으로 실행한다.
+
+## 9. 검증
+
+Smoke는 zero action 100 step과 bounded random action 100 step을 각각 실행한다.
 
 ```bash
 cd ~/Hexapod-Robot
-./Hexapod-MJX-가이드/빠른학습.sh fresh
+
+~/.venvs/hexapod-mjx/bin/python SW/mjx/train_command_curriculum.py \
+  --smoke --smoke-steps 100 --run-name command-smoke
+
+~/.venvs/hexapod-mjx/bin/python SW/mjx/train_rough_terrain.py \
+  --smoke --smoke-steps 100 --terrain-layout mixed --terrain-level 4 \
+  --terrain-randomize --run-name terrain-smoke
+
+~/.venvs/hexapod-mjx/bin/python -m unittest \
+  SW.mjx.tests.test_rough_terrain_contract -v
 ```
 
-긴 실행 예시는 다음과 같다.
+Contract test는 action/observation size, phase mask, airborne transition,
+contact hysteresis, support median, workspace projection, yaw frame invariance,
+NumPy↔JAX zero-action parity, 실제 env reset/JIT/full gait cycle을 검증한다.
+
+## 10. GPU 학습
+
+Flat walking+turning부터 fresh로 학습한다.
 
 ```bash
-./Hexapod-MJX-가이드/큰병렬.sh fresh \
-  --num-envs 256 \
-  --rollout-steps 256 \
-  --num-updates 1000 \
-  --minibatch-size 2048
+cd ~/Hexapod-Robot
+
+~/.venvs/hexapod-mjx/bin/python SW/mjx/train_command_curriculum.py \
+  --run-name flat-transfer-source \
+  --timesteps 50000000 --num-envs 2048 --num-evals 100 \
+  --wandb --wandb-project hexapod-command-curriculum
 ```
 
-학습 wrapper는 best/latest checkpoint, metrics JSON, replay MP4를 `SW/mjx/artifacts/residual_rl_runs/` 아래에 남긴다. 생성물은 Git에서 제외된다.
+Run directory는 같은 이름을 넣어도 timestamp와 seed가 붙어 항상 새로 생성된다.
 
-## 검증 순서
+```text
+SW/mjx/runs/command/flat-transfer-source_<UTC timestamp>_seed0/
+```
 
-1. **Import/compile**: MJX 환경 생성과 한 policy step이 동작하는지 확인한다.
-2. **Zero residual**: action=0에서 imported nominal tripod gait가 안정적인지 확인한다. checkpoint 없이 실행할 수 있다.
+Flat checkpoint에서 mixed terrain을 초기화한다. `checkpoints/` root를 주면 가장 큰
+numeric checkpoint를 자동 선택한다. Terrain reward가 달라 critic은 기본적으로 새로
+초기화하며, 같은 task를 이어갈 때만 `--init-value-function`을 사용한다.
 
-   ```bash
-   ~/.venvs/hexapod-mjx/bin/python SW/mjx/evaluate_residual_policy.py \
-     --repo-root /home/huro/Hexapod-Robot \
-     --zero-residual --num-envs 32 --rollout-steps 128 \
-     --report-path SW/mjx/artifacts/nominal_pi_baseline.json
-   ```
+```bash
+~/.venvs/hexapod-mjx/bin/python SW/mjx/train_rough_terrain.py \
+  --run-name terrain-transfer-level0 \
+  --terrain-layout mixed --terrain-level 0 \
+  --init-checkpoint SW/mjx/runs/command/<flat-run>/checkpoints \
+  --timesteps 50000000 --num-envs 2048 --num-evals 100 \
+  --wandb --wandb-project hexapod-rough-terrain
+```
 
-3. **Mask**: stance 다리에 큰 action을 넣어도 foot target이 변하지 않는지 확인한다.
-4. **Early landing**: swing contact에서 현재 foot target이 유지되는지 확인한다.
-5. **PPO smoke**: `fresh` 소규모 run으로 checkpoint metadata가 `downloads_tripod_ik_swing_delta_z_v3`, action 6, observation 62인지 확인한다.
-6. **본 학습**: reward만이 아니라 velocity tracking, slip, residual/action-rate cost, body contact를 함께 비교한다.
+Competence-based 전체 curriculum:
 
-## 확장 원칙
+```bash
+~/.venvs/hexapod-mjx/bin/python SW/mjx/train_competence_curriculum.py \
+  --run-name mixed-competence \
+  --stages 8 --stage-timesteps 5000000 \
+  --start-level 0 --max-level 4 \
+  --init-checkpoint SW/mjx/runs/command/<flat-run>/checkpoints \
+  --wandb \
+  -- --num-envs 2048 --num-evals 20 --terrain-randomize
+```
 
-18-D Cartesian residual로 확장하기 전 아래 기준을 만족해야 한다.
-
-- 6-D Δz policy가 평지와 낮은 장애물에서 nominal보다 안정적으로 개선된다.
-- residual/action-rate cost가 지속적으로 큰 상태가 아니다.
-- stance slip과 body contact가 증가하지 않는다.
-- zero-residual baseline과 학습 policy 모두 repeatable하게 재생된다.
-
-확장 시에도 action 순서는 발 단위 `[Δx, Δy, Δz] × 6`, stance mask, contact override, workspace/joint safety를 그대로 보존한다.
+학습별 W&B scalar는 `eval/episode_reward`, 각 `eval/episode_reward/*`,
+`eval/episode_terrain_success`, `best/*`이며 `train/global_step`을 공통 x축으로 쓴다.
+새 최고점 GIF는 각 run의 `best_policy.gif`와 W&B `best/video`에 저장된다.

@@ -55,14 +55,15 @@ MUJOCO_GL=egl python SW/mjx/run_controller.py --headless --duration 5
 
 후진 시험은 `--speed -0.06`으로 실행할 수 있습니다.
 
-## MJX Residual RL: 평지 명령 커리큘럼과 계단 지형
+## MJX Residual RL: 평지 명령과 mixed-terrain curriculum
 
 기본 Tripod/IK 제어기 위에서 **swing XYZ / stance Z-only** 권한으로만 보정하는
 `cartesian_gait_residual_v2` 22차원 residual 환경입니다. contact adaptation과
-workspace projection이 policy보다 먼저 적용됩니다. 평지에서 **보행 → 완만한 회전
-→ 전체 보행+회전**을 하나의 1,000-step curriculum으로 먼저 학습하고, 계단 지형은
-별도 명령으로 학습합니다. 기존 v1 22-D checkpoint는 resume하지 않습니다. 자세한 구조는
-[`RL_DESIGN.md`](RL_DESIGN.md)와 Obsidian 가이드를 참고합니다.
+workspace projection이 policy보다 먼저 적용됩니다. 110-D observation의 terrain
+부분은 3×3 coarse grid와 6개 nominal touchdown 높이로 구성됩니다. 평지에서
+보행·회전을 먼저 학습한 뒤 flat checkpoint로 flat/curb/ramp/blocks/stairs/rough가
+같은 XML에 들어 있는 mixed terrain을 초기화합니다. 자세한 최신 명세는
+[`docs/RESIDUAL_RL.md`](../../docs/RESIDUAL_RL.md)를 참고합니다.
 
 학습 전에 계단 장면과 residual이 0인 기본 보행을 눈으로 확인합니다. 기본
 제어기가 계단에서 보이는 진행 거리와 자세가 이후 학습 결과의 비교 기준입니다.
@@ -84,34 +85,41 @@ python -m pip install --upgrade "jax[cuda12]==0.6.2"
 # pip CUDA와 /usr/local/cuda 라이브러리가 섞이지 않도록 현재 셸에서 제거
 unset LD_LIBRARY_PATH
 python -c "import jax; print(jax.devices())"
-python SW/mjx/train_command_curriculum.py --smoke --run-name command-v2-smoke
-python SW/mjx/train_command_curriculum.py --run-name command-v2-seed0 --num-evals 50 --wandb
+python SW/mjx/train_command_curriculum.py \
+  --smoke --smoke-steps 100 --run-name command-v2-smoke
+python SW/mjx/train_command_curriculum.py \
+  --run-name flat-transfer-source --num-evals 100 --wandb
 
-# 계단 지형은 평지 커리큘럼과 별도 run/checkpoint로 실행한다.
-python SW/mjx/train_rough_terrain.py --smoke --run-name terrain-v2-smoke
+# mixed terrain smoke
 python SW/mjx/train_rough_terrain.py \
-  --run-name terrain-v2-level3-seed0 --terrain-level 3 --terrain-randomize \
-  --num-evals 50 --wandb
+  --smoke --smoke-steps 100 --terrain-layout mixed --terrain-level 4 \
+  --terrain-randomize --run-name terrain-v2-smoke
+
+# 위 flat run의 checkpoint로 terrain policy를 초기화한다.
+python SW/mjx/train_rough_terrain.py \
+  --run-name terrain-transfer-level0 --terrain-layout mixed --terrain-level 0 \
+  --init-checkpoint SW/mjx/runs/command/<flat-run>/checkpoints \
+  --num-evals 100 --wandb
+
+# 평가 성공률로 level을 올리고 내리는 전체 curriculum
+python SW/mjx/train_competence_curriculum.py \
+  --run-name mixed-competence --stages 8 --stage-timesteps 5000000 \
+  --init-checkpoint SW/mjx/runs/command/<flat-run>/checkpoints --wandb \
+  -- --num-envs 2048 --num-evals 20 --terrain-randomize
 ```
 
 실제 학습 전 장치 출력에 `GpuDevice`가 있어야 합니다. 이 프로젝트가 고정한 JAX
 0.6.2 조합은 위 CUDA 12 wheel을 사용합니다. 기본 학습 설정은 2048개 병렬 환경과
 5천만 environment step입니다.
 
-각 run은 `SW/mjx/runs/<task>/<timestamp>_seed<seed>/`에 checkpoint, `monitor/`,
+각 run은 `SW/mjx/runs/<task>/<name>_<timestamp>_seed<seed>/`에 checkpoint, `monitor/`,
 `config.json`, `run_metadata.json`을 함께 저장합니다. 기본으로
 `--best-video`가 켜져 있어 `eval/episode_reward`가 새 최고점일 때마다 그 policy의
 deterministic 10초 GIF를 `<run-dir>/best_policy.gif`에 자동으로 저장하고 이전
 최고 영상을 교체합니다. W&B run에서는 같은 파일을 `best/video`로도 업로드합니다.
 
-```bash
-# 예: run별 최고 policy 영상의 위치를 명시한다. (생략하면 run-dir/best_policy.gif)
-python SW/mjx/train_command_curriculum.py \
-  --run-name command-v2-seed0 \
-  --best-video \
-  --best-video-path SW/mjx/runs/command/command-v2-seed0/best_policy.gif \
-  --wandb
-```
+같은 `--run-name`을 다시 사용해도 timestamp suffix 때문에 기존 checkpoint/monitor와
+섞이지 않습니다. `--best-video-path`를 생략하면 새 run directory 안에 저장됩니다.
 
 영상은 기본 `10초 / 20 fps / 640x360`이고 `--best-video-duration`,
 `--best-video-fps`, `--best-video-width`, `--best-video-height`로 바꿉니다. 영상이

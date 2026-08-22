@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Train flat command curriculum or stair-terrain residual PPO on MJX."""
+"""Train flat command or mixed-terrain residual PPO on MJX."""
 
 from __future__ import annotations
 
@@ -30,6 +30,9 @@ from best_policy_video import render_policy_video
 from command_curriculum_env import HexapodCommandCurriculumEnv
 from rough_terrain_env import (
     ACTION_CONTRACT_VERSION,
+    ACTION_SIZE,
+    OBSERVATION_CONTRACT_VERSION,
+    OBSERVATION_SIZE,
     HexapodRoughTerrainEnv,
     default_config,
 )
@@ -116,7 +119,7 @@ def _arguments(default_task: str) -> argparse.Namespace:
         "--task",
         choices=("command", "terrain"),
         default=default_task,
-        help="command = flat walking+yaw curriculum; terrain = staircase task.",
+        help="command = flat walking+yaw; terrain = mixed terrain curriculum.",
     )
     parser.add_argument("--timesteps", type=int, default=50_000_000)
     parser.add_argument("--num-envs", type=int, default=2048)
@@ -141,6 +144,12 @@ def _arguments(default_task: str) -> argparse.Namespace:
         help="compile reset/step only; no PPO training or GPU required",
     )
     parser.add_argument(
+        "--smoke-steps",
+        type=int,
+        default=100,
+        help="Steps in each zero/random smoke rollout (default: 100 = 2 s).",
+    )
+    parser.add_argument(
         "--allow-cpu",
         action="store_true",
         help="allow PPO on CPU (useful only for very small debugging runs)",
@@ -149,8 +158,18 @@ def _arguments(default_task: str) -> argparse.Namespace:
     parser.add_argument("--num-eval-envs", type=int, default=64)
     parser.add_argument("--learning-rate", type=float, default=3e-4)
     parser.add_argument("--entropy-cost", type=float, default=0.01)
-    parser.add_argument("--discounting", type=float, default=0.97)
-    parser.add_argument("--unroll-length", type=int, default=20)
+    parser.add_argument(
+        "--discounting",
+        type=float,
+        default=None,
+        help="PPO gamma. Defaults to 0.97 for command and 0.99 for terrain.",
+    )
+    parser.add_argument(
+        "--unroll-length",
+        type=int,
+        default=None,
+        help="Rollout horizon. Defaults to 20 for command and 32 for terrain.",
+    )
     parser.add_argument("--batch-size", type=int, default=256)
     parser.add_argument("--num-minibatches", type=int, default=8)
     parser.add_argument("--num-updates-per-batch", type=int, default=4)
@@ -161,6 +180,18 @@ def _arguments(default_task: str) -> argparse.Namespace:
         default=(256, 256, 128),
         metavar="WIDTH",
         help="Actor/critic MLP layer widths. Default: 256 256 128.",
+    )
+    parser.add_argument(
+        "--init-checkpoint",
+        type=Path,
+        default=None,
+        help="Initialize policy/normalizer from a compatible Brax checkpoint (e.g. flat -> terrain).",
+    )
+    parser.add_argument(
+        "--init-value-function",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Also initialize the critic; disabled by default because terrain rewards differ.",
     )
     parser.add_argument("--phase-time", type=float, default=0.5)
     parser.add_argument("--base-swing-height", type=float, default=0.07)
@@ -180,16 +211,22 @@ def _arguments(default_task: str) -> argparse.Namespace:
     parser.add_argument("--terrain-speed-max", type=float, default=0.18)
     parser.add_argument("--terrain-yaw-limit", type=float, default=0.35)
     parser.add_argument(
+        "--terrain-layout",
+        choices=("mixed", "stairs"),
+        default="mixed",
+        help="Terrain scene. mixed batches flat/curb/ramp/blocks/stairs/rough lanes.",
+    )
+    parser.add_argument(
         "--terrain-level",
         type=int,
         choices=range(5),
         default=2,
-        help="0: <=20 mm, 1: 20..35 mm, 2: 35..50 mm, 3/4: 20..60 mm terrain.",
+        help="0..4 mixed-patch difficulty (also selects stairs height range).",
     )
     parser.add_argument(
         "--terrain-randomize",
         action="store_true",
-        help="Sample one terrain/dynamics model per run; level 4 also samples mass/actuator/damping.",
+        help="Randomize terrain; level 4 adds per-env friction/mass/servo/damping.",
     )
     parser.add_argument("--terrain-step-height", type=float, default=None, help="Override fixed stair height [m].")
     parser.add_argument("--terrain-step-depth", type=float, default=None, help="Override fixed stair depth [m].")
@@ -280,9 +317,9 @@ def _make_env(args: argparse.Namespace) -> HexapodRoughTerrainEnv:
     config.command_curriculum.speed_min = tuple(args.curriculum_speed_min)
     config.command_curriculum.speed_max = tuple(args.curriculum_speed_max)
     config.command_curriculum.yaw_limit = tuple(args.curriculum_yaw_limit)
-    # Curriculum changes terrain difficulty before model-gap difficulty.  The
-    # first version is deliberately run-level rather than per-reset so every
-    # result has a reproducible physical scene recorded in run_metadata.json.
+    # Curriculum changes terrain geometry before model-gap difficulty.  Mixed
+    # terrain itself is sampled per reset; optional level-4 dynamics are
+    # sampled per vectorized environment by domain_randomization.py.
     level_ranges = (
         (0.001, 0.020),
         (0.020, 0.035),
@@ -308,14 +345,38 @@ def _make_env(args: argparse.Namespace) -> HexapodRoughTerrainEnv:
         if args.terrain_friction is not None
         else (float(rng.uniform(0.6, 1.3)) if randomize_terrain and args.terrain_level >= 3 else 1.0)
     )
+    patch_probabilities = (
+        (0.70, 0.20, 0.10, 0.00, 0.00, 0.00),
+        (0.40, 0.20, 0.20, 0.10, 0.05, 0.05),
+        (0.25, 0.15, 0.20, 0.15, 0.15, 0.10),
+        (0.15, 0.15, 0.20, 0.20, 0.15, 0.15),
+        (0.10, 0.15, 0.20, 0.20, 0.20, 0.15),
+    )
+    if args.task == "terrain":
+        config.terrain.patch_probabilities = patch_probabilities[args.terrain_level]
+    # Physical action semantics stay fixed across levels.  Curriculum changes
+    # how expensive intervention is: easy stages strongly prefer the nominal
+    # controller, while hard terrain permits the same bounded residual more
+    # readily.
+    residual_penalties = (
+        (-0.040, -0.120, -0.060),
+        (-0.030, -0.100, -0.050),
+        (-0.022, -0.080, -0.040),
+        (-0.015, -0.060, -0.030),
+        (-0.010, -0.040, -0.020),
+    )
+    if args.task == "terrain":
+        (
+            config.reward.swing_residual,
+            config.reward.stance_residual,
+            config.reward.gait_residual,
+        ) = residual_penalties[args.terrain_level]
     config.randomization.enabled = randomize_terrain
-    if randomize_terrain and args.terrain_level >= 4:
-        config.randomization.mass_scale = float(rng.uniform(0.90, 1.10))
-        config.randomization.actuator_strength_scale = float(rng.uniform(0.85, 1.15))
-        config.randomization.joint_damping_scale = float(rng.uniform(0.80, 1.20))
+    # Level 4 dynamics are randomized per vectorized environment by the Brax
+    # domain-randomization wrapper.  The base model remains nominal here.
     if args.task == "command":
         return HexapodCommandCurriculumEnv(config=config)
-    return HexapodRoughTerrainEnv(config=config)
+    return HexapodRoughTerrainEnv(config=config, terrain=args.terrain_layout)
 
 
 def _safe_run_component(value: str) -> str:
@@ -324,6 +385,60 @@ def _safe_run_component(value: str) -> str:
     if not cleaned:
         raise SystemExit("--run-name must contain at least one letter or number")
     return cleaned
+
+
+def _resolve_init_checkpoint(path: Path, network_layers: tuple[int, ...]) -> Path:
+    """Resolve and validate a Brax policy-transfer checkpoint."""
+    resolved = path.expanduser().resolve()
+    if resolved.is_dir() and not (resolved / "ppo_network_config.json").exists():
+        candidates = sorted(
+            (
+                child
+                for child in resolved.iterdir()
+                if child.is_dir()
+                and child.name.isdigit()
+                and (child / "ppo_network_config.json").exists()
+            ),
+            key=lambda child: int(child.name),
+        )
+        if not candidates:
+            raise SystemExit(
+                f"--init-checkpoint has no Brax checkpoint directories: {resolved}"
+            )
+        resolved = candidates[-1]
+    config_path = resolved / "ppo_network_config.json"
+    if not config_path.exists():
+        raise SystemExit(f"missing checkpoint contract: {config_path}")
+    try:
+        checkpoint_config = json.loads(config_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise SystemExit(f"invalid checkpoint contract: {config_path}") from exc
+    observation_shape = checkpoint_config.get("observation_size", {}).get("shape")
+    saved_layers = checkpoint_config.get("network_factory_kwargs", {}).get(
+        "policy_hidden_layer_sizes"
+    )
+    if checkpoint_config.get("action_size") != ACTION_SIZE or observation_shape != [OBSERVATION_SIZE]:
+        raise SystemExit(
+            "--init-checkpoint contract mismatch: expected action=22 and observation=110"
+        )
+    if saved_layers is not None and tuple(saved_layers) != tuple(network_layers):
+        raise SystemExit(
+            f"--init-checkpoint network mismatch: saved={saved_layers}, requested={list(network_layers)}"
+        )
+    run_metadata_path = resolved.parent.parent / "run_metadata.json"
+    if run_metadata_path.exists():
+        run_metadata = json.loads(run_metadata_path.read_text(encoding="utf-8"))
+        saved_observation_contract = run_metadata.get("observation_contract_version")
+        if saved_observation_contract != OBSERVATION_CONTRACT_VERSION:
+            raise SystemExit(
+                "--init-checkpoint observation semantics mismatch: "
+                f"saved={saved_observation_contract!r}, expected={OBSERVATION_CONTRACT_VERSION!r}"
+            )
+    else:
+        raise SystemExit(
+            f"--init-checkpoint is missing run metadata required for semantic validation: {run_metadata_path}"
+        )
+    return resolved
 
 
 def _git_commit() -> str:
@@ -357,9 +472,15 @@ def _write_run_metadata(args: argparse.Namespace, env: HexapodRoughTerrainEnv) -
             "seed": args.seed,
             "git_commit": _git_commit(),
             "action_contract_version": ACTION_CONTRACT_VERSION,
+            "observation_contract_version": OBSERVATION_CONTRACT_VERSION,
             "action_size": env.action_size,
             "observation_size": env.observation_size,
             "checkpoint_dir": str(args.output),
+            "init_checkpoint": (
+                str(args.init_checkpoint) if args.init_checkpoint is not None else None
+            ),
+            "terrain_layout": args.terrain_layout,
+            "terrain_level": args.terrain_level,
             "monitor_dir": str(args.monitor_dir),
             "best_video_path": str(args.best_video_path),
             "jax_version": jax.__version__,
@@ -384,36 +505,88 @@ def _write_run_metadata(args: argparse.Namespace, env: HexapodRoughTerrainEnv) -
     )
 
 
-def _smoke_test(env: HexapodRoughTerrainEnv, seed: int) -> None:
+def _smoke_test(env: HexapodRoughTerrainEnv, seed: int, steps: int) -> None:
+    if steps < 50:
+        raise SystemExit("--smoke-steps must be at least 50 (one nominal gait cycle)")
     reset = jax.jit(env.reset)
     step = jax.jit(env.step)
-    state = reset(jax.random.PRNGKey(seed))
-    action_key = jax.random.PRNGKey(seed + 1)
     started = time.monotonic()
-    for _ in range(10):
-        action_key, sample_key = jax.random.split(action_key)
-        action = jax.random.uniform(
-            sample_key, (env.action_size,), minval=-1.0, maxval=1.0
-        )
-        state = step(state, action)
-    state.reward.block_until_ready()
-    if bool(jp.any(jp.isnan(state.obs))) or bool(jp.any(jp.isnan(state.data.qpos))):
-        raise RuntimeError("MJX smoke test produced NaN under bounded random actions")
+
+    def rollout(*, random_actions: bool, rollout_seed: int):
+        state = reset(jax.random.PRNGKey(rollout_seed))
+        action_key = jax.random.PRNGKey(rollout_seed + 1)
+        max_projection = jp.zeros(())
+        torso_contacts = jp.zeros(())
+        for _ in range(steps):
+            action_key, sample_key = jax.random.split(action_key)
+            action = (
+                jax.random.uniform(
+                    sample_key, (env.action_size,), minval=-1.0, maxval=1.0
+                )
+                if random_actions
+                else jp.zeros(env.action_size)
+            )
+            state = step(state, action)
+            max_projection = jp.maximum(
+                max_projection, state.metrics["projection_cost"]
+            )
+            torso_contacts += (
+                state.metrics["reward/body_contact"]
+                / env._config.reward.body_contact
+            )
+        state.reward.block_until_ready()
+        finite = jp.all(jp.isfinite(state.obs)) & jp.all(jp.isfinite(state.data.qpos))
+        if not bool(finite):
+            raise RuntimeError("MJX smoke test produced NaN/Inf")
+        joint_position = state.data.qpos[env._joint_qpos_ids]
+        limit = env._config.controller.safety.joint_limit + 0.05
+        if bool(jp.any(jp.abs(joint_position) > limit)):
+            raise RuntimeError("MJX smoke test exceeded the guarded joint range")
+        if float(torso_contacts) > 0.25 * steps:
+            raise RuntimeError("MJX smoke test has persistent torso contact")
+        if not random_actions and bool(state.done):
+            raise RuntimeError("zero-action nominal gait terminated during smoke test")
+        return state, float(max_projection), int(torso_contacts)
+
+    nominal, nominal_projection, nominal_body_contacts = rollout(
+        random_actions=False, rollout_seed=seed
+    )
+    random_state, random_projection, random_body_contacts = rollout(
+        random_actions=True, rollout_seed=seed + 1000
+    )
     print(
         f"MJX smoke test OK | backend={jax.default_backend()} | "
-        f"obs={state.obs.shape[-1]} action={env.action_size} random-actions=10 | "
-        f"reward={float(state.reward):.4f} done={int(state.done)} | "
+        f"obs={random_state.obs.shape[-1]} action={env.action_size} "
+        f"zero/random={steps}/{steps} steps | "
+        f"nominal_projection={nominal_projection:.6f} "
+        f"random_projection={random_projection:.6f} "
+        f"body_contacts={nominal_body_contacts}/{random_body_contacts} | "
+        f"reward={float(random_state.reward):.4f} done={int(random_state.done)} | "
         f"wall={time.monotonic() - started:.2f}s"
     )
 
 
 def main(default_task: str = "terrain") -> None:
     args = _arguments(default_task)
-    generated_run_id = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
-    generated_run_id = f"{generated_run_id}_seed{args.seed}"
-    args.run_id = _safe_run_component(args.run_name) if args.run_name else generated_run_id
+    if args.discounting is None:
+        args.discounting = 0.97 if args.task == "command" else 0.99
+    if args.unroll_length is None:
+        args.unroll_length = 20 if args.task == "command" else 32
+    if args.init_checkpoint is not None:
+        args.init_checkpoint = _resolve_init_checkpoint(
+            args.init_checkpoint, tuple(args.network_layers)
+        )
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+    args.run_id = (
+        f"{_safe_run_component(args.run_name)}_{timestamp}_seed{args.seed}"
+        if args.run_name
+        else f"{timestamp}_seed{args.seed}"
+    )
     args.run_dir = (args.run_root.expanduser() / args.task / args.run_id).resolve()
-    args.run_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        args.run_dir.mkdir(parents=True, exist_ok=False)
+    except FileExistsError as exc:
+        raise SystemExit(f"refusing to mix runs in existing directory: {args.run_dir}") from exc
     if args.output is None:
         args.output = args.run_dir / "checkpoints"
     # Orbax checkpointing requires an absolute path.  Resolve user-provided
@@ -433,12 +606,21 @@ def main(default_task: str = "terrain") -> None:
     args.best_video_path = args.best_video_path.expanduser().resolve()
     if args.best_video_path.suffix.lower() != ".gif":
         raise SystemExit("--best-video-path must end with .gif")
+    for label, directory in (("--output", args.output), ("--monitor-dir", args.monitor_dir)):
+        if directory.exists() and (
+            not directory.is_dir() or any(directory.iterdir())
+        ):
+            raise SystemExit(f"refusing to mix a new run into non-empty {label}: {directory}")
+    if args.best_video_path.exists():
+        raise SystemExit(
+            f"refusing to overwrite an existing --best-video-path: {args.best_video_path}"
+        )
     print("JAX devices:", jax.devices())
     print(f"run={args.run_dir} contract={ACTION_CONTRACT_VERSION}")
     env = _make_env(args)
     _write_run_metadata(args, env)
     if args.smoke:
-        _smoke_test(env, args.seed)
+        _smoke_test(env, args.seed, args.smoke_steps)
         return
     if jax.default_backend() != "gpu" and not args.allow_cpu:
         raise SystemExit(
@@ -450,6 +632,18 @@ def main(default_task: str = "terrain") -> None:
     from brax.training.agents.ppo import networks as ppo_networks
     from brax.training.agents.ppo import train as ppo
     from mujoco_playground import wrapper
+
+    randomization_fn = None
+    if args.task == "terrain" and args.terrain_randomize and args.terrain_level >= 4:
+        from domain_randomization import domain_randomize
+
+        randomization_fn = functools.partial(
+            domain_randomize,
+            friction_range=tuple(env._config.randomization.friction_range),
+            mass_range=tuple(env._config.randomization.mass_scale_range),
+            actuator_range=tuple(env._config.randomization.actuator_strength_range),
+            damping_range=tuple(env._config.randomization.joint_damping_scale_range),
+        )
 
     args.output.mkdir(parents=True, exist_ok=True)
     network_factory = functools.partial(
@@ -475,10 +669,13 @@ def main(default_task: str = "terrain") -> None:
         wandb_config["output"] = str(args.output)
         wandb_config["monitor_dir"] = str(args.monitor_dir)
         wandb_config["best_video_path"] = str(args.best_video_path)
+        wandb_config["init_checkpoint"] = (
+            str(args.init_checkpoint) if args.init_checkpoint is not None else None
+        )
         wandb_run = wandb.init(
             project=args.wandb_project,
             entity=args.wandb_entity,
-            name=args.wandb_name,
+            name=args.wandb_name or args.run_id,
             group=args.wandb_group,
             mode=args.wandb_mode,
             config={
@@ -489,8 +686,12 @@ def main(default_task: str = "terrain") -> None:
                 "task": args.task,
                 "controller": "classical tripod + contact/workspace-safe 22D residual",
                 "action_contract_version": env.action_contract_version,
+                "observation_contract_version": env.observation_contract_version,
             },
         )
+        wandb_run.define_metric("train/global_step")
+        wandb_run.define_metric("eval/*", step_metric="train/global_step")
+        wandb_run.define_metric("best/*", step_metric="train/global_step")
 
     latest_policy: dict[str, object] = {}
     pending_video: tuple[int, float] | None = None
@@ -512,7 +713,7 @@ def main(default_task: str = "terrain") -> None:
                 fps=args.best_video_fps,
                 width=args.best_video_width,
                 height=args.best_video_height,
-                terrain="flat" if args.task == "command" else "stairs",
+                terrain="flat" if args.task == "command" else args.terrain_layout,
             )
         except Exception as exc:
             # Rendering must not throw away an otherwise valid, long PPO run.
@@ -600,8 +801,15 @@ def main(default_task: str = "terrain") -> None:
         num_eval_envs=args.num_eval_envs,
         deterministic_eval=True,
         network_factory=network_factory,
-        wrap_env_fn=wrapper.wrap_for_brax_training,
+        wrap_env_fn=functools.partial(
+            wrapper.wrap_for_brax_training, full_reset=True
+        ),
+        randomization_fn=randomization_fn,
         save_checkpoint_path=str(args.output),
+        restore_checkpoint_path=(
+            str(args.init_checkpoint) if args.init_checkpoint is not None else None
+        ),
+        restore_value_fn=args.init_value_function,
         seed=args.seed,
         progress_fn=progress,
         policy_params_fn=policy_params,

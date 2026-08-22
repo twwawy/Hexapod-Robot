@@ -110,6 +110,28 @@ def nominal_foot_targets(
     return feet_local, swing
 
 
+def nominal_touchdown_body_targets(
+    *,
+    origins: jp.ndarray,
+    outward: jp.ndarray,
+    command: jp.ndarray,
+    phase_time: float,
+) -> jp.ndarray:
+    """Classical nominal touchdown locations expressed in the body frame.
+
+    These targets contain no learned action and therefore expose useful
+    classical knowledge to the terrain observation without changing the
+    residual controller contract.
+    """
+    nominal_body = origins + outward * 0.218728
+    nominal_body = nominal_body.at[:, 2].set(origins[:, 2] - 0.287006)
+    yaw_velocity = jp.cross(
+        jp.tile(jp.array((0.0, 0.0, command[1])), (6, 1)), nominal_body
+    )
+    foot_velocity = MODEL_FORWARD * command[0] + yaw_velocity
+    return nominal_body + foot_velocity * (0.5 * phase_time)
+
+
 def phase_masked_residual(
     raw_xyz: jp.ndarray,
     swing: jp.ndarray,
@@ -151,22 +173,71 @@ def contact_adapt_targets(
     current: jp.ndarray,
     swing: jp.ndarray,
     contacts: jp.ndarray,
+    airborne: jp.ndarray,
     *,
     lost_contact_search: float,
 ) -> tuple[jp.ndarray, jp.ndarray, jp.ndarray]:
     """Prioritize deterministic contact handling over the learned residual.
 
-    Early swing contact freezes the foot at its measured current target.  A
-    stance foot with no terrain contact receives only a small downward search;
-    it cannot receive learned horizontal stance motion.
+    A swing foot is considered to have landed early only after it has first
+    been observed airborne.  Contact that persists during normal liftoff is
+    therefore not mistaken for landing.  A stance foot with no terrain contact
+    receives only a small downward search; it cannot receive learned
+    horizontal stance motion.
     """
-    early_landing = swing & contacts
+    early_landing = swing & airborne & contacts
     lost_contact = (~swing) & (~contacts)
     adapted = jp.where(early_landing[:, None], current, requested)
     adapted = adapted.at[:, 2].add(
         jp.where(lost_contact, -lost_contact_search, 0.0)
     )
     return adapted, early_landing, lost_contact
+
+
+def update_airborne_state(
+    airborne: jp.ndarray, swing: jp.ndarray, contacts: jp.ndarray
+) -> jp.ndarray:
+    """Track whether each currently swinging leg has completed liftoff.
+
+    Stance clears the state.  During swing, the state latches as soon as
+    contact is absent and remains latched until stance starts again.  This
+    pure transition is deliberately separate from contact adaptation so its
+    contract can be tested without MuJoCo.
+    """
+    return swing & (airborne | (~contacts))
+
+
+def hysteretic_clearance_contact(
+    clearance: jp.ndarray,
+    previous: jp.ndarray,
+    *,
+    enter_clearance: float,
+    release_clearance: float,
+) -> jp.ndarray:
+    """Latch geometric contact until a larger release clearance is reached."""
+    if release_clearance <= enter_clearance:
+        raise ValueError("contact release clearance must exceed enter clearance")
+    threshold = jp.where(previous, release_clearance, enter_clearance)
+    return clearance < threshold
+
+
+def median_support_height(
+    terrain_heights: jp.ndarray,
+    support_mask: jp.ndarray,
+    fallback_height: jp.ndarray,
+) -> jp.ndarray:
+    """Robust support-surface height from stance feet currently in contact.
+
+    Invalid feet sort to the end.  Odd and even contact counts use the usual
+    median definition; no-contact states fall back to the local terrain height
+    supplied by the caller.
+    """
+    count = jp.sum(support_mask.astype(jp.int32))
+    ordered = jp.sort(jp.where(support_mask, terrain_heights, jp.inf))
+    lower_index = jp.maximum((count - 1) // 2, 0)
+    upper_index = jp.maximum(count // 2, 0)
+    median = 0.5 * (ordered[lower_index] + ordered[upper_index])
+    return jp.where(count > 0, median, fallback_height)
 
 
 def project_workspace(
