@@ -204,6 +204,12 @@ def _arguments(default_task: str) -> argparse.Namespace:
     parser.add_argument("--stance-z", type=float, default=None, help="Active task stance-only Z residual limit [m].")
     parser.add_argument("--stride-half-range", type=float, default=None, help="Stride scale authority around one; 0.2 = 0.8..1.2.")
     parser.add_argument("--frequency-half-range", type=float, default=None, help="Frequency authority around one; 0.15 = 0.85..1.15.")
+    parser.add_argument(
+        "--gait-filter-time-constant",
+        type=float,
+        default=0.15,
+        help="Smoothing time constant for the four global gait actions [s].",
+    )
     parser.add_argument("--swing-height-min", type=float, default=None, help="Active task global swing height minimum [m].")
     parser.add_argument("--swing-height-max", type=float, default=None, help="Active task global swing height maximum [m].")
     parser.add_argument("--radial-min", type=float, default=None, help="Active task radial offset minimum [m].")
@@ -232,6 +238,12 @@ def _arguments(default_task: str) -> argparse.Namespace:
     parser.add_argument("--terrain-step-height", type=float, default=None, help="Override fixed stair height [m].")
     parser.add_argument("--terrain-step-depth", type=float, default=None, help="Override fixed stair depth [m].")
     parser.add_argument("--terrain-friction", type=float, default=None, help="Override fixed terrain/foot friction scale.")
+    parser.add_argument(
+        "--flat-friction",
+        type=float,
+        default=0.8,
+        help="Flat plane/foot sliding friction; 0.8 is dry-asphalt nominal.",
+    )
     parser.add_argument("--curriculum-forward-only-steps", type=int, default=250)
     parser.add_argument("--curriculum-limited-yaw-steps", type=int, default=250)
     parser.add_argument(
@@ -302,6 +314,14 @@ def _make_env(args: argparse.Namespace) -> HexapodRoughTerrainEnv:
     config.controller.nominal.phase_time = args.phase_time
     config.controller.nominal.base_swing_height = args.base_swing_height
     config.controller.nominal.base_radial_offset = args.base_radial_offset
+    if args.gait_filter_time_constant < 0.0:
+        raise ValueError("--gait-filter-time-constant must be non-negative")
+    if args.flat_friction <= 0.0:
+        raise ValueError("--flat-friction must be positive")
+    config.controller.residual.gait_filter_time_constant = (
+        args.gait_filter_time_constant
+    )
+    config.terrain.flat_friction = args.flat_friction
     authority = (
         config.controller.residual.command
         if args.task == "command"

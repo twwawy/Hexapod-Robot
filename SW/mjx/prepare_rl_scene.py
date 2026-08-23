@@ -19,6 +19,7 @@ STEP_START_X = 0.55
 STEP_DEPTH = 0.25
 STEP_HEIGHT = 0.05
 STEP_COUNT = 7
+DRY_ASPHALT_FRICTION = 0.8
 MIXED_PATCH_NAMES = ("flat", "curb", "ramp", "blocks", "stairs", "rough")
 MIXED_PATCH_Y = (0.0, 3.0, 6.0, 9.0, 12.0, 15.0)
 MIXED_LANE_HALF_WIDTH = 0.9
@@ -366,7 +367,11 @@ def prepare_rl_scene(
 
     _replace_inertials(root, source_model)
     _strip_cad_meshes(root)
-    _add_robot_colliders(root, foot_friction=1.2 * friction)
+    # Equal-priority MuJoCo contacts take the larger geom friction.  Matching
+    # the plane and foot values makes ``friction`` the actual flat contact
+    # coefficient; rough terrain keeps the conservative legacy multipliers.
+    foot_friction = friction if terrain == "flat" else 1.2 * friction
+    _add_robot_colliders(root, foot_friction=foot_friction)
     for geom in root.findall("./worldbody/geom"):
         if geom.get("type") == "plane":
             geom.set("friction", f"{friction:.6g} 0.01 0.001")
@@ -392,9 +397,9 @@ def prepare_rl_scene(
 
 
 def prepare_flat_rl_scene(
-    output: Path = FLAT_RL_SCENE_OUTPUT, *, friction: float = 1.0
+    output: Path = FLAT_RL_SCENE_OUTPUT, *, friction: float = DRY_ASPHALT_FRICTION
 ) -> Path:
-    """Create the mesh-free plane scene for walking-and-turning curriculum."""
+    """Create the mesh-free plane scene with nominal dry-asphalt friction."""
     return prepare_rl_scene(output, terrain="flat", friction=friction)
 
 

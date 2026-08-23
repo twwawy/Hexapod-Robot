@@ -68,7 +68,11 @@ workspace projection이 policy보다 먼저 적용됩니다. 110-D observation�
 Flat command Stage 2는 최대 `0.21 m/s`를 학습합니다. `phase_time=0.50 s`는
 유지하고, forward+yaw를 합친 가장 빠른 다리 기준 horizontal stroke를 120 mm로
 제한합니다. Actuator hard clamp ±8 Nm와 함께 torque saturation(6.8 Nm 초과), slip,
-self-collision을 별도 reward/metric으로 감시합니다. Terrain 속도 상한은 0.18 m/s입니다.
+self-collision을 별도 reward/metric으로 감시합니다. 네트워크는 마지막 4-D action으로
+stride/frequency/swing-height/radial-offset을 제한 범위 안에서 조절하며, 기본 0.15초
+filter가 급격한 gait 변화를 막습니다. 평지 contact는 건조 아스팔트 nominal
+`friction=0.8`이고 `--flat-friction`으로 바꿀 수 있습니다. Terrain 속도 상한은
+0.18 m/s입니다.
 
 학습 전에 계단 장면과 residual이 0인 기본 보행을 눈으로 확인합니다. 기본
 제어기가 계단에서 보이는 진행 거리와 자세가 이후 학습 결과의 비교 기준입니다.

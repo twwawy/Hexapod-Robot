@@ -31,6 +31,10 @@ command
 - action physical range는 curriculum 중 바꾸지 않는다.
 - raw stride action은 0.8–1.2×지만 회전까지 포함한 어떤 다리의 horizontal stroke도
   120 mm를 넘지 않도록 safety layer가 최종 scale을 낮춘다.
+- 네트워크는 마지막 4-D로 `stride 0.8–1.2×`, `frequency 0.85–1.15×`,
+  `swing height 50–110 mm`, `radial offset 5–25 mm`를 조절한다. 이 네 값만
+  기본 0.15초 time constant의 1차 filter를 거쳐 적용되며 Cartesian foot residual은
+  접촉 대응을 위해 지연시키지 않는다.
 - 쉬운 stage에서는 residual penalty를 강하게 하고 어려워질수록 완화한다.
 - action=0이면 NumPy classical nominal과 JAX nominal target이 `1e-4 rad` 이내로
   일치해야 한다.
@@ -108,6 +112,11 @@ flat | curb | ramp | irregular blocks | stairs | rough patch
 | 4 | .10 | .15 | .20 | .20 | .20 | .15 |
 
 `--terrain-layout stairs`는 비교 실험용 기존 stairs-only scene이다.
+
+Flat command scene은 건조 아스팔트 nominal로 plane과 foot geom의 sliding friction을
+모두 `0.8`로 둔다(`friction="0.8 0.01 0.001"`: sliding, torsional, rolling).
+MuJoCo가 같은 priority의 두 geom에서는 큰 friction 값을 contact에 사용하므로 양쪽을
+같게 설정한다. 다른 바닥/foot pad를 시험할 때는 `--flat-friction`으로 변경한다.
 
 ## 5. Command sampling
 
@@ -232,7 +241,17 @@ eval/stage0|1|2/torque_saturation_mean
 eval/stage0|1|2/self_collision_rate
 eval/stage0|1|2/effective_stride_mean_m
 eval/stage0|1|2/effective_stride_max_m
+eval/stage0|1|2/gait_step_scale_mean
+eval/stage0|1|2/gait_frequency_scale_mean
+eval/stage0|1|2/gait_swing_height_mean_m
+eval/stage0|1|2/gait_radial_offset_mean_m
 ```
+
+일반 evaluation에도 실제 적용값
+`eval/episode_applied_step_scale`, `eval/episode_applied_frequency_scale`,
+`eval/episode_applied_swing_height_m`, `eval/episode_applied_radial_offset_m`와
+raw/applied 차이인 `eval/episode_gait_filter_error`가 기록된다. 기본 filter는
+`--gait-filter-time-constant 0.15`, 즉시 적용 비교 실험은 `0`으로 설정한다.
 
 학습 command는 계속 1.5–4초 random resampling을 사용하고, 위 비교 평가와 영상만
 고정 script를 사용한다. `eval/episode_reward`가 NEW_BEST일 때 command run은

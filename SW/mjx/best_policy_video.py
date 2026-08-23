@@ -146,6 +146,24 @@ def make_policy_evaluator(
             max_effective_stride = jp.max(
                 jp.where(valid, next_state.metrics["effective_stride_m"], 0.0)
             )
+            step_scale = jp.sum(
+                jp.where(valid, next_state.metrics["applied_step_scale"], 0.0)
+            )
+            frequency_scale = jp.sum(
+                jp.where(
+                    valid, next_state.metrics["applied_frequency_scale"], 0.0
+                )
+            )
+            swing_height = jp.sum(
+                jp.where(
+                    valid, next_state.metrics["applied_swing_height_m"], 0.0
+                )
+            )
+            radial_offset = jp.sum(
+                jp.where(
+                    valid, next_state.metrics["applied_radial_offset_m"], 0.0
+                )
+            )
             samples = jp.sum(valid.astype(jp.float32))
             next_alive = valid & (~next_state.done.astype(jp.bool_))
             return (next_state, next_alive, action_key), (
@@ -158,6 +176,10 @@ def make_policy_evaluator(
                 self_collision,
                 effective_stride,
                 max_effective_stride,
+                step_scale,
+                frequency_scale,
+                swing_height,
+                radial_offset,
             )
 
         (_, _, _), totals = jax.lax.scan(
@@ -175,6 +197,10 @@ def make_policy_evaluator(
             jp.sum(totals[6]) / alive_count,
             jp.sum(totals[7]) / alive_count,
             jp.max(totals[8]),
+            jp.sum(totals[9]) / alive_count,
+            jp.sum(totals[10]) / alive_count,
+            jp.sum(totals[11]) / alive_count,
+            jp.sum(totals[12]) / alive_count,
         )
 
     def evaluate(params: Any) -> dict[str, float]:
@@ -188,6 +214,10 @@ def make_policy_evaluator(
             self_collision_rate,
             effective_stride_mean,
             effective_stride_max,
+            step_scale_mean,
+            frequency_scale_mean,
+            swing_height_mean,
+            radial_offset_mean,
         ) = rollout(params)
         reward.block_until_ready()
         return {
@@ -200,6 +230,10 @@ def make_policy_evaluator(
             "self_collision_rate": float(self_collision_rate),
             "effective_stride_mean_m": float(effective_stride_mean),
             "effective_stride_max_m": float(effective_stride_max),
+            "gait_step_scale_mean": float(step_scale_mean),
+            "gait_frequency_scale_mean": float(frequency_scale_mean),
+            "gait_swing_height_mean_m": float(swing_height_mean),
+            "gait_radial_offset_mean_m": float(radial_offset_mean),
         }
 
     return evaluate

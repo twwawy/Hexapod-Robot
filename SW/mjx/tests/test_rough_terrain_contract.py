@@ -35,10 +35,14 @@ from tripod_core import (  # noqa: E402
     project_workspace,
     scale_asymmetric,
     self_collision_detected,
+    smooth_gait_action,
     torque_saturation_cost,
     update_airborne_state,
 )
-from prepare_rl_scene import prepare_flat_rl_scene  # noqa: E402
+from prepare_rl_scene import (  # noqa: E402
+    DRY_ASPHALT_FRICTION,
+    prepare_flat_rl_scene,
+)
 from tripod_controller import (  # noqa: E402
     GaitConfig,
     LEG_PREFIXES,
@@ -65,6 +69,10 @@ class RoughTerrainContractTest(unittest.TestCase):
         )
         self.assertEqual(tuple(config.command_curriculum.speed_max), (0.08, 0.12, 0.21))
         self.assertAlmostEqual(config.controller.safety.max_effective_stride, 0.120)
+        self.assertAlmostEqual(
+            config.controller.residual.gait_filter_time_constant, 0.15
+        )
+        self.assertAlmostEqual(config.terrain.flat_friction, DRY_ASPHALT_FRICTION)
         self.assertAlmostEqual(config.reward.torque, -0.020)
         self.assertAlmostEqual(config.reward.torque_saturation, -0.050)
         self.assertAlmostEqual(config.reward.slip, -0.080)
@@ -231,6 +239,38 @@ class RoughTerrainContractTest(unittest.TestCase):
         output = compiled(jp.ones((6, 3)) * jp.array([0.22, 0.0, -0.28]))
         self.assertEqual(output.shape, (6, 3))
 
+    def test_global_gait_action_is_smoothed_but_converges(self) -> None:
+        previous = jp.zeros(4)
+        requested = jp.ones(4)
+        first = smooth_gait_action(
+            previous, requested, control_dt=0.02, time_constant=0.15
+        )
+        self.assertTrue(jp.all(first > 0.0))
+        self.assertTrue(jp.all(first < 0.2))
+        applied = previous
+        for _ in range(75):
+            applied = smooth_gait_action(
+                applied, requested, control_dt=0.02, time_constant=0.15
+            )
+        self.assertTrue(jp.allclose(applied, requested, atol=1e-4))
+        immediate = smooth_gait_action(
+            previous, requested, control_dt=0.02, time_constant=0.0
+        )
+        self.assertTrue(jp.array_equal(immediate, requested))
+
+    def test_flat_scene_uses_dry_asphalt_contact_friction(self) -> None:
+        prepare_flat_rl_scene()
+        env = HexapodRoughTerrainEnv(terrain="flat", command_curriculum=True)
+        model = env.mj_model
+        self.assertAlmostEqual(
+            float(model.geom("floor").friction[0]), DRY_ASPHALT_FRICTION
+        )
+        for prefix in LEG_PREFIXES:
+            self.assertAlmostEqual(
+                float(model.geom(f"{prefix}_foot_collision").friction[0]),
+                DRY_ASPHALT_FRICTION,
+            )
+
     def test_zero_action_numpy_classical_matches_jax_nominal(self) -> None:
         prepare_flat_rl_scene()
         env = HexapodRoughTerrainEnv(terrain="flat", command_curriculum=True)
@@ -375,6 +415,10 @@ class RoughTerrainContractTest(unittest.TestCase):
                 "self_collision_rate",
                 "effective_stride_mean_m",
                 "effective_stride_max_m",
+                "gait_step_scale_mean",
+                "gait_frequency_scale_mean",
+                "gait_swing_height_mean_m",
+                "gait_radial_offset_mean_m",
             },
         )
         self.assertTrue(all(np.isfinite(value) for value in metrics.values()))

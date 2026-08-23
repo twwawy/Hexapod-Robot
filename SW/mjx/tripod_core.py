@@ -39,6 +39,22 @@ def scale_asymmetric(action: jp.ndarray, low: float, high: float) -> jp.ndarray:
     return jp.where(bounded >= 0.0, bounded * high, bounded * (-low))
 
 
+def smooth_gait_action(
+    previous: jp.ndarray,
+    requested: jp.ndarray,
+    *,
+    control_dt: float,
+    time_constant: float,
+) -> jp.ndarray:
+    """Low-pass global gait outputs without delaying foot residual safety."""
+    if control_dt <= 0.0 or time_constant < 0.0:
+        raise ValueError("control_dt must be positive and time_constant non-negative")
+    if time_constant == 0.0:
+        return requested
+    alpha = 1.0 - jp.exp(-control_dt / time_constant)
+    return previous + alpha * (requested - previous)
+
+
 def phase_masks(tripod_a: jp.ndarray, phase: jp.ndarray) -> tuple[jp.ndarray, jp.ndarray]:
     """Return the swing mask and local half-cycle timing for six tripod legs."""
     first_half = phase < 0.5

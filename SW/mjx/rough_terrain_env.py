@@ -13,6 +13,7 @@ from mujoco_playground._src import mjx_env
 import numpy as np
 
 from prepare_rl_scene import (
+    DRY_ASPHALT_FRICTION,
     FLAT_RL_SCENE_OUTPUT,
     MIXED_BLOCKS,
     MIXED_CURB,
@@ -46,6 +47,7 @@ from tripod_core import (
     project_workspace,
     scale_asymmetric,
     self_collision_detected,
+    smooth_gait_action,
     torque_saturation_cost,
     update_airborne_state,
 )
@@ -84,6 +86,7 @@ def default_config() -> config_dict.ConfigDict:
                 base_radial_offset=0.01,
             ),
             residual=config_dict.create(
+                gait_filter_time_constant=0.15,
                 command=config_dict.create(
                     # Physical semantics are identical to terrain so a flat
                     # checkpoint can transfer without remapping its outputs.
@@ -140,6 +143,7 @@ def default_config() -> config_dict.ConfigDict:
             step_height=STEP_HEIGHT,
             step_count=STEP_COUNT,
             friction=1.0,
+            flat_friction=DRY_ASPHALT_FRICTION,
             patch_probabilities=(0.10, 0.15, 0.20, 0.20, 0.20, 0.15),
         ),
         # Ranges are consumed by the optional per-env randomization wrapper.
@@ -247,7 +251,7 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
             scene_path = MIXED_RL_SCENE_OUTPUT
         else:
             prepare_flat_rl_scene(
-                FLAT_RL_SCENE_OUTPUT, friction=self._config.terrain.friction
+                FLAT_RL_SCENE_OUTPUT, friction=self._config.terrain.flat_friction
             )
             scene_path = FLAT_RL_SCENE_OUTPUT
         self._xml_path = str(scene_path)
@@ -625,6 +629,8 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
         return targets, {
             "frequency_scale": frequency_scale,
             "step_scale": step_scale,
+            "swing_height": swing_height,
+            "radial_offset": radial_offset,
             "effective_stride": effective_stride,
             "swing": swing,
             "residual": residual,
@@ -688,6 +694,7 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
             "steps": jp.zeros((), dtype=jp.int32),
             "curriculum_stage": curriculum_stage,
             "last_action": jp.zeros(ACTION_SIZE),
+            "last_policy_action": jp.zeros(ACTION_SIZE),
             "previous_foot_positions": data.site_xpos[self._foot_site_ids],
             "contact_state": contact_state,
             "airborne": jp.zeros(6, dtype=jp.bool_),
@@ -705,6 +712,14 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
             torque_rms_nm=jp.zeros(()), torque_saturation=jp.zeros(()),
             self_collision=jp.zeros(()), effective_stride_m=jp.zeros(()),
             applied_step_scale=jp.ones(()),
+            applied_frequency_scale=jp.ones(()),
+            applied_swing_height_m=jp.array(
+                self._config.controller.nominal.base_swing_height
+            ),
+            applied_radial_offset_m=jp.array(
+                self._config.controller.nominal.base_radial_offset
+            ),
+            gait_filter_error=jp.zeros(()),
             curriculum_stage=curriculum_stage.astype(jp.float32),
             contact_early_landing=jp.zeros(()), contact_lost=jp.zeros(()),
         )
@@ -712,9 +727,17 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
 
     def step(self, state: mjx_env.State, action: jax.Array) -> mjx_env.State:
         action = jp.clip(action, -1.0, 1.0)
+        previous_action = state.info["last_action"]
+        applied_gait = smooth_gait_action(
+            previous_action[18:],
+            action[18:],
+            control_dt=self.dt,
+            time_constant=self._config.controller.residual.gait_filter_time_constant,
+        )
+        applied_action = action.at[18:].set(applied_gait)
         blend = jp.clip(state.info["steps"] * self.dt / 0.75, 0.0, 1.0)
         targets, controller = self._controller_targets(
-            action, state.info["phase"], state.info["command"], blend,
+            applied_action, state.info["phase"], state.info["command"], blend,
             state.info["contact_state"], state.info["airborne"],
             self._feet_leg_local(state.data),
         )
@@ -738,9 +761,9 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
         foot_velocity = (data.site_xpos[self._foot_site_ids] - state.info["previous_foot_positions"]) / self.dt
         contact_count = jp.maximum(jp.sum(contacts.astype(jp.float32)), 1.0)
         slip_cost = jp.sum(contacts.astype(jp.float32) * jp.sum(jp.square(foot_velocity[:, :2] / 0.30), axis=-1)) / contact_count
-        previous_action = state.info["last_action"]
+        previous_policy_action = state.info["last_policy_action"]
         swing = controller["swing"]
-        foot_action = action[:18].reshape(6, 3)
+        foot_action = applied_action[:18].reshape(6, 3)
         previous_foot_action = previous_action[:18].reshape(6, 3)
         swing_count = jp.maximum(jp.sum(swing.astype(jp.float32)) * 3.0, 1.0)
         stance_count = jp.maximum(jp.sum((~swing).astype(jp.float32)), 1.0)
@@ -762,9 +785,11 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
             "progress": jp.clip(forward_velocity, -0.2, 0.3),
             "swing_residual": swing_residual_cost,
             "stance_residual": stance_residual_cost,
-            "gait_residual": jp.mean(jp.square(action[18:])),
+            "gait_residual": jp.mean(jp.square(applied_action[18:])),
             "foot_action_rate": jp.mean(jp.square(foot_action - previous_foot_action)),
-            "gait_action_rate": jp.mean(jp.square(action[18:] - previous_action[18:])),
+            "gait_action_rate": jp.mean(
+                jp.square(action[18:] - previous_policy_action[18:])
+            ),
             "vertical_velocity": jp.square(data.qvel[2]),
             "lateral_velocity": jp.square(local_velocity[0]),
             "joint_velocity": jp.mean(jp.square(data.qvel[self._joint_qvel_ids] / 10.0)),
@@ -814,7 +839,8 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
             )
         state.info["curriculum_stage"] = next_stage
         state.info["steps"] = next_steps
-        state.info["last_action"] = action
+        state.info["last_action"] = applied_action
+        state.info["last_policy_action"] = action
         state.info["previous_foot_positions"] = data.site_xpos[self._foot_site_ids]
         state.info["contact_state"] = contacts
         state.info["support_height"] = support_height
@@ -836,6 +862,12 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
         state.metrics["self_collision"] = self_collision
         state.metrics["effective_stride_m"] = controller["effective_stride"]
         state.metrics["applied_step_scale"] = controller["step_scale"]
+        state.metrics["applied_frequency_scale"] = controller["frequency_scale"]
+        state.metrics["applied_swing_height_m"] = controller["swing_height"]
+        state.metrics["applied_radial_offset_m"] = controller["radial_offset"]
+        state.metrics["gait_filter_error"] = jp.sqrt(
+            jp.mean(jp.square(action[18:] - applied_action[18:]))
+        )
         state.metrics["curriculum_stage"] = state.info["curriculum_stage"].astype(jp.float32)
         state.metrics["contact_early_landing"] = jp.mean(controller["early_landing"].astype(jp.float32))
         state.metrics["contact_lost"] = jp.mean(controller["lost_contact"].astype(jp.float32))
