@@ -65,6 +65,11 @@ workspace projection이 policy보다 먼저 적용됩니다. 110-D observation�
 같은 XML에 들어 있는 mixed terrain을 초기화합니다. 자세한 최신 명세는
 [`docs/RESIDUAL_RL.md`](../../docs/RESIDUAL_RL.md)를 참고합니다.
 
+Flat command Stage 2는 최대 `0.21 m/s`를 학습합니다. `phase_time=0.50 s`는
+유지하고, forward+yaw를 합친 가장 빠른 다리 기준 horizontal stroke를 120 mm로
+제한합니다. Actuator hard clamp ±8 Nm와 함께 torque saturation(6.8 Nm 초과), slip,
+self-collision을 별도 reward/metric으로 감시합니다. Terrain 속도 상한은 0.18 m/s입니다.
+
 학습 전에 계단 장면과 residual이 0인 기본 보행을 눈으로 확인합니다. 기본
 제어기가 계단에서 보이는 진행 거리와 자세가 이후 학습 결과의 비교 기준입니다.
 

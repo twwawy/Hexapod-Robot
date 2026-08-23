@@ -111,9 +111,7 @@ def make_policy_evaluator(
     reset_keys = jax.random.split(jax.random.PRNGKey(seed), num_envs)
 
     @jax.jit
-    def rollout(
-        params: Any,
-    ) -> tuple[jax.Array, jax.Array, jax.Array, jax.Array]:
+    def rollout(params: Any) -> tuple[jax.Array, ...]:
         policy = make_policy(params, deterministic=True)
         state = reset_batch(reset_keys)
         alive = jp.ones((num_envs,), dtype=jp.bool_)
@@ -133,6 +131,21 @@ def make_policy_evaluator(
             yaw_error = jp.sum(
                 jp.where(valid, next_state.metrics["yaw_error_rps"], 0.0)
             )
+            torque_squared = jp.sum(
+                jp.where(valid, jp.square(next_state.metrics["torque_rms_nm"]), 0.0)
+            )
+            torque_saturation = jp.sum(
+                jp.where(valid, next_state.metrics["torque_saturation"], 0.0)
+            )
+            self_collision = jp.sum(
+                jp.where(valid, next_state.metrics["self_collision"], 0.0)
+            )
+            effective_stride = jp.sum(
+                jp.where(valid, next_state.metrics["effective_stride_m"], 0.0)
+            )
+            max_effective_stride = jp.max(
+                jp.where(valid, next_state.metrics["effective_stride_m"], 0.0)
+            )
             samples = jp.sum(valid.astype(jp.float32))
             next_alive = valid & (~next_state.done.astype(jp.bool_))
             return (next_state, next_alive, action_key), (
@@ -140,6 +153,11 @@ def make_policy_evaluator(
                 velocity_error,
                 yaw_error,
                 samples,
+                torque_squared,
+                torque_saturation,
+                self_collision,
+                effective_stride,
+                max_effective_stride,
             )
 
         (_, _, _), totals = jax.lax.scan(
@@ -152,16 +170,36 @@ def make_policy_evaluator(
             jp.sum(totals[1]) / alive_count,
             jp.sum(totals[2]) / alive_count,
             alive_count / scheduled_count,
+            jp.sqrt(jp.sum(totals[4]) / alive_count),
+            jp.sum(totals[5]) / alive_count,
+            jp.sum(totals[6]) / alive_count,
+            jp.sum(totals[7]) / alive_count,
+            jp.max(totals[8]),
         )
 
     def evaluate(params: Any) -> dict[str, float]:
-        reward, velocity_error, yaw_error, survival = rollout(params)
+        (
+            reward,
+            velocity_error,
+            yaw_error,
+            survival,
+            torque_rms,
+            torque_saturation,
+            self_collision_rate,
+            effective_stride_mean,
+            effective_stride_max,
+        ) = rollout(params)
         reward.block_until_ready()
         return {
             "reward_mean": float(reward),
             "velocity_error_mps": float(velocity_error),
             "yaw_error_rps": float(yaw_error),
             "survival_fraction": float(survival),
+            "torque_rms_nm": float(torque_rms),
+            "torque_saturation_mean": float(torque_saturation),
+            "self_collision_rate": float(self_collision_rate),
+            "effective_stride_mean_m": float(effective_stride_mean),
+            "effective_stride_max_m": float(effective_stride_max),
         }
 
     return evaluate

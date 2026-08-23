@@ -238,7 +238,7 @@ def _arguments(default_task: str) -> argparse.Namespace:
         "--curriculum-speed-min", type=float, nargs=3, default=(0.03, 0.05, 0.03)
     )
     parser.add_argument(
-        "--curriculum-speed-max", type=float, nargs=3, default=(0.08, 0.12, 0.18)
+        "--curriculum-speed-max", type=float, nargs=3, default=(0.08, 0.12, 0.21)
     )
     parser.add_argument(
         "--curriculum-yaw-limit", type=float, nargs=3, default=(0.00, 0.15, 0.35)
@@ -794,7 +794,9 @@ def main(default_task: str = "terrain") -> None:
             + " | ".join(
                 f"{name}: reward={flattened[f'eval/{name}/reward_mean']:.4f} "
                 f"v_err={flattened[f'eval/{name}/velocity_error_mps']:.4f} "
-                f"yaw_err={flattened[f'eval/{name}/yaw_error_rps']:.4f}"
+                f"yaw_err={flattened[f'eval/{name}/yaw_error_rps']:.4f} "
+                f"torque={flattened[f'eval/{name}/torque_rms_nm']:.3f}Nm "
+                f"self_col={flattened[f'eval/{name}/self_collision_rate']:.4f}"
                 for name in ("stage0", "stage1", "stage2")
             )
         )

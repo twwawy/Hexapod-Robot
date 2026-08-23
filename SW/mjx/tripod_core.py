@@ -132,6 +132,71 @@ def nominal_touchdown_body_targets(
     return nominal_body + foot_velocity * (0.5 * phase_time)
 
 
+def limit_effective_stride(
+    *,
+    requested_scale: jp.ndarray,
+    command: jp.ndarray,
+    origins: jp.ndarray,
+    outward: jp.ndarray,
+    phase_time: float,
+    max_stride: float,
+) -> tuple[jp.ndarray, jp.ndarray]:
+    """Limit every leg's forward+yaw horizontal stroke to ``max_stride``.
+
+    A yaw command produces a different tangential velocity at each hip.  The
+    cap therefore uses the fastest nominal foot rather than forward velocity
+    alone.  It is a safety layer after action scaling: low-speed action
+    semantics remain unchanged, while high-speed/turn combinations cannot
+    request an excessive Cartesian stroke.
+    """
+    if max_stride <= 0.0:
+        raise ValueError("max_stride must be positive")
+    nominal_body = origins + outward * 0.218728
+    nominal_body = nominal_body.at[:, 2].set(origins[:, 2] - 0.287006)
+    yaw_velocity = jp.cross(
+        jp.tile(jp.array((0.0, 0.0, command[1])), (origins.shape[0], 1)),
+        nominal_body,
+    )
+    foot_velocity = MODEL_FORWARD * command[0] + yaw_velocity
+    peak_horizontal_speed = jp.max(jp.linalg.norm(foot_velocity[:, :2], axis=-1))
+    requested_stride = peak_horizontal_speed * phase_time * requested_scale
+    applied_scale = jp.where(
+        requested_stride > max_stride,
+        requested_scale * max_stride / jp.maximum(requested_stride, 1e-8),
+        requested_scale,
+    )
+    effective_stride = peak_horizontal_speed * phase_time * applied_scale
+    return applied_scale, effective_stride
+
+
+def self_collision_detected(
+    contact_geom: jp.ndarray,
+    contact_distance: jp.ndarray,
+    geom_body_ids: jp.ndarray,
+) -> jp.ndarray:
+    """Return whether an active contact joins two robot-owned bodies."""
+    bodies = geom_body_ids[contact_geom]
+    active = contact_distance < 0.0
+    return jp.any(active & (bodies[:, 0] > 0) & (bodies[:, 1] > 0))
+
+
+def torque_saturation_cost(
+    actuator_force: jp.ndarray,
+    *,
+    force_limit: float,
+    threshold_fraction: float = 0.85,
+) -> jp.ndarray:
+    """Continuous 0..1 cost above a fraction of the hard torque limit."""
+    if force_limit <= 0.0:
+        raise ValueError("force_limit must be positive")
+    if not 0.0 < threshold_fraction < 1.0:
+        raise ValueError("threshold_fraction must be in (0, 1)")
+    threshold = force_limit * threshold_fraction
+    span = force_limit - threshold
+    normalized = jp.clip((jp.abs(actuator_force) - threshold) / span, 0.0, 1.0)
+    return jp.mean(normalized)
+
+
 def phase_masked_residual(
     raw_xyz: jp.ndarray,
     swing: jp.ndarray,

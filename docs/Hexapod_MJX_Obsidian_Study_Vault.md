@@ -152,7 +152,7 @@ stance Z ±8 mm를 사용한다. Flat에서는 residual penalty만 더 강하다
 | 범위 | 의미 |
 |---|---|
 | 0:18 | RF, RM, RB, LF, LM, LB raw local foot action → swing XYZ / stance Z-only |
-| 18 | 보폭 scale: 0.8~1.2 |
+| 18 | 보폭 scale: raw 0.8~1.2, 최종 horizontal stroke ≤120 mm |
 | 19 | gait frequency scale: 0.85~1.15 |
 | 20 | global swing height: 50~110 mm |
 | 21 | radial offset: 5~25 mm |
@@ -174,7 +174,8 @@ nominal gait와 동일한 target을 만든다.
 ## Reward와 종료
 
 주 보상은 목표 선속도·Yaw rate 추종이다. Upright, 몸체 높이 및 전진 진행을
-보상하고 swing/stance/gait residual과 각각의 action-rate, torque, slip, body contact,
+보상하고 swing/stance/gait residual과 각각의 action-rate, torque, torque saturation,
+slip, body/self contact,
 workspace projection을 분리된 penalty로 둔다. 몸체가 지면에 너무 가까워지거나 크게 기울면 episode를
 종료한다.
 
@@ -193,7 +194,7 @@ episode stage는 다음 command 범위를 제공한다.
 | --- | ---: | --- | --- | --- |
 | `0` | `0–249` | `0.03–0.08 m/s` | `0` | 안정적인 직진 tripod gait |
 | `1` | `250–499` | `0.05–0.12 m/s` | `±0.15 rad/s` | 완만한 곡선 보행 |
-| `2` | `500–999` | `0.03–0.18 m/s` | `±0.35 rad/s` | 전체 보행·회전 명령 추종 |
+| `2` | `500–999` | `0.03–0.21 m/s` | `±0.35 rad/s` | 전체 보행·회전 명령 추종 |
 
 실제 command는 stage의 고정 순서를 암기하지 못하도록 1.5–4.0초마다 범위 안에서
 무작위로 다시 sample한다. policy는 항상 현재 command를
@@ -348,7 +349,9 @@ W&B에서 이름에 `curriculum_stage`가 들어간 metric이 `0 → 1 → 2`로
 `reward/yaw`, `reward/swing_residual`, `reward/stance_residual`, `projection_cost`를 함께 본다.
 추가로 매 evaluation마다 독립 reset과 고정 command script로 계산되는
 `eval/stage0|1|2/reward_mean`, `velocity_error_mps`, `yaw_error_rps`,
-`survival_fraction`을 비교한다. 학습 command 자체는 계속 1.5–4초 random이다.
+`survival_fraction`, `torque_rms_nm`, `torque_saturation_mean`,
+`self_collision_rate`, `effective_stride_mean_m/max_m`을 비교한다. 학습 command
+자체는 계속 1.5–4초 random이다.
 
 ### B. Mixed terrain transfer
 
@@ -520,7 +523,7 @@ python SW/mjx/train_command_curriculum.py \
 | index | 수량 | 의미 | 변환 후 범위 |
 | --- | ---: | --- | --- |
 | `0:18` | 6×3 | `RF, RM, RB, LF, LM, LB` local foot `(x,y,z)` | swing XYZ; stance `(0,0,Δz)` only |
-| `18` | 1 | stride scale | `0.8 … 1.2` |
+| `18` | 1 | stride scale | raw `0.8 … 1.2`; forward+yaw fastest-leg stroke `≤120 mm` |
 | `19` | 1 | gait frequency scale | `0.85 … 1.15` |
 | `20` | 1 | global swing height | `50…110 mm`, 두 task 동일 |
 | `21` | 1 | radial offset | `5…25 mm`, 두 task 동일 |
@@ -626,9 +629,11 @@ cos(θ3) = (ρ² + z² - L2² - L3²) / (2 L2 L3)
 | vertical/lateral velocity | penalty | bounce, sideways drift 억제 |
 | joint_velocity | penalty | 불필요한 관절 고속 운동 억제 |
 | torque | penalty | `mean((actuator_force / 8 Nm)^2)` |
+| torque_saturation | penalty | 6.8 Nm(85%) 초과분을 8 Nm까지 0…1로 정규화 |
 | slip | penalty | contact foot의 normalized XY velocity |
 | projection | penalty | requested target이 safe workspace에서 밀려난 거리² |
 | body_contact | penalty | torso collision; recovery를 위해 즉시 terminate하지 않음 |
+| self_collision | penalty | active contact의 양쪽 geom이 모두 robot body인 경우 |
 | termination | penalty | 낙상 종료 비용 |
 
 episode는 아래 조건에서 끝난다.
@@ -639,7 +644,9 @@ or base clearance above terrain < 0.14 m
 or qpos/qvel contains NaN
 ```
 
-reward만 높다고 좋은 정책은 아니다. `swing_residual`, `stance_residual`, `gait_residual`, `slip`, `torque`, `projection_cost`, torso contact와 termination 빈도를 zero-residual baseline 동영상과 함께 비교한다.
+reward만 높다고 좋은 정책은 아니다. `swing_residual`, `stance_residual`,
+`gait_residual`, `slip`, `torque`, `torque_saturation`, `self_collision`,
+`projection_cost`, torso contact와 termination 빈도를 zero-residual baseline 동영상과 함께 비교한다.
 
 ---
 
@@ -685,7 +692,10 @@ python SW/mjx/train_command_curriculum.py \
 
 영상은 W&B의 기본 설정이 아니라 trainer가 직접 기록하는 artifact다. 따라서 `--wandb`만 켜면 추가 login이나 별도 video 인수 없이 자동 업로드된다. local 저장만 원하면 `--wandb`를 빼면 되고, 영상까지 끄려면 `--no-best-video`를 준다.
 
-W&B dashboard에서 최소한 `eval/episode_reward`, `train/global_step`, `reward/velocity`, `reward/upright`, `reward/swing_residual`, `reward/stance_residual`, `reward/gait_residual`, `reward/slip`, `reward/torque`, `projection_cost`를 함께 본다.
+W&B dashboard에서 최소한 `eval/episode_reward`, `train/global_step`,
+`reward/velocity`, `reward/upright`, `reward/swing_residual`, `reward/stance_residual`,
+`reward/gait_residual`, `reward/slip`, `reward/torque`, `reward/torque_saturation`,
+`self_collision`, `effective_stride_m`, `projection_cost`를 함께 본다.
 
 ---
 

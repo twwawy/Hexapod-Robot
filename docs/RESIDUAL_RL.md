@@ -13,6 +13,7 @@ command
   -> classical tripod nominal foot targets
   -> phase-masked 22-D residual
   -> airborne/contact adaptation
+  -> 120 mm effective-stride clamp (forward+yaw, fastest leg basis)
   -> reachable-workspace projection
   -> analytical IK
   -> joint speed/position + fixed ±8 Nm actuator safety
@@ -28,6 +29,8 @@ command
 - swing: XYZ residual 허용
 - stance: Z-only, X/Y는 정확히 0
 - action physical range는 curriculum 중 바꾸지 않는다.
+- raw stride action은 0.8–1.2×지만 회전까지 포함한 어떤 다리의 horizontal stroke도
+  120 mm를 넘지 않도록 safety layer가 최종 scale을 낮춘다.
 - 쉬운 stage에서는 residual penalty를 강하게 하고 어려워질수록 완화한다.
 - action=0이면 NumPy classical nominal과 JAX nominal target이 `1e-4 rad` 이내로
   일치해야 한다.
@@ -112,10 +115,16 @@ Command는 episode의 고정 순서를 암기하지 못하도록 1.5–4.0초마
 샘플한다. Curriculum stage는 허용 가능한 speed/yaw 범위만 정하며, stage 안의
 command 순서는 고정하지 않는다.
 
+Flat Stage 2의 속도 범위는 `0.03–0.21 m/s`다. `phase_time=0.50 s`는 유지하므로
+zero-action straight nominal stride 상한은 `105 mm`다. Terrain command 상한은
+안정성을 위해 기존 `0.18 m/s`를 유지한다.
+
 ## 6. Reward와 competence
 
-Tracking/upright/height/progress와 residual/action-rate/slip/torque/projection/contact
-cost를 각각 W&B에 기록한다. `terrain_success`는 episode 종료 시 다음 조건을 모두
+Tracking/upright/height/progress와 residual/action-rate/slip/torque/
+torque-saturation/projection/body-contact/self-collision cost를 각각 W&B에 기록한다.
+Torque hard clamp는 ±8 Nm이며 6.8 Nm(85%)를 넘는 부분에는 별도 연속 saturation
+cost를 적용한다. `terrain_success`는 episode 종료 시 다음 조건을 모두
 만족하면 1이다.
 
 - 조기 termination 없음
@@ -218,6 +227,11 @@ eval/stage0|1|2/reward_mean
 eval/stage0|1|2/velocity_error_mps
 eval/stage0|1|2/yaw_error_rps
 eval/stage0|1|2/survival_fraction
+eval/stage0|1|2/torque_rms_nm
+eval/stage0|1|2/torque_saturation_mean
+eval/stage0|1|2/self_collision_rate
+eval/stage0|1|2/effective_stride_mean_m
+eval/stage0|1|2/effective_stride_max_m
 ```
 
 학습 command는 계속 1.5–4초 random resampling을 사용하고, 위 비교 평가와 영상만

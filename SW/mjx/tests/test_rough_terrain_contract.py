@@ -28,11 +28,14 @@ from tripod_core import (  # noqa: E402
     analytical_ik,
     heading_aligned_points,
     hysteretic_clearance_contact,
+    limit_effective_stride,
     median_support_height,
     nominal_foot_targets,
     phase_masked_residual,
     project_workspace,
     scale_asymmetric,
+    self_collision_detected,
+    torque_saturation_cost,
     update_airborne_state,
 )
 from prepare_rl_scene import prepare_flat_rl_scene  # noqa: E402
@@ -60,6 +63,11 @@ class RoughTerrainContractTest(unittest.TestCase):
             config.controller.residual.command.to_dict(),
             config.controller.residual.terrain.to_dict(),
         )
+        self.assertEqual(tuple(config.command_curriculum.speed_max), (0.08, 0.12, 0.21))
+        self.assertAlmostEqual(config.controller.safety.max_effective_stride, 0.120)
+        self.assertAlmostEqual(config.reward.torque, -0.020)
+        self.assertAlmostEqual(config.reward.torque_saturation, -0.050)
+        self.assertAlmostEqual(config.reward.slip, -0.080)
 
     def test_stance_xy_is_exactly_zero_and_swing_ranges_are_asymmetric(self) -> None:
         raw = jp.array(
@@ -153,6 +161,55 @@ class RoughTerrainContractTest(unittest.TestCase):
         self.assertTrue(jp.all(distance >= 0.112 - 1e-6))
         self.assertTrue(jp.all(distance <= 0.345 + 1e-6))
         self.assertGreater(float(cost), 0.0)
+
+    def test_effective_stride_caps_forward_and_yaw_stroke(self) -> None:
+        env = HexapodRoughTerrainEnv(terrain="flat", command_curriculum=True)
+        for command in (jp.array((0.21, 0.0)), jp.array((0.21, 0.35))):
+            applied_scale, effective_stride = limit_effective_stride(
+                requested_scale=jp.array(1.2),
+                command=command,
+                origins=env._origins,
+                outward=env._outward,
+                phase_time=0.5,
+                max_stride=0.120,
+            )
+            self.assertLessEqual(float(effective_stride), 0.120001)
+            self.assertLess(float(applied_scale), 1.2)
+        straight_scale, straight_stride = limit_effective_stride(
+            requested_scale=jp.array(1.2),
+            command=jp.array((0.21, 0.0)),
+            origins=env._origins,
+            outward=env._outward,
+            phase_time=0.5,
+            max_stride=0.120,
+        )
+        self.assertAlmostEqual(float(straight_stride), 0.120, places=6)
+        self.assertAlmostEqual(float(straight_scale), 0.120 / 0.105, places=5)
+
+    def test_self_collision_and_torque_saturation_costs(self) -> None:
+        geom_body_ids = jp.array((0, 1, 2, 3))
+        self.assertTrue(
+            bool(
+                self_collision_detected(
+                    jp.array(((1, 2), (1, 0))),
+                    jp.array((-0.01, -0.01)),
+                    geom_body_ids,
+                )
+            )
+        )
+        self.assertFalse(
+            bool(
+                self_collision_detected(
+                    jp.array(((1, 0), (2, 0))),
+                    jp.array((-0.01, -0.01)),
+                    geom_body_ids,
+                )
+            )
+        )
+        saturation = torque_saturation_cost(
+            jp.array((0.0, 6.8, 8.0)), force_limit=8.0
+        )
+        self.assertAlmostEqual(float(saturation), 1.0 / 3.0, places=6)
 
     def test_body_frame_vector_is_yaw_invariant(self) -> None:
         body_vector = jp.array([0.31, -0.18, -0.29])
@@ -275,7 +332,7 @@ class RoughTerrainContractTest(unittest.TestCase):
             (0, (0.08, 0.0)),
             (150, (0.14, 0.30)),
             (300, (0.10, -0.30)),
-            (450, (0.18, 0.15)),
+            (450, (0.21, 0.15)),
         )
         for steps, command in expected:
             self.assertTrue(
@@ -313,6 +370,11 @@ class RoughTerrainContractTest(unittest.TestCase):
                 "velocity_error_mps",
                 "yaw_error_rps",
                 "survival_fraction",
+                "torque_rms_nm",
+                "torque_saturation_mean",
+                "self_collision_rate",
+                "effective_stride_mean_m",
+                "effective_stride_max_m",
             },
         )
         self.assertTrue(all(np.isfinite(value) for value in metrics.values()))
