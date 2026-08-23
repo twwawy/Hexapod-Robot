@@ -4,16 +4,21 @@
 
 ## 현재 기준 경로
 
+Canonical contract: `cartesian_gait_residual_v2` action + `body_state_coarse9_touchdown6_v1` observation(110-D)
+
 ```text
-command → nominal tripod gait → nominal foot targets
-        → RL Δz (swing legs only) → contact/safety → posture layer
-        → linearized IK → joint limits → PD torque
+command → classical tripod nominal foot targets
+        → phase-masked 22-D residual → airborne/contact adaptation
+        → 120 mm effective-stride clamp (forward+yaw, fastest leg basis)
+        → reachable-workspace projection → analytical IK
+        → joint speed/position limits + fixed ±8 Nm actuator safety
 ```
 
-- RL action: 다리 순서 `LF, LM, LB, RF, RM, RB`의 6차원 swing-foot `Δz`
-- RL은 stance 발, 보폭, 착지 XY, gait timing, body pose를 직접 바꾸지 않는다.
-- early landing은 contact/safety 계층이 현재 발 위치를 유지해 RL residual을 무시한다.
-- 기존 7-D residual checkpoint는 action/observation 계약이 달라 재사용할 수 없다. `fresh`로 새 학습을 시작해야 한다.
+- Action 22-D: 다리 순서 `LF, LM, LB, RF, RM, RB`의 `[Δx, Δy, Δz] × 6` + gait 파라미터 4-D(`stride`, `frequency`, `swing-height`, `radial`)
+- Swing leg는 XYZ residual을, stance leg는 Z-only residual을 쓴다. stance 착지 XY는 항상 정확히 0이다.
+- 마지막 4-D는 각각 `stride 0.8–1.2×`, `frequency 0.85–1.15×`, `swing height 50–110 mm`, `radial offset 5–25 mm` 범위에서 gait를 조절하며, 0.15초 time constant의 1차 filter를 거친다.
+- 우선순위는 `safety > contact > RL residual > nominal gait`다. early landing이면 contact/safety 계층이 현재 발 위치를 유지해 residual을 무시한다.
+- 이전 6-D/7-D residual checkpoint는 action/observation 계약이 달라 재사용할 수 없다. `fresh`로 새 학습을 시작해야 한다.
 
 설계·관측·보상·실행 방법은 [docs/RESIDUAL_RL.md](docs/RESIDUAL_RL.md)에만 최신 기준으로 정리한다.
 
@@ -21,9 +26,11 @@ command → nominal tripod gait → nominal foot targets
 
 - `SW/mjx/hexapod_mjx/residual_controller.py`: nominal gait, residual, contact safety, IK
 - `SW/mjx/hexapod_mjx/residual_env.py`: MJX observation, reward, termination
-- `SW/mjx/train_residual_ppo.py`: PPO 학습 및 checkpoint 계약
-- `SW/mjx/visualize_residual_policy.py`: policy replay/render
-- `Hexapod-MJX-가이드/residual_rl_run.sh`: 학습·재개·영상 생성 wrapper
+- `SW/mjx/train_command_curriculum.py`: flat walking+turning curriculum 학습 진입점
+- `SW/mjx/train_rough_terrain.py`: mixed terrain 학습(task 엔진, command 학습도 여기서 재사용)
+- `SW/mjx/train_competence_curriculum.py`: evaluation success로 level을 올리고 내리는 전체 curriculum launcher
+- `SW/mjx/best_policy_video.py` / `SW/mjx/visualize_residual_policy.py`: 최고 policy GIF 렌더 / viewer replay
+- `Hexapod-MJX-가이드/residual_rl_run.sh`: 레거시 7-D residual(`train_residual_ppo.py`) 학습·재개·영상 wrapper
 - `HW/`: 실제 로봇의 URDF, CAD, PCB, 부품 자료
 
 ## 빠른 시작
