@@ -65,9 +65,11 @@ workspace projection이 policy보다 먼저 적용됩니다. 110-D observation�
 같은 XML에 들어 있는 mixed terrain을 초기화합니다. 자세한 최신 명세는
 [`docs/RESIDUAL_RL.md`](../../docs/RESIDUAL_RL.md)를 참고합니다.
 
-Flat command Stage 2는 최대 `0.21 m/s`를 학습합니다. `phase_time=0.50 s`는
+Flat command는 Stage 0/1/2에서 각각 최대 `0.10/0.18/0.27 m/s`를 학습합니다.
+`phase_time=0.50 s`는
 유지하고, forward+yaw를 합친 가장 빠른 다리 기준 horizontal stroke를 120 mm로
-제한합니다. Actuator hard clamp ±8 Nm와 함께 torque saturation(6.8 Nm 초과), slip,
+제한합니다. 고속에서는 gait가 낼 수 있는 범위 안으로 yaw command를 자동 축소합니다.
+Actuator hard clamp ±8 Nm와 함께 torque saturation(6.8 Nm 초과), slip,
 self-collision을 별도 reward/metric으로 감시합니다. 네트워크는 마지막 4-D action으로
 stride/frequency/swing-height/radial-offset을 제한 범위 안에서 조절하며, 기본 0.15초
 filter가 급격한 gait 변화를 막습니다. 평지 contact는 건조 아스팔트 nominal

@@ -36,6 +36,7 @@ from tripod_core import (
     MODEL_FORWARD,
     analytical_ik,
     contact_adapt_targets,
+    feasible_yaw_limit,
     heading_aligned_points,
     hysteretic_clearance_contact,
     limit_effective_stride,
@@ -75,7 +76,7 @@ def default_config() -> config_dict.ConfigDict:
             forward_only_steps=250,
             limited_yaw_steps=250,
             speed_min=(0.03, 0.05, 0.03),
-            speed_max=(0.08, 0.12, 0.21),
+            speed_max=(0.10, 0.18, 0.27),
             yaw_limit=(0.00, 0.15, 0.35),
             resample_seconds=(1.5, 4.0),
         ),
@@ -436,14 +437,14 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
             local_steps = steps
         local_seconds = local_steps.astype(jp.float32) * self.dt
 
-        stage0 = jp.array((0.06, 0.0))
+        stage0 = jp.array((0.08, 0.0))
         stage1_index = jp.clip((local_seconds / 3.0).astype(jp.int32), 0, 2)
         stage1 = jp.array(
-            ((0.09, 0.12), (0.09, -0.12), (0.09, 0.08))
+            ((0.12, 0.12), (0.12, -0.12), (0.16, 0.08))
         )[stage1_index]
         stage2_index = jp.clip((local_seconds / 3.0).astype(jp.int32), 0, 3)
         stage2 = jp.array(
-            ((0.08, 0.0), (0.14, 0.30), (0.10, -0.30), (0.21, 0.15))
+            ((0.10, 0.0), (0.14, 0.30), (0.14, -0.30), (0.27, 0.0))
         )[stage2_index]
         return jp.where(stage == 0, stage0, jp.where(stage == 1, stage1, stage2))
 
@@ -458,7 +459,19 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
             speed_max = self._config.command_max_speed
             yaw_limit = self._config.command_max_yaw_rate
         speed = jax.random.uniform(speed_key, (), minval=speed_min, maxval=speed_max)
-        yaw_rate = jax.random.uniform(yaw_key, (), minval=-yaw_limit, maxval=yaw_limit)
+        authority = self._authority()
+        safe_yaw_limit = feasible_yaw_limit(
+            speed=speed,
+            requested_yaw_limit=yaw_limit,
+            origins=self._origins,
+            outward=self._outward,
+            phase_time=self._config.controller.nominal.phase_time,
+            max_stride=self._config.controller.safety.max_effective_stride,
+            max_frequency_scale=1.0 + authority.frequency_half_range,
+        )
+        yaw_rate = jax.random.uniform(
+            yaw_key, (), minval=-safe_yaw_limit, maxval=safe_yaw_limit
+        )
         return jp.array((speed, yaw_rate))
 
     def _sample_command_interval(self, rng: jax.Array) -> jax.Array:

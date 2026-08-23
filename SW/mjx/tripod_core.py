@@ -185,6 +185,53 @@ def limit_effective_stride(
     return applied_scale, effective_stride
 
 
+def feasible_yaw_limit(
+    *,
+    speed: jp.ndarray,
+    requested_yaw_limit: jp.ndarray,
+    origins: jp.ndarray,
+    outward: jp.ndarray,
+    phase_time: float,
+    max_stride: float,
+    max_frequency_scale: float,
+    iterations: int = 12,
+) -> jp.ndarray:
+    """Return the largest symmetric yaw rate feasible at a given speed.
+
+    At high forward speed, independently sampling maximum yaw can demand more
+    stance stroke than the 120 mm Cartesian safety envelope can produce.  The
+    available command-space speed is ``max_stride * frequency / phase_time``.
+    A fixed-iteration bisection keeps both yaw signs feasible while preserving
+    the requested forward speed.
+    """
+    if phase_time <= 0.0 or max_stride <= 0.0 or max_frequency_scale <= 0.0:
+        raise ValueError("gait feasibility limits must be positive")
+    if iterations <= 0:
+        raise ValueError("iterations must be positive")
+    nominal_body = origins + outward * 0.218728
+    nominal_body = nominal_body.at[:, 2].set(origins[:, 2] - 0.287006)
+    capacity = max_stride * max_frequency_scale / phase_time
+    requested = jp.maximum(requested_yaw_limit, 0.0)
+    low = jp.zeros_like(requested)
+    high = requested
+    for _ in range(iterations):
+        middle = 0.5 * (low + high)
+
+        def peak(yaw_rate: jp.ndarray) -> jp.ndarray:
+            yaw_velocity = jp.cross(
+                jp.tile(jp.array((0.0, 0.0, yaw_rate)), (origins.shape[0], 1)),
+                nominal_body,
+            )
+            foot_velocity = MODEL_FORWARD * speed + yaw_velocity
+            return jp.max(jp.linalg.norm(foot_velocity[:, :2], axis=-1))
+
+        feasible = jp.maximum(peak(middle), peak(-middle)) <= capacity
+        low = jp.where(feasible, middle, low)
+        high = jp.where(feasible, high, middle)
+    straight_feasible = speed <= capacity
+    return jp.where(straight_feasible, low, 0.0)
+
+
 def self_collision_detected(
     contact_geom: jp.ndarray,
     contact_distance: jp.ndarray,

@@ -192,14 +192,19 @@ episode stage는 다음 command 범위를 제공한다.
 
 | stage | 제어 step | forward speed | yaw rate | 학습 목적 |
 | --- | ---: | --- | --- | --- |
-| `0` | `0–249` | `0.03–0.08 m/s` | `0` | 안정적인 직진 tripod gait |
-| `1` | `250–499` | `0.05–0.12 m/s` | `±0.15 rad/s` | 완만한 곡선 보행 |
-| `2` | `500–999` | `0.03–0.21 m/s` | `±0.35 rad/s` | 전체 보행·회전 명령 추종 |
+| `0` | `0–249` | `0.03–0.10 m/s` | `0` | 안정적인 직진 tripod gait |
+| `1` | `250–499` | `0.05–0.18 m/s` | 최대 `±0.15 rad/s` | 중속 완만한 곡선 보행 |
+| `2` | `500–999` | `0.03–0.27 m/s` | 최대 `±0.35 rad/s` | 전체 보행·회전 명령 추종 |
 
 실제 command는 stage의 고정 순서를 암기하지 못하도록 1.5–4.0초마다 범위 안에서
 무작위로 다시 sample한다. policy는 항상 현재 command를
 observation의 첫 2개 값으로 받으며, 22D residual action과 nominal tripod/IK는 바뀌지 않는다.
 따라서 “보행 policy”와 “회전 policy”를 이어 붙이는 구조가 아니다.
+
+120 mm stride와 최대 `1.15×` frequency에서 fastest-foot 속도 한계는 약
+`0.276 m/s`다. `0.27 m/s`와 큰 yaw를 동시에 요구하지 않도록 각 forward speed에서
+가능한 yaw 범위를 자동 계산한다. 따라서 최고속도는 사실상 직진으로 평가하고,
+`±0.30 rad/s` 회전은 `0.14 m/s` 고정 평가에서 좌우 각각 확인한다.
 
 ### B. Mixed terrain: 별도 competence task
 
@@ -489,13 +494,14 @@ full 영상의 5초·10초 경계에는 0.8초 전환 banner가 나온다. W&B M
 | network | `--network-layers` | 기본 `256 256 128`; OOM이면 `192 128` |
 | nominal gait | `--phase-time --base-swing-height --base-radial-offset` | controller 자체가 바뀌므로 기존 run과 직접 비교하지 않음 |
 | RL foot 권한 | `--swing-x --swing-y --swing-z-low --swing-z-high --stance-z` | active task만 override; stance XY는 항상 0 |
-| RL gait 권한 | `--stride-half-range --frequency-half-range --swing-height-min --swing-height-max --radial-min --radial-max` | 기본 stride `0.8…1.2×`, frequency `0.85…1.15×` |
+| RL gait 권한 | `--stride-half-range --frequency-half-range --swing-height-min --swing-height-max --radial-min --radial-max --gait-filter-time-constant` | 기본 stride `0.8…1.2×`, frequency `0.85…1.15×`, filter `0.15 s` |
 | terrain command 범위 | `--terrain-speed-min --terrain-speed-max --terrain-yaw-limit` | stairs/mixed terrain task에서 사용 |
 | terrain 난이도 | `--terrain-layout --terrain-level --terrain-randomize` | mixed patch 확률 + level 4 per-env dynamics |
 | policy transfer | `--init-checkpoint` | 동일 22/110 semantic contract의 flat policy로 terrain 초기화 |
 | run 관리 | `--run-name --run-root` | checkpoint/monitor/video/config/metadata를 한 run directory에 저장 |
 | 평지 curriculum 길이 | `--curriculum-forward-only-steps --curriculum-limited-yaw-steps` | 기본 `250 250`, 마지막 stage는 episode 끝까지 |
 | 평지 curriculum 범위 | `--curriculum-speed-min`, `--curriculum-speed-max`, `--curriculum-yaw-limit` | 각 stage 순서의 값 3개 |
+| 평지 마찰 | `--flat-friction` | 건조 아스팔트 nominal `0.8` |
 | 최고점 기준/경로 | `--score-key --monitor-dir` | 기본 score key는 `eval/episode_reward` |
 | 최고 정책 영상 | `--best-video --best-video-path` | command는 `videos/` 4종, terrain은 단일 GIF; NEW_BEST에서만 교체 |
 | 영상 길이 | `--best-video-stage0-duration` 등 | command 기본 `10/10/12/22 s`; terrain은 `--best-video-duration=10` |

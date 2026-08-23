@@ -250,7 +250,7 @@ def _arguments(default_task: str) -> argparse.Namespace:
         "--curriculum-speed-min", type=float, nargs=3, default=(0.03, 0.05, 0.03)
     )
     parser.add_argument(
-        "--curriculum-speed-max", type=float, nargs=3, default=(0.08, 0.12, 0.21)
+        "--curriculum-speed-max", type=float, nargs=3, default=(0.10, 0.18, 0.27)
     )
     parser.add_argument(
         "--curriculum-yaw-limit", type=float, nargs=3, default=(0.00, 0.15, 0.35)
@@ -351,6 +351,24 @@ def _make_env(args: argparse.Namespace) -> HexapodRoughTerrainEnv:
     config.command_curriculum.speed_min = tuple(args.curriculum_speed_min)
     config.command_curriculum.speed_max = tuple(args.curriculum_speed_max)
     config.command_curriculum.yaw_limit = tuple(args.curriculum_yaw_limit)
+    if any(
+        minimum < 0.0 or maximum < minimum
+        for minimum, maximum in zip(
+            args.curriculum_speed_min, args.curriculum_speed_max
+        )
+    ):
+        raise ValueError("each curriculum speed range must satisfy 0 <= min <= max")
+    if args.task == "command":
+        gait_speed_capacity = (
+            config.controller.safety.max_effective_stride
+            * (1.0 + authority.frequency_half_range)
+            / config.controller.nominal.phase_time
+        )
+        if max(args.curriculum_speed_max) > gait_speed_capacity + 1e-6:
+            raise ValueError(
+                "command curriculum exceeds the configured stride/frequency "
+                f"capacity ({gait_speed_capacity:.3f} m/s)"
+            )
     # Curriculum changes terrain geometry before model-gap difficulty.  Mixed
     # terrain itself is sampled per reset; optional level-4 dynamics are
     # sampled per vectorized environment by domain_randomization.py.

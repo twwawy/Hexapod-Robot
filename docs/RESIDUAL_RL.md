@@ -124,9 +124,22 @@ Command는 episode의 고정 순서를 암기하지 못하도록 1.5–4.0초마
 샘플한다. Curriculum stage는 허용 가능한 speed/yaw 범위만 정하며, stage 안의
 command 순서는 고정하지 않는다.
 
-Flat Stage 2의 속도 범위는 `0.03–0.21 m/s`다. `phase_time=0.50 s`는 유지하므로
-zero-action straight nominal stride 상한은 `105 mm`다. Terrain command 상한은
-안정성을 위해 기존 `0.18 m/s`를 유지한다.
+Flat command의 속도 curriculum은 다음과 같다.
+
+| Stage | command | speed range | yaw range |
+| ---: | --- | ---: | ---: |
+| 0 | forward only | `0.03–0.10 m/s` | `0` |
+| 1 | limited yaw | `0.05–0.18 m/s` | 최대 `±0.15 rad/s` |
+| 2 | full command | `0.03–0.27 m/s` | 최대 `±0.35 rad/s` |
+
+`phase_time=0.50 s`, 120 mm stride, 최대 frequency `1.15×`에서 가능한 fastest-foot
+속도는 약 `0.276 m/s`다. 따라서 speed와 yaw를 독립적으로 끝값까지 샘플하지 않는다.
+각 speed에서 forward+yaw를 합친 가장 빠른 leg가 이 한계를 넘지 않도록 yaw 범위를
+자동 축소한다. `0.27 m/s`는 거의 직진 전용이고, 큰 회전 명령은 중간 속도에서
+학습한다. 기본 geometry에서 `0.27 m/s`의 yaw 한계는 약 `±0.015 rad/s`이고,
+`0.14 m/s`에서는 약 `±0.337 rad/s`다. CLI로 gait capacity보다 큰 curriculum
+speed를 넣으면 학습 시작 전에 오류로 막는다. Terrain command 상한은 안정성을 위해
+기존 `0.18 m/s`를 유지한다.
 
 ## 6. Reward와 competence
 
@@ -259,3 +272,6 @@ raw/applied 차이인 `eval/episode_gait_filter_error`가 기록된다. 기본 f
 `best/video_stage0_forward`, `best/video_stage1_limited_yaw`,
 `best/video_stage2_full_command`, `best/video_curriculum_full`에 올린다. Terrain run은
 `videos/best_policy.gif`와 `best/video` 한 개를 유지한다.
+
+Stage 2 고정 영상은 `0.10 straight → 0.14/+0.30 yaw → 0.14/-0.30 yaw →
+0.27 straight` 순서라 회전 성능과 최고속도를 서로 방해하지 않고 비교할 수 있다.

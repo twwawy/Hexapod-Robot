@@ -26,6 +26,7 @@ from rough_terrain_env import (  # noqa: E402
 from tripod_core import (  # noqa: E402
     LINK1,
     analytical_ik,
+    feasible_yaw_limit,
     heading_aligned_points,
     hysteretic_clearance_contact,
     limit_effective_stride,
@@ -67,7 +68,7 @@ class RoughTerrainContractTest(unittest.TestCase):
             config.controller.residual.command.to_dict(),
             config.controller.residual.terrain.to_dict(),
         )
-        self.assertEqual(tuple(config.command_curriculum.speed_max), (0.08, 0.12, 0.21))
+        self.assertEqual(tuple(config.command_curriculum.speed_max), (0.10, 0.18, 0.27))
         self.assertAlmostEqual(config.controller.safety.max_effective_stride, 0.120)
         self.assertAlmostEqual(
             config.controller.residual.gait_filter_time_constant, 0.15
@@ -172,7 +173,7 @@ class RoughTerrainContractTest(unittest.TestCase):
 
     def test_effective_stride_caps_forward_and_yaw_stroke(self) -> None:
         env = HexapodRoughTerrainEnv(terrain="flat", command_curriculum=True)
-        for command in (jp.array((0.21, 0.0)), jp.array((0.21, 0.35))):
+        for command in (jp.array((0.27, 0.0)), jp.array((0.27, 0.35))):
             applied_scale, effective_stride = limit_effective_stride(
                 requested_scale=jp.array(1.2),
                 command=command,
@@ -185,14 +186,41 @@ class RoughTerrainContractTest(unittest.TestCase):
             self.assertLess(float(applied_scale), 1.2)
         straight_scale, straight_stride = limit_effective_stride(
             requested_scale=jp.array(1.2),
-            command=jp.array((0.21, 0.0)),
+            command=jp.array((0.27, 0.0)),
             origins=env._origins,
             outward=env._outward,
             phase_time=0.5,
             max_stride=0.120,
         )
         self.assertAlmostEqual(float(straight_stride), 0.120, places=6)
-        self.assertAlmostEqual(float(straight_scale), 0.120 / 0.105, places=5)
+        self.assertAlmostEqual(float(straight_scale), 0.120 / 0.135, places=5)
+
+    def test_speed_curriculum_limits_yaw_to_reachable_gait_envelope(self) -> None:
+        env = HexapodRoughTerrainEnv(terrain="flat", command_curriculum=True)
+        capacity = 0.120 * 1.15 / 0.5
+        high_speed_limit = feasible_yaw_limit(
+            speed=jp.array(0.27),
+            requested_yaw_limit=jp.array(0.35),
+            origins=env._origins,
+            outward=env._outward,
+            phase_time=0.5,
+            max_stride=0.120,
+            max_frequency_scale=1.15,
+        )
+        self.assertGreater(float(high_speed_limit), 0.0)
+        self.assertLess(float(high_speed_limit), 0.35)
+        for seed in range(20):
+            command = env._sample_command(
+                jax.random.PRNGKey(seed), jp.array(2, dtype=jp.int32)
+            )
+            nominal_body = env._origins + env._outward * 0.218728
+            yaw_velocity = jp.cross(
+                jp.tile(jp.array((0.0, 0.0, command[1])), (6, 1)), nominal_body
+            )
+            foot_velocity = jp.array((0.0, -command[0], 0.0)) + yaw_velocity
+            peak = jp.max(jp.linalg.norm(foot_velocity[:, :2], axis=-1))
+            self.assertLessEqual(float(command[0]), 0.270001)
+            self.assertLessEqual(float(peak), capacity + 1e-5)
 
     def test_self_collision_and_torque_saturation_costs(self) -> None:
         geom_body_ids = jp.array((0, 1, 2, 3))
@@ -356,10 +384,10 @@ class RoughTerrainContractTest(unittest.TestCase):
         self.assertEqual(int(stage1._curriculum_stage(jp.array(0))), 1)
         self.assertEqual(int(stage1._curriculum_stage(jp.array(999))), 1)
         self.assertTrue(
-            jp.allclose(stage1._scripted_command(jp.array(0), jp.array(1)), jp.array((0.09, 0.12)))
+            jp.allclose(stage1._scripted_command(jp.array(0), jp.array(1)), jp.array((0.12, 0.12)))
         )
         self.assertTrue(
-            jp.allclose(stage1._scripted_command(jp.array(160), jp.array(1)), jp.array((0.09, -0.12)))
+            jp.allclose(stage1._scripted_command(jp.array(160), jp.array(1)), jp.array((0.12, -0.12)))
         )
 
         stage2 = HexapodRoughTerrainEnv(
@@ -369,10 +397,10 @@ class RoughTerrainContractTest(unittest.TestCase):
             scripted_commands=True,
         )
         expected = (
-            (0, (0.08, 0.0)),
+            (0, (0.10, 0.0)),
             (150, (0.14, 0.30)),
-            (300, (0.10, -0.30)),
-            (450, (0.21, 0.15)),
+            (300, (0.14, -0.30)),
+            (450, (0.27, 0.0)),
         )
         for steps, command in expected:
             self.assertTrue(
