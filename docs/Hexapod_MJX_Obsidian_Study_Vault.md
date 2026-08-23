@@ -48,7 +48,7 @@ canonical_source: /home/huro/Downloads/mjx
 | 평지 학습 | `train_command_curriculum.py --wandb` |
 | mixed terrain 학습 | `train_rough_terrain.py --terrain-layout mixed --wandb` |
 | 실시간 최고 점수 | `SW/mjx/runs/<task>/<run-id>/monitor/best_score.txt` |
-| 최고 policy 영상 | `SW/mjx/runs/<task>/<run-id>/best_policy.gif` (새 best마다 자동 교체) |
+| 최고 policy 영상 | command는 `runs/.../videos/` 4종, terrain은 `videos/best_policy.gif` |
 
 핵심 식:
 
@@ -346,6 +346,9 @@ python SW/mjx/train_command_curriculum.py \
 
 W&B에서 이름에 `curriculum_stage`가 들어간 metric이 `0 → 1 → 2`로 진행하는지와 `reward/velocity`,
 `reward/yaw`, `reward/swing_residual`, `reward/stance_residual`, `projection_cost`를 함께 본다.
+추가로 매 evaluation마다 독립 reset과 고정 command script로 계산되는
+`eval/stage0|1|2/reward_mean`, `velocity_error_mps`, `yaw_error_rps`,
+`survival_fraction`을 비교한다. 학습 command 자체는 계속 1.5–4초 random이다.
 
 ### B. Mixed terrain transfer
 
@@ -419,10 +422,14 @@ trainer는 `--run-name`을 prefix로 사용하고 항상
 절대 재사용하지 않는다.
 
 ```text
-runs/terrain/terrain-v2-level3-seed0/
+runs/command/command-v2-seed0/
 ├── checkpoints/
 ├── monitor/
-├── best_policy.gif
+├── videos/
+│   ├── best_stage0_forward.gif
+│   ├── best_stage1_limited_yaw.gif
+│   ├── best_stage2_full_command.gif
+│   └── best_curriculum_full.gif
 ├── config.json
 └── run_metadata.json     # git SHA, v2 action contract, config, PPO, version
 ```
@@ -435,8 +442,10 @@ runs/terrain/terrain-v2-level3-seed0/
 | `metrics_history.jsonl` | 매 evaluation | 시간 순서 전체 metric 이력 |
 | `best_score.json` | `--score-key`가 최고 기록일 때 | 프로그램/분석용 best record |
 | `best_score.txt` | `--score-key`가 최고 기록일 때 | terminal에서 바로 확인할 요약 |
-| `../best_policy.gif` | `--score-key`가 최고 기록일 때 | 해당 policy의 deterministic 10초 보행 영상; 새 best로 자동 교체 |
-| `best_video.json` | `best_policy.gif` 저장 성공 시 | 영상에 해당하는 step, score, 실제 절대 경로 |
+| `stage_metrics_latest.json` | command 매 evaluation | Stage 0/1/2 독립 reward·tracking·survival 최신값 |
+| `stage_metrics_history.jsonl` | command 매 evaluation | Stage별 scalar 전체 이력 |
+| `../videos/*.gif` | `--score-key`가 최고 기록일 때 | Stage 0/1/2/full deterministic 영상; 새 best로 자동 교체 |
+| `best_video.json` | 영상 생성 시 | step, score, 네 영상 경로, 렌더 오류 |
 
 기본 최고 점수 기준은 `eval/episode_reward`다. 학습 중 다른 terminal에서 다음을 실행한다.
 
@@ -452,11 +461,15 @@ tail -f SW/mjx/runs/command/command-v2-seed0/monitor/metrics_history.jsonl
 더 자주 보고 싶으면 `--num-evals 100`으로 올릴 수 있지만 평가 비용도 증가한다. W&B를 켠
 run에서는 새 최고점이 `best/score`, `best/step`, `best/score_key` summary에도 기록된다.
 
-기본값으로 `--best-video`가 켜져 있다. 새 최고점이 나오면 동일한 policy를 deterministic하게
-10초·20 fps로 다시 rollout하여 `<run-dir>/best_policy.gif`에 **자동 저장하고 기존 최고 영상은
-교체**한다. `--wandb` run이면 같은 GIF가 W&B의 `best/video`에도 올라간다. 별도 ffmpeg process가
-아닌 Pillow GIF writer를 쓰므로 JAX 학습 worker가 실행된 뒤에도 fork하지 않는다. 영상 렌더링 오류는
-`best_video_error`로만 출력하며 PPO 학습이나 checkpoint를 중단시키지 않는다.
+기본값으로 `--best-video`가 켜져 있다. Command NEW_BEST에서는 서로 독립 reset된
+Stage 0 10초, Stage 1 10초, Stage 2 12초 영상과 0→1→2 전환을 포함한 full 22초
+영상을 생성한다. Stage 영상은 checkpoint마다 같은 command script를 사용하므로 영상 간
+비교가 가능하다. 좌측 상단 overlay에는 stage, 시간, `v_cmd/v`, `yaw_cmd/yaw`가 표시되고,
+full 영상의 5초·10초 경계에는 0.8초 전환 banner가 나온다. W&B Media key는
+`best/video_stage0_forward`, `best/video_stage1_limited_yaw`,
+`best/video_stage2_full_command`, `best/video_curriculum_full`이다. Terrain은 기존처럼
+단일 `videos/best_policy.gif`와 `best/video`를 쓴다. Pillow GIF writer를 사용하며,
+`best_video_error`가 발생해도 PPO 학습이나 checkpoint는 중단되지 않는다.
 
 ### 자주 조정하는 CLI 옵션
 
@@ -466,7 +479,7 @@ run에서는 새 최고점이 `best/score`, `best/step`, `best/score_key` summar
 | --- | --- | --- |
 | 병렬 규모 | `--num-envs` | 3090은 `2048`부터, OOM이면 `1024 → 512` |
 | 학습 시간 | `--timesteps` | 본 run `50000000`, 빠른 검증 `20000` |
-| 평가/monitor 빈도 | `--num-evals`, `--num-eval-envs` | `50`, `64`; eval을 늘리면 느려짐 |
+| 평가/monitor 빈도 | `--num-evals`, `--num-eval-envs`, `--stage-eval-envs` | `50`, `64`, `8`; command stage 평가는 독립 reset 8개 |
 | PPO rollout | `--unroll-length` | command `20`, terrain `32`; ablation `20/32/50` |
 | PPO update | `--batch-size --num-minibatches --num-updates-per-batch` | 기본 `256 8 4`; 한 번에 하나만 바꿈 |
 | optimizer | `--learning-rate --entropy-cost --discounting` | command γ `0.97`, terrain γ `0.99` |
@@ -481,8 +494,9 @@ run에서는 새 최고점이 `best/score`, `best/step`, `best/score_key` summar
 | 평지 curriculum 길이 | `--curriculum-forward-only-steps --curriculum-limited-yaw-steps` | 기본 `250 250`, 마지막 stage는 episode 끝까지 |
 | 평지 curriculum 범위 | `--curriculum-speed-min`, `--curriculum-speed-max`, `--curriculum-yaw-limit` | 각 stage 순서의 값 3개 |
 | 최고점 기준/경로 | `--score-key --monitor-dir` | 기본 score key는 `eval/episode_reward` |
-| 최고 정책 영상 | `--best-video --best-video-path` | 기본 켜짐; `<run-dir>/best_policy.gif`를 새 best마다 교체 |
-| 영상 품질/비용 | `--best-video-duration --best-video-fps --best-video-width --best-video-height` | 기본 `10 s, 20 fps, 640×360`; 평가 직후 한 번만 렌더링 |
+| 최고 정책 영상 | `--best-video --best-video-path` | command는 `videos/` 4종, terrain은 단일 GIF; NEW_BEST에서만 교체 |
+| 영상 길이 | `--best-video-stage0-duration` 등 | command 기본 `10/10/12/22 s`; terrain은 `--best-video-duration=10` |
+| 영상 품질/비용 | `--best-video-fps --best-video-width --best-video-height` | 기본 `20 fps, 640×360`; NEW_BEST 직후만 렌더링 |
 | W&B | `--wandb-*` | project·name·group을 실험 단위로 분리 |
 
 예: 평지 curriculum에서 회전 도입을 늦추고 policy 크기를 줄이는 debug run:
@@ -650,7 +664,7 @@ reward만 높다고 좋은 정책은 아니다. `swing_residual`, `stance_residu
 | discounting / GAE | command 0.97, terrain 0.99 / 0.95 | gait-cycle credit assignment |
 | network | 256, 256, 128 | actor/critic hidden layers |
 
-`--wandb`를 켜면 Brax evaluation progress callback의 metrics와 `train/global_step`이 현재 로그인된 W&B account로 전송된다. `--best-video`가 켜진 상태에서 score가 새 최고점이면 local GIF와 함께 W&B의 `best/video`도 갱신된다.
+`--wandb`를 켜면 Brax evaluation progress callback의 metrics와 `train/global_step`이 현재 로그인된 W&B account로 전송된다. `--best-video`가 켜진 상태에서 score가 새 최고점이면 terrain은 `best/video`, command는 `best/video_stage0_forward`, `best/video_stage1_limited_yaw`, `best/video_stage2_full_command`, `best/video_curriculum_full`이 갱신된다.
 
 ```bash
 python SW/mjx/train_command_curriculum.py \

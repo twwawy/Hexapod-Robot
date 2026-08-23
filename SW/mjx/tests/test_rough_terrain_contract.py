@@ -44,6 +44,7 @@ from tripod_controller import (  # noqa: E402
     TripodGaitController,
 )
 from domain_randomization import domain_randomize  # noqa: E402
+from best_policy_video import make_policy_evaluator  # noqa: E402
 
 
 class RoughTerrainContractTest(unittest.TestCase):
@@ -247,6 +248,75 @@ class RoughTerrainContractTest(unittest.TestCase):
         self.assertTrue(bool(jp.all(jp.isfinite(state.obs))))
         phase = float(state.info["phase"])
         self.assertLess(min(phase, 1.0 - phase), 1e-4)
+
+    def test_fixed_stage_script_is_deterministic_and_independent(self) -> None:
+        stage1 = HexapodRoughTerrainEnv(
+            terrain="flat",
+            command_curriculum=True,
+            fixed_curriculum_stage=1,
+            scripted_commands=True,
+        )
+        self.assertEqual(int(stage1._curriculum_stage(jp.array(0))), 1)
+        self.assertEqual(int(stage1._curriculum_stage(jp.array(999))), 1)
+        self.assertTrue(
+            jp.allclose(stage1._scripted_command(jp.array(0), jp.array(1)), jp.array((0.09, 0.12)))
+        )
+        self.assertTrue(
+            jp.allclose(stage1._scripted_command(jp.array(160), jp.array(1)), jp.array((0.09, -0.12)))
+        )
+
+        stage2 = HexapodRoughTerrainEnv(
+            terrain="flat",
+            command_curriculum=True,
+            fixed_curriculum_stage=2,
+            scripted_commands=True,
+        )
+        expected = (
+            (0, (0.08, 0.0)),
+            (150, (0.14, 0.30)),
+            (300, (0.10, -0.30)),
+            (450, (0.18, 0.15)),
+        )
+        for steps, command in expected:
+            self.assertTrue(
+                jp.allclose(
+                    stage2._scripted_command(jp.array(steps), jp.array(2)),
+                    jp.array(command),
+                )
+            )
+
+    def test_scripted_stage_policy_evaluator_reports_tracking_metrics(self) -> None:
+        env = HexapodRoughTerrainEnv(
+            terrain="flat",
+            command_curriculum=True,
+            fixed_curriculum_stage=0,
+            scripted_commands=True,
+        )
+
+        def make_policy(params, deterministic=False):
+            del params, deterministic
+
+            def policy(obs, key):
+                del key
+                return jp.zeros(obs.shape[:-1] + (ACTION_SIZE,)), {}
+
+            return policy
+
+        evaluator = make_policy_evaluator(
+            env=env, make_policy=make_policy, duration=0.04, num_envs=2, seed=9
+        )
+        metrics = evaluator(None)
+        self.assertEqual(
+            set(metrics),
+            {
+                "reward_mean",
+                "velocity_error_mps",
+                "yaw_error_rps",
+                "survival_fraction",
+            },
+        )
+        self.assertTrue(all(np.isfinite(value) for value in metrics.values()))
+        self.assertGreater(metrics["survival_fraction"], 0.0)
 
     def test_mixed_terrain_height_families_and_per_env_reset(self) -> None:
         env = HexapodRoughTerrainEnv(terrain="mixed")

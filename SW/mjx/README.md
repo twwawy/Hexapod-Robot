@@ -113,15 +113,20 @@ python SW/mjx/train_competence_curriculum.py \
 5천만 environment step입니다.
 
 각 run은 `SW/mjx/runs/<task>/<name>_<timestamp>_seed<seed>/`에 checkpoint, `monitor/`,
-`config.json`, `run_metadata.json`을 함께 저장합니다. 기본으로
-`--best-video`가 켜져 있어 `eval/episode_reward`가 새 최고점일 때마다 그 policy의
-deterministic 10초 GIF를 `<run-dir>/best_policy.gif`에 자동으로 저장하고 이전
-최고 영상을 교체합니다. W&B run에서는 같은 파일을 `best/video`로도 업로드합니다.
+`videos/`, `config.json`, `run_metadata.json`을 함께 저장합니다. Flat command run은
+매 evaluation마다 Stage 0/1/2를 독립 reset·고정 command로 평가하고, NEW_BEST에서
+`best_stage0_forward.gif`, `best_stage1_limited_yaw.gif`,
+`best_stage2_full_command.gif`, `best_curriculum_full.gif` 네 파일을 갱신합니다.
+W&B에도 각각 `best/video_stage0_forward`, `best/video_stage1_limited_yaw`,
+`best/video_stage2_full_command`, `best/video_curriculum_full`로 올라갑니다. Terrain
+run은 `videos/best_policy.gif`와 W&B `best/video` 한 개를 유지합니다.
 
 같은 `--run-name`을 다시 사용해도 timestamp suffix 때문에 기존 checkpoint/monitor와
 섞이지 않습니다. `--best-video-path`를 생략하면 새 run directory 안에 저장됩니다.
 
-영상은 기본 `10초 / 20 fps / 640x360`이고 `--best-video-duration`,
+Command 영상은 기본 Stage 0/1/2/full이 각각 `10/10/12/22초`이며 모든 frame에
+stage, `v_cmd/v`, `yaw_cmd/yaw` overlay가 들어갑니다. Full 영상은 stage 전환을
+0.8초 banner로 표시합니다. 길이는 `--best-video-stage0-duration` 등으로, 공통 품질은
 `--best-video-fps`, `--best-video-width`, `--best-video-height`로 바꿉니다. 영상이
 필요 없는 짧은 debug run에는 `--no-best-video`를 사용합니다. 렌더링 실패는
 `best_video_error`만 출력하며 학습·checkpoint 저장을 멈추지 않습니다. X11 DISPLAY가

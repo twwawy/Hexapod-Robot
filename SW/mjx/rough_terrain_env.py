@@ -203,6 +203,8 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
         *,
         terrain: str = "mixed",
         command_curriculum: bool = False,
+        fixed_curriculum_stage: Optional[int] = None,
+        scripted_commands: bool = False,
     ) -> None:
         if terrain not in {"flat", "stairs", "mixed"}:
             raise ValueError(
@@ -210,6 +212,14 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
             )
         self._terrain = terrain
         self._command_curriculum = command_curriculum
+        if fixed_curriculum_stage is not None and fixed_curriculum_stage not in (0, 1, 2):
+            raise ValueError("fixed_curriculum_stage must be 0, 1, 2, or None")
+        if (fixed_curriculum_stage is not None or scripted_commands) and not command_curriculum:
+            raise ValueError(
+                "fixed/scripted curriculum evaluation requires command_curriculum=True"
+            )
+        self._fixed_curriculum_stage = fixed_curriculum_stage
+        self._scripted_commands = scripted_commands
         super().__init__(config, config_overrides)
         if terrain == "stairs":
             prepare_rl_scene(
@@ -386,11 +396,45 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
         return jp.max(jp.where(inside, self._step_heights, 0.0), axis=-1)
 
     def _curriculum_stage(self, steps: jax.Array) -> jax.Array:
+        if self._fixed_curriculum_stage is not None:
+            return jp.asarray(self._fixed_curriculum_stage, dtype=jp.int32)
         if not self._command_curriculum:
             return jp.zeros((), dtype=jp.int32)
         first_end = int(self._config.command_curriculum.forward_only_steps)
         second_end = first_end + int(self._config.command_curriculum.limited_yaw_steps)
         return jp.where(steps < first_end, 0, jp.where(steps < second_end, 1, 2)).astype(jp.int32)
+
+    def _scripted_command(self, steps: jax.Array, stage: jax.Array) -> jax.Array:
+        """Deterministic command used only for comparable evaluation/video.
+
+        Training continues to call :meth:`_sample_command`.  A fixed-stage
+        evaluation uses time from episode reset, while the full curriculum
+        script resets its local clock at the 0->1 and 1->2 boundaries.
+        """
+        first_end = int(self._config.command_curriculum.forward_only_steps)
+        second_end = first_end + int(
+            self._config.command_curriculum.limited_yaw_steps
+        )
+        if self._fixed_curriculum_stage is None:
+            local_steps = jp.where(
+                stage == 0,
+                steps,
+                jp.where(stage == 1, steps - first_end, steps - second_end),
+            )
+        else:
+            local_steps = steps
+        local_seconds = local_steps.astype(jp.float32) * self.dt
+
+        stage0 = jp.array((0.06, 0.0))
+        stage1_index = jp.clip((local_seconds / 3.0).astype(jp.int32), 0, 2)
+        stage1 = jp.array(
+            ((0.09, 0.12), (0.09, -0.12), (0.09, 0.08))
+        )[stage1_index]
+        stage2_index = jp.clip((local_seconds / 3.0).astype(jp.int32), 0, 3)
+        stage2 = jp.array(
+            ((0.08, 0.0), (0.14, 0.30), (0.10, -0.30), (0.18, 0.15))
+        )[stage2_index]
+        return jp.where(stage == 0, stage0, jp.where(stage == 1, stage1, stage2))
 
     def _sample_command(self, rng: jax.Array, stage: jax.Array) -> jax.Array:
         speed_key, yaw_key = jax.random.split(rng)
@@ -594,9 +638,14 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
         contact_state = self._foot_contacts(data)
         initial_swing, _ = phase_masks(self._tripod_a, jp.zeros(()))
         support_height = self._support_height(data, contact_state, initial_swing)
+        command = (
+            self._scripted_command(jp.zeros((), dtype=jp.int32), curriculum_stage)
+            if self._scripted_commands
+            else self._sample_command(command_key, curriculum_stage)
+        )
         info = {
             "rng": rng,
-            "command": self._sample_command(command_key, curriculum_stage),
+            "command": command,
             "command_steps_remaining": self._sample_command_interval(interval_key),
             "phase": jp.zeros(()),
             "steps": jp.zeros((), dtype=jp.int32),
@@ -615,6 +664,7 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
             support_height=jp.zeros(()), body_clearance=jp.zeros(()),
             terrain_patch=terrain_patch.astype(jp.float32),
             terrain_success=jp.zeros(()),
+            velocity_error_mps=jp.zeros(()), yaw_error_rps=jp.zeros(()),
             curriculum_stage=curriculum_stage.astype(jp.float32),
             contact_early_landing=jp.zeros(()), contact_lost=jp.zeros(()),
         )
@@ -635,6 +685,10 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
         quat = data.qpos[3:7]
         local_velocity = _quat_rotate_inverse(quat, data.qvel[:3])
         forward_velocity = jp.dot(local_velocity, MODEL_FORWARD)
+        velocity_error_mps = jp.abs(
+            forward_velocity - state.info["command"][0]
+        )
+        yaw_error_rps = jp.abs(data.qvel[5] - state.info["command"][1])
         up_z = _quat_rotate(quat, jp.array((0.0, 0.0, 1.0)))[2]
         contacts = self._foot_contacts(data, state.info["contact_state"])
         support_height = self._support_height(data, contacts, controller["swing"])
@@ -689,21 +743,27 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
             & (forward_distance > 0.5)
         )
         next_stage = self._curriculum_stage(next_steps)
-        next_rng, command_key, interval_key = jax.random.split(state.info["rng"], 3)
-        stage_changed = next_stage != state.info["curriculum_stage"]
-        interval_elapsed = state.info["command_steps_remaining"] <= 1
-        resample_command = stage_changed | interval_elapsed
-        sampled_command = self._sample_command(command_key, next_stage)
-        sampled_interval = self._sample_command_interval(interval_key)
-        state.info["rng"] = next_rng
-        state.info["command"] = jp.where(
-            resample_command, sampled_command, state.info["command"]
-        )
-        state.info["command_steps_remaining"] = jp.where(
-            resample_command,
-            sampled_interval,
-            state.info["command_steps_remaining"] - 1,
-        )
+        if self._scripted_commands:
+            state.info["command"] = self._scripted_command(next_steps, next_stage)
+            state.info["command_steps_remaining"] = jp.zeros((), dtype=jp.int32)
+        else:
+            next_rng, command_key, interval_key = jax.random.split(
+                state.info["rng"], 3
+            )
+            stage_changed = next_stage != state.info["curriculum_stage"]
+            interval_elapsed = state.info["command_steps_remaining"] <= 1
+            resample_command = stage_changed | interval_elapsed
+            sampled_command = self._sample_command(command_key, next_stage)
+            sampled_interval = self._sample_command_interval(interval_key)
+            state.info["rng"] = next_rng
+            state.info["command"] = jp.where(
+                resample_command, sampled_command, state.info["command"]
+            )
+            state.info["command_steps_remaining"] = jp.where(
+                resample_command,
+                sampled_interval,
+                state.info["command_steps_remaining"] - 1,
+            )
         state.info["curriculum_stage"] = next_stage
         state.info["steps"] = next_steps
         state.info["last_action"] = action
@@ -721,6 +781,8 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
         state.metrics["body_clearance"] = clearance
         state.metrics["terrain_patch"] = state.info["terrain_patch"].astype(jp.float32)
         state.metrics["terrain_success"] = terrain_success.astype(jp.float32)
+        state.metrics["velocity_error_mps"] = velocity_error_mps
+        state.metrics["yaw_error_rps"] = yaw_error_rps
         state.metrics["curriculum_stage"] = state.info["curriculum_stage"].astype(jp.float32)
         state.metrics["contact_early_landing"] = jp.mean(controller["early_landing"].astype(jp.float32))
         state.metrics["contact_lost"] = jp.mean(controller["lost_contact"].astype(jp.float32))

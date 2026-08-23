@@ -23,10 +23,15 @@ class HexapodCommandCurriculumEnv(HexapodRoughTerrainEnv):
         self,
         config: config_dict.ConfigDict = default_config(),
         config_overrides: Optional[dict[str, Any]] = None,
+        *,
+        fixed_curriculum_stage: Optional[int] = None,
+        scripted_commands: bool = False,
     ) -> None:
         super().__init__(
             config=config,
             config_overrides=config_overrides,
             terrain="flat",
             command_curriculum=True,
+            fixed_curriculum_stage=fixed_curriculum_stage,
+            scripted_commands=scripted_commands,
         )

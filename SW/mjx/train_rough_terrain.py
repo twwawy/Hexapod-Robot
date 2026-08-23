@@ -25,8 +25,9 @@ import jax
 import jax.numpy as jp
 import mujoco
 import numpy as np
+from ml_collections import config_dict
 
-from best_policy_video import render_policy_video
+from best_policy_video import make_policy_evaluator, render_policy_video
 from command_curriculum_env import HexapodCommandCurriculumEnv
 from rough_terrain_env import (
     ACTION_CONTRACT_VERSION,
@@ -263,9 +264,22 @@ def _arguments(default_task: str) -> argparse.Namespace:
         "--best-video-path",
         type=Path,
         default=None,
-        help="GIF path for the current best policy. Defaults to <monitor-dir>/best_policy.gif.",
+        help=(
+            "Full-curriculum/terrain GIF path. Defaults under <run-dir>/videos; "
+            "command stage GIFs use the same directory."
+        ),
     )
     parser.add_argument("--best-video-duration", type=float, default=10.0)
+    parser.add_argument("--best-video-stage0-duration", type=float, default=10.0)
+    parser.add_argument("--best-video-stage1-duration", type=float, default=10.0)
+    parser.add_argument("--best-video-stage2-duration", type=float, default=12.0)
+    parser.add_argument("--best-video-full-duration", type=float, default=22.0)
+    parser.add_argument(
+        "--stage-eval-envs",
+        type=int,
+        default=8,
+        help="Independent reset count for each scripted Stage 0/1/2 evaluation.",
+    )
     parser.add_argument("--best-video-fps", type=int, default=20)
     parser.add_argument("--best-video-width", type=int, default=640)
     parser.add_argument("--best-video-height", type=int, default=360)
@@ -483,6 +497,7 @@ def _write_run_metadata(args: argparse.Namespace, env: HexapodRoughTerrainEnv) -
             "terrain_level": args.terrain_level,
             "monitor_dir": str(args.monitor_dir),
             "best_video_path": str(args.best_video_path),
+            "best_video_paths": args.best_video_paths,
             "jax_version": jax.__version__,
             "mujoco_version": mujoco.__version__,
             "brax_version": brax_version,
@@ -602,19 +617,48 @@ def main(default_task: str = "terrain") -> None:
         args.monitor_dir = args.run_dir / "monitor"
     args.monitor_dir = args.monitor_dir.expanduser().resolve()
     if args.best_video_path is None:
-        args.best_video_path = args.run_dir / "best_policy.gif"
+        args.best_video_path = args.run_dir / "videos" / (
+            "best_curriculum_full.gif"
+            if args.task == "command"
+            else "best_policy.gif"
+        )
     args.best_video_path = args.best_video_path.expanduser().resolve()
     if args.best_video_path.suffix.lower() != ".gif":
         raise SystemExit("--best-video-path must end with .gif")
+    if args.stage_eval_envs < 1:
+        raise SystemExit("--stage-eval-envs must be positive")
+    for duration_name in (
+        "best_video_duration",
+        "best_video_stage0_duration",
+        "best_video_stage1_duration",
+        "best_video_stage2_duration",
+        "best_video_full_duration",
+    ):
+        if getattr(args, duration_name) <= 0:
+            raise SystemExit(f"--{duration_name.replace('_', '-')} must be positive")
+    if args.task == "command":
+        video_directory = args.best_video_path.parent
+        command_video_paths = {
+            "stage0": video_directory / "best_stage0_forward.gif",
+            "stage1": video_directory / "best_stage1_limited_yaw.gif",
+            "stage2": video_directory / "best_stage2_full_command.gif",
+            "full": args.best_video_path,
+        }
+    else:
+        command_video_paths = {"policy": args.best_video_path}
+    args.best_video_paths = {
+        name: str(path.resolve()) for name, path in command_video_paths.items()
+    }
     for label, directory in (("--output", args.output), ("--monitor-dir", args.monitor_dir)):
         if directory.exists() and (
             not directory.is_dir() or any(directory.iterdir())
         ):
             raise SystemExit(f"refusing to mix a new run into non-empty {label}: {directory}")
-    if args.best_video_path.exists():
-        raise SystemExit(
-            f"refusing to overwrite an existing --best-video-path: {args.best_video_path}"
-        )
+    existing_videos = [
+        path for path in map(Path, args.best_video_paths.values()) if path.exists()
+    ]
+    if existing_videos:
+        raise SystemExit(f"refusing to overwrite existing best videos: {existing_videos}")
     print("JAX devices:", jax.devices())
     print(f"run={args.run_dir} contract={ACTION_CONTRACT_VERSION}")
     env = _make_env(args)
@@ -644,6 +688,20 @@ def main(default_task: str = "terrain") -> None:
             actuator_range=tuple(env._config.randomization.actuator_strength_range),
             damping_range=tuple(env._config.randomization.joint_damping_scale_range),
         )
+
+    scripted_envs: dict[str, HexapodCommandCurriculumEnv] = {}
+    if args.task == "command":
+        for name, fixed_stage in (
+            ("stage0", 0),
+            ("stage1", 1),
+            ("stage2", 2),
+            ("full", None),
+        ):
+            scripted_envs[name] = HexapodCommandCurriculumEnv(
+                config=config_dict.ConfigDict(env._config.to_dict()),
+                fixed_curriculum_stage=fixed_stage,
+                scripted_commands=True,
+            )
 
     args.output.mkdir(parents=True, exist_ok=True)
     network_factory = functools.partial(
@@ -696,29 +754,90 @@ def main(default_task: str = "terrain") -> None:
     latest_policy: dict[str, object] = {}
     pending_video: tuple[int, float] | None = None
     best_video_metadata = args.monitor_dir / "best_video.json"
+    stage_metrics_latest = args.monitor_dir / "stage_metrics_latest.json"
+    stage_metrics_history = args.monitor_dir / "stage_metrics_history.jsonl"
+    latest_stage_metrics: dict[str, object] = {}
+    stage_evaluators: dict[str, object] = {}
+    progress_steps_seen: set[int] = set()
+    stage_durations = {
+        "stage0": args.best_video_stage0_duration,
+        "stage1": args.best_video_stage1_duration,
+        "stage2": args.best_video_stage2_duration,
+    }
+
+    def evaluate_command_stages(step: int, make_policy, params) -> dict[str, float]:
+        if args.task != "command":
+            return {}
+        flattened: dict[str, float] = {}
+        for index, name in enumerate(("stage0", "stage1", "stage2")):
+            if name not in stage_evaluators:
+                stage_evaluators[name] = make_policy_evaluator(
+                    env=scripted_envs[name],
+                    make_policy=make_policy,
+                    duration=stage_durations[name],
+                    num_envs=args.stage_eval_envs,
+                    seed=args.seed + 10_000 + index * 100,
+                )
+            result = stage_evaluators[name](params)
+            for metric_name, value in result.items():
+                flattened[f"eval/{name}/{metric_name}"] = value
+        payload = {
+            "step": int(step),
+            "updated_at_utc": datetime.now(timezone.utc).isoformat(),
+            "metrics": flattened,
+        }
+        ScoreMonitor._write_json(stage_metrics_latest, payload)
+        with stage_metrics_history.open("a", encoding="utf-8") as history:
+            history.write(json.dumps(payload, sort_keys=True) + "\n")
+        print(
+            "stage_eval "
+            + " | ".join(
+                f"{name}: reward={flattened[f'eval/{name}/reward_mean']:.4f} "
+                f"v_err={flattened[f'eval/{name}/velocity_error_mps']:.4f} "
+                f"yaw_err={flattened[f'eval/{name}/yaw_error_rps']:.4f}"
+                for name in ("stage0", "stage1", "stage2")
+            )
+        )
+        return flattened
 
     def save_best_video(step: int, score: float) -> bool:
         if not args.best_video:
             return True
         if latest_policy.get("step") != step:
             return False
-        try:
-            video_path = render_policy_video(
-                env=env,
-                make_policy=latest_policy["make_policy"],
-                params=latest_policy["params"],
-                output=args.best_video_path,
-                seed=args.seed,
-                duration=args.best_video_duration,
-                fps=args.best_video_fps,
-                width=args.best_video_width,
-                height=args.best_video_height,
-                terrain="flat" if args.task == "command" else args.terrain_layout,
+        if args.task == "command":
+            render_specs = (
+                ("stage0", scripted_envs["stage0"], stage_durations["stage0"]),
+                ("stage1", scripted_envs["stage1"], stage_durations["stage1"]),
+                ("stage2", scripted_envs["stage2"], stage_durations["stage2"]),
+                ("full", scripted_envs["full"], args.best_video_full_duration),
             )
-        except Exception as exc:
-            # Rendering must not throw away an otherwise valid, long PPO run.
-            print(f"best_video_error step={step:,}: {type(exc).__name__}: {exc}")
-            return True
+        else:
+            render_specs = (("policy", env, args.best_video_duration),)
+
+        rendered: dict[str, Path] = {}
+        errors: dict[str, str] = {}
+        for name, video_env, duration in render_specs:
+            try:
+                video_path = render_policy_video(
+                    env=video_env,
+                    make_policy=latest_policy["make_policy"],
+                    params=latest_policy["params"],
+                    output=Path(args.best_video_paths[name]),
+                    seed=args.seed,
+                    duration=duration,
+                    fps=args.best_video_fps,
+                    width=args.best_video_width,
+                    height=args.best_video_height,
+                    terrain="flat" if args.task == "command" else args.terrain_layout,
+                )
+            except Exception as exc:
+                # Rendering must not throw away an otherwise valid, long PPO run.
+                errors[name] = f"{type(exc).__name__}: {exc}"
+                print(f"best_video_error {name} step={step:,}: {errors[name]}")
+                continue
+            rendered[name] = video_path
+            print(f"best_video {name} step={step:,}: {video_path}")
 
         ScoreMonitor._write_json(
             best_video_metadata,
@@ -727,24 +846,36 @@ def main(default_task: str = "terrain") -> None:
                 "score_key": args.score_key,
                 "score": score,
                 "step": step,
-                "video": str(video_path),
+                "videos": args.best_video_paths,
+                "rendered": sorted(rendered),
+                "errors": errors,
                 "updated_at_utc": datetime.now(timezone.utc).isoformat(),
             },
         )
-        print(f"best_video step={step:,}: {video_path}")
-        if wandb_run is not None and wandb_module is not None:
-            wandb_run.log(
+        if rendered and wandb_run is not None and wandb_module is not None:
+            wandb_keys = {
+                "stage0": "best/video_stage0_forward",
+                "stage1": "best/video_stage1_limited_yaw",
+                "stage2": "best/video_stage2_full_command",
+                "full": "best/video_curriculum_full",
+                "policy": "best/video",
+            }
+            video_payload = {
+                wandb_keys[name]: wandb_module.Video(
+                    str(path),
+                    format="gif",
+                    caption=f"{name} | step={step:,} | score={score:.3f}",
+                )
+                for name, path in rendered.items()
+            }
+            video_payload.update(
                 {
-                    "best/video": wandb_module.Video(
-                        str(video_path),
-                        format="gif",
-                        caption=f"{args.task} | step={step:,} | score={score:.3f}",
-                    ),
+                    "train/global_step": step,
                     "best/video_step": step,
                     "best/video_score": score,
-                },
-                step=step,
+                }
             )
+            wandb_run.log(video_payload)
         return True
 
     def policy_params(step: int, make_policy, params) -> None:
@@ -752,13 +883,22 @@ def main(default_task: str = "terrain") -> None:
         latest_policy["step"] = step
         latest_policy["make_policy"] = make_policy
         latest_policy["params"] = params
+        stage_metrics = evaluate_command_stages(step, make_policy, params)
+        latest_stage_metrics["step"] = step
+        latest_stage_metrics["metrics"] = stage_metrics
+        # Initial Brax evaluation calls progress() before policy_params().
+        if stage_metrics and step in progress_steps_seen and wandb_run is not None:
+            wandb_run.log({**stage_metrics, "train/global_step": step})
         if pending_video is not None and pending_video[0] == step:
             save_best_video(*pending_video)
             pending_video = None
 
     def progress(step: int, metrics) -> None:
         nonlocal pending_video
-        score, is_best = score_monitor.record(step, metrics)
+        combined_metrics = dict(metrics)
+        if latest_stage_metrics.get("step") == step:
+            combined_metrics.update(latest_stage_metrics.get("metrics", {}))
+        score, is_best = score_monitor.record(step, combined_metrics)
         marker = " NEW_BEST" if is_best else ""
         print(
             f"step={step:,} {args.score_key}={score:.3f}{marker} | "
@@ -766,13 +906,14 @@ def main(default_task: str = "terrain") -> None:
             f"monitor={score_monitor.best_text_path}"
         )
         if wandb_run is not None:
-            payload = {key: float(value) for key, value in metrics.items()}
+            payload = {key: float(value) for key, value in combined_metrics.items()}
             payload["train/global_step"] = step
-            wandb_run.log(payload, step=step)
+            wandb_run.log(payload)
             if is_best:
                 wandb_run.summary["best/score"] = score
                 wandb_run.summary["best/score_key"] = args.score_key
                 wandb_run.summary["best/step"] = step
+        progress_steps_seen.add(step)
         if is_best:
             if not save_best_video(step, score):
                 # At step 0 Brax reports evaluation before exposing policy

@@ -209,4 +209,20 @@ Competence-based 전체 curriculum:
 
 학습별 W&B scalar는 `eval/episode_reward`, 각 `eval/episode_reward/*`,
 `eval/episode_terrain_success`, `best/*`이며 `train/global_step`을 공통 x축으로 쓴다.
-새 최고점 GIF는 각 run의 `best_policy.gif`와 W&B `best/video`에 저장된다.
+
+Flat command policy는 매 evaluation마다 동일한 scripted command로 Stage 0/1/2를
+독립 reset하여 다음 값을 추가 기록한다.
+
+```text
+eval/stage0|1|2/reward_mean
+eval/stage0|1|2/velocity_error_mps
+eval/stage0|1|2/yaw_error_rps
+eval/stage0|1|2/survival_fraction
+```
+
+학습 command는 계속 1.5–4초 random resampling을 사용하고, 위 비교 평가와 영상만
+고정 script를 사용한다. `eval/episode_reward`가 NEW_BEST일 때 command run은
+`videos/`에 Stage 0, Stage 1, Stage 2, 전체 curriculum GIF를 각각 저장하고 W&B의
+`best/video_stage0_forward`, `best/video_stage1_limited_yaw`,
+`best/video_stage2_full_command`, `best/video_curriculum_full`에 올린다. Terrain run은
+`videos/best_policy.gif`와 `best/video` 한 개를 유지한다.

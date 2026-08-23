@@ -6,7 +6,15 @@ from pathlib import Path
 from typing import Any, Callable
 
 import jax
+import jax.numpy as jp
 import numpy as np
+
+
+STAGE_LABELS = {
+    0: "Stage 0 - Forward Only",
+    1: "Stage 1 - Limited Yaw",
+    2: "Stage 2 - Full Command",
+}
 
 
 def _camera(camera: Any, data: Any, *, terrain: str) -> None:
@@ -17,6 +25,146 @@ def _camera(camera: Any, data: Any, *, terrain: str) -> None:
     camera.distance = 1.75
     camera.azimuth = 135
     camera.elevation = -24
+
+
+def _quat_rotate_inverse_numpy(quat: np.ndarray, vector: np.ndarray) -> np.ndarray:
+    conjugate_xyz = -quat[1:]
+    temporary = 2.0 * np.cross(conjugate_xyz, vector)
+    return vector + quat[0] * temporary + np.cross(conjugate_xyz, temporary)
+
+
+def _overlay_frame(
+    frame: Any,
+    *,
+    data: Any,
+    command: np.ndarray,
+    stage: int,
+    elapsed: float,
+    transition: str | None,
+) -> Any:
+    """Draw the command/tracking contract directly into a rendered frame."""
+    from PIL import ImageDraw, ImageFont
+
+    image = frame.convert("RGB")
+    draw = ImageDraw.Draw(image, "RGBA")
+    try:
+        font = ImageFont.truetype("DejaVuSans.ttf", 17)
+        title_font = ImageFont.truetype("DejaVuSans-Bold.ttf", 20)
+        banner_font = ImageFont.truetype("DejaVuSans-Bold.ttf", 26)
+    except OSError:
+        font = title_font = banner_font = ImageFont.load_default()
+
+    local_velocity = _quat_rotate_inverse_numpy(
+        np.asarray(data.qpos[3:7], dtype=float),
+        np.asarray(data.qvel[:3], dtype=float),
+    )
+    # MODEL_FORWARD is [0, -1, 0].
+    forward_velocity = -float(local_velocity[1])
+    yaw_rate = float(data.qvel[5])
+    lines = (
+        STAGE_LABELS.get(stage, f"Stage {stage}"),
+        f"t          {elapsed:6.2f} s",
+        f"v_cmd / v  {command[0]:+6.3f} / {forward_velocity:+6.3f} m/s",
+        f"yaw_cmd/yaw {command[1]:+6.3f} / {yaw_rate:+6.3f} rad/s",
+    )
+    panel_width = min(image.width - 20, 410)
+    draw.rounded_rectangle(
+        (10, 10, panel_width, 126), radius=8, fill=(0, 0, 0, 175)
+    )
+    draw.text((22, 18), lines[0], font=title_font, fill=(255, 255, 255, 255))
+    for index, line in enumerate(lines[1:]):
+        draw.text(
+            (22, 48 + index * 23), line, font=font, fill=(235, 242, 248, 255)
+        )
+
+    if transition:
+        left, top, right, bottom = draw.textbbox((0, 0), transition, font=banner_font)
+        text_width = right - left
+        text_height = bottom - top
+        x = (image.width - text_width) // 2
+        y = max(145, (image.height - text_height) // 2)
+        draw.rounded_rectangle(
+            (x - 20, y - 14, x + text_width + 20, y + text_height + 14),
+            radius=10,
+            fill=(17, 28, 42, 220),
+            outline=(255, 190, 65, 255),
+            width=3,
+        )
+        draw.text((x, y), transition, font=banner_font, fill=(255, 222, 128, 255))
+    return image
+
+
+def make_policy_evaluator(
+    *,
+    env: Any,
+    make_policy: Callable[..., Any],
+    duration: float,
+    num_envs: int,
+    seed: int,
+) -> Callable[[Any], dict[str, float]]:
+    """Build one compiled, batched deterministic stage evaluator."""
+    if duration <= 0 or num_envs <= 0:
+        raise ValueError("stage evaluation duration and num_envs must be positive")
+    control_steps = max(1, int(np.ceil(duration / float(env.dt))))
+    reset_batch = jax.vmap(env.reset)
+    step_batch = jax.vmap(env.step)
+    reset_keys = jax.random.split(jax.random.PRNGKey(seed), num_envs)
+
+    @jax.jit
+    def rollout(
+        params: Any,
+    ) -> tuple[jax.Array, jax.Array, jax.Array, jax.Array]:
+        policy = make_policy(params, deterministic=True)
+        state = reset_batch(reset_keys)
+        alive = jp.ones((num_envs,), dtype=jp.bool_)
+        key = jax.random.PRNGKey(seed + 1)
+
+        def body(carry, unused):
+            del unused
+            current, current_alive, action_key = carry
+            action_key, policy_key = jax.random.split(action_key)
+            action, _ = policy(current.obs, policy_key)
+            next_state = step_batch(current, action)
+            valid = current_alive
+            reward = jp.sum(jp.where(valid, next_state.reward, 0.0))
+            velocity_error = jp.sum(
+                jp.where(valid, next_state.metrics["velocity_error_mps"], 0.0)
+            )
+            yaw_error = jp.sum(
+                jp.where(valid, next_state.metrics["yaw_error_rps"], 0.0)
+            )
+            samples = jp.sum(valid.astype(jp.float32))
+            next_alive = valid & (~next_state.done.astype(jp.bool_))
+            return (next_state, next_alive, action_key), (
+                reward,
+                velocity_error,
+                yaw_error,
+                samples,
+            )
+
+        (_, _, _), totals = jax.lax.scan(
+            body, (state, alive, key), xs=None, length=control_steps
+        )
+        alive_count = jp.maximum(jp.sum(totals[3]), 1.0)
+        scheduled_count = float(control_steps * num_envs)
+        return (
+            jp.sum(totals[0]) / scheduled_count,
+            jp.sum(totals[1]) / alive_count,
+            jp.sum(totals[2]) / alive_count,
+            alive_count / scheduled_count,
+        )
+
+    def evaluate(params: Any) -> dict[str, float]:
+        reward, velocity_error, yaw_error, survival = rollout(params)
+        reward.block_until_ready()
+        return {
+            "reward_mean": float(reward),
+            "velocity_error_mps": float(velocity_error),
+            "yaw_error_rps": float(yaw_error),
+            "survival_fraction": float(survival),
+        }
+
+    return evaluate
 
 
 def render_policy_video(
@@ -31,6 +179,7 @@ def render_policy_video(
     width: int,
     height: int,
     terrain: str,
+    overlay: bool = True,
 ) -> Path:
     """Render deterministic policy inference using the exact MJX task env.
 
@@ -76,10 +225,20 @@ def render_policy_video(
     frame_steps = np.clip(frame_steps, 0, control_steps - 1)
     next_frame = 0
     frames: list[Image.Image] = []
+    previous_stage: int | None = None
+    transition_text: str | None = None
+    transition_until = -1.0
 
     try:
         key = jax.random.PRNGKey(seed + 1)
         for control_step in range(control_steps):
+            displayed_command = np.asarray(state.info["command"], dtype=float)
+            displayed_stage = int(np.asarray(state.info["curriculum_stage"]))
+            elapsed = (control_step + 1) * float(env.dt)
+            if previous_stage is not None and displayed_stage != previous_stage:
+                transition_text = f"STAGE {previous_stage} -> STAGE {displayed_stage}"
+                transition_until = elapsed + 0.8
+            previous_stage = displayed_stage
             key, action_key = jax.random.split(key)
             action, _ = policy(state.obs, action_key)
             state = step(state, action)
@@ -88,11 +247,19 @@ def render_policy_video(
             host_data = mjx.get_data(env.mj_model, state.data)
             _camera(camera, host_data, terrain=terrain)
             renderer.update_scene(host_data, camera=camera)
-            frames.append(
-                Image.fromarray(renderer.render()).convert(
-                    "P", palette=Image.ADAPTIVE
+            frame = Image.fromarray(renderer.render())
+            if overlay:
+                frame = _overlay_frame(
+                    frame,
+                    data=host_data,
+                    command=displayed_command,
+                    stage=displayed_stage,
+                    elapsed=elapsed,
+                    transition=(
+                        transition_text if elapsed <= transition_until else None
+                    ),
                 )
-            )
+            frames.append(frame.convert("P", palette=Image.ADAPTIVE))
             next_frame += 1
     except Exception:
         temporary.unlink(missing_ok=True)
