@@ -64,7 +64,8 @@ static void IMU_ParseFrame(IMU_Handle_t *handle)
                 raw[axis] = IMU_ReadI16(&frame[2U + (axis * 2U)]);
                 handle->data.acceleration_mps2[axis]
                     = ((float)raw[axis] / 32768.0f)
-                    * IMU_ACCEL_FULL_SCALE_G * IMU_STANDARD_GRAVITY;
+                    * IMU_ACCEL_FULL_SCALE_G * IMU_STANDARD_GRAVITY
+                    * (float)handle->calibration.acceleration_sign[axis];
             }
             handle->data.temperature_c = (float)IMU_ReadI16(&frame[8]) / 100.0f;
             handle->data.valid_mask |= IMU_VALID_ACCELEROMETER;
@@ -76,7 +77,8 @@ static void IMU_ParseFrame(IMU_Handle_t *handle)
                 raw[axis] = IMU_ReadI16(&frame[2U + (axis * 2U)]);
                 handle->data.angular_velocity_radps[axis]
                     = ((float)raw[axis] / 32768.0f)
-                    * IMU_GYRO_FULL_SCALE_DPS * IMU_DEG_TO_RAD;
+                    * IMU_GYRO_FULL_SCALE_DPS * IMU_DEG_TO_RAD
+                    * (float)handle->calibration.angular_velocity_sign[axis];
             }
             handle->data.temperature_c = (float)IMU_ReadI16(&frame[8]) / 100.0f;
             handle->data.valid_mask |= IMU_VALID_GYROSCOPE;
@@ -87,7 +89,9 @@ static void IMU_ParseFrame(IMU_Handle_t *handle)
             {
                 raw[axis] = IMU_ReadI16(&frame[2U + (axis * 2U)]);
                 handle->data.euler_angle_rad[axis]
-                    = ((float)raw[axis] / 32768.0f) * IMU_PI;
+                    = ((float)raw[axis] / 32768.0f) * IMU_PI
+                    * (float)handle->calibration.euler_angle_sign[axis]
+                    - handle->calibration.euler_offset_rad[axis];
             }
             handle->data.temperature_c = (float)IMU_ReadI16(&frame[8]) / 100.0f;
             handle->data.valid_mask |= IMU_VALID_ANGLE;
@@ -122,6 +126,8 @@ static void IMU_ParseFrame(IMU_Handle_t *handle)
 
 void IMU_Init(IMU_Handle_t *handle, UART_HandleTypeDef *uart)
 {
+    uint32_t axis;   // 보정할 축 번호를 저장한다.
+
     if (handle == NULL)
     {
         return;
@@ -129,6 +135,13 @@ void IMU_Init(IMU_Handle_t *handle, UART_HandleTypeDef *uart)
 
     memset(handle, 0, sizeof(*handle));
     handle->uart = uart;
+
+    for (axis = 0U; axis < 3U; ++axis)
+    {
+        handle->calibration.acceleration_sign[axis] = 1;       // 기본 축 부호를 유지한다.
+        handle->calibration.angular_velocity_sign[axis] = 1;  // 기본 축 부호를 유지한다.
+        handle->calibration.euler_angle_sign[axis] = 1;        // 기본 축 부호를 유지한다.
+    }
 }
 
 HAL_StatusTypeDef IMU_Start(IMU_Handle_t *handle)
@@ -228,4 +241,28 @@ bool IMU_HasNavigationData(const IMU_Data_t *data)
                             | IMU_VALID_ANGLE;
 
     return (data != NULL) && ((data->valid_mask & required) == required);
+}
+
+/* 실측한 WT931 장착 방향과 자세 Offset을 적용한다. */
+void IMU_SetCalibration(IMU_Handle_t *handle,
+                        const IMU_Calibration_t *calibration)
+{
+    if ((handle == NULL) || (calibration == NULL))
+    {
+        return;
+    }
+
+    handle->calibration = *calibration;   // 이후 수신 프레임에 보정값을 적용한다.
+}
+
+/* 현재 사용 중인 WT931 보정값을 반환한다. */
+void IMU_GetCalibration(const IMU_Handle_t *handle,
+                        IMU_Calibration_t *calibration)
+{
+    if ((handle == NULL) || (calibration == NULL))
+    {
+        return;
+    }
+
+    *calibration = handle->calibration;   // 시험 코드에 보정값을 전달한다.
 }

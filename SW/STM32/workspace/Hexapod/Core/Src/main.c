@@ -21,15 +21,6 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "sensor/gps.h"
-#include "sensor/imu.h"
-#include "sensor/mcp3008.h"
-#include "sensor/nav_kalman.h"
-#include "module/leg6_test.h"
-#include "module/lora.h"
-#include "module/relay.h"
-
-#include <stdio.h>
 
 /* USER CODE END Includes */
 
@@ -40,9 +31,6 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define LORA_STM32_ADDRESS   1U
-#define LORA_ARDUINO_ADDRESS 2U
-#define LORA_NETWORK_ID      18U
 
 /* USER CODE END PD */
 
@@ -69,22 +57,6 @@ UART_HandleTypeDef huart3;
 UART_HandleTypeDef huart6;
 
 /* USER CODE BEGIN PV */
-static GPS_Handle_t g_gps;
-static IMU_Handle_t g_imu;
-static GPS_Data_t g_gps_data;
-static IMU_Data_t g_imu_data;
-static NavKalman_t g_nav_kalman;
-static MCP3008_Handle_t g_mcp3008;
-static MCP3008_Data_t g_mcp3008_data;
-static LoRa_Handle_t g_lora;
-static LoRa_Message_t g_lora_message;
-static char g_lora_tx_buffer[LORA_MAX_PAYLOAD_SIZE + 1U];
-static uint32_t g_lora_last_ping_ms;
-static uint32_t g_lora_handled_rx_counter;
-static uint32_t g_lora_ping_tx_count;
-static uint32_t g_lora_ack_tx_count;
-static HAL_StatusTypeDef g_lora_last_tx_status;
-static Leg6Test_Handle_t g_leg6_test;
 
 /* USER CODE END PV */
 
@@ -155,64 +127,6 @@ int main(void)
   MX_USART3_UART_Init();
   MX_USART6_UART_Init();
   /* USER CODE BEGIN 2 */
-  /* PC2/PC3/PC4 relay inputs are active-high. Start safely with all OFF. */
-  Relay_Init();
-
-  /* Start only leg 6 PWM channels at neutral before applying servo power. */
-  if (Leg6Test_Start(&g_leg6_test, &htim1, &htim3, &htim4) != HAL_OK)
-  {
-    Error_Handler();
-  }
-
-  HAL_Delay(100U);
-  Relay_AllOn();
-
-  if (MCP3008_Init(&g_mcp3008, &hspi1) != HAL_OK)
-  {
-    Error_Handler();
-  }
-
-  /* GPS uses its original USART2 connection. UART5 is reserved for LoRa. */
-  GPS_Init(&g_gps, &huart2);
-  IMU_Init(&g_imu, &huart3);
-  NavKalman_Init(&g_nav_kalman, NULL);
-  LoRa_Init(&g_lora, &huart5);
-
-  if (GPS_Start(&g_gps) != HAL_OK)
-  {
-    Error_Handler();
-  }
-
-  if (IMU_Start(&g_imu) != HAL_OK)
-  {
-    Error_Handler();
-  }
-
-  if (LoRa_Start(&g_lora) != HAL_OK)
-  {
-    Error_Handler();
-  }
-
-  HAL_Delay(500U);
-
-  /* Settings are saved in the RYLR998 flash. Both modules must use the same
-     NETWORKID, BAND, and PARAMETER values. */
-  if (LoRa_Configure(&g_lora, LORA_STM32_ADDRESS, LORA_NETWORK_ID) != HAL_OK)
-  {
-    Error_Handler();
-  }
-
-  /* ===================== LORA SEND FUNCTION =====================
-     Send text to the Arduino LoRa module like this:
-
-     LoRa_SendText(&g_lora, LORA_ARDUINO_ADDRESS, "PUT_DATA_HERE");
-
-     - LORA_ARDUINO_ADDRESS: receiver address (Arduino module = 2)
-     - "PUT_DATA_HERE": ASCII data to send, maximum 240 bytes
-
-     Example:
-     LoRa_SendText(&g_lora, LORA_ARDUINO_ADDRESS, "100,200,300");
-     ============================================================= */
 
   /* USER CODE END 2 */
 
@@ -223,57 +137,6 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-    (void)GPS_Process(&g_gps);
-    (void)IMU_Process(&g_imu);
-    (void)LoRa_Process(&g_lora);
-    (void)MCP3008_ReadAll(&g_mcp3008, &g_mcp3008_data);
-    Leg6Test_Process(&g_leg6_test);
-
-    /* These snapshots are safe to inspect in the debugger or forward to
-       the Jetson. The Kalman predict step is intentionally not called until
-       the installed WT931 axis directions and gravity sign are verified. */
-    (void)GPS_GetLatest(&g_gps, &g_gps_data);
-    (void)IMU_GetLatest(&g_imu, &g_imu_data);
-
-    /* Arduino -> STM32 test:
-       When a new Arduino payload arrives, send STM_ACK:<payload> back. */
-    if (LoRa_GetLatest(&g_lora, &g_lora_message) &&
-        (g_lora_message.receive_counter != g_lora_handled_rx_counter))
-    {
-      g_lora_handled_rx_counter = g_lora_message.receive_counter;
-
-      (void)snprintf(g_lora_tx_buffer,
-                     sizeof(g_lora_tx_buffer),
-                     "STM_ACK:%.*s",
-                     (int)(LORA_MAX_PAYLOAD_SIZE - 8U),
-                     g_lora_message.payload);
-
-      g_lora_last_tx_status = LoRa_SendText(&g_lora,
-                                            LORA_ARDUINO_ADDRESS,
-                                            g_lora_tx_buffer);
-
-      if (g_lora_last_tx_status == HAL_OK)
-      {
-        g_lora_ack_tx_count++;
-      }
-
-      /* Prevent a periodic PING immediately after the ACK packet. */
-      g_lora_last_ping_ms = HAL_GetTick();
-    }
-
-    /* STM32 -> Arduino test: transmit STM_PING once every second. */
-    if ((HAL_GetTick() - g_lora_last_ping_ms) >= 1000U)
-    {
-      g_lora_last_ping_ms = HAL_GetTick();
-      g_lora_last_tx_status = LoRa_SendText(&g_lora,
-                                            LORA_ARDUINO_ADDRESS,
-                                            "STM_PING");
-
-      if (g_lora_last_tx_status == HAL_OK)
-      {
-        g_lora_ping_tx_count++;
-      }
-    }
   }
   /* USER CODE END 3 */
 }
@@ -1049,19 +912,6 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
-{
-  GPS_RxCpltCallback(&g_gps, huart);
-  IMU_RxCpltCallback(&g_imu, huart);
-  LoRa_RxCpltCallback(&g_lora, huart);
-}
-
-void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
-{
-  GPS_ErrorCallback(&g_gps, huart);
-  IMU_ErrorCallback(&g_imu, huart);
-  LoRa_ErrorCallback(&g_lora, huart);
-}
 
 /* USER CODE END 4 */
 

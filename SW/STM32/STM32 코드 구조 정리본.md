@@ -4,7 +4,7 @@
 
 STM32 사용자 코드를 기능별 폴더로 나누고 `main.c`에는 초기화, 반복 처리와 HAL 콜백 전달을 위한 함수 호출만 남긴다.
 
-제어 로직은 [Controller Architecture](../Controller/Controller_Architecture.md)와 [Controller detail](../Controller/Controller_detail.md)의 현재 동작을 기준으로 옮긴다. 이 문서는 파일의 책임과 참조 관계만 정하며 실제 헤더·소스 파일은 구현 단계에서 만든다.
+제어 로직은 [Controller Architecture](../Controller/Controller_Architecture.md)와 [Controller detail](../Controller/Controller_detail.md)의 현재 동작을 기준으로 옮겼다. 이 문서는 현재 구현된 파일의 책임과 참조 관계를 정리한다.
 
 ## 2. 기본 원칙
 
@@ -65,6 +65,7 @@ Core
 │  └─ test
 │     ├─ test_runner.h
 │     ├─ sensor_test.h
+│     ├─ imu_calibration_test.h
 │     ├─ low_control_test.h
 │     ├─ joint_sensor_calibration_test.h
 │     ├─ foot_pressure_calibration_test.h
@@ -119,6 +120,7 @@ Core
    └─ test
       ├─ test_runner.c
       ├─ sensor_test.c
+      ├─ imu_calibration_test.c
       ├─ low_control_test.c
       ├─ joint_sensor_calibration_test.c
       ├─ foot_pressure_calibration_test.c
@@ -193,7 +195,7 @@ communication ────────┘
 test/*.c ─────────────▶ 시험 대상 모듈
 ```
 
-`common`은 다른 프로젝트 폴더를 참조하지 않는다. `app/hexapod_app.h`는 개별 모듈 헤더를 노출하지 않고, 전체 조합은 `hexapod_app.c`에서만 수행한다.
+`common`은 다른 프로젝트 폴더를 참조하지 않는다. `main.c`는 `app/hexapod_app.h`만 직접 포함하며, 개별 모듈의 호출 순서와 전체 조합은 `hexapod_app.c`에서 수행한다.
 
 ### 5.2 high_control 내부 참조
 
@@ -301,7 +303,7 @@ CRSF 채널을 프로젝트 명령으로 변환한다. 네 짐벌 축은 보정 
 
 ### `high_control/stand_landing.h`
 
-5.6 s 서기와 착지 동안 기본 발 위치에 적용할 높이 변화를 계산하고 완료 상태를 제공한다.
+5.6 s 서기와 착지 동안 기본 발 위치에 적용할 높이 변화를 계산한다. 완료 상태는 `drone_controller`가 진행률과 안정 시간을 기준으로 관리한다.
 
 ### `high_control/body_position_estimator.h`
 
@@ -368,13 +370,13 @@ Swing 진행률 50% 이후의 Early Landing과 정상 Swing 종료 후 Late Land
 
 ### `low_control/relay.h`
 
-INA1~INC2 여섯 릴레이의 출력과 릴레이-다리 대응 테이블을 관리한다. Active High, 초기 OFF이며 Kill이 활성화되면 모든 릴레이를 즉시 끈다.
+INA1~INC2 여섯 Active High 출력을 관리한다. 초기 상태는 OFF이며 Kill이 활성화되면 모든 릴레이를 즉시 끈다. 릴레이-다리 대응은 `servo_relay_calibration_test`에서 기록하며 현재 운용 Kill은 여섯 채널을 동시에 차단하므로 개별 다리 매핑에 의존하지 않는다.
 
 ## 11. 통신 파일
 
 ### `communication/lora.h`
 
-UART5에 연결된 RYLR998의 AT 명령, 송수신 파싱과 전송을 담당한다.
+UART5 115200 baud에 연결된 RYLR998의 AT 명령, 주소·Network 설정, 송수신 파싱과 전송을 담당한다.
 
 ### `communication/robot_telemetry.h`
 
@@ -395,6 +397,10 @@ SPI2 Slave의 최소 인터페이스 자리만 유지한다. 명령, 프레임, 
 ### `test/sensor_test.h`
 
 GPS, WT931과 MCP3008 24채널 raw 값, 수신 주기와 오류 횟수를 확인한다. 가상 센서값은 만들지 않는다.
+
+### `test/imu_calibration_test.h`
+
+로봇을 수평으로 정지한 상태에서 WT931 Roll·Pitch·Yaw 평균 Offset을 기록한다. +X 전진, +Y 왼쪽, +Z 위쪽이 되도록 확인한 가속도·각속도·자세 축별 부호와 함께 `imu` 보정값을 만든다.
 
 ### `test/low_control_test.h`
 
@@ -462,18 +468,19 @@ LoRa와 Robot Telemetry 패킷을 검사한다. Jetson SPI는 인터페이스 �
 
 1. `robot_config`, `robot_types`와 App 인터페이스를 정의한다.
 2. `sensor_test`로 GPS, WT931과 MCP3008 실제 raw 값을 확인한다.
-3. `low_control_test`로 릴레이와 PWM의 전기적 출력을 확인한다.
-4. 관절센서, 압력센서, 서보·릴레이 보정 테스트로 설정 테이블을 완성한다.
-5. 임시 RC 명령으로 상위 입력을 시험하고 실제 조종기가 오면 CRSF 테이블을 보정한다.
-6. `kinematics_test`로 좌표변환, FK와 IK를 확인한다.
-7. Priority, Drone Controller, Position·Heading·Posture 제어기를 Simulink 결과와 비교한다.
-8. `workspace_test`로 보행·자세·보정 명령의 동적 제한을 확인한다.
-9. Gait Manager와 발끝 궤적을 연결하고 접촉 적응을 시험한다.
-10. `mode_transition_test`로 모드 사이의 순간이동과 한 주기 Enable 변화를 확인한다.
-11. `safety_test`로 Fault Latch와 릴레이 차단을 확인한다.
-12. 낮은 속도에서 시작하여 최대 0.28 m/s까지 실제 보행을 검증한다.
-13. LoRa를 추가하고 Jetson SPI는 프로토콜 확정 전까지 비워둔다.
-14. 모든 시험이 끝난 뒤 `hexapod_app`에서 통합하고 마지막에 `main.c`를 함수 호출 중심으로 정리한다.
+3. `imu_calibration_test`로 WT931 축 부호와 수평 Offset을 확정한다.
+4. `low_control_test`로 릴레이와 PWM의 전기적 출력을 확인한다.
+5. 관절센서, 압력센서, 서보·릴레이 보정 테스트로 설정 테이블을 완성한다.
+6. 임시 RC 명령으로 상위 입력을 시험하고 실제 조종기가 오면 CRSF 테이블을 보정한다.
+7. `kinematics_test`로 좌표변환, FK와 IK를 확인한다.
+8. Priority, Drone Controller, Position·Heading·Posture 제어기를 Simulink 결과와 비교한다.
+9. `workspace_test`로 보행·자세·보정 명령의 동적 제한을 확인한다.
+10. Gait Manager와 발끝 궤적을 연결하고 접촉 적응을 시험한다.
+11. `mode_transition_test`로 모드 사이의 순간이동과 한 주기 Enable 변화를 확인한다.
+12. `safety_test`로 Fault Latch와 릴레이 차단을 확인한다.
+13. 낮은 속도에서 시작하여 최대 0.28 m/s까지 실제 보행을 검증한다.
+14. LoRa를 추가하고 Jetson SPI는 프로토콜 확정 전까지 비워둔다.
+15. 모든 시험이 끝난 뒤 마지막으로 `main.c`를 `hexapod_app` 함수 호출 중심으로 정리한다.
 
 ## 14. 5 ms 제어 흐름
 
@@ -494,7 +501,7 @@ Gait Pose → 보행 명령 Workspace 검사
     ↓
 Tripod Manager와 Foot Trajectory → 보정 명령 Workspace 검사
     ↓
-Body Posture Overlay와 Stand/Landing Offset → 자세 명령 Workspace 검사
+Stand/Landing Offset → Body Posture Overlay와 자세 명령 Workspace 검사
     ↓
 Body↔Leg 변환과 IK
     ↓
