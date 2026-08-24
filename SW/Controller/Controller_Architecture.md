@@ -1,344 +1,246 @@
 # 6족 로봇 보행 제어기 Architecture
 
-6족 로봇의 수동 보행 및 몸체 안정화 제어 구조를 정의한다.
+6족 로봇의 수동 조종, 자세·위치 피드백, Tripod 보행, 접촉 적응, 기구학과 Safety의 전체 구조를 정의한다. 세부 수식은 [Controller_detail.md](Controller_detail.md), 입력 채널은 [드론 조종기 입력 README](드론%20조종기%20입력/README.md), 좌표 부호는 [좌표축 README](좌표축/README.md)를 따른다.
 
-좌표계와 관절 방향은 좌표축 README의 정의를 따른다.
+## 1. 설계 기준
 
-절대 좌표계 $\{W\}$는 지면에 고정하며, 모든 관절각이 0°인 최초 착지 상태의 몸체 원점을 절대 원점으로 사용한다. 그 자리에서 기본 자세로 일어서면 절대좌표계 기준 몸체 위치는 $[0,0,h_{stand}]^T$가 된다. 몸체 좌표계 $\{B\}$와 몸체 기준 좌표계 $\{R\}$는 로봇을 따라 이동한다. Body Position Estimator는 절대좌표계의 위치 ${}^W\hat p_B$를 추정하고, Position PI는 그중 x·y 위치 ${}^W\hat p_B^{xy}$와 목표 $p_{B,ref}^{xy}$를 사용한다.
+| 항목 | 현재 값 |
+|---|---:|
+| 제어 주기 | 5 ms, 200 Hz |
+| 기본 보행 | Tripod Gait |
+| Tripod A | Leg 1, 3, 5 |
+| Tripod B | Leg 2, 4, 6 |
+| 한 Phase 시간 | 0.5 s |
+| 최대 x·y 선속도 | 각 ±0.28 m/s |
+| 최대 Yaw 각속도 | ±45 deg/s |
+| 최대 Roll·Pitch 목표각 | ±45 deg |
+| 보정 모드 이동 속도 | 각 축 ±0.05 m/s |
+| 보정 모드 Yaw 목표각 | ±10 deg |
+| 기본 Swing Height | 0.20 m |
+| Swing Height 범위 | 0.15~0.25 m |
+| Swing 방사 오프셋 | 0.07 m |
+| IK 작업공간 여유 | 0.0001 m |
+| 관절 범위 | -135~135 deg |
+| 관절 명령 속도 제한 | 315.8 deg/s |
+| 5 ms당 관절 최대 변화 | 1.579 deg |
 
----
+몸체 축은 +X 전진, +Y 왼쪽, +Z 위쪽을 사용한다.
 
-## 전체 제어 구조
+## 2. 전체 제어 흐름
 
-```text
-조종기 입력
-    │
-    ▼
-Dead Zone + LPF
-    │
-    ▼
-사용자 Body Command 개별 신호
-(v_x,user / φ_ref / θ_ref / ω_z,user / ψ_corr,ref)
-    │
-    ▼
-연속 명령 및 동적 Motion Workspace 제한
-    │
-    ├──▶ 조종 모드 X·Y 속도 Pose Reference 적분
-    │            ├──▶ x·y Position PI ◀─ FK + Contact
-    │            └──▶ Gait Heading Yaw PI ◀─ IMU Yaw
-    │                          │
-    │                          ▼
-    │                  Final Gait Body Twist
-    │                          │
-    │                          ▼
-    │                 Tripod Gait Manager
-    │                    ┌─────┴─────┐
-    │                  Stance       Swing
-    │                    └─────┬─────┘
-    │                          ▼
-    │                  Contact Adaptation
-    │                          │
-    │                          ▼
-    │       STANCE Hold / Tripod 기준 발끝 목표 선택
-    │                          │
-    └──▶ 조종 Roll·Pitch / 보정 Yaw 단일 자세 PI ◀─ IMU 자세
-                               │
-                      자세 보정 각속도 적분
-                               │
-                               ▼
-                  몸체 원점 기준 자세 역회전 적용
-                               │
-                               ▼
-                몸체 좌표계 {B} → 다리 좌표계 {L_i}
-                               │
-                               ▼
-                  다리별 Foot Workspace Limiter
-                               │
-                               ▼
-                            3DOF IK
-                               │
-                               ▼
-                  18개 관절 목표각 → Joint Rate Limiter
-                               │
-                               ▼
-                         Servo Output
-```
+~~~text
+센서와 사용자 명령
+        ↓
+상위 상태와 동작 허가 결정
+        ↓
+입력 정규화·Dead Zone·LPF
+        ↓
+적용 가능한 속도·자세 명령 결정
+        ↓
+몸체 위치 추정과 Position PI
+        ↓
+Heading PI와 몸체 자세 PI
+        ↓
+최종 Body Twist
+        ↓
+Tripod 위상과 Stance/Swing 궤적
+        ↓
+Early/Late Landing
+        ↓
+몸체 자세 오버레이
+        ↓
+다리 좌표 변환과 3DOF IK
+        ↓
+Safety와 관절 출력 제한
+        ↓
+18개 서보 PWM 또는 릴레이 차단
+~~~
 
----
+위 흐름은 5 ms마다 한 번 실행한다. GPS, LoRa와 같이 200 Hz가 필요하지 않은 통신은 실시간 제어 흐름과 분리한다.
 
-## 블록별 설명
+## 3. 상위 상태와 모드
 
-### 1. 조종기 입력
+상위 상태는 다음 우선순위를 사용한다.
 
-조종기 입력으로 로봇의 x·y 이동 속도, Roll·Pitch 목표각과 Yaw 각속도를 명령한다. 스로틀 raw 범위는 중립을 0으로 한 `-1000~1000`으로 사용한다.
-입력에는 **Dead Zone과 Low Pass Filter**를 적용한다.
+~~~text
+KILL
+  > ROLLOVER_FAULT
+  > CONTROLLER_FAULT
+  > LANDING
+  > STANDING
+  > READY
+~~~
+
+READY 안에서 현재 구현된 사용자 동작은 조종 모드와 보정 모드이다. 암 모드와 자율주행 모드는 조종기 채널 배치를 유지하지만 제어 기능은 추후 구현한다.
+
+| 상태 | 주요 동작 |
+|---|---|
+| LANDED | 착지 자세를 유지한다. |
+| STANDING | 5.6 s 동안 기본 자세로 일어서고 0.5 s 안정 시간을 확인한다. |
+| READY | 동작 명령을 받을 수 있는 서기 완료 상태이다. |
+| MANUAL | 보행 속도와 Roll·Pitch 자세를 조종한다. |
+| CORRECTION | 보행 없이 몸체 x·y·z 위치와 Yaw를 미세 조정한다. |
+| LANDING | Swing 발을 정리한 뒤 5.6 s 동안 착지 자세로 내려간다. |
+| FAULT | Safety Fault를 유지하고 서보 전원 릴레이를 끈다. |
+| KILL | 사용자 Kill 요청에 따라 서보 전원 릴레이를 끈다. |
+
+READY에 들어간 뒤 Throttle·Yaw·Roll·Pitch가 0.2 s 동안 중립이어야 동작을 허가한다. 서기·착지 중에는 짐벌 명령을 전달하지 않는다.
+
+모드가 바뀌면 새 모드의 출력을 계산하기 전에 네 짐벌 필터 상태를 0으로 초기화한다. 조종 모드에서 SA가 바뀌면 Yaw 회전 명령과 y축 이동 명령이 서로 이어지지 않도록 Yaw 필터만 초기화한다.
+
+## 4. 사용자 명령
+
+조종 모드의 주요 명령은 다음과 같다.
 
 | 입력 | 명령 |
 |---|---|
-| Throttle | 부호가 있는 x축 전진·후진 선속도 |
+| Throttle | x축 전진·후진 속도 |
+| Yaw, SA OFF | Yaw 회전 속도 |
+| Yaw, SA ON | Heading을 유지한 y축 좌·우 속도 |
 | Roll | Roll 목표각 |
 | Pitch | Pitch 목표각 |
-| Yaw, SA OFF | Yaw 각속도 |
-| Yaw, SA ON | y축 좌·우 선속도 |
-| SA | Yaw 회전 모드와 Yaw 고정 x·y 이동 모드 선택 |
 
-현재 최대 명령은 x·y 이동 속도 각각 `0.28 m/s`, Roll·Pitch 목표각 `±45°`, Yaw 각속도 `±45°/s`로 설정한다.
+보정 모드는 Pitch·Roll·Throttle로 몸체 x·y·z 이동 속도를 명령하고 Yaw로 상대 Yaw 목표각을 명령한다. 보정 Yaw는 각속도가 아니라 짐벌 위치에 직접 대응하며 중립에서 0 deg로 돌아온다.
 
-실제 RC 짐벌 입력은 시간에 따라 연속적으로 변하는 신호로 취급한다. Simulink `USER` 시험 신호는 raw 입력에 `5000/s` Ramp 제한을 적용하여 `-1000→1000`이 `0.4 s`, 중립→최대가 `0.2 s`에 변하게 한다. 강화학습 제어기도 RC와 동일한 Throttle, Roll, Pitch, Yaw 스칼라 입력 포트를 사용하며 Step Action을 발끝 위치나 관절각으로 직접 전달하지 않는다. 강화학습 출력은 **반드시 RC 짐벌과 동일한 Ramp 변화율 제한을 먼저 통과**시킨 뒤 LPF에 입력한다. 학습 정책의 Step 출력을 제어기에 직접 연결하지 않는다.
+실제 RC, 임시 시험 입력과 강화학습 출력은 모두 연속 명령을 사용한다. 불연속 Action은 RC 짐벌과 같은 변화율 제한을 통과시킨 뒤 제어기에 전달한다. 발끝 위치나 관절각을 사용자 명령에서 직접 출력하지 않는다.
 
-Simulink 구현에서는 여러 명령, 6개 발 위치 또는 18개 관절각을 행렬·벡터 입출력으로 묶지 않는다. 각 축, 각 다리의 x·y·z와 각 관절을 독립된 스칼라 포트로 연결한다.
+## 5. 몸체 위치 추정
 
-Yaw는 **Heading Hold**를 사용한다.
+STANCE이면서 발 접촉이 확인된 다리만 위치 추정에 사용한다. 각 다리는 관절 측정각의 FK, Stance 시작 때 저장한 지면 Anchor와 IMU 자세를 이용해 절대좌표계의 몸체 위치 후보를 계산한다.
 
-위 정의는 조종 모드에 적용한다. 보정 모드에서는 Yaw 입력을 각속도로 사용하지 않고 yaw 보정 목표각에 직접 대응시킨다. 보정 모드의 Yaw 입력은 적분하지 않으며 조이스틱이 중앙으로 복귀하면 보정 목표각도 0°로 복귀한다.
+다리별 후보 중 다른 정상 후보가 0.05 m 안에 없는 고립 후보는 해당 주기부터 평균에서 제외한다. 이 상태가 5회 연속, 즉 25 ms 유지되면 Stance Foot Slip으로 Latch한다. 해당 다리가 STANCE 또는 CONTACT 조건을 벗어나면 Latch를 해제하고 다음 Stance에서 Anchor를 다시 만든다.
 
-#### Control Priority Manager와 Drone Controller
+정상 후보는 압력 크기로 가중하지 않고 단순 평균한다. 추정 결과는 절대좌표계 x·y·z 위치와 유효 다리 수, 6비트 Slip Leg Mask이다. 현재 Slip Mask는 진단값이며 Safety Fault를 직접 발생시키지 않는다.
 
-조종기 입력은 `ControlPriorityManager → DroneController` 순서로 처리한다. `ControlPriorityManager`가 스위치, 동작 완료 신호와 Fault 신호를 이용하여 허용 모드를 결정한 뒤, `DroneController`가 해당 모드의 입력 필터와 기능별 Enable 및 명령을 생성한다. 따라서 우선순위에서 차단된 기능의 진행률은 내부에서 미리 진행하지 않는다.
+## 6. 위치와 자세 피드백
 
-상위 제어 상태는 다음 우선순위를 따른다.
+### 6.1 Position PI
 
-$$
-\boxed{
-KILL
->
-ROLLOVER\_FAULT
->
-CONTROLLER\_FAULT
->
-LANDING
->
-STANDING
->
-READY(MANUAL/CORRECTION)
-}
-$$
+조종 모드의 적용 x·y 속도를 현재 Heading으로 절대좌표계에 회전하고 적분하여 목표 위치를 만든다. FK 기반 몸체 위치 추정과의 오차를 x·y Position PI에 입력한다.
 
-READY 진입 후에는 조종기 네 축이 0.2초 동안 중립일 때 `Motion_Armed`를 활성화한다. 활성화 전에는 수동 조종 및 보정 명령을 전달하지 않는다.
+Position PI는 조종 모드에서만 사용한다. z 위치는 추정하지만 Position PI에는 사용하지 않는다. 보정 모드의 x·y·z 명령과 암 모드에는 Position PI를 적용하지 않는다.
 
-Tripod 보행은 수동 조종 모드에서 다음 이동 명령 조건 중 하나를 만족할 때만 활성화한다.
+조종 모드 진입 시 목표 위치를 현재 추정 위치에 맞추고 적분항을 초기화한다. 출력 포화 또는 작업공간 제한 중에는 적분항이 바깥 방향으로 누적되지 않게 한다.
 
-$$
-|v_{x,user}|\ge V_{gait,th}
-\quad\text{or}\quad
-|v_{y,user}|\ge V_{gait,th}
-\quad\text{or}\quad
-|\omega_{z,user}|\ge \Omega_{gait,th}
-$$
+### 6.2 Heading PI
 
-READY 상태만으로는 `Tripod_Enable`을 활성화하지 않는다.
+SA OFF에서는 사용자 Yaw 각속도를 적분해 목표 Heading을 만들고, IMU Yaw와의 오차를 Heading PI로 보정한다. SA ON에서는 사용자 Yaw 각속도를 0으로 두고 전환 시점의 Heading을 유지한다.
 
-`Body_Control_Enable`과 `Tripod_Enable`은 서로 다른 역할을 가진다. `Body_Control_Enable`은 Final Gait Body Twist, Stance 궤적과 몸체 자세 오버레이 경로를 허용하고, `Tripod_Enable`은 Tripod 위상 진행과 Swing 궤적만 허용한다. READY에서 `Motion_Armed=1`이면 조종 모드와 보정 모드의 `Body_Control_Enable`을 활성화한다. 실제 x·y 이동 또는 Yaw 회전 명령이 없으면 `Tripod_Enable=0`으로 두고 6개 다리를 모두 STANCE로 유지한다.
+SA 상태가 어느 방향으로 바뀌든 현재 IMU Yaw를 새 목표 Heading으로 사용하여 전환 순간의 회전 Jump를 막는다.
 
----
+### 6.3 몸체 자세 PI
 
-### 2. Body Position Feedback
+조종 모드 Roll·Pitch와 보정 모드 Yaw는 하나의 몸체 자세 PI를 사용한다. 자세 PI 출력은 보정 각속도이며 200 Hz로 적분해 몸체 자세 오버레이를 만든다. 별도의 내부 각속도 PI는 두지 않는다.
 
-STANCE 상태이면서 실제로 CONTACT가 확인된 다리의 관절각과 Forward Kinematics를 이용하여 몸체 위치를 추정한다.
+자세 오버레이는 Tripod 위상, 보폭과 Swing 착지점을 변경하지 않는다. 선택된 6개 발끝 목표를 몸체 원점 기준으로 역회전하여 몸체만 기울이거나 회전시킨다.
 
-각 유효 Stance 다리가 계산한 몸체 위치 후보끼리 3차원 거리를 비교한다. 다른 정상 후보가 `0.05 m` 이내에 없는 고립 후보는 Stance Foot Slip 의심 다리로 보고 즉시 평균에서 제외한다.
+## 7. 최종 Body Twist
 
-Slip 의심이 200 Hz 제어 주기에서 5회 연속 발생하면 해당 다리의 Slip 상태를 확정한다. 확정 상태는 다리가 STANCE 또는 CONTACT 조건에서 벗어날 때 해제하며, 확정된 다리는 다음 Stance Anchor가 생성될 때까지 위치 추정에 사용하지 않는다.
+조종 모드의 보행 명령은 다음 세 성분을 합한다.
 
-Foot Slip Reject를 통과한 Stance 다리의 위치 추정값만 **단순 평균**한다. 압력센서 값은 접촉 여부 판단에만 사용하며, Slip 다리 정보는 Leg 1~6에 대응하는 6비트 `Slip_Leg_Mask`로 출력한다.
+~~~text
+사용자 x·y 속도와 Yaw 각속도
+  + x·y Position PI 보정
+  + Heading Yaw PI 보정
+  = 최종 보행 Body Twist
+~~~
 
-Body Position Estimator는 절대좌표계의 x·y·z 위치를 추정하지만, 현재 Position PI에는 x·y 위치만 사용한다. z 위치는 추정과 검증에만 사용하고 Position PI에는 입력하지 않는다.
+Roll·Pitch 자세 PI와 보정 모드 Yaw 자세 PI는 보행 Body Twist에 합하지 않는다. 보정 모드의 x·y·z 속도는 PI 없이 몸체 이동 경로에 직접 사용한다.
 
-조종 모드에서 몸체 좌표계의 x·y 선속도를 현재 Yaw Reference로 절대좌표계에 회전한 뒤 200 Hz로 적분하여 x·y 목표 위치를 생성한다. SA OFF에서는 $v_{y,user}=0$이고, SA ON에서는 Yaw 짐벌이 $v_{y,user}$를 만든다.
+최종 Body Twist에는 축별 크기 제한과 변화율 제한을 적용한다. Position과 Heading Reference에는 사용자가 요청한 값이 아니라 작업공간 검사를 통과한 실제 적용 속도를 적분한다.
 
-$$
-p_{B,ref}^{xy}[k]
-=
-p_{B,ref}^{xy}[k-1]
-+
-\begin{bmatrix}
-\cos\psi_{ref}[k] & -\sin\psi_{ref}[k]\\
-\sin\psi_{ref}[k] & \cos\psi_{ref}[k]
-\end{bmatrix}
-\begin{bmatrix}
-v_{x,user}[k]\\
-v_{y,user}[k]
-\end{bmatrix}T_s
-$$
+## 8. Tripod Gait
 
-Position Reference Generator 활성화 시에는 $p_{B,ref}^{xy}[k_0]={}^W\hat p_B^{xy}[k_0]$로 초기화한다. x·y 목표 위치와 FK·Stance Anchor로 계산한 x·y Body Position Estimate의 차이를 Position PI에 입력한다.
+Tripod 그룹은 다음과 같다.
 
-Position PI는 조종 모드에서만 사용한다. 보정 모드의 x·y·z 이동속도와 암 모드 입력에는 Position PI를 적용하지 않는다.
+~~~text
+Tripod A = Leg 1, 3, 5
+Tripod B = Leg 2, 4, 6
+~~~
 
-LANDED, STANDING, LANDING, CORRECTION, ARM, FAULT, KILL 상태에서는 Position PI 출력을 0으로 만들고 적분항을 누적하지 않는다. 조종 모드 진입 시 x·y 목표 위치를 현재 추정 위치로 맞추고 적분항을 초기화한다.
+두 그룹은 0.5 s마다 STANCE와 SWING을 교대한다. 실제 x·y 이동 또는 Yaw 회전 명령이 임계값을 넘을 때만 보행 위상을 진행한다.
 
----
+보행 명령이 중립으로 돌아오면 진행 중인 Swing 다리를 먼저 착지시킨다. 착지 완료 시점의 6개 STANCE 발끝 목표를 그대로 유지하며, 발끝 목표를 0이나 기본 위치로 순간 변경하지 않는다.
 
-### 3. Gait Heading 및 Body Posture Feedback
+보정 모드에서는 6개 다리를 모두 STANCE로 유지한 채 몸체 위치와 자세만 변경한다.
 
-9축 IMU에서 얻은 Roll, Pitch, Yaw를 이용하여 현재 몸체 자세를 추정한다.
+## 9. 발끝 궤적
 
-조종 모드 Yaw는 SA OFF에서 보행 방향 제어에 사용한다. Yaw 각속도 명령을 적분하여 $\psi_{ref}$를 만들고, IMU Yaw와 비교한 Gait Heading Yaw PI 출력 $\omega_{z,heading,fb}$를 사용자 Yaw 각속도에 더한다. SA ON이 되면 현재 IMU Yaw를 $\psi_{ref}$로 다시 잡고, 사용자 Yaw 각속도를 0으로 두며 Yaw 짐벌을 y축 속도로 사용한다. 따라서 헤딩 PI의 보정 회전만 허용하여 방향을 유지한다.
+### 9.1 Stance
 
-조종 모드의 Roll·Pitch와 보정 모드의 Yaw는 보행 경로와 분리된 몸체 자세 제어에 사용한다. 목표 자세와 IMU 자세의 오차를 하나의 **단일 자세 PI**에 입력하여 자세 보정 각속도 $\omega_{posture}$를 생성한다. 내부 각속도 PI를 추가한 이중 PI 구조는 사용하지 않는다.
+STANCE 발은 지면에 고정된 것처럼 보이도록 몸체 선속도와 각속도의 반대 방향으로 발끝 목표를 갱신한다.
 
-자세 보정 각속도는 200 Hz로 적분하고 Saturation과 Rate Limiter를 적용하여 몸체 원점 기준 자세 명령 $\eta_{posture,cmd}$를 만든다. 이 자세 명령은 Final Gait Body Twist, Tripod 위상, 보폭 또는 Swing 착지점 계산에 넣지 않는다.
+\[
+\dot p_i=-v_B-\omega_B\times p_i
+\]
 
-먼저 `Tripod_Enable`에 따라 기준 좌표계 $\{R\}$의 발끝 목표를 선택한다. `Tripod_Enable=1`이면 Tripod와 Contact Adaptation이 만든 Stance/Swing 목표를 사용하고, `Tripod_Enable=0`이면 6개 다리의 기본 또는 직전 안전 STANCE 목표를 계속 출력한다. 이후 선택된 기준 발끝 목표에 몸체 자세의 역회전을 적용한다.
+### 9.2 Swing
 
-$$
-{}^Bp_{F_i}^{cmd}
-=
-({}^RR_B(\eta_{posture,cmd}))^T
-{}^Rp_{F_i}^{base}
-$$
+Swing 착지점은 다음 Stance 동안 예상되는 몸체 이동과 회전을 절반 선행 보상해 계산한다. 시작점과 착지점을 연결하는 3차 Bezier Curve에 Quintic Time Scaling을 적용한다.
 
-두 좌표계는 같은 몸체 원점을 사용하므로 평행이동 없이 원점 기준 회전만 적용된다. STANCE 발은 지면에 고정되고, SWING 발의 명목 보행 궤적과 착지점도 그대로 유지된다.
+Swing 중간에는 다리 장착 방향 바깥쪽으로 최대 0.07 m의 방사 오프셋을 추가한다. 오프셋은 시작과 착지에서 0이므로 착지점은 바뀌지 않는다.
 
-LANDED, STANDING, LANDING, FAULT, KILL 상태에서는 자세 PI 출력과 자세 오버레이를 0으로 만들고 적분항을 누적하지 않는다. 각 PI가 다시 활성화될 때는 목표 자세를 해당 모드의 진입 기준에 맞추고 적분항을 초기화한다.
+Swing Height 기본값은 0.20 m이고 몸체 z Offset에 따라 0.15~0.25 m 범위에서 변한다.
 
----
+## 10. 접촉 적응
 
-### 4. Final Gait Body Twist
+압력센서는 발별 CONTACT/NO CONTACT 판정에 사용한다. 접촉과 해제는 서로 다른 임계값과 연속 Sample 조건을 사용하며 실제 값은 센서 캘리브레이션으로 정한다.
 
-조종 모드에서는 사용자 x·y 선속도·Yaw 각속도 Feedforward와 x·y Position PI 및 Gait Heading Yaw PI Feedback을 합쳐 보행용 Body Twist를 만든다.
+Early Landing은 Swing 진행률 50% 이후의 하강 구간에서 접촉이 검출될 때 판단한다. 해당 다리는 현재 발끝 위치를 저장하고 즉시 STANCE로 전환한다.
 
-사용자 선속도는 Position Reference를 적분하는 목표 속도이자 Final Gait Body Twist의 Feedforward 성분이다. Position Feedback은 목표 위치와 FK 기반 추정 위치 사이의 오차만 보정한다.
+정상 Swing 시간이 끝났는데 접촉하지 못하면 Late Landing으로 전환한다. 발을 -Z 방향으로 0.20 m/s로 내리면서 다리 안쪽으로 0.16 m/s 이동시킨다. 모든 Swing 다리가 접촉하기 전에는 다음 Tripod Phase로 넘어가지 않는다.
 
-보정 모드에서는 x·y·z 이동속도 명령을 PI 없이 직접 사용한다. 보정 모드 Yaw는 Final Gait Body Twist에 더하지 않고 몸체 자세 오버레이에만 사용한다. 암 모드에는 Position PI와 자세 PI를 적용하지 않는다.
+Late Landing의 최대 탐색 거리와 최대 탐색 시간은 아직 정하지 않았다. 탐색 중 IK가 유효하지 않으면 Controller Fault를 발생시킨다.
 
-```text
-User Command
-    +
-Position Feedback
-    +
-Gait Heading Yaw Feedback
-    ↓
-Final Gait Body Twist
-```
+## 11. 작업공간 제한과 연속성
 
----
+사용자 출력 범위는 Roll·Pitch ±45 deg, x·y 속도 ±0.28 m/s와 Yaw ±45 deg/s로 유지한다. 실제 적용값은 현재 발 배치에서 6개 다리가 모두 IK 가능한 범위로 동적으로 제한한다.
 
-### 5. Tripod Gait Manager
+한 주기의 자세 후보가 가능하면 Roll·Pitch·Yaw 증분을 함께 적용한다. 한 다리라도 불가능하면 세 축을 모두 직전 유효 명령으로 유지한다. 작은 연속 입력을 전제로 하므로 최대 가능값을 찾는 이분 탐색은 사용하지 않는다.
 
-기본 보행은 **Tripod Gait**를 사용한다.
+x·y 속도와 Yaw 회전은 다음 보행 궤적 전체를 검사한 뒤 같은 비율과 공통 적용 여부를 사용한다. 합성 이동 방향과 회전 반경을 보존하고 보행 Phase 중간에는 적용값을 바꾸지 않는다.
 
-`Tripod_Enable=1`일 때만 Tripod 위상과 Swing 진행률을 갱신한다. `Tripod_Enable=0`은 발끝 목표 출력을 0으로 만드는 조건이 아니다. `Body_Control_Enable=1`, `Tripod_Enable=0`이면 Tripod 위상을 정지하고 6개 다리의 기본 또는 직전 안전 STANCE 목표를 계속 출력한다. 따라서 정지 상태에서도 Position PI, 자세 PI 또는 보정 모드의 Body 명령이 작동한다. 자세 오버레이는 `Tripod_Enable`과 독립적으로 동작하므로 보행 중에도 Roll·Pitch 또는 보정 Yaw 명령이 Tripod 궤적을 바꾸지 않는다. 두 Enable이 모두 0이면 보행용 Body Twist와 발끝 궤적 갱신을 정지한다.
+보정 x·y·z 이동은 다음 위치 후보가 불가능하면 바깥 방향 속도를 0으로 만들고 위치 적분 상태도 갱신하지 않는다. 안쪽 복귀 명령은 즉시 허용한다.
 
-```text
-Tripod A = 1, 3, 5
-Tripod B = 2, 4, 6
-```
+최종 IK 앞에는 0.0001 m 여유의 발끝 작업공간 제한을 둔다. 정상 동작에서 이 마지막 제한이 큰 위치 보정을 수행하면 상위 동적 제한 오류로 판단한다.
 
-두 그룹은 Swing과 Stance를 번갈아 수행한다.
+## 12. 기구학과 관절 출력
 
----
+각 발끝 목표는 몸체 좌표계에서 다리 로컬 좌표계로 변환한 뒤 Yaw-Pitch-Pitch 3DOF IK로 관절각을 계산한다. IK는 해 존재 여부와 -135~135 deg 관절 범위를 함께 검사한다.
 
-### 6. Stance Trajectory
+18개 관절 명령은 각각 독립적으로 315.8 deg/s, 즉 5 ms당 1.579 deg로 제한한다. 이후 관절별 방향, 중립점과 Pulse 보정을 적용하여 500~2500 us 범위의 200 Hz PWM으로 출력한다.
 
-STANCE 발은 지면에 고정된 상태를 유지하도록 몸체 이동과 회전의 반대 방향으로 발끝 목표 위치를 갱신한다.
+현재 속도 제한은 DS51150-270의 12.6 V 최고 무부하 속도를 기준으로 한다. 실기에서는 관절 ADC로 부하 상태 추종 속도를 측정한 뒤 필요하면 낮춘다.
 
----
+## 13. Safety
 
-### 7. Swing Trajectory
+현재 Safety는 다음 조건을 평가한다.
 
-SWING 다리는 다음 착지 목표점을 계산한 뒤 **3차 Bezier Curve와 방사 방향 오프셋**으로 발끝 경로를 생성한다.
-
-시간 진행에는 **Quintic Time Scaling**을 사용하여 Swing 시작과 종료를 부드럽게 만든다.
-
-Swing Height는 몸체 기준점에 대한 몸체 원점의 z방향 상대 위치에 따라 보정한다.
-
-방사 방향 오프셋은 Swing 시작점과 착지점에서는 0이고 최고점에서 최대가 되며, 발끝을 각 다리의 장착 방향 바깥쪽으로 이동시켜 IK 관절각을 줄인다. 현재 Swing Height 기본값은 `0.20 m`, 제한 범위는 `0.15~0.25 m`이며 방사 방향 오프셋은 `0.07 m`이다.
-
----
-
-### 8. Early / Late Landing
-
-**Early Landing**이 발생하면 해당 다리는 즉시 STANCE로 전환한다.
-
-**Late Landing**이 발생하면 미접촉 발을 기준 좌표계의 `-z_R` 방향으로 내리는 동시에 각 다리 장착점 방향으로 당겨 Search Down한다. 현재 Simulink 검증값은 하강 속도 `0.20 m/s`, 안쪽 이동 비율 `0.8`, 안쪽 이동 속도 `0.16 m/s`이다. 모든 Swing 다리가 접촉하기 전까지 다음 Tripod Phase로 넘어가지 않는다.
-
----
-
-### 9. 좌표변환 및 IK
-
-`Tripod_Enable`에 따라 선택한 6개 STANCE Hold 또는 Tripod 기준 발끝 목표에 몸체 자세 오버레이의 역회전을 적용하여 몸체 좌표계 $\{B\}$로 변환한다. 이후 각 다리 좌표계로 변환한 뒤 **3DOF Inverse Kinematics**를 이용해 18개 관절 목표각을 계산한다.
-
-Roll·Pitch 목표각은 `±45°` 범위를 유지하되, 매 주기 생성한 후보 자세에서 6개 다리가 모두 IK 가능한 경우에만 실제 자세 명령을 갱신한다. Roll, Pitch, Yaw는 결합된 후보 자세에 공통 적용 여부를 사용하므로 후보가 작업공간 밖이면 이번 주기의 세 축 증분을 모두 0으로 만들고 직전 가능 자세를 유지한다. 결합된 후보가 다시 작업공간 안쪽을 향하면 세 축 증분을 즉시 허용한다. RC 입력과 자세 Rate Limiter가 만드는 작은 주기별 증분을 사용하므로 최대 가능각을 찾는 이분 탐색은 사용하지 않는다.
-
-확인용 출력은 `Posture_Command_Accepted`로 명명한다. `1`은 이번 자세 명령 후보 채택, `0`은 후보 거부와 직전 채택 명령 유지를 뜻한다.
-
-자세 후보 생성과 6개 다리 작업공간 검사는 `BodyPosturePIOverlay` MATLAB Function 내부에서 함께 수행한다. 별도의 자세 제한 블록이나 자세 출력 피드백 선은 추가하지 않는다.
-
-x·y 이동 속도와 Yaw 회전 속도는 다음 보행 주기의 전체 발끝 궤적을 미리 검사하여 가능한 보폭과 회전량까지만 증가시킨다. 세 명령이 동시에 들어오면 동일한 적용 여부를 사용하여 이동 방향과 회전 반경을 유지한다. 한 걸음 `0.5 s`에서 한 축 최대 `0.28 m/s` 명령은 보폭 `0.14 m`에 해당한다. 현재 자세나 회전 명령 때문에 마지막 가능 보폭이 `0.12 m`이면 적용 속도는 `0.24 m/s`가 된다.
-
-Position Reference와 Heading Reference에는 요청값이 아니라 작업공간 검사를 통과한 실제 적용 x·y 선속도와 Yaw 각속도를 적분한다. 자세 후보가 거부된 동안에는 자세 명령 상태와 자세 PI 적분항이 바깥 방향으로 누적되지 않게 한다.
-
-보정 모드의 x·y·z 속도는 다음 위치 후보가 작업공간 밖이면 바깥 방향 적용 속도를 0으로 만들고 위치 적분 상태도 갱신하지 않는다. 작업공간 안쪽으로 복귀시키는 명령은 즉시 허용한다.
-
-각 `Body2Leg` 출력과 `LegIK` 입력 사이에는 작업공간 여유 `0.0001 m`를 사용하는 최종 `FootWorkspaceLimiter`를 둔다. 이 블록은 상위 동적 명령 제한 뒤에 배치하며 수치 오차만 보정한다.
-
-시간 기반 모드 전환 보간은 사용하지 않는다. 모드 전환 시 새 제어 경로의 상태를 직전 출력에 맞추고, 보행 정지 시 진행 중인 Swing 다리를 착지시킨 뒤 직전 안전 STANCE 목표를 유지하여 출력 연속성을 확보한다.
-
-모든 관절의 사용 범위는 **-135° ~ +135°**이다.
-
----
-
-### 10. 안전장치
-
-이 절의 Safety 판단과 출력 보호는 후속 구현 대상으로 둔다. 최초 STM32 구현에서는 두 Fault를 0으로 유지하고 관절 명령 상태만 `0°`로 초기화한다.
-
-Servo 출력 전에 다음 항목을 검사한다.
-
-- ROLLOVER FAULT
-- IK Workspace
-- 관절 각도 범위
-- Safe Support Polygon
-- 비정상 목표각 Jump
-- 관절 최대 각속도 초과 여부
-
-Safe Support Polygon은 실제 지지다각형을 중심 기준으로 **10% 축소한 영역**을 사용하며, 몸체 원점이 이 영역을 벗어나면 보행을 중단한다.
-
-비정상적인 Joint Jump가 검출되면 새 명령을 적용하지 않고 **직전 관절각을 HOLD**한다.
-
-IK 해가 없다는 검출은 기구학 계산에서 수행하고, 검출 즉시 로봇을 정지시키는 결정은 Safety가 `Controller_Fault`를 발생시키는 방식으로 나중에 구현한다.
-
-Roll 또는 Pitch가 **80° 이상**이면 ROLLOVER FAULT로 판단하고 즉시 정지한다.
-
----
-
-### 11. Servo Output
-
-사용 Servo는 **DS51150-270**이다.
-
-| 항목 | 값 |
-|---|---:|
-| PWM 주파수 | 200 Hz |
-| PWM 주기 | 5 ms |
-| 중립 Pulse | 1500 us |
-| Pulse 범위 | 500 ~ 2500 us |
-| 관절 사용 범위 | -135° ~ +135° |
-| 관절 명령 각속도 제한 | 315.8°/s |
-| 5 ms당 최대 관절 명령 변화량 | 1.579° |
-
-관절의 0° 방향은 좌표축 README의 정의를 따른다.
-
-Joint Rate Limiter는 Safety Fault와 별개의 상시 출력 보호이다. 18개 IK 출력 각각에 독립된 Discrete Rate Limiter를 적용한 뒤 서보 방향·중립점 보정과 PWM 변환을 수행한다.
-
----
-
-## 필수 설정
-
-| 항목 | 설정 |
+| Fault | 조건 |
 |---|---|
-| 전체 제어 주파수 | 200 Hz |
-| Sampling Time | 5 ms |
-| 기본 보행 | Tripod Gait |
-| Tripod A | 1, 3, 5 |
-| Tripod B | 2, 4, 6 |
-| Position Controller | PI |
-| Attitude Controller | PI |
-| Yaw 제어 | Heading Hold |
-| Swing Path | Cubic Bezier + Radial Offset |
-| Swing Time Scaling | Quintic |
-| Safe Support Polygon | 실제 지지다각형의 90% |
-| Rollover 기준 | Roll 또는 Pitch 80° |
-| Joint Jump | 직전 각도 HOLD |
-| IK Workspace Margin | 0.0001 m |
-| Joint Rate Limit | 315.8°/s, 5 ms당 1.579° |
-| Servo | DS51150-270 |
+| Rollover Fault | 유효한 IMU Roll 또는 Pitch의 절댓값이 80 deg 이상 |
+| Controller Fault | IMU 값이 유한하지 않거나 6개 다리 중 하나라도 IK Invalid |
+
+두 Fault는 한 번 발생하면 Latch되며 Reset 입력을 두지 않는다. Fault가 발생하면 상위 상태가 FAULT로 전환되고 Kill 동작으로 6개 서보 전원 릴레이를 모두 끈다. 자동 Recovery는 수행하지 않는다.
+
+다음 항목은 설계 후보이지만 현재 Safety 판정에는 아직 포함하지 않는다.
+
+- Safe Support Polygon
+- 비정상 Joint Jump
+- 센서별 Timeout
+- Stance Foot Slip Fault 승격
+
+관절 범위, 발끝 작업공간과 관절 명령 속도 제한은 Safety Latch와 별개로 항상 적용하는 출력 보호이다.
+
+## 14. 시험 원칙
+
+시험은 센서와 기구학부터 시작해 실제 서보 출력으로 범위를 넓힌다.
+
+1. 좌표축, 관절 방향과 FK/IK를 검증한다.
+2. 압력센서 CONTACT/RELEASE를 튜닝한다.
+3. Stance와 Swing 궤적을 서보 전원 없이 확인한다.
+4. Position PI와 Heading PI를 낮은 Gain으로 조정한다.
+5. Roll·Pitch와 보정 Yaw 자세 PI를 조정한다.
+6. 작업공간 제한과 모드 전환 연속성을 확인한다.
+7. IK Invalid와 전복 입력에서 Safety Latch와 릴레이 차단을 확인한다.
+8. 낮은 속도에서 시작해 최대 0.28 m/s까지 단계적으로 실기 검증한다.

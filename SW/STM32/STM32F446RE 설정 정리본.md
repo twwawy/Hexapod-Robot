@@ -1,5 +1,7 @@
 # STM32F446RE 설정 정리본
 
+STM32CubeMX에서 확정한 핀, 주변장치와 통신 설정을 정리한다. 보정값과 상위 통신 프로토콜처럼 실측 또는 추가 합의가 필요한 항목은 포함하지 않는다.
+
 ---
 
 ## 1. 보드 / MCU
@@ -13,7 +15,7 @@
 | APB1 Timer Clock | 84 MHz |
 | APB2 Timer Clock | 84 MHz |
 
-PA15, PB3, PB4 같은 핀을 PWM으로 쓰기 때문에 `SYS → Debug = Serial Wire`로 설정해야 함.
+PA15, PB3, PB4를 PWM으로 사용하므로 `SYS → Debug = Serial Wire`로 설정한다.
 
 ---
 
@@ -37,7 +39,7 @@ PA15, PB3, PB4 같은 핀을 PWM으로 쓰기 때문에 `SYS → Debug = Serial 
 84 MHz / (83 + 1) = 1 MHz
 ```
 
-즉 카운터 1칸이 1 us이고, `4999 + 1 = 5000 us = 5 ms`가 됨.
+즉 카운터 1칸은 1 us이고, `4999 + 1 = 5000 us = 5 ms`가 된다.
 
 ---
 
@@ -69,7 +71,7 @@ MCP3008 1개당 8채널 총 24채널
 | SPI 속도 | 약 2.625 Mbit/s |
 | CRC | Disable |
 
-CS 핀은 GPIO Output으로 직접 제어함.
+CS 핀은 GPIO Output으로 직접 제어한다.
 
 ```text
 평소 CS = HIGH
@@ -229,21 +231,9 @@ STM32F446RE = SPI Slave
 | NSS | Hardware Input |
 | CRC | Disable |
 
-### DRDY 역할
+### 프로토콜 결정 상태
 
-원래는 Jetson이 읽고 싶을 때만 STM32의 값을 읽을 수 있음  
-그러면 긴급한 신호에 반응을 못 할 수 있음  
-따라서 STM32가 보낼 데이터 준비 완료를 알려주는 신호가 필요함
-
-### 동작 개념
-
-```text
-→ STM32가 상태 데이터 준비
-→ DRDY HIGH
-→ Jetson이 CS LOW
-→ SPI 통신
-→ 통신 완료 후 DRDY LOW
-```
+SPI2 핀과 `DRDY` 핀만 물리적으로 설정되어 있다. 실제 명령, 송수신 프레임, CRC, 타임아웃과 `DRDY` 동작 순서는 Jetson 통신 프로토콜을 정할 때 확정한다.
 
 ---
 
@@ -333,8 +323,7 @@ RadioMaster Pocket은 최대 16채널을 지원한다. 실제 조종 입력은 M
 | USART6_TX | PC6 |
 | USART6_RX | PC7 |
 
-실제로 필요한 건 RX인 PC7임.  
-PC6 TX는 설정상 잡혀 있어도 배선하지 않아도 됨.
+CRSF 수신에는 RX인 PC7을 사용한다. PC6 TX는 설정되어 있지만 단방향 수신만 사용할 때는 배선하지 않아도 된다.
 
 ### 설정
 
@@ -348,6 +337,17 @@ PC6 TX는 설정상 잡혀 있어도 배선하지 않아도 됨.
 | Data Direction | TX/RX |
 | Hardware Flow Control | Disable |
 | Over Sampling | 16 Samples |
+
+### 인터럽트
+
+| 항목 | 설정 |
+|---|---|
+| USART6 global interrupt | Enable |
+| Preemption Priority | 1 |
+| Sub Priority | 0 |
+| IRQ Handler | `USART6_IRQHandler()` |
+
+현재 `.ioc`에는 USART6 NVIC가 활성화되어 있으며, 생성 코드의 IRQ Handler에서 `HAL_UART_IRQHandler(&huart6)`를 호출한다.
 
 ### 프로젝트 CRSF 채널 배치
 
@@ -388,7 +388,7 @@ STM32의 `user_command`는 CH1~CH4를 위 이름으로 다시 배치하고, 네 
 
 ### 용도
 
-5ms마다 제어 루프를 돌릴 때 쓰면 됨.
+5 ms 제어 주기를 만드는 기준 타이머로 사용한다.
 
 ```c
 HAL_TIM_Base_Start_IT(&htim6);
@@ -396,4 +396,4 @@ HAL_TIM_Base_Start_IT(&htim6);
 
 ---
 
-위의 설정을 기반으로 HAL 기반 + 일부 레지스터 직접 접근 방식으로 코드 작성
+주변장치 초기화와 인터럽트 처리는 HAL을 기준으로 구현한다.

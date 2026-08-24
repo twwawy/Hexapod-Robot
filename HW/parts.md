@@ -1,6 +1,6 @@
-# Hardware Parts List
+# 하드웨어 부품 목록
 
-이 문서는 Hexapod Robot 제작에 사용한 주요 하드웨어 부품 목록을 정리한 문서입니다.
+Hexapod Robot 제작에 사용하는 주요 부품의 수량, 용도와 구매처를 정리한다. 실제 로봇에는 DS51150-270 서보 18개를 사용하며 나머지 수량은 예비 부품을 포함한다.
 
 ---
 
@@ -177,7 +177,7 @@
 - **용도**: 로봇 발의 지면 접촉 여부 확인
 - **구매링크**: [DeviceMart](https://www.devicemart.co.kr/goods/view?no=33870)
 
-### ADC Module
+### MCP3008 ADC Module
 
 - **개수**: 3개
 - **용도**: STM32의 부족한 ADC 채널 보완

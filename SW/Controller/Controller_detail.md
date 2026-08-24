@@ -1,53 +1,28 @@
 # 6족 로봇 보행 제어기 상세 설계
 
-본 문서는 `Controller_Architecture.md`에서 정의한 전체 제어 구조를 실제 구현 가능한 수준의 수식과 이산시간 제어식으로 구체화한다.
+[Controller_Architecture.md](Controller_Architecture.md)의 제어 구조를 수식과 이산시간 규칙으로 정의한다. 조종기 채널·시험 입력은 [드론 조종기 입력 README](드론%20조종기%20입력/README.md), 좌표 부호와 기본 자세는 [좌표축 README](좌표축/README.md)를 따른다.
 
-기본 구조는 다음을 유지한다.
+이 문서는 현재 제어 모델의 동작 기준이다. 블록 배치나 선 연결 방법은 다루지 않는다.
 
-- 전체 제어 주기: **200 Hz**
-- 기본 보행: **Tripod Gait**
-- 사용자 명령 + Body Position Feedback + Gait Heading Yaw Feedback → **Final Gait Body Twist**
-- 조종 Roll·Pitch + 보정 Yaw 단일 자세 PI → **IK 직전 몸체 자세 오버레이**
-- Stance 다리: Final Gait Body Twist의 반대 운동으로 **PULL 궤적** 생성
-- Swing 다리: 착지 목표점 + **3차 Bezier Curve + 방사 방향 오프셋**
-- 발끝 압력센서: **Early / Late Landing**
-- 발끝 목표 위치 → 좌표계 변환 → **3DOF IK**
-- 최종 관절각에 안전 제한 적용 후 Servo Output
+## 1. 공통 정의
 
----
+### 1.1 좌표계
 
-# 1. 기호 및 좌표계
+| 기호 | 의미 |
+|---|---|
+| \(\{W\}\) | 지면에 고정된 절대 좌표계 |
+| \(\{B\}\) | 현재 몸체 원점 좌표계 |
+| \(\{R\}\) | 명목 몸체 기준 좌표계 |
+| \(\{L_i\}\) | i번 다리 로컬 좌표계 |
+| \(O_B\) | 현재 몸체 원점 |
+| \(O_R\) | 기본 자세의 몸체 기준점 |
+| \(F_i\) | i번 다리 발끝 |
 
-## 1.1 좌표계
+몸체 축은 +X 전진, +Y 왼쪽, +Z 위쪽이다.
 
-좌표계 정의는 좌표축 README 및 `Controller_Architecture.md`의 정의를 따른다.
+몸체 선속도, 각속도와 Body Twist는 다음과 같다.
 
-- $\{B\}$: 현재 몸체 원점 좌표계
-- $\{W\}$: 지면에 고정된 절대 좌표계
-- $\{R\}$: 몸체 기준점 좌표계
-- $\{L_i\}$: i번 다리 좌표계
-- $O_W$: 최초 관절각 0° 착지 상태에서 정의한 절대 원점
-- $O_B$: 현재 몸체 원점
-- $O_R$: 몸체 기준점
-- $F_i$: i번 다리 발끝
-
-몸체 좌표계 $\{B\}$의 축은
-
-$$
-+x_B:\text{전진},\qquad
-+y_B:\text{왼쪽},\qquad
-+z_B:\text{위쪽}
-$$
-
-으로 정의한다.
-
-절대 좌표계 $\{W\}$는 로봇의 이동과 무관하게 지면에 고정한다. 최초 관절각 0° 착지 상태에서 $O_W=O_B$로 초기화하며, 기본 자세로 일어서면 ${}^Wp_B=[0,0,h_{stand}]^T$가 된다. 몸체 좌표계 $\{B\}$와 몸체 기준 좌표계 $\{R\}$는 로봇의 명목 이동을 따라간다. Body Position Estimator는 절대좌표계의 x·y·z 위치를 추정하고, Position PI의 x·y 목표·측정·오차는 절대 좌표계 $\{W\}$에서 계산한다.
-
-## 1.2 벡터
-
-몸체 선속도와 각속도는
-
-$$
+\[
 v_B=
 \begin{bmatrix}
 v_x\\v_y\\v_z
@@ -56,256 +31,89 @@ v_x\\v_y\\v_z
 \omega_B=
 \begin{bmatrix}
 \omega_x\\\omega_y\\\omega_z
-\end{bmatrix}
-$$
-
-로 정의한다.
-
-Body Twist는
-
-$$
+\end{bmatrix},
+\qquad
 \xi_B=
 \begin{bmatrix}
-v_B\\
-\omega_B
+v_B\\\omega_B
 \end{bmatrix}
-=
-\begin{bmatrix}
-v_x\\v_y\\v_z\\
-\omega_x\\\omega_y\\\omega_z
-\end{bmatrix}
-$$
+\]
 
-이다.
+벡터 \(a\)의 Skew-Symmetric Matrix는 다음과 같다.
 
-## 1.3 Skew-Symmetric Matrix
-
-벡터
-
-$$
-a=
-\begin{bmatrix}
-a_x\\a_y\\a_z
-\end{bmatrix}
-$$
-
-에 대해
-
-$$
+\[
 [a]_\times=
 \begin{bmatrix}
 0&-a_z&a_y\\
 a_z&0&-a_x\\
 -a_y&a_x&0
-\end{bmatrix}
-$$
-
-로 정의하면
-
-$$
+\end{bmatrix},
+\qquad
 a\times b=[a]_\times b
-$$
+\]
 
-로 표현할 수 있다.
+### 1.2 제어 주기
 
----
+전체 제어 루프는 200 Hz로 실행한다.
 
-# 2. 제어 주기
+\[
+T_s=0.005\ \mathrm{s}
+\]
 
-전체 제어 루프는 200 Hz로 동작한다.
+센서 Snapshot부터 서보 명령 갱신까지 한 주기 안에서 순서대로 완료한다고 가정한다. 계산이 일찍 끝나면 다음 5 ms Tick까지 기다린다. 별도의 연산시간 초과 Fault는 현재 구현하지 않는다.
 
-$$
-f_s=200\text{ Hz}
-$$
+## 2. 사용자 입력 전처리
 
-$$
-\boxed{\Delta t=T_s=0.005\text{ s}}
-$$
+### 2.1 정규화와 Dead Zone
 
-따라서 한 번의 전체 제어 계산은 다음 제어 주기가 시작되기 전인 5 ms 이내에 완료되어야 한다.
+Throttle·Yaw·Roll·Pitch의 공통 raw 범위는 -1000~1000이고 중립은 0이다. 정규화 값은 \(u\in[-1,1]\)이다.
 
-$$
-\boxed{
-T_{exec}<5\text{ ms}
-}
-$$
+Dead Zone \(\delta\)는 다음처럼 적용한다.
 
-실제 구현에서는 연산 여유를 확보하기 위해 실행 시간을 측정하고, 가능한 한 5 ms에 충분한 여유를 두도록 한다.
-
-모든 PI 적분, 발끝 궤적 적분, 관절 각속도 제한은 동일한 $0.005\,\mathrm{s}$의 제어 주기를 기준으로 계산한다.
-
-제어 주기 번호를 $k$라 하면 현재 시각은
-
-$$
-t_k=kT_s
-$$
-
-이다.
-
----
-
-# 3. 조종기 입력 전처리
-
-조종기에서 들어오는 Throttle·Roll·Pitch·Yaw raw 값은 중립 0, 범위 `-1000~1000`으로 정의한다. 제어기 내부에서 이를 다음 정규화 입력으로 변환한다.
-
-$$
-u_j\in[-1,1]
-$$
-
-로 정의한다.
-
-현재 조종 모드의 기본 입력은
-
-$$
-u_T:\text{Throttle}
-$$
-
-$$
-u_R:\text{Roll}
-$$
-
-$$
-u_P:\text{Pitch}
-$$
-
-$$
-u_Y:\text{Yaw}
-$$
-
-이다.
-
----
-
-## 3.1 Dead Zone
-
-조이스틱 중앙 노이즈를 제거하기 위해 Dead Zone을 적용한다.
-
-Dead Zone 크기를 $\delta$라 하면
-
-$$
+\[
 D(u)=
 \begin{cases}
-0,
-&
-|u|\le\delta
-\\[6pt]
-\operatorname{sgn}(u)
-\dfrac{|u|-\delta}{1-\delta},
-&
-|u|>\delta
+0, & |u|\le\delta\\
+\operatorname{sgn}(u)\dfrac{|u|-\delta}{1-\delta}, & |u|>\delta
 \end{cases}
-$$
+\]
 
-로 정의한다.
+현재 raw 기준 Dead Zone은 다음과 같다.
 
-이 식을 사용하면 Dead Zone 외부의 입력 범위가 다시 $[-1,1]$로 정규화된다.
+| 입력 | Dead Zone |
+|---|---:|
+| Throttle | ±20 |
+| Yaw·Roll·Pitch | ±50 |
 
-각 입력에 대해
+Dead Zone 밖의 범위는 다시 -1~1로 선형 대응한다.
 
-$$
-u_{T,d}=D(u_T)
-$$
+### 2.2 Low Pass Filter
 
-$$
-u_{R,d}=D(u_R)
-$$
+Dead Zone 이후 각 축에 5 Hz 1차 LPF를 적용한다.
 
-$$
-u_{P,d}=D(u_P)
-$$
+\[
+u_f[k]=\alpha u_f[k-1]+(1-\alpha)u_d[k]
+\]
 
-$$
-u_{Y,d}=D(u_Y)
-$$
+\[
+\alpha=e^{-2\pi f_cT_s},
+\qquad
+f_c=5\ \mathrm{Hz}
+\]
 
-를 계산한다.
+모드가 바뀌면 새 모드 출력 계산 전에 네 필터 상태를 모두 0으로 초기화한다. 조종 모드에서 SA가 바뀌면 Yaw 필터만 0으로 초기화한다.
 
----
+### 2.3 연속 명령
 
-## 3.2 Low Pass Filter
+임시 조종기 입력과 강화학습 Action의 raw 변화율은 5000/s로 제한한다. 5 ms당 최대 변화량은 25 raw이며 중립에서 최대까지 0.2 s, 최소에서 최대까지 0.4 s가 걸린다.
 
-Dead Zone을 통과한 조종기 입력에는 1차 Low Pass Filter를 적용한다.
+실제 RC와 강화학습 모두 속도·자세 명령 경로를 사용한다. Step Action을 발끝 위치나 관절각에 직접 전달하지 않는다.
 
-연속시간 1차 LPF
+## 3. 상위 상태
 
-$$
-G(s)=\frac{\omega_c}{s+\omega_c}
-$$
+### 3.1 상태 우선순위
 
-를 이산화하여
-
-$$
-u_f[k]
-=
-\alpha u_f[k-1]
-+
-(1-\alpha)u_d[k]
-$$
-
-로 사용한다.
-
-여기서
-
-$$
-\alpha=e^{-2\pi f_cT_s}
-$$
-
-이고 $f_c$는 Cutoff Frequency이다.
-
-따라서 각 채널은
-
-$$
-u_{T,f},\quad
-u_{R,f},\quad
-u_{P,f},\quad
-u_{Y,f}
-$$
-
-로 변환된다.
-
----
-
-## 3.3 RC 및 강화학습 연속 명령 규칙
-
-Simulink `USER`는 raw 변화율을 `5000/s`로 제한한다. 따라서 `-1000→1000`은 `0.4 s`, 중립→최대는 `0.2 s`가 걸리고 5 ms 제어 주기당 최대 raw 변화량은 `25`이다.
-
-실제 RC 조종기는 짐벌 위치가 연속적으로 변하므로 정상 운용 입력을 Step 신호로 취급하지 않는다. 강화학습 제어기도 RC 조종기와 동일한 정규화 명령을 사용하며, 한 제어 주기 만에 최소값에서 최대값으로 바뀌는 Step Action을 직접 제어기에 전달하지 않는다.
-
-강화학습 출력은 다음 규칙을 따른다.
-
-- 각 명령은 `[-1,1]` 범위의 독립된 스칼라 신호로 출력한다.
-- Throttle, Roll, Pitch, Yaw와 모드 명령을 하나의 행렬이나 벡터 포트로 묶지 않는다.
-- 발끝 위치나 관절각을 직접 출력하지 않고 RC와 동일한 Body Command 입력 경로를 사용한다.
-- 출력은 RC 짐벌처럼 시간에 따라 연속적으로 변하게 만들고 **반드시 Ramp 변화율 제한 후 LPF** 순서로 통과시킨다.
-- 학습 정책이 불연속 출력을 만들 수 있으면 정책 출력단에서 이전 Action을 기준으로 `5000 raw/s`에 해당하는 변화량을 제한한 뒤 제어기에 전달한다.
-- 학습·평가·실기 모든 경로에서 Step Action을 직접 연결하는 우회 경로를 두지 않는다.
-
-별도의 0.3~0.5초 모드 전환 보간은 사용하지 않는다. 대신 모드 전환 시 새 제어 경로의 적분 상태와 기준값을 직전 출력에 맞추는 Bumpless Transfer를 적용한다. 보행 정지는 진행 중인 Swing 다리를 먼저 착지시키고, 착지 완료 시점의 6개 STANCE 발끝 목표를 그대로 유지한다.
-
----
-
-## 3.4 Control Priority Manager와 Drone Controller
-
-조종기 입력 처리와 동작 모드 생성은 다음 순서를 따른다.
-
-```text
-USER 또는 실제 RC 입력
-        ↓
-ControlPriorityManager
-        ↓
-DroneController
-        ↓
-기능별 Enable, 진행률 및 사용자 명령
-```
-
-`ControlPriorityManager`는 조종기 스위치, 서기·착지 완료 신호와 Fault 신호를 이용하여 현재 허용할 `Active_Mode`를 먼저 결정한다. `DroneController`는 전달받은 `Active_Mode`에 해당하는 기능만 갱신한다. 이 순서를 사용하면 우선순위에서 차단된 서기·착지 또는 보행 진행률이 내부에서 미리 진행되는 것을 방지할 수 있다.
-
-`Active_Mode`가 바뀌면 `DroneController`는 새 모드의 출력을 계산하기 전에 `Throttle_Filter`, `Yaw_Filter`, `Roll_Filter`, `Pitch_Filter`를 0으로 초기화한다. 조종 모드에서 SA 상태가 바뀌면 이전 Yaw 회전 명령이 y축 이동 명령으로, 또는 반대로 이어지지 않도록 `Yaw_Filter`만 0으로 다시 초기화한다.
-
-상위 제어 상태의 우선순위는 다음과 같다.
-
-$$
-\boxed{
+\[
 KILL
 >
 ROLLOVER\_FAULT
@@ -316,1480 +124,513 @@ LANDING
 >
 STANDING
 >
-READY(MANUAL/CORRECTION)
-}
-$$
+READY
+\]
 
-`Motion_Armed`는 READY 진입 직후 남아 있는 조종기 입력으로 갑작스러운 동작이 발생하는 것을 방지하는 내부 허가 상태이다. READY가 아니면 즉시 해제하고, READY 진입 후 Throttle·Yaw·Roll·Pitch가 연속 0.2초 동안 중립 범위에 있을 때 활성화한다. 활성화 전에는 수동 조종 및 보정 명령을 출력하지 않는다.
+READY 안에서 MANUAL 또는 CORRECTION을 선택한다. ARM과 AUTONOMOUS는 조종기 배치만 유지하며 현재 제어 계산에는 포함하지 않는다.
 
-수동 조종 모드에서는 실제 이동 명령이 다음 조건 중 하나를 만족할 때만 Tripod 보행을 활성화한다.
+### 3.2 서기와 착지
 
-$$
-\boxed{
-Tripod\_Enable
-=
-\left(
-|v_{x,user}|\ge V_{gait,th}
-\right)
-\lor
-\left(
-|v_{y,user}|\ge V_{gait,th}
-\right)
-\lor
-\left(
-|\omega_{z,user}|\ge \Omega_{gait,th}
-\right)
-}
-$$
+서기는 자세 진행률을 5.6 s 동안 0에서 1로 증가시킨 뒤 0.5 s 동안 안정 상태를 유지하면 완료한다.
 
-따라서 READY 또는 MANUAL 상태에 진입했다는 이유만으로 Tripod 보행을 시작하지 않는다.
+착지는 다음 순서를 사용한다.
 
----
+1. 보행 중이었다면 모든 Swing 발의 접촉을 완료한다.
+2. Leg 1·3·5와 Leg 2·4·6을 각각 0.5 s 동안 순서대로 정리한다.
+3. 5.6 s 동안 자세 진행률을 1에서 0으로 낮춘다.
+4. 0.5 s 동안 안정 상태를 유지한 뒤 LANDED로 전환한다.
 
-# 4. 사용자 Body Command
+보행하지 않았다면 발 정리 단계를 건너뛰고 자세 하강부터 시작한다.
 
-`Controller_Architecture.md`의 정의에 따라 현재 조종 모드에서는
+### 3.3 동작 허가
 
-- Throttle → 부호가 있는 x축 전진·후진 속도
-- Roll → 몸체 Roll 목표각
-- Pitch → 몸체 Pitch 목표각
-- Yaw, SA OFF → 몸체 Yaw 각속도
-- Yaw, SA ON → 몸체 y축 좌·우 속도
+READY 진입 직후에는 동작을 허가하지 않는다. 네 짐벌이 다음 범위에서 0.2 s 동안 중립이어야 Motion Armed를 활성화한다.
 
-를 명령한다.
+| 입력 | 중립 범위 |
+|---|---:|
+| Throttle | ±20 raw |
+| Yaw·Roll·Pitch | ±50 raw |
 
-최대 명령값을
+READY가 아니면 Motion Armed를 즉시 해제한다. CRSF 100 ms Timeout과 재연결 조건은 드론 조종기 입력 문서를 따른다.
 
-$$
-V_{x,\max},
-\quad
-V_{y,\max},
-\quad
-\phi_{\max},
-\quad
-\theta_{\max},
-\quad
-\Omega_{z,\max}
-$$
+## 4. 사용자 Body Command
 
-현재 값은 다음과 같다.
+필터 출력 \(u_{T,f},u_{Y,f},u_{R,f},u_{P,f}\)를 사용한다.
 
-$$
-V_{x,\max}=0.28\ \mathrm{m/s},
-\quad
-V_{y,\max}=0.28\ \mathrm{m/s},
-\quad
-\phi_{\max}=45^\circ,
-\quad
-\theta_{\max}=45^\circ,
-\quad
-\Omega_{z,\max}=45^\circ/\mathrm{s}
-$$
+### 4.1 조종 모드
 
-라 하면
+\[
+v_{x,user}=0.28u_{T,f}
+\]
 
-$$
-v_{x,user}
-=
-V_{x,\max}u_{T,f}
-$$
-
-$$
-\phi_{ref}
-=
-\phi_{\max}u_{R,f}
-$$
-
-$$
-\theta_{ref}
-=
-\theta_{\max}u_{P,f}
-$$
-
-로 x축 속도와 Roll·Pitch 목표각을 변환한다. SA ON에서는 Yaw 짐벌을 측방 속도로 변환한다.
-
-$$
-v_{y,user}=V_{y,\max}u_{Y,f},
+\[
+\phi_{ref}=45^\circ u_{R,f},
 \qquad
-\omega_{z,user}=0
-$$
+\theta_{ref}=45^\circ u_{P,f}
+\]
 
-SA OFF에서는 x축 이동과 Yaw 회전을 명령한다.
+SA OFF에서는 다음을 사용한다.
 
-$$
+\[
 v_{y,user}=0,
 \qquad
-\omega_{z,user}=\Omega_{z,\max}u_{Y,f}
-$$
+\omega_{z,user}=45^\circ/\mathrm{s}\;u_{Y,f}
+\]
 
-현재 조종 모드에서 별도의 높이 속도 명령은 사용하지 않으므로
+SA ON에서는 다음을 사용한다.
 
-$$
-v_{z,user}=0
-$$
-
-으로 둔다.
-
-따라서
-
-$$
-\boxed{
-\xi_{user}
-=
-\begin{bmatrix}
-v_{x,user}\\
-v_{y,user}\\
-0\\
-0\\
-0\\
-\omega_{z,user}
-\end{bmatrix}
-}
-$$
-
-이다.
-
-현재 Simulink 배선은 추가 포트 없이 기존 `Correction_Vy` 스칼라 선을 모드별로 재사용한다. 조종 모드+SA ON에서는 $v_{y,user}$를 전달하고, 보정 모드에서는 기존 y축 보정 속도를 전달한다. 두 모드는 동시에 활성화되지 않으므로 신호가 충돌하지 않으며 블록 포트 수와 선 연결은 변경하지 않는다.
-
-보정 모드의 Yaw 입력은 조종 모드의 $\omega_{z,user}$와 구분하여 yaw 보정 목표각으로 사용한다. 최대 yaw 보정각을 $\psi_{corr,max}$라 하면
-
-$$
-\boxed{
-\psi_{corr,ref}[k]
-=
-\psi_{corr,max}u_{Y,f}[k]
-}
-$$
-
-로 직접 변환한다. $\psi_{corr,ref}$는 각속도 명령이 아니므로 시간 적분하지 않는다. 보정 모드의 yaw 조이스틱이 중앙으로 복귀하면 $\psi_{corr,ref}=0$으로 복귀하며, 필요한 실제 보정 각속도는 이후 자세 오차 제어에서 생성한다.
-
----
-
-# 5. 몸체 자세 목표값 생성
-
-Roll과 Pitch 조이스틱 입력은 **목표각 명령**으로 사용한다. 필터링된 입력을 각 축의 최대 목표각에 직접 대응시킨다.
-
-$$
-\phi_{ref}[k]
-=
-\phi_{\max}u_{R,f}[k]
-$$
-
-$$
-\theta_{ref}[k]
-=
-\theta_{\max}u_{P,f}[k]
-$$
-
-조종 모드의 Yaw 조이스틱 입력만 **각속도 명령**으로 사용한다. Heading Reference는
-
-$$
-\psi_{ref}[k+1]
-=
-\operatorname{wrap}_{\pi}
-\left(
-\psi_{ref}[k]
-+
-\omega_{z,user}[k]T_s
-\right)
-$$
-
-로 갱신한다.
-
-Roll과 Pitch의 최대 허용 자세를 각각
-
-$$
-\phi_{\max},
+\[
+v_{y,user}=0.28u_{Y,f},
 \qquad
-\theta_{\max}
-$$
-
-라 하면
-
-$$
-\phi_{ref}
-=
-\operatorname{clamp}
-(
-\phi_{ref},
--\phi_{\max},
-\phi_{\max}
-)
-$$
-
-$$
-\theta_{ref}
-=
-\operatorname{clamp}
-(
-\theta_{ref},
--\theta_{\max},
-\theta_{\max}
-)
-$$
-
-를 적용한다.
-
-> 조종 모드에서 Roll·Pitch 조이스틱이 중앙으로 복귀하면 목표각은 0으로 복귀한다. SA OFF에서 Yaw 조이스틱이 중앙으로 복귀하면 Yaw 각속도 명령만 0이 되고 목표 Heading은 유지된다. SA ON에서 Yaw 조이스틱은 y축 속도를 명령한다.
-
-조종 모드의 Yaw 축은 **Heading Hold를 기본으로 사용한다.**
-
-SA OFF에서 Yaw 조이스틱 입력은 목표 Yaw 각도 자체가 아니라 목표 Yaw 각속도 $\omega_{z,user}$를 명령한다. 따라서 Yaw 조이스틱을 움직이는 동안에는 목표 Heading을 다음과 같이 적분하여 갱신한다. SA ON으로 전환하거나 OFF로 복귀할 때는 현재 IMU Yaw를 $\psi_{ref}$로 다시 잡아 명령 점프를 막는다. SA ON에서는 $\omega_{z,user}=0$으로 두고 Heading PI 보정만 허용한다. 보정 모드의 $\psi_{corr,ref}$에는 이 적분식을 적용하지 않는다.
-
-$$
-\psi_{ref}[k+1]
-=
-\operatorname{wrap}_{\pi}
-\left(
-\psi_{ref}[k]
-+
-\omega_{z,user}[k]T_s
-\right)
-$$
-
-조종 모드에서 Yaw 조이스틱이 중앙으로 복귀하면
-
-$$
 \omega_{z,user}=0
-$$
+\]
 
-이므로
+단위는 선속도 m/s, 각도 deg와 각속도 deg/s이다.
 
-$$
+### 4.2 Heading Reference
+
+SA OFF에서 목표 Heading은 사용자 Yaw 각속도를 적분한다.
+
+\[
 \psi_{ref}[k+1]
-=
-\psi_{ref}[k]
-$$
-
-가 되어 마지막 목표 Heading을 유지한다.
-
-이후 IMU에서 측정한 현재 Yaw와 목표 Yaw의 오차를
-
-$$
-e_{\psi}
 =
 \operatorname{wrap}_{\pi}
 \left(
-\psi_{ref}-\psi
+\psi_{ref}[k]+\omega_{z,user}[k]T_s
 \right)
-$$
+\]
 
-로 계산하고, Yaw PI를 이용하여 보정 각속도를 생성한다.
+Yaw 입력이 중립이면 마지막 Heading을 유지한다. MANUAL 진입 또는 SA 전환 시에는 현재 IMU Yaw를 새 목표로 사용한다.
 
-$$
-\omega_{z,feedback}
+\[
+\psi_{ref}\leftarrow\psi_{IMU}
+\]
+
+SA ON에서는 사용자 Yaw 각속도를 0으로 두고 Heading PI의 보정만 허용한다.
+
+### 4.3 보정 모드
+
+\[
+v_{x,corr}=0.05u_{P,f},
+\qquad
+v_{y,corr}=0.05u_{R,f},
+\qquad
+v_{z,corr}=0.05u_{T,f}
+\]
+
+\[
+\psi_{corr,ref}=10^\circ u_{Y,f}
+\]
+
+보정 Yaw는 각속도가 아니라 상대 목표각이다. Yaw 입력이 중립으로 돌아오면 목표각도 0 deg로 복귀한다.
+
+## 5. 몸체 위치 추정
+
+i번 다리의 측정 관절각을 \(q_i\)라 하면 몸체 좌표계 발끝 위치는 FK로 계산한다.
+
+\[
+{}^Bp_{F_i}^{meas}=FK_i(q_i)
+\]
+
+STANCE이면서 CONTACT가 확인된 다리만 원시 유효 다리로 사용한다. Stance 시작 순간의 지면 고정 Anchor는 다음과 같다.
+
+\[
+{}^Wp_{F_i}^{anchor}
 =
-K_{P,\psi}e_{\psi}
+{}^W\hat p_B
 +
-K_{I,\psi}I_{\psi}
-$$
-
-따라서 조이스틱이 중앙에 있어도 보행 중 좌우 다리의 추진력 차이, 지면 마찰 차이 또는 외력으로 몸체의 Yaw가 틀어지면 Yaw Feedback이 목표 Heading으로 복원한다.
-
-제어기 최초 활성화, MANUAL 모드 진입 또는 Heading Hold 재활성화 시에는 이전 목표값 때문에 갑작스러운 회전 명령이 발생하지 않도록 현재 Yaw를 목표값으로 초기화한다.
-
-$$
-\boxed{
-\psi_{ref}
-\leftarrow
-\psi
-}
-$$
-
----
-
-# 6. 몸체 상태 추정
-
-몸체 상태 Feedback에 필요한 상태는 크게 $\hat p_B$와 $\hat R_B$이다.
-
-- $\hat p_B$: 절대 좌표계에 대한 몸체 원점의 추정 위치
-- $\hat R_B$: 절대 좌표계에 대한 IMU 기반 몸체 추정 자세
-
----
-
-# 7. Body Position 추정
-
-## 7.1 Stance 발끝의 순기구학
-
-i번 다리의 실제 관절각을
-
-$$
-q_i=
-\begin{bmatrix}
-\theta_{i1}\\
-\theta_{i2}\\
-\theta_{i3}
-\end{bmatrix}
-$$
-
-라 한다.
-
-각 다리의 Forward Kinematics를 이용하여 현재 몸체 좌표계에서의 발끝 위치를 계산한다.
-
-$$
+{}^WR_B
 {}^Bp_{F_i}^{meas}
-=
-FK_i(q_i)
-$$
+\]
 
-Stance 상태이며 압력센서로 접촉이 확인된 다리만 위치 추정에 사용한다.
+Stance 중에는 Anchor를 갱신하지 않는다. i번 다리로 계산한 몸체 위치 후보는 다음과 같다.
 
----
-
-## 7.2 Stance 발 고정 조건
-
-지면에 미끄럼이 없다고 가정하면 Stance 발끝은 기준 좌표계에서 고정되어 있다.
-
-$$
-{}^W\dot p_{F_i}\approx0
-$$
-
-몸체 자세 회전행렬을
-
-$$
-{}^WR_B
-$$
-
-라 하면 발끝의 위치 관계는
-
-$$
-{}^Wp_{F_i}
-=
-{}^Wp_B
-+
-{}^WR_B
-{}^Bp_{F_i}
-$$
-
-이다.
-
-따라서 i번 Stance 발을 이용한 몸체 위치 추정값은
-
-$$
-\boxed{
+\[
 {}^W\hat p_{B,i}
 =
 {}^Wp_{F_i}^{anchor}
 -
 {}^WR_B
 {}^Bp_{F_i}^{meas}
-}
-$$
+\]
 
-로 계산할 수 있다.
+### 5.1 Stance Foot Slip
 
-여기서
+같은 주기의 후보 간 거리를 비교한다.
 
-$$
-{}^Wp_{F_i}^{anchor}
-$$
-
-는 해당 발이 Stance를 시작할 때 저장한 지면 고정 발끝 위치이다.
-
----
-
-## 7.3 Stance Anchor 초기화
-
-Swing → Stance 전환 순간을 $k_s$라 하면
-
-$$
-{}^Wp_{F_i}^{anchor}
-=
-{}^W\hat p_B[k_s]
-+
-{}^WR_B[k_s]
-{}^Bp_{F_i}^{meas}[k_s]
-$$
-
-로 저장한다.
-
-이후 해당 발이 Stance인 동안 Anchor는 변경하지 않는다.
-
----
-
-## 7.4 여러 Stance 다리의 단순 평균
-
-Tripod Gait에서는 일반적으로 세 개의 Stance 다리가 지면을 지지한다.
-
-각 Stance 다리의 관절각과 Forward Kinematics를 이용하면 각 다리로부터 몸체 위치 추정값을 각각 계산할 수 있다.
-
-$$
-{}^W\hat p_{B,i}
-=
-{}^Wp_{F_i}^{anchor}
--
-{}^WR_B
-{}^Bp_{F_i}^{meas}
-$$
-
-실제 로봇에서는 관절각 오차, 링크 변형, 발 미끄러짐 등의 영향으로 각 다리에서 계산한 몸체 위치가 완전히 동일하지 않을 수 있다.
-
-따라서 먼저 **STANCE 상태이면서 압력센서에서 CONTACT가 확인된 다리만** 원시 유효 다리로 선택한다. 원시 유효 다리 중 Foot Slip Reject를 통과한 다리만 최종 위치 추정에 사용한다.
-
-Foot Slip Reject를 통과한 Stance 다리 집합을 $\mathcal S$라 하고, 유효 다리의 개수를 $N_S=|\mathcal S|$라 하면 최종 몸체 위치는 각 다리의 추정값을 단순 평균하여 계산한다.
-
-$$
-\boxed{
-{}^W\hat p_B
-=
-\frac{1}{N_S}
-\sum_{i\in\mathcal S}
-{}^W\hat p_{B,i}
-}
-$$
-
-정상적인 Tripod Gait에서 세 Stance 다리가 모두 접촉하고 있다면 $N_S=3$이다.
-
-예를 들어 Tripod A가 Stance인 경우
-
-$$
-\boxed{
-{}^W\hat p_B
-=
-\frac{
-{}^W\hat p_{B,1}
-+
-{}^W\hat p_{B,3}
-+
-{}^W\hat p_{B,5}
-}{3}
-}
-$$
-
-이고, Tripod B가 Stance인 경우
-
-$$
-\boxed{
-{}^W\hat p_B
-=
-\frac{
-{}^W\hat p_{B,2}
-+
-{}^W\hat p_{B,4}
-+
-{}^W\hat p_{B,6}
-}{3}
-}
-$$
-
-으로 계산한다.
-
-압력센서 값의 크기는 가중치로 사용하지 않고, 각 발이 지면에 접촉했는지를 판단하는 **CONTACT / NO CONTACT 판정에만 사용한다.**
-
-유효 Stance 다리가 하나도 없는 경우에는
-
-$$
-N_S=0
-$$
-
-이므로 몸체 위치를 새로 계산하지 않고 직전 유효 추정값을 유지하며, 정상적인 지지 상태가 아니므로 별도의 Fault 또는 Recovery 조건으로 처리한다.
-
-
-## 7.5 Foot Slip Reject
-
-각 원시 유효 Stance 다리가 계산한 몸체 위치 후보끼리 같은 제어 주기에서 3차원 거리를 비교한다. 발 자체의 이동거리가 아니라, Stance Anchor와 현재 FK·IMU 자세로 계산한 다리별 몸체 위치 후보의 불일치를 검사한다.
-
-$$
+\[
 d_{ij}
 =
 \left\|
 {}^W\hat p_{B,i}
 -
 {}^W\hat p_{B,j}
-\right\|
-$$
+\right\|_2
+\]
 
-현재 Slip 거리 기준은
+다른 정상 후보가 0.05 m 안에 하나도 없으면 해당 후보를 즉시 평균에서 제외한다. 이 상태가 5회 연속, 25 ms 유지되면 해당 다리의 Slip을 Latch한다.
 
-$$
-d_{slip}=0.05\ \mathrm{m}
-$$
+원시 유효 다리가 하나면 비교 없이 사용한다. 두 다리만 있고 서로 0.05 m보다 멀면 어느 다리가 정상인지 결정할 수 없으므로 둘 다 제외한다.
 
-이다. 다리 $i$에 대해 다른 원시 유효 다리 중 다음 조건을 만족하는 다리 $j$가 하나라도 있으면 정상 후보로 판정한다.
+Slip Latch는 다리가 STANCE 또는 CONTACT 조건에서 벗어날 때 해제한다. 다음 Stance에서 Anchor를 새로 만들고 다시 판정한다.
 
-$$
-d_{ij}\le d_{slip}
-$$
-
-모든 다른 후보와의 거리가 `0.05 m`보다 크면 고립 후보로 판정하고, 해당 제어 주기부터 몸체 위치 평균에서 즉시 제외한다. 고립 판정이 200 Hz 제어 주기에서 5회 연속되면 25 ms 동안 불일치가 지속된 것이므로 해당 다리의 Slip 상태를 확정하고 Latch한다.
-
-Slip Latch는 해당 다리가 STANCE 또는 CONTACT 조건에서 벗어날 때 해제한다. 이후 다시 STANCE와 CONTACT 조건을 만족하면 새로운 Stance Anchor를 생성하고 판정을 다시 시작한다.
-
-원시 유효 다리가 하나뿐이면 비교할 수 없으므로 해당 후보를 정상으로 사용한다. 원시 유효 다리가 두 개뿐이고 두 후보의 거리가 `0.05 m`보다 크면 어느 다리가 정상인지 결정할 다수 후보가 없으므로 두 다리 모두 고립 후보로 처리한다.
-
-확정된 Slip 상태는 다음 6비트 마스크로 출력한다.
-
-$$
+\[
 Slip\_Leg\_Mask
 =
-\sum_{i=1}^{6} Slip_i 2^{i-1}
-$$
+\sum_{i=1}^{6} Slip_i2^{i-1}
+\]
 
-Bit 0~5는 각각 Leg 1~6에 대응한다. 현재 `Slip_Leg_Mask`는 Body Position Estimator의 진단 출력이며 다른 제어 또는 Safety 블록에는 아직 연결하지 않는다.
+Bit 0~5는 Leg 1~6이다. 현재 Slip Mask는 진단 출력이며 Safety Fault에는 연결하지 않는다.
 
----
+### 5.2 최종 위치
 
-# 8. Body Position PI Controller
+Slip Reject를 통과한 다리 집합을 \(\mathcal S\), 개수를 \(N_S\)라 하면 다음처럼 단순 평균한다.
 
-Body Position Estimator는 절대좌표계의 x·y·z 위치를 계산하지만, 현재 Position PI는 조종 모드의 몸체 x·y 속도 명령에 대해 절대좌표계 x·y 위치만 제어한다. z 위치는 추정과 검증에 사용하며 Position PI에는 입력하지 않는다.
+\[
+{}^W\hat p_B
+=
+\frac{1}{N_S}
+\sum_{i\in\mathcal S}
+{}^W\hat p_{B,i}
+\]
 
-## 8.1 Position Reference Generator
+압력값 크기는 가중치로 사용하지 않는다. \(N_S=0\)이면 직전 유효 위치를 유지한다.
 
-조종 모드의 몸체 좌표계 x·y 선속도 명령을
+## 6. Position과 Heading PI
 
-$$
-\begin{bmatrix}v_{x,user}[k] & v_{y,user}[k]\end{bmatrix}^{T}
-$$
+### 6.1 Position Reference
 
-라 하고 현재 Yaw Reference를 $\psi_{ref}[k]$라 하면, 절대좌표계의 목표 x·y 위치는
+조종 모드의 몸체 x·y 속도를 목표 Heading으로 절대좌표계에 회전하고 적분한다.
 
-$$
-\boxed{
+\[
 p_{B,ref}^{xy}[k]
 =
 p_{B,ref}^{xy}[k-1]
 +
 \begin{bmatrix}
-\cos\psi_{ref}[k] & -\sin\psi_{ref}[k]\\
-\sin\psi_{ref}[k] & \cos\psi_{ref}[k]
+\cos\psi_{ref} & -\sin\psi_{ref}\\
+\sin\psi_{ref} & \cos\psi_{ref}
 \end{bmatrix}
 \begin{bmatrix}
-v_{x,user}[k]\\
-v_{y,user}[k]
-\end{bmatrix}T_s
-}
-$$
+v_{x,applied}\\
+v_{y,applied}
+\end{bmatrix}
+T_s
+\]
 
-로 갱신한다.
+MANUAL 진입 또는 Reset 시에는 다음처럼 현재 위치에서 시작한다.
 
-Throttle의 x축 속도와 SA ON의 Yaw 짐벌이 만든 y축 속도를 Yaw Reference로 회전하여 절대좌표계의 x·y 속도로 변환한다.
-
-Position Reference Generator를 활성화할 때는 명령 점프를 방지하기 위해
-
-$$
-\boxed{
-p_{B,ref}^{xy}[k_0]
-=
-{}^W\hat p_B^{xy}[k_0]
-}
-$$
-
-로 초기화한다.
-
-$v_{x,user}=0$이면 $p_{B,ref}^{xy}$는 현재 목표 위치에 고정되므로 조종 모드에서 정지 위치 유지가 가능하다. 절대 원점 유지 시험에서만
-
-$$
+\[
 p_{B,ref}^{xy}
+\leftarrow
+{}^W\hat p_B^{xy}
+\]
+
+요청 속도가 아니라 작업공간 검사를 통과한 적용 속도를 적분한다.
+
+### 6.2 Position PI
+
+\[
+e_p
 =
-\begin{bmatrix}
-0\\0
-\end{bmatrix}
-$$
-
-을 사용할 수 있다. 일반 보행 중에 $p_{B,ref}^{xy}=0$을 고정하면 Position PI가 사용자의 이동 명령을 반대로 보정하므로 사용하지 않는다.
-
-## 8.2 Position Error
-
-PI에 입력하는 위치는 개별 다리의 FK 발끝 좌표가 아니라, FK와 Stance Anchor를 이용해 계산한 Body Position Estimate의 x·y 성분 ${}^W\hat p_B^{xy}$이다.
-
-위치 오차는
-
-$$
-\boxed{
-e_p^{xy}[k]
-=
-p_{B,ref}^{xy}[k]
+p_{B,ref}^{xy}
 -
-{}^W\hat p_B^{xy}[k]
-}
-$$
+{}^W\hat p_B^{xy}
+\]
 
-이다.
-
-축별 PI Gain을 대각행렬로 정의한다.
-
-$$
-K_{P,p}
-=
-\operatorname{diag}
-(
-K_{Px},K_{Py}
-)
-$$
-
-$$
-K_{I,p}
-=
-\operatorname{diag}
-(
-K_{Ix},K_{Iy}
-)
-$$
-
-
----
-
-## 8.3 적분항
-
-$$
-I_p[k]
-=
-I_p[k-1]
-+
-e_p^{xy}[k]T_s
-$$
-
-적분 포화를 막기 위해
-
-$$
+\[
 I_p[k]
 =
 \operatorname{clamp}
-(
-I_p[k],
-I_{p,min},
+\left(
+I_p[k-1]+e_p[k]T_s,
+-I_{p,max},
 I_{p,max}
-)
-$$
+\right)
+\]
 
-를 적용한다.
-
----
-
-
-## 8.4 PI 출력
-
-포화 전 위치 보정 속도는
-
-$$
-v_{feedback}^{raw}
-=
-K_{P,p}e_p^{xy}
-+
-K_{I,p}I_p
-$$
-
-이다.
-
-축별 최대 보정 속도를
-
-$$
-v_{fb,max}
-=
-\begin{bmatrix}
-v_{x,fb,max}\\
-v_{y,fb,max}
-\end{bmatrix}
-$$
-
-라 하면
-
-$$
-\boxed{
-v_{feedback}
+\[
+v_{feedback}^{W}
 =
 \operatorname{sat}
 \left(
-v_{feedback}^{raw},
--v_{fb,max},
-v_{fb,max}
+K_{P,p}e_p+K_{I,p}I_p,
+\pm v_{fb,max}
 \right)
-}
-$$
+\]
 
-를 적용한다.
+현재 초기값은 다음과 같다.
 
-$v_{feedback}$은 절대좌표계의 x·y 보정 속도이다. 발끝 궤적에 입력하기 전에 현재 몸체 Yaw를 이용하여 몸체 좌표계 속도로 변환하고, z축 보정 속도는 0으로 둔다.
+| 항목 | 값 |
+|---|---:|
+| Position \(K_P\) | 1.0 |
+| Position \(K_I\) | 0 |
+| 적분 제한 | ±0.20 |
+| 축별 Feedback 제한 | ±0.05 m/s |
 
----
+Position PI는 유효 위치 후보가 하나 이상인 MANUAL에서만 활성화한다. z 위치와 CORRECTION에는 적용하지 않는다.
 
-## 8.5 모드별 활성 조건
+### 6.3 Heading PI
 
-Position PI는 `Motion_Armed`가 활성화된 조종 모드에서만 사용한다. 보정 모드의 x·y·z 이동속도와 암 모드 입력에는 Position PI를 적용하지 않는다.
-
-Position PI는 `Tripod_Enable`과 독립적으로 동작한다. `Body_Control_Enable=1`, `Tripod_Enable=0`인 조종 모드에서는 6개 발을 모두 STANCE로 유지한 상태에서 x·y 위치 오차를 보정한다.
-
-LANDED, STANDING, LANDING, CORRECTION, ARM, FAULT, KILL 상태에서는 Position PI 출력을 0으로 만들고 적분항을 누적하지 않는다. 조종 모드에 새로 진입할 때는
-
-$$
-p_{B,ref}^{xy}[k_0]
+\[
+e_\psi
 =
-{}^W\hat p_B^{xy}[k_0]
-$$
-
-로 목표 위치를 현재 추정 위치에 맞추고 적분항을 0으로 초기화하여 명령 점프를 방지한다.
-
----
-
-## 8.6 Anti-Windup
-
-출력 포화 시 적분항이 계속 증가하지 않도록 Back-Calculation Anti-Windup을 적용할 수 있다.
-
-$$
-I_p[k]
-=
-I_p[k]
-+
-K_{aw,p}
+\operatorname{wrap}_{\pi}
 \left(
-v_{feedback}
--
-v_{feedback}^{raw}
-\right)T_s
-$$
+\psi_{ref}-\psi_{IMU}
+\right)
+\]
 
-초기 구현에서는 Conditional Integration 방식도 사용할 수 있다.
+\[
+\omega_{z,feedback}
+=
+\operatorname{sat}
+\left(
+K_{P,\psi}e_\psi+K_{I,\psi}I_\psi,
+\pm15^\circ/\mathrm{s}
+\right)
+\]
 
-즉, 출력이 포화되었고 현재 오차가 포화를 더 증가시키는 방향이면 적분을 정지한다.
+현재 \(K_{P,\psi}=2.0\), \(K_{I,\psi}=0\), 적분 제한은 ±0.50이다.
 
----
+PI 출력이 포화되거나 작업공간에서 거부된 방향으로 명령이 계속되면 적분을 중단한다. 비활성 모드에서는 출력과 적분항을 0으로 만든다.
 
-# 9. Body Attitude 추정
+## 7. 몸체 자세 PI와 오버레이
 
-Body Attitude PI Controller에서는 자세 상태를 **Roll, Pitch, Yaw Euler Angle**로 표현한다.
+### 7.1 자세 오차
 
-9축 IMU와 자세 추정 필터로
+MANUAL에서는 Roll·Pitch만 사용한다.
 
-$$
-\phi,\qquad
-\theta,\qquad
-\psi
-$$
-
-를 계산한다.
-
-Euler Angle 벡터를
-
-$$
-\eta=
-\begin{bmatrix}
-\phi\\\theta\\\psi
-\end{bmatrix}
-$$
-
-로 정의한다.
-
----
-
-# 10. Body Attitude PI Controller
-
-몸체 자세 제어는 **단일 자세 PI**를 사용한다. 내부 각속도 PI를 추가한 이중 PI 구조는 사용하지 않는다. 조종 모드에서는 Roll·Pitch를 제어하고, 보정 모드에서는 Yaw만 제어한다. 조종 모드 Yaw는 이 자세 PI가 아니라 5장의 Gait Heading Yaw PI에서 보행 방향을 제어한다.
-
-## 10.1 Euler Angle 자세 오차
-
-본 로봇은 $|Roll|\ge80^\circ$ 또는 $|Pitch|\ge80^\circ$인 경우를 안전장치에서 전복 상태로 처리하므로, 정상 자세 제어에서는 Pitch가 짐벌락이 발생하는 $\pm90^\circ$에 도달하지 않는다. 따라서 Body Attitude PI의 자세 오차는 Roll, Pitch, Yaw Euler Angle을 직접 사용한다.
-
-
-조종 모드의 자세 오차는 Roll과 Pitch만 사용하여
-
-$$
+\[
 e_{posture}
 =
 \begin{bmatrix}
-e_\phi\\
-e_\theta\\
+\operatorname{wrap}_{\pi}(\phi_{ref}-\phi)\\
+\operatorname{wrap}_{\pi}(\theta_{ref}-\theta)\\
 0
 \end{bmatrix}
-$$
+\]
 
-$$
-e_\phi
-=
-\operatorname{wrap}_{\pi}
-(
-\phi_{ref}-\phi
-)
-$$
+CORRECTION 진입 시 Yaw 기준 \(\psi_{corr,0}\)를 현재 IMU Yaw로 저장한다.
 
-$$
-e_\theta
-=
-\operatorname{wrap}_{\pi}
-(
-\theta_{ref}-\theta
-)
-$$
-
-로 계산한다.
-
-보정 모드에서는 Roll·Pitch 성분을 0으로 두고 Yaw 자세 PI만 사용한다. 보정 모드 진입 시의 기준 Heading을 $\psi_{corr,0}$, 조종기에서 직접 생성한 상대 Yaw 보정 목표각을 $\psi_{corr,ref}$라 하면 절대 목표각은
-
-$$
+\[
 \psi_{corr,target}
 =
 \operatorname{wrap}_{\pi}
 \left(
-\psi_{corr,0}
-+
-\psi_{corr,ref}
+\psi_{corr,0}+\psi_{corr,ref}
 \right)
-$$
+\]
 
-이고 Yaw 오차는
-
-$$
-\boxed{
-e_{\psi,corr}
-=
-\operatorname{wrap}_{\pi}
-\left(
-\psi_{corr,target}-\psi
-\right)
-}
-$$
-
-로 계산한다.
-
-따라서 보정 모드의 자세 오차 벡터는
-
-$$
+\[
 e_{posture}
 =
 \begin{bmatrix}
-0\\0\\e_{\psi,corr}
+0\\
+0\\
+\operatorname{wrap}_{\pi}(\psi_{corr,target}-\psi)
 \end{bmatrix}
-$$
+\]
 
-로 둔다.
+### 7.2 단일 자세 PI
 
----
-
-
-## 10.2 단일 자세 PI
-
-Gain 행렬을
-
-$$
-K_{P,R}
-=
-\operatorname{diag}
-(
-K_{P\phi},
-K_{P\theta},
-K_{P\psi}
-)
-$$
-
-$$
-K_{I,R}
-=
-\operatorname{diag}
-(
-K_{I\phi},
-K_{I\theta},
-K_{I\psi}
-)
-$$
-
-
-로 둔다.
-
-적분항은
-
-$$
+\[
 I_R[k]
-=
-I_R[k-1]
-+
-e_{posture}[k]T_s
-$$
-
-이다.
-
-포화 전 출력은 몸체 각속도 보정 명령이며
-
-$$
-\omega_{posture}^{raw}
-=
-K_{P,R}e_{posture}
-+
-K_{I,R}I_R
-$$
-
-이다.
-
-최대 자세 보정 각속도를
-
-$$
-\omega_{posture,max}
-=
-\begin{bmatrix}
-\omega_{x,posture,max}\\
-\omega_{y,posture,max}\\
-\omega_{z,posture,max}
-\end{bmatrix}
-$$
-
-라 하면
-
-$$
-\boxed{
-\omega_{posture}
-=
-\operatorname{sat}
-(
-\omega_{posture}^{raw},
--\omega_{posture,max},
-\omega_{posture,max}
-)
-}
-$$
-
-로 제한한다.
-
-단일 자세 PI가 직접 몸체 회전각을 출력하는 것은 아니다. 출력 $\omega_{posture}$는 몸체 자세 오버레이에 사용할 보정 각속도이다. 별도의 내부 각속도 PI는 두지 않고, Saturation과 Rate Limiter를 거친 값을 200 Hz로 적분한다.
-
-$$
-\eta_{posture,cmd}[k+1]
 =
 \operatorname{clamp}
 \left(
-\eta_{posture,cmd}[k]
-+
-\omega_{posture}[k]T_s,
--\eta_{posture,max},
-\eta_{posture,max}
+I_R[k-1]+e_{posture}[k]T_s,
+-0.50,
+0.50
 \right)
-$$
+\]
 
-자세 명령으로 몸체 기준 좌표계 $\{R\}$에서 실제 몸체 좌표계 $\{B\}$로의 회전행렬을 만든다.
+\[
+\omega_{posture}
+=
+\operatorname{sat}
+\left(
+K_{P,R}e_{posture}+K_{I,R}I_R,
+\pm15^\circ/\mathrm{s}
+\right)
+\]
 
-$$
+현재 Roll·Pitch·Yaw의 \(K_P\)는 2.0, \(K_I\)는 0이다. PI 출력은 자세 보정 각속도이며 별도의 내부 각속도 PI는 사용하지 않는다.
+
+자세 명령은 다음처럼 적분한다.
+
+\[
+\eta_{cmd}[k+1]
+=
+\operatorname{clamp}
+\left(
+\eta_{cmd}[k]+\omega_{posture}[k]T_s,
+\eta_{min},
+\eta_{max}
+\right)
+\]
+
+Roll·Pitch 범위는 ±45 deg, 보정 Yaw 범위는 ±10 deg이다.
+
+### 7.3 자세 오버레이
+
+자세 명령의 회전행렬은 Z-Y-X 순서를 사용한다.
+
+\[
 {}^RR_B
 =
-R_z(\psi_{posture,cmd})
-R_y(\theta_{posture,cmd})
-R_x(\phi_{posture,cmd})
-$$
+R_z(\psi_{cmd})R_y(\theta_{cmd})R_x(\phi_{cmd})
+\]
 
-`Tripod_Enable`에 따라 기준 좌표계 발끝 목표를 먼저 선택한다. `Tripod_Enable=1`이면 Tripod와 Contact Adaptation이 만든 Stance/Swing 목표를 사용하고, `Tripod_Enable=0`이면 6개 다리의 기본 또는 직전 안전 STANCE 목표를 계속 출력한다. 선택된 기준 발끝 목표를 IK 직전에 다음과 같이 역회전한다.
+명목 발끝 목표에 몸체 원점 기준 역회전을 적용한다.
 
-$$
-\boxed{
+\[
 {}^Bp_{F_i}^{cmd}
 =
 ({}^RR_B)^T
 {}^Rp_{F_i}^{base}
-}
-$$
+\]
 
-$\{R\}$과 $\{B\}$는 같은 몸체 원점을 사용하므로 평행이동 없이 원점 기준 회전만 적용된다. 자세 오버레이는 Final Gait Body Twist, Tripod Phase, 보폭, Swing 착지점 계산에 입력하지 않는다. 따라서 보행 중에도 명목 Stance/Swing 궤적은 유지되고 몸체 자세만 변경된다.
+\(\{R\}\)과 \(\{B\}\)는 같은 원점을 사용하므로 평행이동은 추가하지 않는다. 자세 오버레이는 Tripod Phase, 보폭과 Swing 착지점을 바꾸지 않는다.
 
-조종 모드에서는 Roll·Pitch 자세 PI만 사용하고, 보정 모드에서는 Yaw 자세 PI만 사용한다. `Body_Control_Enable=1`, `Tripod_Enable=0`이면 6개 발을 모두 STANCE로 유지하여 보행 없이 몸체 자세만 보정한다. 암 모드와 LANDED, STANDING, LANDING, FAULT, KILL 상태에서는 자세 PI 출력과 자세 오버레이를 0으로 만들고 적분항을 누적하지 않는다. PI가 다시 활성화될 때는 해당 적분항과 자세 명령 상태를 초기화한다.
+## 8. 최종 Body Twist
 
----
+MANUAL에서는 사용자 Feedforward와 Position·Heading Feedback을 합한다.
 
-# 11. Final Gait Body Twist
-
-조종 모드에서는 사용자 Feedforward 명령과 x·y Position PI 및 Gait Heading Yaw PI Feedback을 합한다. Roll·Pitch 자세 PI와 보정 모드 Yaw 자세 PI는 이 Body Twist에 합하지 않는다.
-
-선속도는
-
-$$
-\boxed{
-v_{gait}
-=
-v_{user}
-+
-v_{feedback}
-}
-$$
-
-각속도는
-
-$$
-\boxed{
-\omega_{gait}
-=
-\omega_{user}
-+
-\omega_{heading,feedback}
-}
-$$
-
-이다.
-
-따라서
-
-$$
-\boxed{
-\xi_{gait}
-=
-\begin{bmatrix}
-v_{gait}\\
-\omega_{gait}
-\end{bmatrix}
-}
-$$
-
-가 된다.
-
-즉,
-
-$$
-\xi_{gait}
-=
-\xi_{user}
-+
-\xi_{position}
-+
-\xi_{heading}
-$$
-
-의 구조이다.
-
-조종 모드에서 현재 사용하는 성분을 직접 쓰면
-
-$$
+\[
 v_{gait}^{B}
 =
-\begin{bmatrix}
-v_{x,user}\\0\\0
-\end{bmatrix}
+v_{user}^{B}
 +
-{}^BR_W
-\begin{bmatrix}
-v_{x,feedback}^{W}\\
-v_{y,feedback}^{W}\\
-0
-\end{bmatrix}
-$$
+{}^BR_Wv_{feedback}^{W}
+\]
 
-이고
-
-$$
+\[
 \omega_{gait}^{B}
 =
 \begin{bmatrix}
 0\\
 0\\
-\omega_{z,user}+\omega_{z,heading,feedback}
+\omega_{z,user}+\omega_{z,feedback}
 \end{bmatrix}
-$$
+\]
 
-이다.
+CORRECTION에서는 다음을 사용한다.
 
-보정 모드의 x·y·z 이동속도는 PI 없이 발 고정 몸체 이동 경로에 직접 사용한다. 보정 모드 Yaw 자세 PI는 이 Body Twist에 합하지 않고 IK 직전 자세 오버레이에만 사용한다.
-
-$$
+\[
 v_{gait}^{B}
 =
-v_{correction}^{B}
-$$
-
-$$
-\omega_{gait}^{B}
-=
 \begin{bmatrix}
-0\\0\\0
-\end{bmatrix}
-$$
+v_{x,corr}\\
+v_{y,corr}\\
+v_{z,corr}
+\end{bmatrix},
+\qquad
+\omega_{gait}^{B}=0
+\]
 
-암 모드에는 Position PI와 자세 PI를 적용하지 않고 암 제어 명령만 해당 기능 블록으로 전달한다. LANDED, STANDING, LANDING, FAULT, KILL 상태에서는 Final Gait Body Twist를 0으로 만든다.
+Roll·Pitch와 보정 Yaw 자세 PI는 Body Twist에 합하지 않는다.
 
----
+현재 명령 변화율 제한은 다음과 같다.
 
-## 11.1 최종 Saturation
+| 항목 | 값 |
+|---|---:|
+| 선가속도 제한 | 0.5 m/s² |
+| Yaw 각가속도 제한 | 90 deg/s² |
+| 5 ms당 선속도 변화 | 0.0025 m/s |
+| 5 ms당 Yaw 속도 변화 | 0.45 deg/s |
 
-Final Gait Body Twist에도 물리적인 제한을 둔다.
+최종 크기는 x·y 각각 0.28 m/s, z 0.05 m/s, Yaw 45 deg/s로 제한한다.
 
-$$
-v_{gait,j}
-=
-\operatorname{clamp}
-(
-v_{gait,j},
--v_{j,max},
-v_{j,max}
-)
-$$
+## 9. Tripod Gait Manager
 
-$$
-\omega_{gait,j}
-=
-\operatorname{clamp}
-(
-\omega_{gait,j},
--\omega_{j,max},
-\omega_{j,max}
-)
-$$
+Tripod A는 Leg 1·3·5, Tripod B는 Leg 2·4·6이다. 정상 보행에서는 두 그룹이 0.5 s마다 STANCE와 SWING을 교대한다.
 
----
-
-## 11.2 Twist Rate Limiter
-
-명령이 한 주기 만에 급변하지 않도록
-
-$$
-\Delta v_{max}
-=
-a_{B,max}T_s
-$$
-
-$$
-\Delta\omega_{max}
-=
-\alpha_{B,max}T_s
-$$
-
-를 정의한다.
-
-$$
-v_{cmd}[k]
-=
-v_{cmd}[k-1]
-+
-\operatorname{clamp}
-\left(
-v_{gait}[k]-v_{cmd}[k-1],
--\Delta v_{max},
-\Delta v_{max}
-\right)
-$$
-
-$$
-\omega_{cmd}[k]
-=
-\omega_{cmd}[k-1]
-+
-\operatorname{clamp}
-\left(
-\omega_{gait}[k]-\omega_{cmd}[k-1],
--\Delta\omega_{max},
-\Delta\omega_{max}
-\right)
-$$
-
-로 실제 Gait Generator에 전달할 Twist를 생성한다.
-
-이후 Gait 식에서 $v_B$, $\omega_B$는 이 최종 제한을 통과한 보행 명령을 의미한다. $\omega_B$에는 SA OFF의 사용자 Yaw 각속도와 Gait Heading Yaw PI 보정을 포함한다. SA ON에서는 사용자 Yaw 각속도를 0으로 두고 Heading 유지 보정만 포함한다. Roll·Pitch 및 보정 모드 Yaw 자세 PI는 $\omega_B$에 포함하지 않는다.
-
----
-
-# 12. Tripod Gait Manager
-
-`Body_Control_Enable`은 Final Gait Body Twist와 Stance 궤적 갱신을 허용하는 상위 Enable이다. `Tripod_Enable`은 Tripod 위상 진행과 Swing 궤적을 허용하는 보행 Enable이다.
-
-| Body_Control_Enable | Tripod_Enable | 동작 |
-|---:|---:|---|
-| 0 | 0 | 보행용 Body Twist와 자세 오버레이를 정지하고 상위 안전·서기·착지 블록의 발끝 목표를 사용한다. |
-| 1 | 0 | 6개 다리의 기본 또는 직전 안전 STANCE 목표를 계속 출력하고 몸체 위치·자세 또는 보정 모드 명령을 수행한다. |
-| 1 | 1 | Tripod 위상에 따라 STANCE와 SWING을 반복한다. |
-
-`Body_Control_Enable=0`, `Tripod_Enable=1` 조합은 사용하지 않는다. `Tripod_Enable=0`은 발끝 목표 0을 의미하지 않으며, Tripod 위상만 정지하고 6개 STANCE 기준 목표를 유지한다. 조종 모드에서는 `Motion_Armed=1`일 때 `Body_Control_Enable=1`로 두고, x·y 이동 또는 Yaw 회전 명령이 임계값을 넘을 때만 `Tripod_Enable=1`로 둔다. 보정 모드에서는 `Body_Control_Enable=1`, `Tripod_Enable=0`으로 둔다.
-
-Tripod 그룹은
-
-$$
-A=\{1,3,5\}
-$$
-
-$$
-B=\{2,4,6\}
-$$
-
-로 정의한다.
-
-Phase A:
-
-$$
-1,3,5:\ SWING
-$$
-
-$$
-2,4,6:\ STANCE
-$$
-
-Phase B:
-
-$$
-1,3,5:\ STANCE
-$$
-
-$$
-2,4,6:\ SWING
-$$
-
-이다.
-
----
-
-## 12.1 Phase 진행률
-
-한 Tripod Phase의 목표 시간을 $T_{phase}$라 하고 Phase 시작 시간을 $t_0$라 하면
-
-$$
-\tau
-=
-\frac{t-t_0}{T_{phase}}
-$$
-
-이다.
-
-정규화 진행률은
-
-$$
+\[
 s_{phase}
 =
 \operatorname{clamp}
-(
-\tau,
+\left(
+\frac{t-t_0}{0.5},
 0,
 1
-)
-$$
+\right)
+\]
 
-로 둔다.
+실제 적용 명령이 다음 중 하나를 만족할 때만 보행을 시작한다.
 
-정상적인 경우 $s_{phase}=1$이 되면 다음 Phase로 전환한다.
+\[
+|v_x|\ge0.005\ \mathrm{m/s}
+\]
 
-단, Late Landing 상태에서는 다음 Phase 전환을 정지한다.
+\[
+|v_y|\ge0.005\ \mathrm{m/s}
+\]
 
----
+\[
+|\omega_z|\ge1^\circ/\mathrm{s}
+\]
 
-# 13. Stance Leg Trajectory
+보행 명령이 중립으로 돌아오면 진행 중인 Swing 다리를 착지시킨 뒤 Phase를 정지한다. 6개 발의 마지막 안전 STANCE 목표를 유지하며 0이나 기본 위치로 순간 변경하지 않는다.
 
-몸체 기준 좌표계 $\{R\}$에서 Stance 발끝 위치를
+Late Landing 중에는 시간 진행률이 1이어도 모든 Swing 발이 접촉하기 전까지 다음 Phase로 전환하지 않는다.
 
-$$
-p_i=
-\begin{bmatrix}
-x_i\\y_i\\z_i
-\end{bmatrix}
-$$
+## 10. 발끝 궤적
 
-라 한다. 13장부터 Contact Adaptation까지의 $p_i$는 별도 표기가 없으면 기준 좌표계 $\{R\}$에서 표현한 명목 보행 발끝 위치를 의미한다.
+### 10.1 Stance
 
-지면 기준으로 발끝이 정지해 있다면 몸체 기준 좌표계에서 관측되는 발끝 속도는 강체 운동학에 의해
+몸체 기준 좌표계에서 지면에 고정된 Stance 발의 속도는 다음과 같다.
 
-$$
-\boxed{
-\dot p_i
+\[
+\dot p_i=-v_B-\omega_B\times p_i
+\]
+
+200 Hz Forward Euler는 다음과 같다.
+
+\[
+p_i[k+1]
 =
--v_B
--
-\omega_B\times p_i
-}
-$$
-
-이다.
-
-Skew Matrix를 사용하면
-
-$$
-\dot p_i
-=
--v_B
--
-[\omega_B]_\times p_i
-$$
-
-로 표현된다.
-
----
-
-## 13.1 200 Hz 이산화
-
-Forward Euler를 사용하면
-
-$$
-\boxed{
-p_i^{ref}[k+1]
-=
-p_i^{ref}[k]
+p_i[k]
 +
 \left(
--v_B[k]
--
-\omega_B[k]\times p_i^{ref}[k]
+-v_B[k]-\omega_B[k]\times p_i[k]
 \right)T_s
-}
-$$
+\]
 
-이다.
+### 10.2 Swing 착지점
 
-$$
-T_s=0.005\text{ s}
-$$
+기본 발끝 위치를 \(p_{0,i}\), 예상 Stance 시간을 \(T_{stance}\)라 하면 착지점은 다음과 같다.
 
-이다.
-
-이 궤적이 Stance 다리가 지면을 밀거나 당겨 몸체를 이동시키는 **PULL 궤적**이다.
-
----
-
-## 13.2 Stance Workspace 제한
-
-발끝이 작업공간 끝까지 끌려가지 않도록 각 Stance 발끝에 허용 영역을 둔다.
-
-기준 발끝 위치를
-
-$$
-p_{0,i}
-$$
-
-라 하고 최대 허용 변위를
-
-$$
-\Delta p_{stance,max}
-$$
-
-라 하면
-
-$$
-\left\|
-p_i^{ref}-p_{0,i}
-\right\|
-\le
-\Delta p_{stance,max}
-$$
-
-가 되도록 제한한다.
-
-작업공간 한계에 접근하면 다음 Swing Phase로 전환하거나 Body Twist를 감소시킨다.
-
----
-
-# 14. Swing Landing Target
-
-몸체 기준 좌표계 $\{R\}$에서 Swing 다리의 기준 발끝 위치를
-
-$$
-p_{0,i}
-$$
-
-라 한다.
-
-다음 Stance 구간에서 몸체가 이동할 양의 절반을 선행 보상하여 착지 목표점을 생성한다.
-
-$$
-\boxed{
+\[
 p_{r,i}
 =
 p_{0,i}
 +
 \frac{T_{stance}}{2}
 \left(
-v_B
-+
-\omega_B\times p_{0,i}
+v_B+\omega_B\times p_{0,i}
 \right)
-}
-$$
+\]
 
-여기서
+착지점과 전체 Swing 중간 궤적은 IK와 관절 범위를 만족해야 한다.
 
-$$
-T_{stance}
-$$
+### 10.3 Bezier Curve
 
-는 예상 Stance 시간이다.
+Swing 시작점 \(P_0\), 착지점 \(P_3\), Swing Height \(h\)에 대해 다음 제어점을 사용한다.
 
----
-
-## 14.1 선속도 항
-
-$$
-\Delta p_{v,i}
-=
-\frac{T_{stance}}{2}v_B
-$$
-
-는 몸체의 예상 병진 운동을 보상한다.
-
----
-
-## 14.2 회전 항
-
-$$
-\Delta p_{\omega,i}
-=
-\frac{T_{stance}}{2}
-\left(
-\omega_B\times p_{0,i}
-\right)
-$$
-
-는 몸체 회전에 의해 각 발끝이 이동해야 하는 위치를 보상한다.
-
----
-
-## 14.3 착지점 제한
-
-계산된 목표점은 각 다리의 안전 작업공간으로 제한한다.
-
-$$
-p_{r,i}
-=
-\operatorname{ProjectWorkspace}_i
-(
-p_{r,i}
-)
-$$
-
-이 함수는 최소한
-
-- IK 해 존재 여부
-- 관절 제한
-- 몸체와의 충돌 여부
-- 최대 Step Length
-- 방사 방향 오프셋이 적용된 전체 Swing 중간 궤적
-
-를 검사해야 한다.
-
----
-
-# 15. Swing Bezier and Radial Offset Trajectory
-
-Swing 시작 위치를
-
-$$
-P_0=
+\[
+P_1=P_0+
 \begin{bmatrix}
-x_0\\y_0\\z_0
-\end{bmatrix}
-$$
-
-착지 목표 위치를
-
-$$
-P_3=
-\begin{bmatrix}
-x_r\\y_r\\z_r
-\end{bmatrix}
-$$
-
-라 한다.
-
-Swing Height를 $h$라 하면
-
-$$
-P_1
-=
-P_0
-+
+0\\0\\\frac{4}{3}h
+\end{bmatrix},
+\qquad
+P_2=P_3+
 \begin{bmatrix}
 0\\0\\\frac{4}{3}h
 \end{bmatrix}
-$$
+\]
 
-$$
-P_2
-=
-P_3
-+
-\begin{bmatrix}
-0\\0\\\frac{4}{3}h
-\end{bmatrix}
-$$
-
-로 둔다.
-
-3차 Bezier Curve는
-
-$$
-\boxed{
+\[
 B(s)
 =
 (1-s)^3P_0
@@ -1799,24 +640,11 @@ B(s)
 3(1-s)s^2P_2
 +
 s^3P_3
-}
-$$
+\]
 
-이다.
+시간 진행률 \(\tau\)에는 Quintic Time Scaling을 적용한다.
 
-$$
-0\le s\le1
-$$
-
----
-
-## 15.1 시간 진행률
-
-Swing 궤적의 시간 진행에는 **Quintic Time Scaling을 사용한다.**
-
-Swing 시작 시각을 $t_s$, Swing 시간을 $T_{swing}$이라 하면 먼저 현재 Swing 진행률을
-
-$$
+\[
 \tau
 =
 \operatorname{clamp}
@@ -1825,63 +653,21 @@ $$
 0,
 1
 \right)
-$$
+\]
 
-로 계산한다.
-
-여기서
-
-$$
-0\le\tau\le1
-$$
-
-이며,
-
-- $\tau=0$: Swing 시작
-- $\tau=1$: Swing 종료
-
-를 의미한다.
-
-Bezier Curve에 직접 $\tau$를 넣지 않고, 다음 Quintic Time Scaling을 적용하여 실제 궤적 진행 변수 $s$를 계산한다.
-
-$$
-\boxed{
+\[
 s(\tau)
 =
-10\tau^3
--
-15\tau^4
-+
-6\tau^5
-}
-$$
+10\tau^3-15\tau^4+6\tau^5
+\]
 
-이 함수는 Swing 시작과 종료에서
+시작과 종료에서 속도와 가속도가 0이 되어 궤적 전환을 부드럽게 한다.
 
-$$
-\dot s(0)=0,
-\qquad
-\dot s(1)=0
-$$
+### 10.4 방사 오프셋
 
-및
+다리 바깥 방향 단위벡터는 다음과 같다.
 
-$$
-\ddot s(0)=0,
-\qquad
-\ddot s(1)=0
-$$
-
-을 만족한다.
-
-따라서 발끝이 Swing 시작 순간에 갑자기 움직이거나 착지 순간에 갑자기 정지하는 현상을 줄이고, 시작과 종료를 부드럽게 만든다.
-
-## 15.2 Swing Radial Offset
-
-i번 다리의 Body 좌표계 기준 장착 방향을 $\alpha_i$라 하고, 다리 바깥 방향 단위벡터를
-
-$$
-\boxed{
+\[
 e_{r,i}
 =
 \begin{bmatrix}
@@ -1889,878 +675,142 @@ e_{r,i}
 \sin\alpha_i\\
 0
 \end{bmatrix}
-}
-$$
+\]
 
-로 정의한다. 각 다리의 장착 방향은
+\[
+\alpha_i=
+[-45,-90,-135,45,90,135]^\circ
+\]
 
-$$
-\alpha_i
-=
-\left[
--45^\circ,
--90^\circ,
--135^\circ,
-45^\circ,
-90^\circ,
-135^\circ
-\right]
-$$
+진행률에 따른 방사 오프셋은 다음과 같다.
 
-이다.
+\[
+r(s)=4r_{swing}s(1-s),
+\qquad
+r_{swing}=0.07\ \mathrm{m}
+\]
 
-Swing 최고점의 방사 방향 오프셋을 $r_{swing}$이라 하면 진행률에 따른 오프셋은
+최종 Swing 발끝 목표는 다음과 같다.
 
-$$
-\boxed{
-r(s)
-=
-4r_{swing}s(1-s)
-}
-$$
-
-로 계산한다. $r(0)=r(1)=0$이고 $r(0.5)=r_{swing}$이므로 시작점과 착지점은 바뀌지 않고 Swing 최고점에서만 최대 오프셋이 적용된다.
-
-최종 Swing 발끝 목표 위치는
-
-$$
-\boxed{
+\[
 p_i^{ref}
 =
-B\left(s(\tau)\right)
-+
-r\left(s(\tau)\right)e_{r,i}
-}
-$$
+B(s)+r(s)e_{r,i}
+\]
 
-로 계산한다. 현재 Simulink 구현에서는 모든 Swing 다리에
+시작점과 착지점에서는 오프셋이 0이고 Swing 중간에서 0.07 m가 된다.
 
-$$
-\boxed{
-r_{swing}=0.07\text{ m}
-}
-$$
+### 10.5 Swing Height
 
-를 동일하게 적용한다.
-
-즉, 매 제어 주기에서
-
-```text
-현재 시간
-   ↓
-Swing 진행률 τ 계산
-   ↓
-Quintic Time Scaling
-s = 10τ³ - 15τ⁴ + 6τ⁵
-   ↓
-Bezier Curve B(s)
-   ↓
-방사 방향 오프셋 r(s)e_r,i 추가
-   ↓
-발끝 목표 위치 p_i^ref
-```
-
-순서로 Swing 궤적을 생성한다.
-
-
-## 15.3 Swing Height
-
-Swing 다리의 기본 발끝 상승 높이를 $h_0$로 정의한다.
-
-현재 Simulink 검증에서는
-
-$$
-\boxed{
-h_0=0.25\text{ m}
-}
-$$
-
-를 사용한다.
-
-몸체 기준점 $O_R$에 대한 현재 몸체 원점 $O_B$의 z방향 상대 변위를
-
-$$
-\boxed{
-\Delta z_B
-=
-z_{O_B}-z_{O_R}
-}
-$$
-
-로 정의한다.
-
-따라서
-
-- $\Delta z_B=0$: 몸체 원점이 기준 높이에 있음
-- $\Delta z_B>0$: 몸체 원점이 기준점보다 위에 있음
-- $\Delta z_B<0$: 몸체 원점이 기준점보다 아래에 있음
-
-을 의미한다.
-
-Swing Height는 몸체의 상대 높이에 따라 다음과 같이 보정한다.
-
-$$
-\boxed{
+\[
 h
 =
 \operatorname{clamp}
 \left(
-h_0+k_h\Delta z_B,
-h_{\min},
-h_{\max}
+0.20+\Delta z_B,
+0.15,
+0.25
 \right)
-}
-$$
+\ \mathrm{m}
+\]
 
-여기서
+\(\Delta z_B\)는 몸체 기준점에 대한 몸체 원점의 z Offset이다. 현재 기본값은 0.20 m이며 0.25 m가 아니다.
 
-- $h_0$: 기준 Swing Height
-- $k_h$: 몸체 높이에 따른 Swing Height 보정 Gain
-- $h_{\min}$: 최소 Swing Height
-- $h_{\max}$: 최대 Swing Height
+## 11. 발 접촉과 착지 적응
 
-이다.
+### 11.1 접촉 Hysteresis
 
-즉, 몸체 원점이 기준점보다 높아지면 Swing Height를 증가시키고, 몸체 원점이 기준점보다 낮아지면 Swing Height를 감소시킨다.
+발별 압력값 \(F_i\)에 대해 다음 조건을 사용한다.
 
-현재 Position PI는 x·y 위치에만 적용하므로 z축 위치 오차와 z축 Position PI는 사용하지 않는다. $\Delta z_B$는 Position PI와 독립적인 Swing Height 보정값으로만 사용한다. 보정 모드의 z축 이동속도 명령에도 Position PI를 적용하지 않는다.
+\[
+F_{release}<F_{contact}
+\]
 
-최종적으로 Swing Bezier Curve의 제어점은 계산된 $h$를 이용하여
+연속 \(N_c\) Sample 동안 \(F_i>F_{contact}\)이면 CONTACT로 전환한다. 연속 \(N_r\) Sample 동안 \(F_i<F_{release}\)이면 CONTACT를 해제한다.
 
-$$
-P_1
-=
-P_0
-+
-\begin{bmatrix}
-0\\
-0\\
-\frac{4}{3}h
-\end{bmatrix}
-$$
+임계값과 Sample 수는 실측 후 발별 설정 테이블에 기록한다.
 
-$$
-P_2
-=
-P_3
-+
-\begin{bmatrix}
-0\\
-0\\
-\frac{4}{3}h
-\end{bmatrix}
-$$
+### 11.2 Early Landing
 
-로 생성한다.
+다음 조건을 모두 만족하면 Early Landing이다.
 
+- Swing 진행률이 50% 이상이다.
+- 발끝이 하강 중이다.
+- CONTACT가 검출된다.
 
-## 15.4 현재 Simulink 검증값
+해당 주기의 현재 발끝 위치를 Stance 시작점으로 저장하고 즉시 STANCE로 전환한다. 다른 Swing 다리는 기존 궤적을 계속 수행한다.
 
-현재 구현의 보행 및 초기자세 파라미터는 다음과 같다.
+### 11.3 Late Landing
 
-| 항목 | 값 |
-|---|---:|
-| 제어 주기 | `0.005 s` |
-| Tripod Phase 시간 | `0.5 s` |
-| 전진 시험 속도 | `0.14 m/s` |
-| 한 Phase 발 이동량 | `0.07 m` |
-| Swing Height 기본값 | `0.20 m` |
-| Swing Height 제한 | `0.15~0.25 m` |
-| Swing Radial Offset | `0.07 m` |
-| 초기 관절각 | $q_1=0^\circ$, $q_2=30^\circ$, $q_3=50^\circ$ |
+Swing 종료 시 CONTACT가 없으면 Late Landing으로 전환한다. 발을 -Z 방향으로 내리면서 다리 안쪽으로 이동한다.
 
-6개 다리의 전체 Swing 및 Stance 궤적을 검사한 결과는 다음과 같다.
+\[
+v_{search}=0.20\ \mathrm{m/s}
+\]
 
-| 항목 | 범위 또는 결과 |
-|---|---:|
-| $q_1$ | $-17.75^\circ \sim 16.30^\circ$ |
-| $q_2$ | $-79.79^\circ \sim 47.08^\circ$ |
-| $q_3$ | $12.53^\circ \sim 125.53^\circ$ |
-| 전체 최대 관절각 | $125.53^\circ$ |
-| $\pm135^\circ$ 제한 여유 | $9.47^\circ$ |
-| IK 작업공간 초과 | 없음 |
+\[
+v_{in}=0.8v_{search}=0.16\ \mathrm{m/s}
+\]
 
-
-# 16. 발 접촉 판단
-
-i번 발의 압력센서 측정값을
-
-$$
-F_i[k]
-$$
-
-라 한다.
-
-Contact Threshold와 Release Threshold를 각각
-
-$$
-F_{contact}
-$$
-
-$$
-F_{release}
-$$
-
-로 둔다.
-
-반드시
-
-$$
-\boxed{
-F_{release}
-<
-F_{contact}
-}
-$$
-
-가 되도록 하여 Hysteresis를 만든다.
-
----
-
-## 16.1 Contact 판정
-
-연속 $N_c$ sample 동안
-
-$$
-F_i>F_{contact}
-$$
-
-이면
-
-$$
-Contact_i=1
-$$
-
-로 변경한다.
-
-200 Hz 제어에서 접촉 확인 시간은
-
-$$
-T_{contact}
-=
-N_cT_s
-=
-N_c\times0.005\text{ s}
-$$
-
-이다.
-
-원하는 실제 접촉 확인 시간 $T_{contact}$에 맞춰
-
-$$
-N_c
-=
-\frac{T_{contact}}{0.005}
-$$
-
-로 Sample 수를 정한다.
-
----
-
-## 16.2 Release 판정
-
-연속 $N_r$ sample 동안
-
-$$
-F_i<F_{release}
-$$
-
-이면
-
-$$
-Contact_i=0
-$$
-
-으로 변경한다.
-
-Release 확인 시간은
-
-$$
-T_{release}
-=
-N_rT_s
-=
-N_r\times0.005\text{ s}
-$$
-
-이다.
-
-원하는 실제 Release 확인 시간 $T_{release}$에 맞춰
-
-$$
-N_r
-=
-\frac{T_{release}}{0.005}
-$$
-
-로 Sample 수를 정한다.
-
----
-
-# 17. Early Landing
-
-Swing이 정상적으로 종료되기 전에 발 접촉이 감지되면 Early Landing으로 판단한다.
-
-노이즈 또는 Swing 초기에 발생할 수 있는 오검출을 방지하기 위해 Early Landing은 Swing 후반의 하강 구간에서만 판단한다.
-
-예를 들어
-
-$$
-s>s_{early,min}
-$$
-
-이고
-
-$$
-\dot z_i<0
-$$
-
-이며
-
-$$
-Contact_i=1
-$$
-
-이면 Early Landing이 발생한 것으로 판단한다.
-
-Early Landing은 별도의 지속 상태로 유지하지 않고, **접촉이 검출된 다리를 즉시 STANCE 상태로 전환한다.**
-
-접촉이 검출된 제어 주기를 $k_{contact}$라 하면 해당 순간의 발끝 위치를
-
-$$
-\boxed{
-p_{contact,i}
-=
-p_i^{ref}[k_{contact}]
-}
-$$
-
-로 저장한다.
-
-그리고 같은 제어 주기에서는 발끝 목표 위치를
-
-$$
-p_i^{ref}[k_{contact}]
-=
-p_{contact,i}
-$$
-
-로 유지하여 Bezier 하강 궤적을 즉시 중단한다.
-
-동시에 Stance 궤적의 시작 위치를
-
-$$
-\boxed{
-p_{stance,i}[k_{contact}]
-=
-p_{contact,i}
-}
-$$
-
-로 초기화하고
-
-$$
-\boxed{
-State_i=STANCE
-}
-$$
-
-로 전환한다.
-
-다음 200 Hz 제어 주기부터 해당 다리는 일반적인 Stance 궤적
-
-$$
-\dot p_i
-=
--v_B-\omega_B\times p_i
-$$
-
-을 적용하며,
-
-$$
-p_i^{ref}[k+1]
-=
-p_i^{ref}[k]
-+
-\left(
--v_B[k]
--
-\omega_B[k]\times p_i^{ref}[k]
-\right)T_s
-$$
-
-로 발끝 목표 위치를 갱신한다.
-
-따라서 Early Landing 처리 흐름은 다음과 같다.
-
-```text
-SWING
-  ↓
-Swing 후반 하강 중 CONTACT 검출
-  ↓
-현재 발끝 위치 저장
-  ↓
-Bezier 하강 즉시 중단
-  ↓
-State_i = STANCE
-  ↓
-다음 200 Hz 주기부터 Stance Trajectory
-```
-
-Early Landing이 발생하지 않은 다른 Swing 다리는 기존 Bezier 궤적을 계속 수행한다.
-
-예를 들어 1, 3, 5번 다리가 Swing 중이고 1번 다리만 먼저 접촉했다면
-
-```text
-1 : STANCE
-3 : SWING
-5 : SWING
-```
-
-으로 관리한다.
-
-다음 Tripod Phase는 Swing 그룹에 속했던 모든 다리가 지면 접촉을 완료한 이후에만 시작한다.
-
----
-
-
-# 18. Late Landing
-
-정상 Swing 시간이 종료되어
-
-$$
-s=1
-$$
-
-이 되었지만
-
-$$
-Contact_i=0
-$$
-
-이면
-
-$$
-\boxed{
-State_i=LATE\_LANDING
-}
-$$
-
-으로 전환한다.
-
-Late Landing 중에는 다음 Tripod Phase 전환을 정지한다.
-
----
-
-## 18.1 Search Down
-
-현재 몸체 기준 좌표계의 $-z_R$ 방향으로 발끝을 내리는 동시에 각 다리 장착점 방향으로 당겨 지면을 탐색한다. 하강만 수행할 때 발생하는 다리 과신전과 IK 작업공간 부담을 줄이기 위한 동작이다.
-
-다리 $i$의 바깥쪽 방사 단위벡터를
-
-$$
-e_{r,i}
+\[
+\dot p_{late,i}
 =
 \begin{bmatrix}
-\cos\alpha_i\\
-\sin\alpha_i\\
-0
-\end{bmatrix}
-$$
-
-로 정의한다. 안쪽 이동 속도는
-
-$$
-\boxed{
-v_{in}
-=
-k_{in}v_{search}
-}
-$$
-
-로 계산한다. 현재 Simulink 검증값은
-
-$$
-v_{search}=0.20\text{ m/s},
-\qquad
-k_{in}=0.8,
-\qquad
-v_{in}=0.16\text{ m/s}
-$$
-
-이다.
-
-$$
-{}^B\dot p_{late}
-=
-\begin{bmatrix}
--v_{in}\cos(\alpha_i)\\
--v_{in}\sin(\alpha_i)\\
+-v_{in}\cos\alpha_i\\
+-v_{in}\sin\alpha_i\\
 -v_{search}
 \end{bmatrix}
-$$
+\]
 
-따라서
+CONTACT가 검출되면 STANCE로 전환한다. 최대 탐색 거리와 최대 탐색 시간은 아직 정하지 않는다. 탐색 중 IK Invalid가 발생하면 Controller Fault를 Latch한다.
 
-$$
-x_i[k+1]
-=
-x_i[k]
--
-v_{in}\cos(\alpha_i)T_s
-$$
+## 12. 좌표 변환과 IK
 
-$$
-y_i[k+1]
-=
-y_i[k]
--
-v_{in}\sin(\alpha_i)T_s
-$$
+### 12.1 몸체에서 다리 좌표로 변환
 
-$$
-\boxed{
-z_i[k+1]
-=
-z_i[k]
--
-v_{search}T_s
-}
-$$
+i번 다리 원점의 몸체 좌표를 \({}^Bp_{L_i}\), 다리 회전행렬을 \({}^BR_{L_i}\)라 하면 다음과 같다.
 
-이다.
-
----
-
-## 18.2 Late Landing 종료
-
-탐색 중
-
-$$
-Contact_i=1
-$$
-
-이 되면
-
-$$
-State_i=STANCE
-$$
-
-로 전환한다.
-
-Swing 그룹의 모든 다리가 접촉하면 다음 Tripod Phase로 전환한다.
-
----
-
-## 18.3 Late Landing Fault
-
-검색 시작 위치를 $p_{late,start,i}$라 하면 전체 대각 탐색 거리는
-
-$$
-d_{search}
-=
-\left\|
-p_i-p_{late,start,i}
-\right\|_2
-$$
-
-이다. 필요하면 수직 하강 거리 $|z_i-z_{late,start,i}|$와 안쪽 이동 거리를 별도로 제한할 수 있다.
-
-다음 중 하나라도 만족하면 Fault로 전환한다.
-
-$$
-d_{search}>d_{search,max}
-$$
-
-또는
-
-$$
-t_{search}>T_{search,max}
-$$
-
-또는
-
-$$
-IK\_Valid=0
-$$
-
-또는
-
-$$
-JointLimit=1
-$$
-
-즉,
-
-$$
-\boxed{
-LateLandingFault
-=
-D\lor T\lor IK\lor J
-}
-$$
-
-로 볼 수 있다.
-
-Recovery 동작은 별도 설계 대상으로 둔다.
-
----
-
-# 19. 다리별 최종 발끝 목표 위치
-
-각 다리의 현재 상태에 따라 최종 발끝 목표 위치를 선택한다.
-
-$$
-p_i^{ref}
-=
-\begin{cases}
-p_{stance,i},
-&
-State_i=STANCE
-\\[4pt]
-p_{bezier,i},
-&
-State_i=SWING
-\\[4pt]
-p_{late,i},
-&
-State_i=LATE\_LANDING
-\end{cases}
-$$
-
-Early Landing은 별도의 지속 상태로 두지 않는다. Swing 중 Early Landing이 검출되면 해당 제어 주기에서 현재 발끝 위치를 Stance 시작 위치로 저장한 뒤 즉시
-
-$$
-State_i=STANCE
-$$
-
-로 전환한다.
-
-따라서 다음 제어 주기부터는 위 식의 `STANCE` 항을 사용한다.
-
-매 200 Hz 주기마다
-
-$$
-p_1^{ref},
-p_2^{ref},
-\dots,
-p_6^{ref}
-$$
-
-의 6개 발끝 목표 위치가 생성된다.
-
----
-
-
-# 20. 몸체 자세 오버레이 및 다리 좌표계 변환
-
-## 20.1 몸체 원점 기준 자세 오버레이
-
-자세 오버레이 앞의 Foot Target Selector는 몸체 기준 좌표계 $\{R\}$의 기준 발끝 목표 ${}^Rp_{F_i}^{base}$를 선택한다.
-
-$$
-{}^Rp_{F_i}^{base}
-=
-\begin{cases}
-{}^Rp_{F_i}^{tripod}, & Tripod\_Enable=1\\
-{}^Rp_{F_i}^{stance\_hold}, & Tripod\_Enable=0
-\end{cases}
-$$
-
-$p_{F_i}^{stance\_hold}$는 기본 자세 발끝 위치 또는 직전 안전 STANCE 위치이다. `Tripod_Enable=0`이어도 이 목표를 매 주기 출력하므로 정지 상태의 Roll·Pitch 또는 보정 Yaw 자세 명령도 정상적으로 적용된다. 조종 모드 Roll·Pitch와 보정 모드 Yaw 자세 PI는 선택 전의 Tripod 궤적을 직접 수정하지 않는다.
-
-단일 자세 PI의 보정 각속도를 적분한 $\eta_{posture,cmd}$로
-
-$$
-{}^RR_B
-=
-R_z(\psi_{posture,cmd})
-R_y(\theta_{posture,cmd})
-R_x(\phi_{posture,cmd})
-$$
-
-를 만들고, IK에 넣을 몸체 좌표계 발끝 목표를
-
-$$
-\boxed{
-{}^Bp_{F_i}^{cmd}
-=
-({}^RR_B)^T
-{}^Rp_{F_i}^{base}
-}
-$$
-
-로 계산한다. $O_R$과 $O_B$를 같은 회전 중심으로 사용하므로 평행이동 없이 몸체 원점 기준 Roll·Pitch·Yaw 회전만 적용된다. 자세 오버레이는 Stance/Swing 상태, 보폭, 진행률, Swing 착지점을 변경하지 않는다.
-
-## 20.2 몸체 좌표계 → 다리 좌표계 변환
-
-자세 PI에서는 Euler Angle 오차를 사용하지만, **서로 다른 좌표계 사이의 벡터와 점을 변환할 때는 회전행렬을 사용한다.**
-
-IMU에서 얻은 Roll, Pitch, Yaw를
-
-$$
-\phi,\qquad \theta,\qquad \psi
-$$
-
-라 하면 Z-Y-X 순서의 몸체 회전행렬은
-
-$$
-{}^WR_B
-=
-R_z(\psi)R_y(\theta)R_x(\phi)
-$$
-
-로 생성하여 절대좌표계의 상태 추정과 벡터 변환에 사용한다. 이 실제 자세행렬 ${}^WR_B$는 몸체 자세 오버레이용 상대 회전행렬 ${}^RR_B$와 구분한다.
-
-
-i번 다리 좌표계 원점의 몸체 좌표계 위치를
-
-$$
-{}^Bp_{L_i}
-$$
-
-라 한다.
-
-다리 좌표계에서 몸체 좌표계로의 회전행렬을
-
-$$
-{}^BR_{L_i}
-$$
-
-라 하면
-
-$$
-{}^Bp_F
-=
-{}^Bp_{L_i}
-+
-{}^BR_{L_i}
-{}^{L_i}p_F
-$$
-
-이다.
-
-따라서 자세 오버레이가 적용된 몸체 좌표계 발끝 목표 위치를 다리 좌표계로 변환하면
-
-$$
-\boxed{
+\[
 {}^{L_i}p_F^{ref}
 =
 ({}^BR_{L_i})^T
 \left(
-{}^Bp_F^{cmd}
--
-{}^Bp_{L_i}
+{}^Bp_F^{cmd}-{}^Bp_{L_i}
 \right)
-}
-$$
+\]
 
-이다.
+### 12.2 3DOF IK
 
-이 값을 각 다리의 IK 입력으로 사용한다.
+현재 링크 길이는 다음과 같다.
 
----
+| 링크 | 길이 |
+|---|---:|
+| \(L_1\) | 0.074 m |
+| \(L_2\) | 0.121 m |
+| \(L_3\) | 0.230 m |
 
-# 21. 3DOF Inverse Kinematics
+다리 로컬 목표를 \([x,y,z]^T\)라 하면 다음을 계산한다.
 
-> 아래 식은 일반적인 `Yaw - Pitch - Pitch` 형식의 3DOF 다리를 기준으로 한 기본식이다. 실제 로봇의 각 관절 0도 기준, 회전 부호, 서보 조립 방향은 좌표축 README와 실제 기구에 맞추어 `sign`과 `offset`을 적용해야 한다.
+\[
+\theta_1=\operatorname{atan2}(y,x)
+\]
 
-다리 링크 길이를
-
-$$
-L_1,\qquad
-L_2,\qquad
-L_3
-$$
-
-라 한다.
-
-다리 좌표계에서 목표 발끝 위치를
-
-$$
-{}^{L_i}p_F^{ref}
-=
-\begin{bmatrix}
-x\\y\\z
-\end{bmatrix}
-$$
-
-라 한다.
-
----
-
-## 21.1 1번 관절
-
-첫 번째 관절이 z축 주위 Yaw 회전이라고 하면
-
-$$
-\boxed{
-\theta_1
-=
-\operatorname{atan2}(y,x)
-}
-$$
-
-이다.
-
-수평 반경은
-
-$$
-r
-=
-\sqrt{x^2+y^2}
-$$
-
-이고 첫 번째 링크 길이를 제외한 평면 거리 성분은
-
-$$
+\[
+r=\sqrt{x^2+y^2},
+\qquad
 \rho=r-L_1
-$$
+\]
 
-이다.
-
----
-
-## 21.2 2-3번 관절 평면 문제
-
-2번 관절에서 발끝까지의 거리는
-
-$$
-d
-=
-\sqrt{\rho^2+z^2}
-$$
-
-이다.
-
-Cosine Law를 이용하면
-
-$$
+\[
 c_3
 =
-\frac{
-\rho^2+z^2-L_2^2-L_3^2
-}{
-2L_2L_3
-}
-$$
+\frac{\rho^2+z^2-L_2^2-L_3^2}
+{2L_2L_3}
+\]
 
-이다.
+IK 해가 존재하려면 \(-1\le c_3\le1\)이어야 한다.
 
-IK 해가 존재하려면
-
-$$
-\boxed{
--1\le c_3\le1
-}
-$$
-
-이어야 한다.
-
-3번 관절은
-
-$$
-\boxed{
+\[
 \theta_3
 =
 \operatorname{atan2}
@@ -2768,23 +818,9 @@ $$
 \sigma_3\sqrt{1-c_3^2},
 c_3
 \right)
-}
-$$
+\]
 
-로 계산한다.
-
-여기서
-
-$$
-\sigma_3\in\{-1,+1\}
-$$
-
-은 기구의 Knee-Up / Knee-Down 해 선택에 사용한다.
-
-2번 관절은
-
-$$
-\boxed{
+\[
 \theta_2
 =
 \operatorname{atan2}(z,\rho)
@@ -2794,1499 +830,254 @@ $$
 L_3\sin\theta_3,
 L_2+L_3\cos\theta_3
 \right)
-}
-$$
+\]
 
-로 계산한다.
+\(\sigma_3\)은 기구에 맞는 Knee 해를 선택한다. 실제 서보 각도는 관절별 방향과 Offset을 적용한다.
 
----
-
-## 21.3 실제 서보 각도 변환
-
-기구학 각도와 실제 서보 방향이 다를 수 있으므로
-
-$$
-\boxed{
+\[
 \theta_{servo,ij}
 =
 s_{ij}\theta_{ij}
 +
-\theta_{offset,ij}
-}
-$$
+\theta_{offset,ij},
+\qquad
+s_{ij}\in\{-1,1\}
+\]
 
-를 사용한다.
+관절별 \(s_{ij}\)와 \(\theta_{offset,ij}\)은 실기 캘리브레이션으로 정한다.
 
-여기서
+## 13. 동적 작업공간 제한
 
-$$
-s_{ij}\in\{-1,+1\}
-$$
+### 13.1 기본 유효 조건
 
-은 서보 회전 방향 보정값이며
+평면 2-Link 거리는 다음 범위를 만족해야 한다.
 
-$$
-\theta_{offset,ij}
-$$
-
-는 조립 시 Zero Offset이다.
-
----
-
-# 22. 동적 Motion 및 IK Workspace 제한
-
-사용자 명령의 고정 출력 범위는 x·y 이동 속도 각각 `0.28 m/s`, Roll·Pitch 목표각 `±45°`, Yaw 각속도 `±45°/s`로 유지한다. 실제 적용 명령은 현재 자세와 보행 위상에서 6개 다리가 모두 도달 가능한 범위까지만 증가시킨다.
-
-동적 제한은 최종 발끝 좌표를 강제로 자르기 전에 수행한다. 제한되지 않은 후보 명령으로 6개 발끝 위치를 미리 계산하고, 모든 다리의 IK 가능 여부를 검사한 뒤 명령을 적용한다. 최종 발끝 제한을 먼저 적용하면 명령값은 계속 증가한 상태에서 다리별 발끝만 서로 다르게 잘리므로 사용하지 않는다.
-
-## 22.1 작업공간 여유
-
-평면 2-Link 부분은 최소한
-
-$$
+\[
 |L_2-L_3|+m_{ws}
 \le
 d
 \le
 L_2+L_3-m_{ws}
-$$
+\]
 
-를 만족해야 한다. 현재 작업공간 여유는
+\[
+d=\sqrt{\rho^2+z^2},
+\qquad
+m_{ws}=0.0001\ \mathrm{m}
+\]
 
-$$
-\boxed{m_{ws}=0.0001\ \mathrm{m}}
-$$
+IK 유효성은 거리, Cosine Law와 관절 범위를 함께 검사한다.
 
-로 둔다. 또한
+### 13.2 자세 명령
 
-$$
--1\le c_3\le1
-$$
+이번 주기의 Roll·Pitch·Yaw 후보를 6개 발에 함께 적용한다.
 
-이어야 한다. 따라서
+1. 자세 PI와 15 deg/s Rate Limit로 후보각을 만든다.
+2. 후보 자세의 6개 발끝 위치를 계산한다.
+3. 모든 다리가 유효하면 세 축 후보를 함께 적용한다.
+4. 한 다리라도 유효하지 않으면 세 축을 모두 직전 적용값으로 유지한다.
+5. 작업공간 안쪽으로 돌아오는 후보는 즉시 허용한다.
 
-$$
-IK\_Valid
+작은 200 Hz 연속 입력을 전제로 하므로 최대 허용각을 찾는 이분 탐색은 사용하지 않는다. 후보가 거부된 동안에는 자세 PI 적분항도 바깥 방향으로 누적하지 않는다.
+
+### 13.3 보행 속도와 회전
+
+한 Phase가 0.5 s이므로 한 축 0.28 m/s는 0.14 m의 발 이동량에 해당한다.
+
+\[
+l_{phase}
 =
-W_d
-\land
-W_c
-\land
-W_{joint}
-$$
+\sqrt{v_x^2+v_y^2}\times0.5
+\]
 
-로 검사한다. 해가 존재하지 않으면 새로운 관절 명령을 Servo에 전달하지 않는다.
+x·y·Yaw가 동시에 입력되면 합성 방향과 회전 반경을 유지하도록 같은 비율과 공통 적용 여부를 사용한다. 다음 보행 궤적 전체가 유효할 때만 새 값을 적용하며 Phase 중간에는 적용값을 바꾸지 않는다.
 
-## 22.2 Roll·Pitch·Yaw 동적 제한
+x·y를 각각 0.28 m/s로 동시에 고정하면 합성 속도가 한 축 제한을 넘을 수 있다. 실제 적용값은 합성 작업공간 검사를 통과한 범위로 제한하며 최대값 시험도 축별로 수행한다.
 
-RC 입력, 자세 명령 Rate Limiter와 200 Hz 제어 주기로 인해 한 주기의 자세 후보 변화량은 충분히 작다고 가정한다. 따라서 최대 허용각을 찾기 위한 이분 탐색은 사용하지 않고 다음 주기의 후보 자세를 적용하거나 직전 자세를 유지한다.
+### 13.4 보정 위치
 
-이 기능은 별도의 전처리 블록으로 만들지 않고 `BodyPosturePIOverlay` MATLAB Function 내부에 구현한다. 같은 함수에서 자세 PI 후보값과 6개 발끝 후보 위치를 계산한 뒤 persistent 자세 명령 상태를 갱신하므로 추가 피드백 선과 Algebraic Loop가 생기지 않는다.
-
-1. `±45°` 범위의 목표각에서 자세 Rate Limiter로 이번 주기 후보각을 만든다.
-2. 후보 Roll, Pitch, Yaw를 적용한 6개 발끝 위치를 제한하지 않은 상태로 계산한다.
-3. 6개 다리가 모두 작업공간과 관절각 범위를 만족하면 후보각을 적용한다.
-4. 한 다리라도 범위를 벗어나면 이번 주기의 Roll, Pitch, Yaw 증분을 모두 0으로 만들고 직전 가능 자세를 유지한다.
-5. 결합된 후보 자세가 다시 작업공간 안쪽을 향하면 세 축 증분을 즉시 허용한다.
-
-여러 회전축이 동시에 변할 때는 Roll, Pitch, Yaw 증분에 공통 적용 여부를 사용한다. 결합된 후보 자세가 가능하면 `Apply=1`로 세 축 증분을 모두 적용하고, 불가능하면 `Apply=0`으로 세 축을 모두 유지한다. 이 방식은 부분적인 축 제한으로 사용자가 의도한 회전 방향이 변하는 것을 방지한다. 경계에서 한 축의 바깥 방향 명령을 계속 유지하면 다른 회전축도 함께 정지하므로 조종기 또는 강화학습 정책은 제한된 축을 중앙이나 복귀 방향으로 되돌려야 한다.
-
-Simulink의 확인용 출력 이름은 `Posture_Command_Accepted`로 사용한다. 값이 `1`이면 이번 주기의 Roll·Pitch·Yaw 자세 명령 후보를 채택하고, `0`이면 후보를 거부하여 직전 주기에 채택한 세 자세 명령을 유지한다. 이 신호는 측정 자세 유지 명령이나 별도의 Enable이 아니다.
-
-`Apply=0`인 동안 자세 명령 적분 상태와 자세 PI 적분항도 바깥 방향으로 누적하지 않는다. 복귀 방향 자세 오차는 적분을 허용하여 작업공간 안쪽으로 빠져나올 수 있게 한다.
-
-예를 들어 Roll 목표 제한은 `45°`로 유지하더라도 현재 발 배치에서 다음 후보 Roll이 IK 범위를 벗어나면 실제 Roll 명령은 직전 가능값에서 일시적으로 멈춘다. 이후 발 배치가 바뀌어 작업공간이 확보되면 다시 목표 방향으로 증가할 수 있다.
-
-## 22.3 x·y 이동 및 회전 보폭 제한
-
-한 걸음 시간이 `0.5 s`일 때 요청 보폭은
-
-$$
-l_{step,req}=\sqrt{v_{x,req}^{2}+v_{y,req}^{2}}\times0.5
-$$
-
-로 계산한다. 한 축으로 `0.28 m/s`를 명령하면 요청 보폭은 `0.14 m`이다. x·y 동시 명령은 방향은 유지하되 합성 선속도가 허용 범위를 넘지 않도록 제한한다.
-
-RC 또는 강화학습의 연속 명령이 증가할 때마다 다음 보행 주기의 Stance와 Swing 궤적을 미리 검사한다. 요청 보폭과 회전량으로 생성한 전체 궤적이 6개 다리의 작업공간을 만족하면 새 값을 적용하고, 만족하지 않으면 직전 가능 보폭과 회전량을 유지한다. 예를 들어 최대 `0.14 m` 요청에서 현재 자세와 회전 명령을 함께 적용한 마지막 가능 보폭이 `0.12 m`이면 실제 보폭은 `0.12 m`, 실제 속도는 `0.24 m/s`가 된다.
-
-x·y 선속도와 Yaw 회전 속도가 동시에 입력되면 세 명령을 같은 비율로 증가시키고 동일한 적용 여부를 사용한다. 따라서 작업공간 제한 중에도 요청한 이동 방향과 회전 반경이 불필요하게 변하지 않는다. 적용값은 보행 주기 도중에 교체하지 않고 다음 보행 주기 시작점에서 갱신한다.
-
-Position Reference는 요청 선속도가 아니라 `Vx_Applied`·`Vy_Applied`를 적분하고, Heading Reference는 요청 Yaw 각속도가 아니라 `YawRate_Applied`를 적분한다. 거부된 요청값을 Reference에 누적하면 작업공간 제한 중 목표만 멀어져 제한 해제 시 급격한 Feedback 명령이 발생한다.
-
-강화학습 정책도 Step Action으로 보폭을 즉시 변경하지 않고 RC 짐벌처럼 연속적인 속도 명령을 출력해야 한다. 정책 출력이 불연속적이면 3.3절의 Action 변화율 제한을 먼저 통과시킨다. 별도의 보폭 전환 보간은 두지 않는다.
-
-## 22.4 보정 모드 X·Y·Z 속도 제한
-
-보정 모드의 위치 상태는 각 축의 요청 속도를 적분하기 전에 후보 위치를 만든다.
-
-$$
+\[
 p_{candidate}[k]
 =
-p_{applied}[k-1]+v_{request}[k]T_s
-$$
-
-후보 위치에서 6개 다리가 모두 유효하면 후보 위치와 요청 속도를 적용한다. 한 다리라도 작업공간을 벗어나면 작업공간 바깥쪽 속도는 `0`으로 만들고 위치 적분 상태도 갱신하지 않는다. 안쪽으로 복귀시키는 속도는 즉시 허용한다.
-
-거부된 요청 위치를 별도 적분기에 계속 누적하지 않는다. 이를 지키지 않으면 작업공간 제한이 풀릴 때 누적된 위치 명령 때문에 발끝 목표가 급변한다.
-
-## 22.5 최종 발끝 작업공간 제한
-
-동적 명령 제한 이후에도 수치 오차와 복합 동작 오차를 막기 위해 각 `Body2Leg` 출력과 `LegIK` 입력 사이에 최종 발끝 제한을 둔다. 다리 로컬 좌표를 `x`, `y`, `z`라 하면
-
-$$
-r=\sqrt{x^2+y^2},
-\qquad
-u=r-L_1,
-\qquad
-d=\sqrt{u^2+z^2}
-$$
-
-를 계산하고 `d`를 22.1절의 작업공간 안으로 제한한다. 이 제한은 정상 동작의 주 제한기가 아니라 마지막 수치 보호 장치이다. 정상 운용에서 이 블록이 큰 위치 보정을 수행하면 상위 동적 Motion 제한이 잘못된 것으로 판단한다.
-
-## 22.6 모드 전환 연속성
-
-RC와 강화학습 명령은 연속 입력으로 제한하므로 별도의 시간 기반 발끝 위치 보간 블록은 추가하지 않는다. 다만 선택기가 다른 제어 경로로 바뀌는 순간에는 다음 조건을 반드시 지킨다.
-
-- 새 모드의 위치 기준, Heading 기준과 PI 적분 상태를 직전 적용 출력에 맞춘다.
-- 보행 정지는 진행 중인 Swing 다리의 착지를 완료한 뒤 STANCE Hold로 전환한다.
-- `Tripod_Enable=0`에서 발끝 오프셋을 0으로 초기화하지 않고 직전 안전 STANCE 목표를 유지한다.
-- 새 모드의 첫 출력은 전환 직전 출력과 같아야 한다.
-
-## 22.7 Simulink 스칼라 포트 구현 규칙
-
-Simulink의 블록 입출력에서는 여러 물리량을 행렬이나 벡터로 묶지 않는다. 다음 신호는 모두 독립된 스칼라 선으로 연결한다.
-
-- 자세 명령: `Roll_Request`, `Pitch_Request`, `Yaw_Request`
-- 적용 자세: `Roll_Applied`, `Pitch_Applied`, `Yaw_Applied`
-- 보행 명령: `Vx_Request`, `YawRate_Request`, `Vx_Applied`, `YawRate_Applied`
-- 보정 명령: `Correction_Vx`, `Correction_Vy`, `Correction_Vz`
-- 발끝 위치: `Leg1_X`, `Leg1_Y`, `Leg1_Z`부터 `Leg6_X`, `Leg6_Y`, `Leg6_Z`까지 개별 연결한다.
-- 관절각: `Leg1_Q1`부터 `Leg6_Q3`까지 18개를 개별 연결한다.
-
-후보 명령의 작업공간 검사는 `Leg1_Candidate_Valid`부터 `Leg6_Candidate_Valid`까지 6개 스칼라 Boolean을 Logical AND로 합친다. 후보 명령이 유효할 때만 Switch가 후보값을 선택하며, 유효하지 않으면 Unit Delay에 저장된 직전 적용값을 선택한다. Unit Delay가 피드백 경로를 끊으므로 작업공간 검사와 명령 제한 사이에 Algebraic Loop가 생기지 않는다.
-
----
-
-# 23. 관절 각도 제한
-
-모든 관절의 허용 범위는
-
-$$
-\boxed{
--135^\circ
-\le
-\theta_{ij}
-\le
-135^\circ
-}
-$$
-
-이다.
-
-따라서
-
-$$
-\theta_{ij}^{lim}
-=
-\operatorname{clamp}
-(
-\theta_{ij}^{ref},
--135^\circ,
-135^\circ
-)
-$$
-
-를 적용한다.
-
-가능하면 단순 clamp 전에 $IK_{Valid}=0$으로 판단하여 비정상적인 발끝 목표점 자체를 수정하는 것이 좋다.
-
----
-
-# 24. 관절 최대 각속도 제한
-
-관절 최대 각속도 제한은 Safety Fault 판정과 분리된 상시 출력 보호로 적용한다. DS51150-270의 무부하 속도는 10 V에서 약 `250°/s`, 12 V에서 약 `285.7°/s`, 12.6 V에서 약 `315.8°/s`이다. 현재 Simulink 시험의 관절 명령 제한은 12.6 V 최고 무부하 속도 기준으로
-
-$$
-\boxed{\dot\theta_{max}=315.8^\circ/\mathrm{s}}
-$$
-
-로 둔다. 제조사 계열 데이터시트의 제어 Pulse 범위는 `500~2500 us`, 동작 주파수는 `50~330 Hz`이므로 현재 `200 Hz` 출력과 일치한다.
-
-서보의 최대 허용 각속도를
-
-$$
-\dot\theta_{max}
-$$
-
-라 하면 한 제어 주기에서 허용되는 최대 관절각 변화량은
-
-$$
-\Delta\theta_{max}
-=
-\dot\theta_{max}T_s
-$$
-
-이다.
-
-현재 제어 주기에서는
-
-$$
-\boxed{\Delta\theta_{max}=315.8^\circ/\mathrm{s}\times0.005\ \mathrm{s}=1.579^\circ}
-$$
-
-이므로 한 주기에서 각 관절 명령을 최대 `1.579°`만 변경한다.
-
-따라서
-
-$$
-\boxed{
-\theta_{ij}^{cmd}[k]
-=
-\theta_{ij}^{cmd}[k-1]
+p_{applied}[k-1]
 +
-\operatorname{clamp}
-\left(
-\theta_{ij}^{lim}[k]
--
-\theta_{ij}^{cmd}[k-1],
--\Delta\theta_{max},
-\Delta\theta_{max}
-\right)
-}
-$$
+v_{request}[k]T_s
+\]
 
-로 제한한다.
+6개 다리가 모두 유효하면 후보 위치를 적용한다. 불가능하면 바깥 방향 속도를 0으로 만들고 적분 상태를 갱신하지 않는다. 안쪽 복귀 속도는 허용한다.
 
-Rate Limiter는 IK와 관절각 범위 제한 뒤, 서보 방향·중립점 보정과 PWM 변환 전에 배치한다. 18개 관절은 서로 묶지 않고 각 관절별 직전 명령 상태와 변화율 제한값을 가진다.
+### 13.5 최종 발끝 보호
 
-`315.8°/s`는 12.6 V 무부하 기준이므로 실제 부하 상태의 추종 속도는 더 낮을 수 있다. 실기 시험에서는 관절 ADC로 실제 추종 속도와 지연을 측정하여 필요하면 전압 및 관절별 제한값을 낮춘다.
+동적 제한 이후 각 IK 입력에도 0.0001 m 여유의 발끝 제한을 적용한다. 이 제한은 수치 오차 보호용이다. 정상 동작에서 큰 발끝 수정이 발생하면 상위 동적 제한 오류로 판단한다.
 
-참고 자료: [DS51150 Servo Motor Datasheet](https://etechrobot.com/wp-content/uploads/2022/11/DS-51150-Servo-Motor-High-Torque-150kg-Datasheet.pdf)
+## 14. 전환 연속성
 
----
+시간 기반 모드 전환 보간은 사용하지 않는다. 다음 상태 초기화로 출력 연속성을 확보한다.
 
-# 25. 비정상 목표각 Jump 검사
+- 모드 변경 전에 새 입력 필터 상태를 초기화한다.
+- MANUAL 진입 시 Position Reference를 현재 추정 위치에 맞춘다.
+- MANUAL 진입과 SA 전환 시 Heading Reference를 현재 IMU Yaw에 맞춘다.
+- 새 PI 모드 진입 시 적분항을 0으로 초기화한다.
+- 자세·보정 후보가 불가능하면 직전 유효 명령을 유지한다.
+- 보행 정지는 Swing 착지를 끝낸 뒤 마지막 STANCE 목표를 유지한다.
+- 발끝 목표를 0이나 기본 위치로 순간 초기화하지 않는다.
 
-이 절의 Joint Jump 판정과 HOLD 동작은 후속 Safety 구현 대상으로 둔다. 최초 STM32 구현에는 Jump 임계값을 두지 않는다.
+## 15. Safety
 
-Rate Limiter와 별도로 IK 오류 또는 좌표변환 오류에 의해 관절 목표각이 비정상적으로 급변하는 경우를 검출하기 위해 Jump Threshold를 둔다.
+### 15.1 현재 구현
 
-현재 IK 목표각과 직전 Servo 명령각의 차이를
+Safety는 다음 두 Fault를 출력한다.
 
-$$
-\Delta\theta_{ij}^{raw}
+\[
+Rollover\_Fault
 =
-\left|
-\theta_{ij}^{ref}[k]
--
-\theta_{ij}^{cmd}[k-1]
-\right|
-$$
-
-로 계산한다.
-
-만약
-
-$$
-\boxed{
-\Delta\theta_{ij}^{raw}
->
-\Delta\theta_{jump,max}
-}
-$$
-
-이면 해당 관절의 새 목표각을 비정상 명령으로 판단한다.
-
-비정상 Jump가 검출되면 새 목표각을 Servo에 전달하지 않고 **직전 명령각을 그대로 HOLD한다.**
-
-$$
-\boxed{
-\theta_{ij}^{cmd}[k]
-=
-\theta_{ij}^{cmd}[k-1]
-}
-$$
-
-동시에 Joint Jump Fault Flag를 기록한다.
-
-```text
-IK 목표각
-   ↓
-Jump Threshold 검사
-   ├─ 정상 → Rate Limiter → Servo Output
-   └─ 비정상 → 직전 관절각 HOLD + Fault Flag
-```
-
----
-
-
-# 26. 지지다각형 검사
-
-현재 지면에 접촉한 Stance 다리의 발끝 지면 투영점을 이용하여 지지다각형을 생성한다.
-
-Tripod Gait에서는 세 개의 Stance 발의 지면 투영점
-
-$$
-P_1,\qquad P_2,\qquad P_3
-$$
-
-이 지지 삼각형을 구성한다.
-
-몸체 원점의 지면 투영점을
-
-$$
-P_B^{xy}
-$$
-
-라 한다.
-
-## 26.1 안전 지지다각형
-
-실제 지지다각형 경계까지 정상 영역으로 사용하지 않고, **지지다각형을 중심 기준으로 10% 축소한 영역을 안전 지지다각형으로 사용한다.**
-
-먼저 세 Stance 발의 중심점을
-
-$$
-\boxed{
-C
-=
-\frac{P_1+P_2+P_3}{3}
-}
-$$
-
-로 계산한다.
-
-각 지지점은 중심 $C$를 기준으로 선형 크기의 90% 위치로 이동시킨다.
-
-$$
-\boxed{
-P_i^{safe}
-=
-C
-+
-0.9
-\left(
-P_i-C
-\right)
-}
-$$
-
-따라서 $P_1^{safe},P_2^{safe},P_3^{safe}$가 Safe Support Polygon을 구성한다.
-
-안전 지지다각형의 선형 Scale Factor는
-
-$$
-\boxed{
-k_{support}=0.9
-}
-$$
-
-이다.
-
-## 26.2 안전 영역 내부 검사
-
-안전 지지 삼각형의 세 꼭짓점을
-
-$$
-A=P_1^{safe},
-\qquad
-B=P_2^{safe},
-\qquad
-C=P_3^{safe}
-$$
-
-라 하고 몸체 원점의 지면 투영점을
-
-$$
-P=P_B^{xy}
-$$
-
-라 한다.
-
-Barycentric Coordinate를 이용하여
-
-$$
-D
-=
-(y_B-y_C)(x_A-x_C)
-+
-(x_C-x_B)(y_A-y_C)
-$$
-
-$$
-\lambda_A
-=
-\frac{
-(y_B-y_C)(x_P-x_C)
-+
-(x_C-x_B)(y_P-y_C)
-}{
-D
-}
-$$
-
-$$
-\lambda_B
-=
-\frac{
-(y_C-y_A)(x_P-x_C)
-+
-(x_A-x_C)(y_P-y_C)
-}{
-D
-}
-$$
-
-$$
-\lambda_C
-=
-1-\lambda_A-\lambda_B
-$$
-
-를 계산한다.
-
-$$
-\boxed{
-\lambda_A\ge0,
-\qquad
-\lambda_B\ge0,
-\qquad
-\lambda_C\ge0
-}
-$$
-
-이면 몸체 원점이 안전 지지다각형 내부에 있다고 판단하고 정상 보행을 계속한다.
-
-반대로
-
-$$
-\boxed{
-P_B^{xy}
-\notin
-\mathcal P_{safe}
-}
-$$
-
-이면 몸체 원점이 안전 지지 영역을 벗어난 것으로 판단하고 **즉시 보행을 중단한다.**
-
-별도의 Barycentric Margin은 사용하지 않고, 지지다각형 자체를 90%로 축소하여 안전 여유를 확보한다.
-
----
-
-
-# 27. 전복 상태 검사
-
-Roll과 Pitch가 정상 보행 제어 범위를 크게 벗어나면 안전장치에서 전복 상태로 처리한다.
-
-전복 기준은
-
-$$
-\boxed{
-|\phi|\ge80^\circ
-\quad\lor\quad
-|\theta|\ge80^\circ
-}
-$$
-
-이다.
-
-즉,
-
-- $|Roll|\ge80^\circ$
-- 또는 $|Pitch|\ge80^\circ$
-
-중 하나라도 만족하면 **ROLLOVER FAULT**로 판단한다.
-
-$$
-RolloverFault
-=
-\left(
-|\phi|\ge80^\circ
-\right)
+(|Roll|\ge80^\circ)
 \lor
-\left(
-|\theta|\ge80^\circ
-\right)
-$$
+(|Pitch|\ge80^\circ)
+\]
 
-ROLLOVER FAULT가 발생하면 해당 상태는 정상적인 Body Attitude PI 제어 범위를 벗어난 것으로 판단하고 **로봇을 즉시 정지한다.**
+단, IMU 값이 유한하지 않으면 Rollover 계산 대신 Controller Fault로 처리한다.
 
-전복 상태에 대한 자동 Recovery는 수행하지 않는다.
+\[
+Controller\_Fault
+=
+IMU\_Invalid
+\lor
+IK\_Invalid
+\]
 
----
+IK Invalid는 6개 다리 중 하나라도 IK Valid가 0이면 참이다.
 
+두 Fault는 한 번 발생하면 영구 Latch한다. Safety Reset은 없으며 자동 Recovery도 수행하지 않는다. Fault가 Latch되면 FAULT 상태를 거쳐 Kill을 활성화하고 6개 서보 전원 릴레이를 모두 끈다.
 
-# 28. Servo Output
+### 15.2 상시 출력 보호
 
-모든 안전장치를 통과한 관절 목표각만 Servo Output으로 전달한다.
+다음 제한은 Safety Latch와 별개로 항상 적용한다.
 
-사용하는 Servo Motor는 **DS51150-270**이며 PWM 신호로 제어한다.
+- 발끝 작업공간
+- 관절각 -135~135 deg
+- 관절 명령 속도 315.8 deg/s
+- PWM 500~2500 us
 
-각 관절의 사용 각도 범위는
+### 15.3 후속 후보
 
-$$
-\boxed{
--135^\circ
-\le
-\theta_{ij}^{cmd}
-\le
-135^\circ
-}
-$$
+다음 항목은 현재 Safety에 포함하지 않는다.
 
-이다.
+- Safe Support Polygon
+- Joint Jump Fault
+- 센서별 Timeout Fault
+- Stance Foot Slip의 Fault 승격
 
-관절의 $0^\circ$ 기준 방향은 좌표축 README에서 정의한 각 관절의 기준 방향을 따른다.
+Late Landing 최대 거리와 최대 시간도 아직 정하지 않는다.
 
-## 28.1 PWM 설정
+## 16. Servo Output
 
-| 항목 | 값 |
-|---|---:|
-| PWM 주기 | 5 ms |
-| PWM 주파수 | 200 Hz |
-| 중립 Pulse | 1500 us |
-| 사용 범위 | 500 ~ 2500 us |
-| 관절 사용 각도 범위 | -135° ~ 135° |
+관절각을 -135~135 deg에서 500~2500 us로 선형 변환한다.
 
-Servo PWM은 Timer에서 200 Hz로 계속 출력하고, 전체 제어 루프도 200 Hz로 동작한다.
-
-$$
-\boxed{
-T_{PWM}=T_s=5\text{ ms}
-}
-$$
-
-따라서 **매 제어 주기마다 새로운 관절 목표각과 Pulse Width를 갱신**하며, 제어 루프 1회와 Servo PWM 주기 1회가 1:1로 대응한다.
-
-## 28.2 관절각 → Pulse Width 변환
-
-관절각
-
-$$
--135^\circ
-\le
-\theta_{ij}^{cmd}
-\le
-135^\circ
-$$
-
-를
-
-$$
-500\ \mathrm{us}
-\le
-PWM_{ij}
-\le
-2500\ \mathrm{us}
-$$
-
-에 선형 대응시킨다.
-
-전체 각도 범위는 $270^\circ$, Pulse Width 범위는 $2000\ \mathrm{us}$이므로
-
-$$
-\frac{2000}{270}
-\approx
-7.4074\ \mathrm{us/deg}
-$$
-
-이다.
-
-따라서 최종 변환식은
-
-$$
-\boxed{
+\[
 PWM_{ij}
 =
 1500
 +
 \frac{1000}{135}
 \theta_{ij}^{cmd}
-}
-$$
+\]
 
-이며 단위는 us이다.
+최종 PWM은 500~2500 us로 제한한다.
 
-$$
-\theta_{ij}^{cmd}=-135^\circ
-\Rightarrow
-PWM_{ij}=500\ \mathrm{us}
-$$
+IK와 관절 범위 제한 뒤에 관절별 Rate Limiter를 적용한다.
 
-$$
-\theta_{ij}^{cmd}=0^\circ
-\Rightarrow
-PWM_{ij}=1500\ \mathrm{us}
-$$
-
-$$
-\theta_{ij}^{cmd}=135^\circ
-\Rightarrow
-PWM_{ij}=2500\ \mathrm{us}
-$$
-
-안전을 위해 최종 Pulse Width에는
-
-$$
-\boxed{
-PWM_{ij}
+\[
+\Delta\theta_{max}
 =
+315.8^\circ/\mathrm{s}\times0.005\ \mathrm{s}
+=
+1.579^\circ
+\]
+
+\[
+\theta_{ij}^{cmd}[k]
+=
+\theta_{ij}^{cmd}[k-1]
++
 \operatorname{clamp}
 \left(
-PWM_{ij},
-500,
-2500
+\theta_{ij}^{ref}[k]-\theta_{ij}^{cmd}[k-1],
+-1.579^\circ,
+1.579^\circ
 \right)
-}
-$$
-
-를 적용한다.
-
-## 28.3 최종 Servo 명령 벡터
-
-최종 관절 명령 벡터는
-
-$$
-q^{cmd}
-=
-\begin{bmatrix}
-q_1^{cmd}\\
-q_2^{cmd}\\
-\vdots\\
-q_6^{cmd}
-\end{bmatrix}
-$$
-
-이고,
-
-$$
-q_i^{cmd}
-=
-\begin{bmatrix}
-\theta_{i1}^{cmd}\\
-\theta_{i2}^{cmd}\\
-\theta_{i3}^{cmd}
-\end{bmatrix}
-$$
-
-이다.
-
-총 18개 관절의 목표각을 각각 PWM Pulse Width로 변환하여 Servo에 출력한다.
-
----
-
-
-# 29. 제어 상태별 우선순위
-
-## 29.1 상위 제어 상태 우선순위
-
-조종기 명령과 로봇의 상위 제어 상태는 다음 우선순위를 따른다.
-
-$$
-\boxed{
-KILL
->
-ROLLOVER\_FAULT
->
-CONTROLLER\_FAULT
->
-LANDING
->
-STANDING
->
-READY(MANUAL/CORRECTION)
-}
-$$
-
-상위 상태에서 허용되지 않은 기능의 Enable과 사용자 명령은 0으로 차단한다.
-
-## 29.2 다리 궤적 상태 우선순위
-
-발끝 명령과 다리별 안전 상태는 다음 우선순위를 따른다.
-
-$$
-\boxed{
-ROLLOVER\_FAULT
->
-FAULT
->
-LATE\_LANDING
->
-SWING/STANCE
-}
-$$
-
-Early Landing은 별도의 지속 상태가 아니라 **SWING → STANCE 즉시 전환 이벤트**로 처리한다.
-
-즉, Early Landing이 검출된 다리는 현재 Bezier 하강을 중단하고 즉시 STANCE로 전환하며, 다음 제어 주기부터 Stance Trajectory를 수행한다.
-
-Late Landing 중에는 일반적인 Phase Time이 끝났더라도 다음 Tripod Phase로 넘어가지 않는다.
-
----
-
-
-# 30. 200 Hz 전체 제어식
-
-한 제어 주기 $k$에서 다음 순서로 계산한다.
-
-## Step 1. Sensor Update
-
-이번 제어 주기에 사용할 **각 다리의 현재 관절각, 발 압력센서값, 몸체 자세값을 읽고 좌표변환용 회전행렬을 계산한다.**
-
-각 다리의 현재 관절각 벡터는
-
-$$
-q_i[k]
-=
-\begin{bmatrix}
-\theta_{i1}[k]\\
-\theta_{i2}[k]\\
-\theta_{i3}[k]
-\end{bmatrix}
-$$
-
-이다.
-
-즉, $q_i[k]$는 $i$번 다리의 1번, 2번, 3번 관절의 현재 각도를 나타낸다.
-
-각 발의 압력센서값은
-
-$$
-F_i[k]
-$$
-
-이며, 이후 Contact State에서 해당 발이 지면에 접촉했는지 판단하는 데 사용한다.
-
-IMU에서는 현재 몸체의 자세각
-
-$$
-\phi[k],\qquad
-\theta[k],\qquad
-\psi[k]
-$$
-
-를 읽는다.
-
-여기서
-
-- $\phi[k]$: 현재 Roll
-- $\theta[k]$: 현재 Pitch
-- $\psi[k]$: 현재 Yaw
-
-이다.
-
-좌표변환에 사용하는 회전행렬 $R[k]$는 센서에서 직접 읽는 값이 아니라 현재 Roll, Pitch, Yaw를 이용해 계산한다.
-
-$$
-\boxed{
-R[k]
-=
-R_z\left(\psi[k]\right)
-R_y\left(\theta[k]\right)
-R_x\left(\phi[k]\right)
-}
-$$
-
-따라서 Step 1에서 직접 읽는 값은
-
-$$
-q_i[k],
-\qquad
-F_i[k],
-\qquad
-\phi[k],
-\qquad
-\theta[k],
-\qquad
-\psi[k]
-$$
-
-이고, 이 값을 이용해 $R[k]$를 계산한다.
-
-
-## Step 2. RC Input Filter
-
-조종기 입력의 작은 떨림과 노이즈를 제거하여 안정적인 사용자 명령값으로 만든다.
-
-$$
-u
-\rightarrow
-DeadZone
-\rightarrow
-LPF
-$$
-
-## Step 3. User Command
-
-조종 모드에서는 필터링된 입력을 x축 전진·후진 선속도와 Roll·Pitch 목표각으로 변환한다. Yaw 짐벌은 SA OFF에서 Yaw 각속도, SA ON에서 y축 선속도로 변환한다.
-
-$$
-v_{x,user}[k],
-\quad
-v_{y,user}[k],
-\quad
-\phi_{ref}[k],
-\quad
-\theta_{ref}[k],
-\quad
-\omega_{z,user}[k]
-$$
-
-을 계산한다.
-
-보정 모드에서는 x·y·z 이동속도와 Yaw 보정 목표각 $\psi_{corr,ref}$를 생성한다. 암 모드 입력은 몸체 Position PI와 자세 PI 경로로 보내지 않는다.
-
-## Step 4. Attitude Reference Update
-
-필터링된 Roll·Pitch 입력을 각 축의 목표각에 직접 대응시킨다.
-
-$$
-\phi_{ref}[k]
-=
-\phi_{\max}u_{R,f}[k]
-$$
-
-$$
-\theta_{ref}[k]
-=
-\theta_{\max}u_{P,f}[k]
-$$
-
-조종 모드의 SA OFF에서는 Yaw 각속도 명령을 적분하여 Heading Reference를 갱신한다. SA ON/OFF 상태가 바뀐 순간에는 현재 IMU Yaw를 Heading Reference로 다시 잡는다. SA ON에서는 사용자 Yaw 각속도를 0으로 두고 현재 Heading을 유지한다.
-
-$$
-\psi_{ref}[k+1]
-=
-\operatorname{wrap}_{\pi}
-\left(
-\psi_{ref}[k]
-+
-\omega_{z,user}[k]T_s
-\right)
-$$
-
-보정 모드의 Yaw 입력은 적분하지 않고 $\psi_{corr,ref}$에 직접 대응시킨다.
-
-## Step 5. Forward Kinematics
-
-현재 관절각을 이용해 각 다리 발끝의 현재 위치를 계산한다.
-
-$$
-{}^Bp_{F_i}^{meas}
-=
-FK_i(q_i)
-$$
-
-## Step 6. Contact State
-
-각 발의 압력센서 값을 이용해 해당 발이 지면에 접촉했는지 판단한다.
-
-$$
-F_i
-\rightarrow
-Contact_i
-$$
-
-## Step 7. Body Position Estimate
-
-STANCE이면서 실제 접촉 중인 다리들의 정보를 이용해 현재 몸체 원점 위치를 추정한다.
-
-STANCE와 CONTACT 조건을 만족하고 Foot Slip Reject를 통과한 다리 집합을 $\mathcal S$라 하고 $N_S=|\mathcal S|$라 하면
-
-$$
-{}^W\hat p_B
-=
-\frac{1}{N_S}
-\sum_{i\in\mathcal S}
-{}^W\hat p_{B,i}
-$$
-
-로 단순 평균한다. 다리별 몸체 위치 후보가 다른 후보들과 모두 `0.05 m`보다 멀면 즉시 평균에서 제외하고, 이 상태가 5회 연속되면 Slip 상태를 확정한다.
-
-## Step 8. Position Feedback
-
-조종 모드에서 몸체 x·y 선속도를 Yaw Reference로 절대좌표계에 회전한 뒤 적분하여 목표 x·y 위치를 생성한다.
-
-$$
-p_{B,ref}^{xy}[k]
-=
-p_{B,ref}^{xy}[k-1]
-+
-\begin{bmatrix}
-\cos\psi_{ref}[k] & -\sin\psi_{ref}[k]\\
-\sin\psi_{ref}[k] & \cos\psi_{ref}[k]
-\end{bmatrix}
-\begin{bmatrix}
-v_{x,user}[k]\\
-v_{y,user}[k]
-\end{bmatrix}T_s
-$$
-
-Position Reference Generator를 활성화할 때는 $p_{B,ref}^{xy}[k_0]={}^W\hat p_B^{xy}[k_0]$로 초기화한다.
-
-목표 몸체 위치와 FK·Stance Anchor로 추정한 현재 Body Position의 차이를 PI 제어기에 넣어 위치 보정 속도를 계산한다.
-
-$$
-e_p^{xy}
-=
-p_{B,ref}^{xy}
--
-{}^W\hat p_B^{xy}
-$$
-
-$$
-v_{feedback}^{xy}
-=
-PI_p(e_p^{xy})
-$$
-
-$v_{x,user}$는 목표 위치 생성에 사용되는 동시에 Final Gait Body Twist의 Feedforward 선속도로 사용된다. $v_{feedback}^{xy}$는 목표 위치와 FK 기반 추정 위치 사이의 x·y 오차만 보정한다. 보정 모드의 x·y·z 이동속도와 암 모드에는 Position PI를 적용하지 않는다.
-
-## Step 9. Gait Heading and Body Posture Feedback
-
-조종 모드 Yaw는 적분된 Heading Reference와 IMU Yaw를 비교하여 Gait Heading Yaw PI 보정값을 만든다.
-
-$$
-\omega_{z,heading,feedback}
-=
-PI_\psi
-\left(
-\operatorname{wrap}_{\pi}(\psi_{ref}-\psi_{IMU})
-\right)
-$$
-
-조종 모드 Roll·Pitch와 보정 모드 Yaw는 별도의 단일 자세 PI로 처리한다.
-
-$$
-\omega_{posture}
-=
-PI_R
-\left(
-\eta_{posture,target}-\eta_{IMU}
-\right)
-$$
-
-조종 모드 자세 PI에는 Roll·Pitch 오차만 사용하고, 보정 모드 자세 PI에는 $\psi_{corr,target}$과 IMU Yaw의 오차만 사용한다. 내부 각속도 PI는 추가하지 않는다. 자세 PI 출력은 200 Hz로 적분하여 IK 직전 몸체 자세 오버레이에 사용한다.
-
-## Step 10. Final Gait Body Twist
-
-조종 모드에서는 사용자 Feedforward 명령과 x·y Position PI 및 Gait Heading Yaw PI 보정값을 합쳐 실제 보행에 사용할 선속도와 Yaw 각속도를 만든다. 자세 PI 출력은 합하지 않는다.
-
-$$
-v_B
-=
-v_{user}
-+
-v_{feedback}
-$$
-
-$$
-\omega_B
-=
-\omega_{user}
-+
-\omega_{heading,feedback}
-$$
-
-이후 Saturation 및 Rate Limit을 적용한다.
-
-보정 모드에서는 x·y·z 이동속도를 PI 없이 직접 사용하고 보정 Yaw는 자세 오버레이에만 사용한다. 암 모드에는 Position PI와 자세 PI를 적용하지 않는다.
-
-## Step 11. Gait Manager
-
-`Body_Control_Enable=0`이면 보행용 Body Twist와 자세 오버레이를 정지하고 상위 안전·서기·착지 블록의 발끝 목표를 사용한다. `Body_Control_Enable=1`, `Tripod_Enable=0`이면 Tripod 위상을 정지하고 6개 다리의 기본 또는 직전 안전 STANCE 목표를 계속 출력한다. 두 Enable이 모두 1일 때만 현재 보행 위상을 기준으로 각 다리가 STANCE인지 SWING인지 결정하고 위상 전환 조건을 관리한다.
-
-현재 Tripod Phase와 각 다리의
-
-$$
-STANCE/SWING
-$$
-
-상태를 결정한다.
-
-## Step 12. Stance Trajectory
-
-지면에 닿아 있는 STANCE 발이 몸체 이동에 맞춰 상대적으로 반대 방향으로 움직이도록 다음 발끝 위치를 계산한다.
-
-$$
-p_i[k+1]
-=
-p_i[k]
-+
-(-v_B-\omega_B\times p_i)T_s
-$$
-
-## Step 13. Swing Target
-
-SWING 다리가 다음에 착지해야 할 목표 위치를 현재 몸체 속도와 회전 속도를 이용해 계산한다.
-
-$$
-p_{r,i}
-=
-p_{0,i}
-+
-\frac{T_{stance}}{2}
-(v_B+\omega_B\times p_{0,i})
-$$
-
-## Step 14. Swing Bezier and Radial Offset
-
-현재 발끝 위치에서 착지 목표점까지 부드럽게 이동하도록 Bezier 곡선을 생성하고, Swing 중간에는 다리 바깥 방향의 방사 오프셋을 추가한다.
-
-$$
-p_i^{ref}
-=
-B(s)
-+
-4r_{swing}s(1-s)e_{r,i}
-$$
-
-## Step 15. Early / Late Landing
-
-예상보다 일찍 닿거나 늦게 닿는 상황을 압력센서로 판단해 STANCE 전환 또는 Search Down을 수행한다.
-
-압력센서 접촉 상태에 따라 발끝 명령과 다리 상태를 수정한다.
-
-Early Landing이 검출되면 현재 발끝 위치를 Stance 시작 위치로 저장하고 해당 다리를 즉시
-
-$$
-State_i=STANCE
-$$
-
-로 전환한다. 같은 제어 주기에서는 접촉 위치를 유지하고, 다음 제어 주기부터 Stance Trajectory를 적용한다.
-
-Swing 종료 후에도 접촉하지 않은 다리는
-
-$$
-State_i=LATE\_LANDING
-$$
-
-으로 전환하여 $-z_B$ 방향으로 내리는 동시에 각 다리 장착점 방향으로 당기는 Search Down을 수행한다.
-
-## Step 16. Body Posture Overlay
-
-Foot Target Selector가 선택한 STANCE Hold 또는 Tripod 기준 발끝 목표에 단일 자세 PI가 만든 몸체 자세의 역회전을 적용한다.
-
-$$
-{}^Bp_{F_i}^{cmd}
-=
-({}^RR_B(\eta_{posture,cmd}))^T
-{}^Rp_{F_i}^{base}
-$$
-
-이 단계는 보행 위상, 보폭, Swing 착지점을 변경하지 않고 몸체 원점 기준 자세만 변경한다.
-
-## Step 17. Coordinate Transform
-
-자세 오버레이로 몸체 좌표계에 변환된 발끝 목표 위치를 각 다리의 로컬 좌표계로 변환한다.
-
-$$
-{}^{L_i}p_F^{ref}
-=
-({}^BR_{L_i})^T
-(
-{}^Bp_F^{cmd}
--
-{}^Bp_{L_i}
-)
-$$
-
-## Step 18. Inverse Kinematics
-
-각 다리 로컬 좌표계의 발끝 목표 위치를 실제 3개 관절의 목표각으로 변환한다.
-
-$$
-{}^{L_i}p_F^{ref}
-\xrightarrow{IK}
-q_i^{ref}
-$$
-
-## Step 19. Safety
-
-계산된 자세·발끝 위치·관절각이 안전 범위를 벗어나는지 검사하고 필요한 제한 또는 정지를 적용한다.
-
-순서대로
-
-1. 전복 상태 검사
-2. IK Workspace 검사
-3. 관절 범위 검사
-4. 지지다각형 검사
-5. 비정상 목표각 Jump 검사
-6. 최대 관절 각속도 제한
-
-을 수행한다.
-
-전복 상태 검사는 다음 조건으로 판단하며, 조건을 만족하면 즉시 로봇을 정지한다.
-
-$$
-|\phi|\ge80^\circ
-\quad\lor\quad
-|\theta|\ge80^\circ
-$$
-
-## Step 20. Servo Output
-
-최종 관절 명령각을 DS51150-270 서보용 PWM Pulse Width로 변환하여 18개 서보에 출력한다.
-
-$$
-q^{cmd}
-\rightarrow
-Servo
-$$
-
----
-
-
-
-
-
-# 31. 권장 초기 튜닝 순서
-
-제어기는 다음 순서로 튜닝하는 것이 안전하다.
-
-## 31.1 기구학 검증
-
-먼저 PI를 모두 끄고
-
-$$
-p^{ref}
-\rightarrow IK
-\rightarrow Servo
-$$
-
-만 검증한다.
-
-확인 항목:
-
-- 각 다리 좌표축 방향
-- 관절 양/음 방향
-- Servo Zero Offset
-- FK와 IK 상호 일치
-- 관절 제한
-
----
-
-## 31.2 Stance 궤적 검증
-
-Feedback을 끈 상태에서 낮은 속도로
-
-$$
-\dot p_i
-=
--v-\omega\times p_i
-$$
-
-만 적용한다.
-
-전진 명령 시 Stance 발끝이 몸체 좌표계에서 뒤쪽으로 이동하는지 확인한다.
-
----
-
-## 31.3 Contact Detection
-
-$F_{contact}$, $F_{release}$, $N_c$, $N_r$를 먼저 튜닝한다.
-
-정지 상태에서 접촉과 미접촉이 안정적으로 구분되어야 한다.
-
----
-
-## 31.4 Body Position PI
-
-Position PI는 조종 모드의 절대좌표계 x·y 위치에 대해서만 튜닝한다. z축과 보정 모드 x·y·z 이동속도에는 적용하지 않는다.
-
-처음에는
-
-$$
-K_I=0
-$$
-
-으로 두고 $K_P$만 증가시킨다.
-
-몸체 위치가 충분히 복원되면서 과도한 진동이 발생하지 않는 수준의 $K_P$를 먼저 찾는다.
-
-그 후 정상상태 오차가 남는 경우에만 작은 $K_I$를 추가한다.
-
-적분항이 너무 크면 느린 진동이나 과도한 보정이 발생할 수 있으므로 $K_I$는 작게 시작한다.
-
----
-
-## 31.5 Body Attitude PI
-
-조종 모드의 Roll / Pitch를 먼저 튜닝한다.
-
-권장 순서는
-
-$$
-P
-\rightarrow
-I
-$$
-
-이다.
-
-먼저 $K_P$를 조정하여 자세 복원 성능을 확보하고, 정상상태 자세 오차가 남는 경우에만 작은 $K_I$를 추가한다.
-
-조종 모드 Yaw는 Gait Heading Hold PI로 먼저 별도 튜닝한다. 보정 모드 Yaw는 Roll·Pitch와 같은 단일 몸체 자세 PI 구조를 사용하되 직접 목표각으로 처리한다. 두 Yaw PI는 목적과 출력 경로가 다르므로 Gain과 적분 상태를 분리하고, 모드 전환 시 목표각과 적분항을 각각 초기화한다. 내부 각속도 PI는 추가하지 않는다.
-
----
-
-## 31.6 Gait
-
-몸체 안정화가 확인된 후
-
-1. 낮은 $V_{x,\max}$
-2. 긴 $T_{phase}$
-3. 높은 안정 여유
-4. 작은 Step Length
-
-에서 시작하고 점차 속도를 증가시킨다.
-
----
-
-# 32. 주요 튜닝 파라미터
-
-| 구분 | 파라미터 | 의미 |
-|---|---|---|
-| 제어 | $f_s$ | 제어 주파수, 200 Hz |
-| 제어 | $T_s$ | 제어 주기, 0.005 s |
-| RC | $\delta$ | 조이스틱 Dead Zone |
-| RC | $f_c$ | 입력 LPF Cutoff |
-| RC | $V_{x,\max}=0.28\ \mathrm{m/s}$ | 최대 전진·후진 속도 |
-| RC | $V_{y,\max}=0.28\ \mathrm{m/s}$ | SA ON 최대 좌·우 속도 |
-| RC | $\Omega_{z,\max}=45^\circ/\mathrm{s}$ | 최대 Yaw 각속도 |
-| RC / 자세 | $\phi_{\max}=45^\circ$ | 최대 Roll 목표각 |
-| RC / 자세 | $\theta_{\max}=45^\circ$ | 최대 Pitch 목표각 |
-| 보정 | $\psi_{corr,max}$ | 최대 Yaw 보정 목표각 |
-| Position PI | $K_{P,p}^{xy}, K_{I,p}^{xy}$ | 조종 모드 x·y 위치 PI Gain |
-| Heading Yaw PI | $K_{P,\psi,h}, K_{I,\psi,h}$ | 조종 모드 보행 Heading PI Gain |
-| Posture PI | $K_{P,R}, K_{I,R}$ | 조종 모드 Roll·Pitch 및 보정 모드 Yaw 단일 자세 PI Gain |
-| Feedback | $v_{fb,\max}^{xy}$ | 최대 x·y 위치 보정 속도 |
-| Feedback | $\omega_{heading,fb,max}$ | 최대 보행 Heading 보정 각속도 |
-| Feedback | $\omega_{posture,max}$ | 최대 몸체 자세 보정 각속도 |
-| Gait | $T_{phase}$ | Tripod Phase 시간 |
-| Gait | $T_{stance}$ | Stance 예상 시간 |
-| Swing | $T_{swing}$ | Swing 시간 |
-| Swing | $h_0=0.20\ \mathrm{m}$ | 기본 Swing Height |
-| Swing | $r_{swing}$ | Swing 최고점의 방사 방향 오프셋, 현재 0.07 m |
-| Swing | $h_{\min}=0.15\ \mathrm{m}, h_{\max}=0.25\ \mathrm{m}$ | Swing Height 제한 |
-| Contact | $F_{contact}$ | 접촉 Threshold |
-| Contact | $F_{release}$ | 해제 Threshold |
-| Contact | $N_c, N_r$ | 연속 판정 Sample 수, 200 Hz 기준 |
-| Early | $s_{early,\min}$ | Early Landing 검사 시작 구간 |
-| Late | $v_{search}$ | 하강 탐색 속도, 현재 0.20 m/s |
-| Late | $k_{in}$ | 하강 속도 대비 안쪽 이동 비율, 현재 0.8 |
-| Late | $v_{in}$ | 안쪽 이동 속도, $k_{in}v_{search}$, 현재 0.16 m/s |
-| Late | $d_{search,\max}$ | 최대 대각 탐색 거리 |
-| Late | $T_{search,\max}$ | 최대 탐색 시간 |
-| Workspace | $m_{ws}=0.0001\ \mathrm{m}$ | IK 전 발끝 작업공간 여유 |
-| Joint | $\dot{\theta}_{\max}=315.8^\circ/\mathrm{s}$ | DS51150-270 최고 무부하 기준 관절 명령 각속도 |
-| Joint | $\Delta\theta_{max}=1.579^\circ$ | 5 ms당 최대 관절 명령 변화량 |
-| Joint | $\Delta\theta_{jump,\max}$ | 비정상 목표각 Jump 기준 |
-| Stability | $k_{support}=0.9$ | 안전 지지다각형 선형 Scale Factor |
-| Safety | $\phi_{rollover}=80^\circ$ | Roll 전복 판정 기준 |
-| Safety | $\theta_{rollover}=80^\circ$ | Pitch 전복 판정 기준 |
-| Estimator | $d_{slip}=0.05\ \mathrm{m}$ | 다리별 몸체 위치 후보 간 Stance Foot Slip 거리 기준 |
-| Estimator | $N_{slip}=5$ | Slip 확정 연속 Sample 수, 200 Hz 기준 25 ms |
-
----
-
-# 33. 최종 제어 구조 요약
-
-전체 제어기는 다음 식으로 요약할 수 있다.
-
-사용자 명령:
-
-$$
-\begin{aligned}
-v_{user},\;\phi_{ref},\;\theta_{ref},\;\omega_{z,user}
-&= f_{RC}(u),\\
-\omega_{user}
-&=
-\begin{bmatrix}
-0 & 0 & \omega_{z,user}
-\end{bmatrix}^{T}
-\end{aligned}
-$$
-
-조종 모드의 몸체 x·y 목표 위치:
-
-$$
-\boxed{
-p_{B,ref}^{xy}[k]
-=
-p_{B,ref}^{xy}[k-1]
-+
-\begin{bmatrix}
-\cos\psi_{ref}[k]\\
-\sin\psi_{ref}[k]
-\end{bmatrix}
-v_{x,user}[k]T_s
-}
-$$
-
-Position Reference Generator 활성화 시에는 $p_{B,ref}^{xy}[k_0]={}^W\hat p_B^{xy}[k_0]$로 초기화한다.
-
-몸체 위치 Feedback:
-
-$$
-v_{feedback}^{xy}
-=
-PI_p
-\left(
-p_{B,ref}^{xy}-{}^W\hat p_B^{xy}
-\right)
-$$
-
-조종 모드의 Gait Heading Yaw Feedback:
-
-$$
-\omega_{z,heading,feedback}
-=
-PI_{\psi,h}
-\left(
-\operatorname{wrap}_{\pi}(\psi_{ref}-\psi_{IMU})
-\right)
-$$
-
-조종 모드 Roll·Pitch 및 보정 모드 Yaw 단일 자세 PI:
-
-$$
-\omega_{posture}
-=
-PI_R
-\left(
-\eta_{posture,target}-\eta_{IMU}
-\right)
-$$
-
-Final Gait Body Twist:
-
-$$
-\boxed{
-\xi_{gait}
-=
-\begin{bmatrix}
-v_{user}+v_{feedback}\\
-0\\
-0\\
-\omega_{z,user}+\omega_{z,heading,feedback}
-\end{bmatrix}
-}
-$$
-
-Stance:
-
-$$
-\boxed{
-\dot p_i
-=
--v_B-\omega_B\times p_i
-}
-$$
-
-Swing 착지점:
-
-$$
-\boxed{
-p_{r,i}
-=
-p_{0,i}
-+
-\frac{T_{stance}}{2}
-\left(
-v_B+\omega_B\times p_{0,i}
-\right)
-}
-$$
-
-Swing 궤적:
-
-$$
-\boxed{
-p_i^{ref}
-=
-Bezier
-(
-P_0,P_1,P_2,P_3,s
-)
-+
-4r_{swing}s(1-s)e_{r,i}
-}
-$$
-
-위 합산식은 조종 모드의 보행 경로에 적용한다. 보정 모드는 x·y·z 이동속도를 PI 없이 직접 사용하고 보정 Yaw 자세 PI는 보행 Body Twist에 합하지 않는다. 암 모드에는 Position PI와 자세 PI를 적용하지 않는다.
-
-발 접촉 보정:
-
-$$
-p_i^{ref}
-\rightarrow
-Early/LateLanding
-$$
-
-기준 발끝 목표 선택:
-
-$$
-{}^Rp_i^{base}
-=
-\begin{cases}
-{}^Rp_i^{tripod}, & Tripod\_Enable=1\\
-{}^Rp_i^{stance\_hold}, & Tripod\_Enable=0
-\end{cases}
-$$
-
-`Tripod_Enable=0`일 때도 $p_i^{stance\_hold}$를 매 주기 출력한다.
-
-몸체 자세 오버레이:
-
-$$
-{}^Bp_i^{cmd}
-=
-({}^RR_B(\eta_{posture,cmd}))^T
-{}^Rp_i^{base}
-$$
-
-자세 오버레이는 Tripod 위상, 보폭, Stance/Swing 궤적과 착지점을 변경하지 않는다.
-
-좌표 변환:
-
-$$
-{}^Bp_i^{cmd}
-\rightarrow
-{}^{L_i}p_i^{ref}
-$$
-
-역기구학:
-
-$$
-{}^{L_i}p_i^{ref}
-\rightarrow
-q_i^{ref}
-$$
-
-안전장치:
-
-$$
-q_i^{ref}
-\rightarrow
-RolloverCheck
-\rightarrow
-Workspace
-\rightarrow
-JointLimit
-\rightarrow
-JumpCheck
-\rightarrow
-RateLimit
-$$
-
-최종 출력:
-
-$$
-\boxed{
-q^{cmd}
-\rightarrow Servo
-}
-$$
-
-이 구조를 매 $0.005\,\mathrm{s}$마다 반복한다.
+\]
+
+Rate Limit 뒤에 관절별 방향·중립점 보정과 PWM 변환을 수행한다. 실기에서는 관절 ADC로 실제 추종 속도를 측정해 필요하면 제한값을 낮춘다.
+
+## 17. 5 ms 실행 순서
+
+1. IMU, 관절 ADC와 압력센서 Snapshot을 갱신한다.
+2. CRSF 명령과 연결 상태를 갱신한다.
+3. 현재 IMU와 직전 IK 결과로 Safety를 평가한다.
+4. 상위 상태와 동작 허가를 결정한다.
+5. 사용자 입력을 정규화하고 필터링한다.
+6. 위치·Heading·자세 Reference를 갱신한다.
+7. FK 기반 몸체 위치와 Slip 상태를 계산한다.
+8. Position·Heading·자세 PI를 계산한다.
+9. 적용 가능한 Body Twist와 자세 후보를 결정한다.
+10. Tripod 상태와 Stance/Swing 궤적을 갱신한다.
+11. Early/Late Landing을 적용한다.
+12. 몸체 자세 오버레이와 다리 좌표 변환을 수행한다.
+13. 6개 다리 IK와 유효성을 계산한다.
+14. 관절 범위와 Rate Limit를 적용한다.
+15. Fault가 없으면 PWM을 갱신하고, Fault 또는 Kill이면 릴레이를 끈다.
+16. 남은 시간 동안 다음 5 ms Tick을 기다린다.
+
+GPS, LoRa와 Jetson SPI는 필요한 주기에 따라 백그라운드에서 처리한다.
+
+## 18. 튜닝과 실기 검증
+
+다음 순서로 진행한다.
+
+1. 서보 전원을 끄고 좌표변환, FK와 IK 수치를 검증한다.
+2. 관절 ADC의 최소·영점·최대값과 방향을 측정한다.
+3. 압력센서의 접촉·해제 임계값과 Sample 수를 정한다.
+4. 서보별 방향, 중립 Pulse와 안전 Pulse 범위를 측정한다.
+5. 낮은 속도로 Stance와 Swing 궤적을 검증한다.
+6. Position \(K_P\)를 먼저 조정하고 필요할 때만 작은 \(K_I\)를 추가한다.
+7. Heading과 몸체 자세 PI도 P부터 조정한다.
+8. Early/Late Landing과 Stance Foot Slip을 검증한다.
+9. 동적 작업공간 제한과 모드 전환 연속성을 검증한다.
+10. IK Invalid와 80 deg 전복 입력에서 Safety Latch와 릴레이 차단을 확인한다.
+11. 실기 속도를 단계적으로 0.28 m/s까지 올린다.
+
+## 19. 현재 파라미터 요약
+
+| 구분 | 항목 | 값 |
+|---|---|---:|
+| 제어 | 주기 | 0.005 s |
+| RC | Throttle Dead Zone | ±20 raw |
+| RC | Stick Dead Zone | ±50 raw |
+| RC | LPF Cutoff | 5 Hz |
+| RC | 시험·RL 변화율 | 5000 raw/s |
+| 조종 | x·y 최대 속도 | 각 ±0.28 m/s |
+| 조종 | Yaw 최대 속도 | ±45 deg/s |
+| 조종 | Roll·Pitch 최대각 | ±45 deg |
+| 보정 | x·y·z 최대 속도 | 각 ±0.05 m/s |
+| 보정 | Yaw 최대각 | ±10 deg |
+| PI | Position \(K_P,K_I\) | 1.0, 0 |
+| PI | Heading \(K_P,K_I\) | 2.0, 0 |
+| PI | Posture \(K_P,K_I\) | 2.0, 0 |
+| Feedback | Position 최대 | ±0.05 m/s |
+| Feedback | Heading 최대 | ±15 deg/s |
+| Posture | 명령 속도 제한 | ±15 deg/s |
+| Gait | Phase 시간 | 0.5 s |
+| Swing | 기본 높이 | 0.20 m |
+| Swing | 높이 범위 | 0.15~0.25 m |
+| Swing | 방사 오프셋 | 0.07 m |
+| Early | 판정 시작 | Swing 50% |
+| Late | 하강 속도 | 0.20 m/s |
+| Late | 안쪽 속도 | 0.16 m/s |
+| Estimator | Slip 거리 | 0.05 m |
+| Estimator | Slip 확정 | 5 Sample, 25 ms |
+| Workspace | 여유 | 0.0001 m |
+| Joint | 범위 | -135~135 deg |
+| Joint | 명령 속도 | 315.8 deg/s |
+| Joint | 5 ms 변화량 | 1.579 deg |
+| Safety | 전복 기준 | Roll 또는 Pitch 80 deg |
