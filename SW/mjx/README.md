@@ -62,6 +62,8 @@ Position/Heading PI, Tripod PULL/Bezier, contact adaptation, 단일 자세 PI와
 `classical_wbc_cartesian_body6d_residual_v1` 24차원 환경입니다. 113-D observation의
 terrain 부분은 3×3 coarse grid와 6개 nominal touchdown 높이로 구성됩니다. 평지에서
 짧게 baseline/residual을 잡고 rough를 거친 뒤 전체 상승 최대 20 cm 계단으로 갑니다.
+접촉은 압력센서나 발높이 proxy 없이 MuJoCo foot–world terrain collision만 사용하고,
+roll/pitch/yaw는 IMU 대신 MuJoCo root ground truth를 사용합니다.
 자세한 최신 명세는
 [`docs/RESIDUAL_RL.md`](../../docs/RESIDUAL_RL.md)를 참고합니다.
 
@@ -173,7 +175,8 @@ trainer 인자(`--` 뒤)에 지정합니다. NEW_BEST 영상은 이와 별도로
 섞이지 않습니다. `--best-video-path`를 생략하면 새 run directory 안에 저장됩니다.
 
 Command NEW_BEST 영상은 기본 Stage 0/1/2/full이 각각 `20초`이며 모든 frame에
-stage, `v_cmd/v`, `yaw_cmd/yaw` overlay가 들어갑니다. Full 영상은 stage 전환을
+stage, `v_cmd/v`, `yaw_cmd/rate`, `GT R/P/Y`, 여섯 발 collision contact overlay가
+들어갑니다. Full 영상은 stage 전환을
 0.8초 banner로 표시합니다. 길이는 `--best-video-stage0-duration` 등으로, 공통 품질은
 `--best-video-fps`, `--best-video-width`, `--best-video-height`로 바꿉니다. 영상이
 필요 없는 짧은 debug run에는 `--no-best-video`를 사용합니다. 렌더링 실패는

@@ -32,6 +32,8 @@ from command_curriculum_env import HexapodCommandCurriculumEnv
 from rough_terrain_env import (
     ACTION_CONTRACT_VERSION,
     ACTION_SIZE,
+    ATTITUDE_SOURCE,
+    CONTACT_SOURCE,
     OBSERVATION_CONTRACT_VERSION,
     OBSERVATION_SIZE,
     HexapodRoughTerrainEnv,
@@ -634,6 +636,8 @@ def _write_run_metadata(args: argparse.Namespace, env: HexapodRoughTerrainEnv) -
             "git_commit": _git_commit(),
             "action_contract_version": ACTION_CONTRACT_VERSION,
             "observation_contract_version": OBSERVATION_CONTRACT_VERSION,
+            "contact_source": CONTACT_SOURCE,
+            "attitude_source": ATTITUDE_SOURCE,
             "action_size": env.action_size,
             "observation_size": env.observation_size,
             "checkpoint_dir": str(args.output),
@@ -949,6 +953,8 @@ def main(default_task: str = "terrain") -> None:
                 "controller": "position/heading/posture PI + tripod + 24D foot/body residual",
                 "action_contract_version": env.action_contract_version,
                 "observation_contract_version": env.observation_contract_version,
+                "contact_source": CONTACT_SOURCE,
+                "attitude_source": ATTITUDE_SOURCE,
             },
         )
         wandb_run.define_metric("train/global_step")

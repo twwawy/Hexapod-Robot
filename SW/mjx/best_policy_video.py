@@ -15,6 +15,7 @@ STAGE_LABELS = {
     1: "Stage 1 - Limited Yaw",
     2: "Stage 2 - Full Command",
 }
+FOOT_LABELS = ("RF", "RM", "RB", "LF", "LM", "LB")
 
 
 def _camera(camera: Any, data: Any, *, terrain: str) -> None:
@@ -33,11 +34,40 @@ def _quat_rotate_inverse_numpy(quat: np.ndarray, vector: np.ndarray) -> np.ndarr
     return vector + quat[0] * temporary + np.cross(conjugate_xyz, temporary)
 
 
+def _ground_truth_controller_rpy(quat: np.ndarray) -> np.ndarray:
+    """Convert MuJoCo root ground-truth quaternion to controller R/P/Y."""
+    quat = np.asarray(quat, dtype=float)
+    quat = quat / max(float(np.linalg.norm(quat)), 1e-12)
+    w, x, y, z = quat
+    rotation = np.array(
+        (
+            (1 - 2 * (y * y + z * z), 2 * (x * y - z * w), 2 * (x * z + y * w)),
+            (2 * (x * y + z * w), 1 - 2 * (x * x + z * z), 2 * (y * z - x * w)),
+            (2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x * x + y * y)),
+        )
+    )
+    basis = np.stack(
+        (
+            np.array((0.0, -1.0, 0.0)),
+            np.array((1.0, 0.0, 0.0)),
+            np.array((0.0, 0.0, 1.0)),
+        ),
+        axis=-1,
+    )
+    controller_rotation = basis.T @ rotation @ basis
+    pitch = np.arcsin(np.clip(-controller_rotation[2, 0], -1.0, 1.0))
+    roll = np.arctan2(controller_rotation[2, 1], controller_rotation[2, 2])
+    forward_world = rotation @ np.array((0.0, -1.0, 0.0))
+    yaw = np.arctan2(forward_world[1], forward_world[0])
+    return np.array((roll, pitch, yaw))
+
+
 def _overlay_frame(
     frame: Any,
     *,
     data: Any,
     command: np.ndarray,
+    contacts: np.ndarray,
     stage: int,
     title: str | None,
     elapsed: float,
@@ -63,16 +93,25 @@ def _overlay_frame(
     forward_velocity = -float(local_velocity[1])
     lateral_velocity = float(local_velocity[0])
     yaw_rate = float(data.qvel[5])
+    rpy_degrees = np.degrees(
+        _ground_truth_controller_rpy(np.asarray(data.qpos[3:7], dtype=float))
+    )
+    contact_text = " ".join(
+        f"{name}{int(active)}" for name, active in zip(FOOT_LABELS, contacts)
+    )
     lines = (
         title or STAGE_LABELS.get(stage, f"Stage {stage}"),
         f"t          {elapsed:6.2f} s",
         f"v_cmd / v  {command[0]:+6.3f} / {forward_velocity:+6.3f} m/s",
         f"vy_cmd/vy   {command[1]:+6.3f} / {lateral_velocity:+6.3f} m/s",
-        f"yaw_cmd/yaw {command[2]:+6.3f} / {yaw_rate:+6.3f} rad/s",
+        f"yaw cmd/rate {command[2]:+6.3f} / {yaw_rate:+6.3f} rad/s",
+        f"GT R/P/Y    {rpy_degrees[0]:+6.1f} {rpy_degrees[1]:+6.1f} {rpy_degrees[2]:+6.1f} deg",
+        f"contact GT  {contact_text}",
     )
-    panel_width = min(image.width - 20, 410)
+    panel_width = min(image.width - 20, 620)
+    panel_bottom = 58 + 23 * (len(lines) - 1)
     draw.rounded_rectangle(
-        (10, 10, panel_width, 149), radius=8, fill=(0, 0, 0, 175)
+        (10, 10, panel_width, panel_bottom), radius=8, fill=(0, 0, 0, 175)
     )
     draw.text((22, 18), lines[0], font=title_font, fill=(255, 255, 255, 255))
     for index, line in enumerate(lines[1:]):
@@ -85,7 +124,7 @@ def _overlay_frame(
         text_width = right - left
         text_height = bottom - top
         x = (image.width - text_width) // 2
-        y = max(145, (image.height - text_height) // 2)
+        y = max(panel_bottom + 5, (image.height - text_height) // 2)
         draw.rounded_rectangle(
             (x - 20, y - 14, x + text_width + 20, y + text_height + 14),
             radius=10,
@@ -329,6 +368,7 @@ def render_policy_video(
                     frame,
                     data=host_data,
                     command=displayed_command,
+                    contacts=np.asarray(state.info["contact_state"], dtype=bool),
                     stage=displayed_stage,
                     title=overlay_title,
                     elapsed=elapsed,

@@ -23,6 +23,7 @@ from rough_terrain_env import (  # noqa: E402
     OBSERVATION_CONTRACT_VERSION,
     HexapodRoughTerrainEnv,
     default_config,
+    mujoco_terrain_foot_contacts,
     _quat_rotate,
     _quat_rotate_inverse,
 )
@@ -35,7 +36,6 @@ from tripod_core import (  # noqa: E402
     classical_body_twist,
     feasible_yaw_limit,
     heading_aligned_points,
-    hysteretic_clearance_contact,
     leg_local_to_body,
     limit_effective_stride,
     median_support_height,
@@ -64,7 +64,11 @@ from tripod_controller import (  # noqa: E402
     TripodGaitController,
 )
 from domain_randomization import domain_randomize  # noqa: E402
-from best_policy_video import make_policy_evaluator  # noqa: E402
+from best_policy_video import (  # noqa: E402
+    FOOT_LABELS,
+    _ground_truth_controller_rpy,
+    make_policy_evaluator,
+)
 from train_rough_terrain import progress_video_targets  # noqa: E402
 from terrain_curriculum import TERRAIN_LEVELS  # noqa: E402
 from urdf_kinematics import (  # noqa: E402
@@ -100,7 +104,7 @@ class RoughTerrainContractTest(unittest.TestCase):
         )
         self.assertEqual(
             OBSERVATION_CONTRACT_VERSION,
-            "body_state_command3_coarse9_touchdown6_v2",
+            "gt_attitude_collision_contact6_coarse9_touchdown6_v3",
         )
         config = default_config()
         self.assertEqual(
@@ -356,22 +360,34 @@ class RoughTerrainContractTest(unittest.TestCase):
         )
         self.assertAlmostEqual(float(fallback), 0.13, places=7)
 
-    def test_clearance_contact_has_enter_release_hysteresis(self) -> None:
-        clearance = jp.array([0.034, 0.040, 0.046])
-        new_contact = hysteretic_clearance_contact(
-            clearance,
-            jp.array([False, False, False]),
-            enter_clearance=0.035,
-            release_clearance=0.045,
+    def test_contact_uses_only_active_foot_to_world_collisions(self) -> None:
+        geom_body_ids = jp.ones(20, dtype=jp.int32)
+        geom_body_ids = geom_body_ids.at[2].set(0).at[3].set(0)
+        contacts = mujoco_terrain_foot_contacts(
+            contact_geom=jp.array(
+                ((10, 2), (11, 12), (3, 12), (13, 2), (-1, -1))
+            ),
+            contact_distance=jp.array((-0.001, -0.001, 0.0, 0.001, -1.0)),
+            foot_geom_ids=jp.array((10, 11, 12, 13, 14, 15)),
+            geom_body_ids=geom_body_ids,
         )
-        latched = hysteretic_clearance_contact(
-            clearance,
-            jp.array([True, True, True]),
-            enter_clearance=0.035,
-            release_clearance=0.045,
+        self.assertTrue(
+            jp.array_equal(
+                contacts, jp.array((True, False, True, False, False, False))
+            )
         )
-        self.assertTrue(jp.array_equal(new_contact, jp.array([True, False, False])))
-        self.assertTrue(jp.array_equal(latched, jp.array([True, True, False])))
+
+    def test_video_attitude_is_ground_truth_and_scene_has_no_imu_sensor(self) -> None:
+        env = HexapodRoughTerrainEnv(terrain="flat")
+        self.assertEqual(FOOT_LABELS, LEG_PREFIXES)
+        self.assertEqual(env.mj_model.nsensor, 0)
+        self.assertEqual(
+            mujoco.mj_name2id(env.mj_model, mujoco.mjtObj.mjOBJ_SITE, "imu"), -1
+        )
+        home_quat = np.asarray(env._home_qpos[3:7])
+        self.assertTrue(
+            np.allclose(_ground_truth_controller_rpy(home_quat), np.zeros(3), atol=1e-6)
+        )
 
     def test_workspace_projection_makes_extreme_targets_feasible(self) -> None:
         requested = jp.array(

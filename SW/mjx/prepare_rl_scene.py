@@ -103,13 +103,6 @@ def _add_robot_colliders(root: ET.Element, *, foot_friction: float = 1.2) -> Non
             },
         )
     )
-    robot.append(
-        ET.Element(
-            "site",
-            {"name": "imu", "pos": "0 0 0", "size": "0.01"},
-        )
-    )
-
     for prefix in LEG_PREFIXES:
         body1 = root.find(f".//body[@name='{prefix}_motor_horn_1_1']")
         body2 = root.find(f".//body[@name='{prefix}_DS51150_270_2_1']")

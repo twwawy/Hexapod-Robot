@@ -3,9 +3,10 @@
 현재 기준 계약은 다음 두 버전이다.
 
 - action: `classical_wbc_cartesian_body6d_residual_v1` (24-D)
-- observation: `body_state_command3_coarse9_touchdown6_v2` (113-D)
+- observation: `gt_attitude_collision_contact6_coarse9_touchdown6_v3` (113-D)
 
-기존 22-D/110-D checkpoint는 의미와 shape가 모두 달라 재사용할 수 없다.
+기존 22-D/110-D checkpoint와 이전 113-D v2 checkpoint는 접촉 의미가 달라 재사용할
+수 없다.
 
 ## 1. 제어 구조
 
@@ -53,7 +54,8 @@ Stance X/Y residual은 코드에서 정확히 0이다. Body residual은 nominal 
 p_body_cmd = R_body_request^T (p_nominal+foot_residual - t_body_request)
 ```
 
-Roll/Pitch/Yaw는 단일 자세 PI가 각속도를 만들고 이를 적분한다. 6개 다리 후보가
+Roll/Pitch/Yaw 측정은 IMU나 임의 센서 신호 없이 MuJoCo root quaternion ground
+truth를 사용한다. 단일 자세 PI가 각속도를 만들고 이를 적분하며, 6개 다리 후보가
 모두 workspace와 `±135 deg` 관절 제한을 만족할 때만 세 회전축을 함께 적용한다.
 불가능한 후보는 projection으로 억지 적용하지 않고 직전 승인 body pose를 유지한다.
 이 경로 덕분에 계단에서 chassis pitch/roll/height를 실제 학습할 수 있다.
@@ -70,6 +72,10 @@ Early landing은 한 번 airborne이 된 swing 발의 재접촉에만 적용한�
 stance anchor도 simulator world position을 읽지 않고 직전 추정 위치와 URDF FK만으로
 갱신하므로 학습 시 배포 불가능한 위치 정보가 새지 않는다.
 
+발 접촉은 압력센서, ADC, 발 높이 threshold 또는 hysteresis를 사용하지 않는다.
+MuJoCo contact pair가 `foot_collision`과 worldbody의 floor/ramp/block/rough/stair geom을
+직접 연결하고 contact distance가 0 이하일 때만 해당 발을 접촉으로 기록한다.
+
 ## 3. Observation 113-D
 
 | 구성 | 차원 |
@@ -78,7 +84,7 @@ stance anchor도 simulator world position을 읽지 않고 직전 추정 위치�
 | body local velocity / angular velocity / gravity | 9 |
 | joint position / scaled velocity | 36 |
 | body-frame foot position | 18 |
-| hysteretic foot contact | 6 |
+| MuJoCo foot–world collision contact | 6 |
 | heading-aligned 3×3 terrain grid | 9 |
 | six nominal-touchdown heights | 6 |
 | gait sin/cos | 2 |

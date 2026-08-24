@@ -569,20 +569,6 @@ def update_airborne_state(
     return swing & (airborne | (~contacts))
 
 
-def hysteretic_clearance_contact(
-    clearance: jp.ndarray,
-    previous: jp.ndarray,
-    *,
-    enter_clearance: float,
-    release_clearance: float,
-) -> jp.ndarray:
-    """Latch geometric contact until a larger release clearance is reached."""
-    if release_clearance <= enter_clearance:
-        raise ValueError("contact release clearance must exceed enter clearance")
-    threshold = jp.where(previous, release_clearance, enter_clearance)
-    return clearance < threshold
-
-
 def median_support_height(
     terrain_heights: jp.ndarray,
     support_mask: jp.ndarray,

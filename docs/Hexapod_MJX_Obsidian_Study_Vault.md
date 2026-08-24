@@ -41,7 +41,7 @@ canonical_source: /home/huro/Downloads/mjx
 | Nominal controller | Position/Heading PI + PULL/Bezier tripod + posture PI + analytical 3-DOF IK |
 | Policy | 18 foot residual + body translation/rotation 6-DOF residual |
 | Action contract | `classical_wbc_cartesian_body6d_residual_v1`; 이전 checkpoint 금지 |
-| Observation contract | `body_state_command3_coarse9_touchdown6_v2` |
+| Observation contract | `gt_attitude_collision_contact6_coarse9_touchdown6_v3` |
 | Action / observation | `24 / 113` |
 | Physics | MuJoCo 3.12, MJX, `sim_dt=0.0025`, `ctrl_dt=0.02` |
 | PPO | Brax PPO + `mujoco_playground` |
@@ -558,11 +558,11 @@ curriculum도 동일한 113D semantic contract를 쓰며 terrain feature 15D는 
 | command | 3 | target forward/lateral speed, yaw rate |
 | local linear velocity | 3 | body local frame 속도 |
 | angular velocity | 3 | base angular velocity |
-| local gravity | 3 | IMU attitude 대체값 |
+| local gravity | 3 | MuJoCo root ground-truth attitude 기준 |
 | joint position error | 18 | home pose 대비 관절각 |
 | scaled joint velocity | 18 | `0.1 × qvel` |
 | foot body position | 18 | `R_WBᵀ(p_foot^W-p_base^W)`; world yaw 불변 |
-| contact | 6 | collision + 35/45 mm clearance hysteresis |
+| contact | 6 | foot–world terrain collision만 사용; 압력/clearance proxy 없음 |
 | coarse terrain | 9 | body heading 기준 3×3, support height 상대값 |
 | touchdown terrain | 6 | classical nominal landing 위치의 support-relative 높이 |
 | phase | 2 | `sin/cos(2πphase)` |
@@ -571,7 +571,7 @@ curriculum도 동일한 113D semantic contract를 쓰며 terrain feature 15D는 
 
 Touchdown feature는 grid·body pose·phase를 network가 다시 조합하지 않아도 각 leg의
 다음 nominal landing 높이를 직접 알게 한다. Observation 크기는 같아도 의미가 바뀌었으므로
-metadata의 `body_state_command3_coarse9_touchdown6_v2`를 반드시 확인한다.
+metadata의 `gt_attitude_collision_contact6_coarse9_touchdown6_v3`를 반드시 확인한다.
 
 ---
 

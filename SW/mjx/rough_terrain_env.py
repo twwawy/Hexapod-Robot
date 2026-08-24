@@ -45,7 +45,6 @@ from tripod_core import (
     contact_adapt_targets,
     feasible_yaw_limit,
     heading_aligned_points,
-    hysteretic_clearance_contact,
     leg_local_to_body,
     limit_effective_stride,
     median_support_height,
@@ -70,7 +69,9 @@ BODY_RESIDUAL_SIZE = 6
 ACTION_SIZE = FOOT_RESIDUAL_SIZE + BODY_RESIDUAL_SIZE
 OBSERVATION_SIZE = 113
 ACTION_CONTRACT_VERSION = "classical_wbc_cartesian_body6d_residual_v1"
-OBSERVATION_CONTRACT_VERSION = "body_state_command3_coarse9_touchdown6_v2"
+OBSERVATION_CONTRACT_VERSION = "gt_attitude_collision_contact6_coarse9_touchdown6_v3"
+CONTACT_SOURCE = "mujoco_foot_world_collision"
+ATTITUDE_SOURCE = "mujoco_ground_truth_root"
 
 
 def default_config() -> config_dict.ConfigDict:
@@ -152,8 +153,6 @@ def default_config() -> config_dict.ConfigDict:
                 slip_confirm_steps=5,
             ),
             contact=config_dict.create(
-                contact_enter_clearance=0.035,
-                contact_release_clearance=0.045,
                 search_down_speed=0.20,
                 search_inward_ratio=0.8,
             ),
@@ -266,6 +265,33 @@ def _controller_roll_pitch(quat: jax.Array) -> jax.Array:
     pitch = jp.arcsin(jp.clip(-controller_rotation[2, 0], -1.0, 1.0))
     roll = jp.arctan2(controller_rotation[2, 1], controller_rotation[2, 2])
     return jp.array((roll, pitch))
+
+
+def mujoco_terrain_foot_contacts(
+    contact_geom: jax.Array,
+    contact_distance: jax.Array,
+    foot_geom_ids: jax.Array,
+    geom_body_ids: jax.Array,
+) -> jax.Array:
+    """Return foot contacts only for active foot-to-world terrain collisions.
+
+    All generated floor, ramp, block, rough and stair geoms are direct
+    ``worldbody`` children (body id 0).  Robot self-collisions and geometric
+    foot-clearance estimates therefore cannot enter this signal.
+    """
+    safe_geom = jp.maximum(contact_geom, 0)
+    first_geom = safe_geom[:, 0]
+    second_geom = safe_geom[:, 1]
+    first_is_world = geom_body_ids[first_geom] == 0
+    second_is_world = geom_body_ids[second_geom] == 0
+    first_is_foot = first_geom[:, None] == foot_geom_ids[None, :]
+    second_is_foot = second_geom[:, None] == foot_geom_ids[None, :]
+    foot_to_world = (first_is_foot & second_is_world[:, None]) | (
+        second_is_foot & first_is_world[:, None]
+    )
+    active = (contact_geom[:, 0] >= 0) & (contact_geom[:, 1] >= 0)
+    active &= contact_distance <= 0.0
+    return jp.any(active[:, None] & foot_to_world, axis=0)
 
 
 class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
@@ -638,25 +664,15 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
             axis=-1,
         )
 
-    def _foot_contacts(
-        self, data: mjx.Data, previous: Optional[jax.Array] = None
-    ) -> jax.Array:
-        """Collision contact fused with a hysteretic clearance estimate."""
+    def _foot_contacts(self, data: mjx.Data) -> jax.Array:
+        """Foot-to-terrain collision state; no pressure or clearance proxy."""
         contact = data._impl.contact
-        active = contact.dist < 0.0
-        foot_match = jp.any(contact.geom[:, :, None] == self._foot_geom_ids[None, None, :], axis=1)
-        physical = jp.any(active[:, None] & foot_match, axis=0)
-        feet = data.site_xpos[self._foot_site_ids]
-        clearance = feet[:, 2] - self._terrain_height(feet[:, :2])
-        if previous is None:
-            previous = jp.zeros(6, dtype=jp.bool_)
-        geometric = hysteretic_clearance_contact(
-            clearance,
-            previous,
-            enter_clearance=self._config.controller.contact.contact_enter_clearance,
-            release_clearance=self._config.controller.contact.contact_release_clearance,
+        return mujoco_terrain_foot_contacts(
+            contact.geom,
+            contact.dist,
+            self._foot_geom_ids,
+            self._geom_body_ids,
         )
-        return physical | geometric
 
     def _support_height(
         self, data: mjx.Data, contacts: jax.Array, swing: jax.Array
@@ -1153,7 +1169,7 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
         yaw_error_rps = jp.abs(data.qvel[5] - state.info["command"][2])
         up_z = _quat_rotate(quat, jp.array((0.0, 0.0, 1.0)))[2]
         measured_roll_pitch = _controller_roll_pitch(quat)
-        contacts = self._foot_contacts(data, state.info["contact_state"])
+        contacts = self._foot_contacts(data)
         support_height = self._support_height(data, contacts, controller["swing"])
         (
             body_position_estimate,

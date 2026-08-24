@@ -5,7 +5,7 @@
 ## 현재 기준 경로
 
 Canonical contract: `classical_wbc_cartesian_body6d_residual_v1` action(24-D) +
-`body_state_command3_coarse9_touchdown6_v2` observation(113-D)
+`gt_attitude_collision_contact6_coarse9_touchdown6_v3` observation(113-D)
 
 ```text
 forward/lateral/yaw command → Position/Heading PI → final body twist
@@ -20,6 +20,8 @@ forward/lateral/yaw command → Position/Heading PI → final body twist
 - 마지막 6-D는 몸체 forward/lateral/height `±50/±50/±100 mm`, roll/pitch/yaw `±45/±45/±25 deg`이며 0.15초 filter와 전체 workspace 승인을 거친다.
 - gait phase/stride/frequency와 nominal swing height `0.20 m`, radial offset `0.07 m`는 정책이 아니라 제어기가 소유한다.
 - 0.5초 phase가 끝나도 swing 3발 착지가 확인되지 않으면 다음 tripod를 들지 않고 late-landing 탐색을 계속한다.
+- 접촉은 압력센서·발높이 추정 없이 MuJoCo foot–world terrain collision만 사용하고,
+  roll/pitch/yaw는 MuJoCo root ground truth를 사용한다.
 - 우선순위는 `safety > contact > RL residual > nominal gait`다. early landing이면 contact/safety 계층이 현재 발 위치를 유지해 residual을 무시한다.
 - 이전 6-D/7-D/22-D residual checkpoint는 action/observation 계약이 달라 재사용할 수 없다. `fresh`로 새 학습을 시작해야 한다.
 
