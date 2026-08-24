@@ -1,6 +1,6 @@
 ################################################################################
 # Automatically-generated file. Do not edit!
-# Toolchain: GNU Tools for STM32 (12.3.rel1)
+# Toolchain: GNU Tools for STM32 (14.3.rel1)
 ################################################################################
 
 -include ../makefile.init
@@ -11,11 +11,8 @@ RM := rm -rf
 -include sources.mk
 -include Drivers/STM32F4xx_HAL_Driver/Src/subdir.mk
 -include Core/Startup/subdir.mk
--include Core/Src/Telemetry/subdir.mk
--include Core/Src/Sensor/subdir.mk
--include Core/Src/Safety/subdir.mk
--include Core/Src/Motion/subdir.mk
--include Core/Src/Control/subdir.mk
+-include Core/Src/sensor/subdir.mk
+-include Core/Src/module/subdir.mk
 -include Core/Src/subdir.mk
 -include objects.mk
 
@@ -65,8 +62,8 @@ all: main-build
 main-build: Hexapod.elf secondary-outputs
 
 # Tool invocations
-Hexapod.elf Hexapod.map: $(OBJS) $(USER_OBJS) C:\Project_TW\Hexapod\Hexapod\STM32F446RETX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
-	arm-none-eabi-gcc -o "Hexapod.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"C:\Project_TW\Hexapod\Hexapod\STM32F446RETX_FLASH.ld" --specs=nosys.specs -Wl,-Map="Hexapod.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
+Hexapod.elf Hexapod.map: $(OBJS) $(USER_OBJS) C:\Project_TW\Hexapod\Hexapod-Robot\SW\STM32\workspace\Hexapod\STM32F446RETX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
+	arm-none-eabi-gcc -o "Hexapod.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"C:\Project_TW\Hexapod\Hexapod-Robot\SW\STM32\workspace\Hexapod\STM32F446RETX_FLASH.ld" --specs=nosys.specs -Wl,-Map="Hexapod.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
 	@echo 'Finished building target: $@'
 	@echo ' '
 

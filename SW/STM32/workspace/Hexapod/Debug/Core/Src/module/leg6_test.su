@@ -1,0 +1,5 @@
+../Core/Src/module/leg6_test.c:12:13:Leg6Test_WritePulse	16	static
+../Core/Src/module/leg6_test.c:22:26:Leg6Test_StartChannel	16	static
+../Core/Src/module/leg6_test.c:29:19:Leg6Test_Start	32	static
+../Core/Src/module/leg6_test.c:72:6:Leg6Test_Process	32	static
+../Core/Src/module/leg6_test.c:142:6:Leg6Test_Stop	24	static

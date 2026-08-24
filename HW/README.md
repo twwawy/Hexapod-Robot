@@ -1,10 +1,10 @@
-# Hexapod-Robot
+# 하드웨어 구성
 
 Jetson Orin Nano Super와 STM32 NUCLEO-F446RE를 기반으로 제작하는 6족 보행 로봇 프로젝트입니다.
 
-Jetson Orin Nano Super는 LiDAR, Depth Camera 등 각종 센서 데이터를 종합하여 이동 경로와 보행 방법을 계산하고, STM32 NUCLEO-F446RE는 GPS, IMU, LoRa 통신 등 하위 센서 및 통신 제어를 담당합니다.
+Jetson Orin Nano Super는 LiDAR와 Depth Camera를 이용한 인지·자율주행을 담당하고, STM32 NUCLEO-F446RE는 센서 수집, 200 Hz 보행 제어, 서보·릴레이 출력과 통신을 담당한다.
 
-## Hardware Overview
+## 주요 구성
 
 | Category | Main Parts |
 |---|---|
@@ -20,4 +20,14 @@ Jetson Orin Nano Super는 LiDAR, Depth Camera 등 각종 센서 데이터를 종
 | Battery | 3S / 2S 7200mAh Battery |
 | Frame | 3D Printed PLA Parts |
 
-자세한 부품 목록은 [parts.md]를 참고하세요.
+자세한 수량과 구매 정보는 [부품 목록](parts.md), STM32 핀과 주변장치 설정은 [STM32F446RE 설정 정리본](../SW/STM32/STM32F446RE%20설정%20정리본.md)을 참고한다.
+
+기구와 제작 자료는 다음 폴더에 있다.
+
+| 경로 | 내용 |
+|---|---|
+| [stl_file](stl_file) | 3D 프린팅용 STL |
+| [gcode_file](gcode_file) | 출력용 G-code와 3MF |
+| [PCB](PCB) | PCB Gerber와 Drill 파일 |
+| [urdf](urdf) | 현재 URDF와 시뮬레이션 설정 |
+| [urdf_earlyVersion](urdf_earlyVersion) | 초기 URDF 보관본 |

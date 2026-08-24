@@ -1,0 +1,34 @@
+#ifndef SENSOR_MANAGER_H
+#define SENSOR_MANAGER_H
+
+#include "common/robot_types.h"
+#include "sensor/foot_pressure.h"
+#include "sensor/gps.h"
+#include "sensor/imu.h"
+#include "sensor/joint_feedback.h"
+#include "sensor/mcp3008.h"
+
+#include <stdbool.h>
+
+typedef struct
+{
+    GPS_Handle_t *gps;                    // GPS 드라이버를 참조한다.
+    IMU_Handle_t *imu;                    // IMU 드라이버를 참조한다.
+    MCP3008_Handle_t *mcp3008;            // ADC 드라이버를 참조한다.
+    JointFeedback_Handle_t joints;        // 관절센서 변환 상태를 저장한다.
+    FootPressure_Handle_t pressure;       // 압력센서 변환 상태를 저장한다.
+    MCP3008_Data_t adc;                   // 최근 ADC 값을 저장한다.
+    RobotSensorSnapshot_t snapshot;       // 최근 센서 스냅샷을 저장한다.
+} SensorManager_Handle_t;
+
+void SensorManager_Init(SensorManager_Handle_t *handle,
+                        GPS_Handle_t *gps,
+                        IMU_Handle_t *imu,
+                        MCP3008_Handle_t *mcp3008);  // 실제 센서 드라이버를 연결한다.
+
+bool SensorManager_Update(SensorManager_Handle_t *handle);  // 최신 실제 센서값을 갱신한다.
+
+bool SensorManager_GetSnapshot(const SensorManager_Handle_t *handle,
+                               RobotSensorSnapshot_t *snapshot);  // 제어용 스냅샷을 반환한다.
+
+#endif
