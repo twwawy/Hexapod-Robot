@@ -36,8 +36,15 @@ typedef enum
 
 typedef struct
 {
-    SPI_HandleTypeDef *spi;
-    uint32_t timeout_ms;
+    uint8_t device;   // MCP3008 장치 번호를 저장한다.
+    uint8_t channel;  // 장치 내부 채널 번호를 저장한다.
+} MCP3008_InputMapping_t;
+
+typedef struct
+{
+    SPI_HandleTypeDef *spi;                                                   // SPI Handle을 저장한다.
+    uint32_t timeout_ms;                                                      // SPI 제한 시간을 저장한다.
+    MCP3008_InputMapping_t mapping[MCP3008_LEG_COUNT][MCP3008_LEG_INPUT_COUNT]; // 다리 입력별 실제 채널을 저장한다.
 } MCP3008_Handle_t;
 
 typedef struct
@@ -77,6 +84,11 @@ HAL_StatusTypeDef MCP3008_ReadChannel(MCP3008_Handle_t *handle,
  */
 HAL_StatusTypeDef MCP3008_ReadAll(MCP3008_Handle_t *handle,
                                   MCP3008_Data_t *data);
+
+bool MCP3008_SetInputMapping(MCP3008_Handle_t *handle,
+                             uint8_t leg,
+                             MCP3008_LegInput_t input,
+                             const MCP3008_InputMapping_t *mapping);  // 다리 입력의 실측 ADC 채널을 설정한다.
 
 /** Safely copy one value from the latest 24-channel snapshot. */
 bool MCP3008_GetRaw(const MCP3008_Data_t *data,

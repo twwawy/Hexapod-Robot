@@ -56,6 +56,9 @@ static void MCP3008_Deselect(MCP3008_Device_t device)
 HAL_StatusTypeDef MCP3008_Init(MCP3008_Handle_t *handle,
                                SPI_HandleTypeDef *spi)
 {
+    uint8_t leg;    // 기본 매핑을 넣을 다리 번호를 저장한다.
+    uint8_t input;  // 기본 매핑을 넣을 입력 번호를 저장한다.
+
     if ((handle == NULL) || (spi == NULL))
     {
         return HAL_ERROR;
@@ -63,6 +66,16 @@ HAL_StatusTypeDef MCP3008_Init(MCP3008_Handle_t *handle,
 
     handle->spi = spi;
     handle->timeout_ms = MCP3008_SPI_TIMEOUT_MS;
+
+    for (leg = 0U; leg < MCP3008_LEG_COUNT; ++leg)
+    {
+        for (input = 0U; input < MCP3008_LEG_INPUT_COUNT; ++input)
+        {
+            handle->mapping[leg][input].device = (uint8_t)(leg / 2U);                       // 기존 장치 배치를 기본값으로 둔다.
+            handle->mapping[leg][input].channel = (uint8_t)(((leg % 2U) *
+                MCP3008_LEG_INPUT_COUNT) + input);                                         // 기존 채널 배치를 기본값으로 둔다.
+        }
+    }
     MCP3008_DeselectAll();
 
     return HAL_OK;
@@ -144,14 +157,13 @@ HAL_StatusTypeDef MCP3008_ReadAll(MCP3008_Handle_t *handle,
 
     memcpy(data->raw, new_raw, sizeof(new_raw));
 
-    /* Convert three MCP3008 x eight channels into six legs x four inputs. */
+    /* 실측 매핑으로 24개 채널을 다리별 입력에 배치한다. */
     for (leg = 0U; leg < MCP3008_LEG_COUNT; leg++)
     {
-        device = (uint8_t)(leg / 2U);
-
         for (input = 0U; input < MCP3008_LEG_INPUT_COUNT; input++)
         {
-            channel = (uint8_t)(((leg % 2U) * MCP3008_LEG_INPUT_COUNT) + input);
+            device = handle->mapping[leg][input].device;    // 실측 장치 번호를 선택한다.
+            channel = handle->mapping[leg][input].channel;  // 실측 채널 번호를 선택한다.
             data->leg_raw[leg][input] = new_raw[device][channel];
         }
     }
@@ -162,6 +174,25 @@ HAL_StatusTypeDef MCP3008_ReadAll(MCP3008_Handle_t *handle,
     data->last_error_channel = MCP3008_INVALID_INDEX;
 
     return HAL_OK;
+}
+
+/* 한 다리 입력의 MCP3008 장치와 채널을 설정한다. */
+bool MCP3008_SetInputMapping(MCP3008_Handle_t *handle,
+                             uint8_t leg,
+                             MCP3008_LegInput_t input,
+                             const MCP3008_InputMapping_t *mapping)
+{
+    if ((handle == NULL) || (mapping == NULL) ||
+        (leg >= MCP3008_LEG_COUNT) ||
+        ((uint32_t)input >= MCP3008_LEG_INPUT_COUNT) ||
+        !MCP3008_IsValidDevice((MCP3008_Device_t)mapping->device) ||
+        !MCP3008_IsValidChannel(mapping->channel))
+    {
+        return false;
+    }
+
+    handle->mapping[leg][input] = *mapping;  // 확인한 실제 채널을 적용한다.
+    return true;
 }
 
 bool MCP3008_GetRaw(const MCP3008_Data_t *data,

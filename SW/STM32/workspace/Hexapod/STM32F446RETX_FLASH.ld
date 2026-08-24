@@ -155,6 +155,7 @@ SECTIONS
     /* This is used by the startup in order to initialize the .bss section */
     _sbss = .;         /* define a global symbol at bss start */
     __bss_start__ = _sbss;
+    KEEP(*(.bss.measurement_debug)) /* 실측 디버그 구조체를 유지한다. */
     *(.bss)
     *(.bss*)
     *(COMMON)

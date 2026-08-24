@@ -46,6 +46,10 @@ bool ServoPwm_SetCalibration(ServoPwm_Handle_t *handle,
                              uint8_t joint,
                              const ServoPwm_Calibration_t *calibration);  // 한 서보 보정값을 갱신한다.
 
+bool ServoPwm_CalculatePulse(const ServoPwm_Calibration_t *calibration,
+                             float angle_rad,
+                             uint16_t *pulse_us);  // 보정된 관절각을 PWM Pulse로 계산한다.
+
 HAL_StatusTypeDef ServoPwm_Start(ServoPwm_Handle_t *handle);  // 모든 PWM을 중립에서 시작한다.
 
 void ServoPwm_SeedAngles(ServoPwm_Handle_t *handle,

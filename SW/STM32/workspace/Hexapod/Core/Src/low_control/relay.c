@@ -1,5 +1,6 @@
 #include "low_control/relay.h"
 
+#include "common/robot_calibration.h"
 #include "main.h"
 
 #include <stddef.h>
@@ -94,13 +95,22 @@ void Relay_AllOff(void)
 /* Kill이 없을 때만 요청한 릴레이 전원을 허용한다. */
 void Relay_ApplySafety(bool relay_enable, bool kill_enable)
 {
+    uint32_t leg;  // 전원을 허용할 다리 번호를 저장한다.
+
     if (kill_enable || !relay_enable)
     {
         Relay_AllOff();  // Kill 또는 비활성 상태에서 전원을 차단한다.
     }
     else
     {
-        Relay_AllOn();   // 정상 허가 상태에서 전원을 공급한다.
+        Relay_AllOff();  // 이전 출력과 중복 매핑을 먼저 제거한다.
+        for (leg = 0U; leg < ROBOT_LEG_COUNT; ++leg)
+        {
+            if (g_robot_calibration.relay_mapped[leg])
+            {
+                Relay_On(g_robot_calibration.relay_for_leg[leg]);  // 중앙 테이블에서 확인된 다리 전원만 공급한다.
+            }
+        }
     }
 }
 

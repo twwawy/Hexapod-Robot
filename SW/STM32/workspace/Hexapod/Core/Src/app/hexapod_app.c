@@ -1,5 +1,6 @@
 #include "app/hexapod_app.h"
 
+#include "common/robot_calibration.h"
 #include "high_control/stand_landing.h"
 #include "low_control/relay.h"
 
@@ -78,7 +79,14 @@ HAL_StatusTypeDef HexapodApp_Init(HexapodApp_Handle_t *handle,
     }
 
     ServoPwm_Init(&handle->servo_pwm, &hardware->servo_timers);  // 18개 서보 채널을 배치한다.
-    status = ServoPwm_Start(&handle->servo_pwm);                  // 중립 PWM을 시작한다.
+    (void)RobotCalibration_Apply(&g_robot_calibration,
+                                 &handle->imu,
+                                 &handle->adc,
+                                 &handle->sensors.joints,
+                                 &handle->sensors.pressure,
+                                 &handle->servo_pwm,
+                                 &handle->user_command);          // 중앙 실측값을 모든 장치에 적용한다.
+    status = ServoPwm_Start(&handle->servo_pwm);                  // 보정된 중립 PWM을 시작한다.
     if (status != HAL_OK)
     {
         return status;

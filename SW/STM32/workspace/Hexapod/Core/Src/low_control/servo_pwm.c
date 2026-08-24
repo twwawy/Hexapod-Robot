@@ -108,6 +108,32 @@ bool ServoPwm_SetCalibration(ServoPwm_Handle_t *handle,
     return true;
 }
 
+/* 한 서보의 보정값으로 관절각을 제한된 PWM Pulse로 계산한다. */
+bool ServoPwm_CalculatePulse(const ServoPwm_Calibration_t *calibration,
+                             float angle_rad,
+                             uint16_t *pulse_us)
+{
+    int32_t pulse;  // 변환한 Pulse를 저장한다.
+
+    if ((calibration == NULL) || (pulse_us == NULL) ||
+        !calibration->calibrated ||
+        (calibration->minimum_us >= calibration->neutral_us) ||
+        (calibration->neutral_us >= calibration->maximum_us) ||
+        (calibration->pulse_per_rad <= 0.0f) ||
+        ((calibration->direction != 1) && (calibration->direction != -1)))
+    {
+        return false;
+    }
+
+    pulse = (int32_t)lroundf((float)calibration->neutral_us +
+                             (float)calibration->direction *
+                             (angle_rad - calibration->zero_angle_rad) *
+                             calibration->pulse_per_rad);                    // 관절각을 Pulse로 변환한다.
+    *pulse_us = ServoPwm_ClampPulse(pulse, calibration->minimum_us,
+                                    calibration->maximum_us);                // 실측 Pulse 범위로 제한한다.
+    return true;
+}
+
 /* 모든 서보 PWM을 중립 Pulse에서 시작한다. */
 HAL_StatusTypeDef ServoPwm_Start(ServoPwm_Handle_t *handle)
 {
@@ -187,17 +213,15 @@ bool ServoPwm_WriteAngles(ServoPwm_Handle_t *handle,
                                             ROBOT_JOINT_MAX_RAD);           // 목표 관절각을 제한한다.
         float difference = target - handle->previous_angle_rad[joint];      // 이전 명령과 차이를 계산한다.
         float limited;                                                       // 속도 제한 관절각을 저장한다.
-        int32_t pulse;                                                       // 변환한 Pulse를 저장한다.
+        uint16_t pulse;                                                      // 변환한 Pulse를 저장한다.
 
         difference = ServoPwm_Clamp(difference, -ROBOT_JOINT_STEP_RAD, ROBOT_JOINT_STEP_RAD);  // 5 ms 변화량을 제한한다.
         limited = handle->previous_angle_rad[joint] + difference;                              // 새 관절 명령을 계산한다.
-        pulse = (int32_t)lroundf((float)calibration->neutral_us +
-                                 (float)calibration->direction *
-                                 (limited - calibration->zero_angle_rad) *
-                                 calibration->pulse_per_rad);                                  // 관절각을 Pulse로 변환한다.
-        handle->pulse_us[joint] = ServoPwm_ClampPulse(pulse,
-                                                      calibration->minimum_us,
-                                                      calibration->maximum_us);                 // 물리 Pulse 범위를 제한한다.
+        if (!ServoPwm_CalculatePulse(calibration, limited, &pulse))
+        {
+            return false;
+        }
+        handle->pulse_us[joint] = pulse;                                                       // 보정된 Pulse를 저장한다.
         handle->previous_angle_rad[joint] = limited;                                            // 다음 주기 이전값을 저장한다.
         __HAL_TIM_SET_COMPARE(handle->timer[joint],
                               handle->channel[joint],
