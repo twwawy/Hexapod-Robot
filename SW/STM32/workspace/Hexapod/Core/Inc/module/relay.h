@@ -7,43 +7,30 @@ extern "C" {
 
 #include <stdbool.h>
 
-/**
- * @brief Relay channels connected to PC2, PC3, and PC4.
- *
- * The relay inputs are active-high:
- * GPIO HIGH = relay ON, GPIO LOW = relay OFF.
- */
 typedef enum
 {
-    RELAY_INA = 0,
-    RELAY_INB,
-    RELAY_INC,
-    RELAY_CHANNEL_COUNT
+    RELAY_INA1 = 0,       // 오른쪽 A 릴레이를 선택한다.
+    RELAY_INB1,           // 오른쪽 B 릴레이를 선택한다.
+    RELAY_INC1,           // 오른쪽 C 릴레이를 선택한다.
+    RELAY_INA2,           // 왼쪽 A 릴레이를 선택한다.
+    RELAY_INB2,           // 왼쪽 B 릴레이를 선택한다.
+    RELAY_INC2,           // 왼쪽 C 릴레이를 선택한다.
+    RELAY_CHANNEL_COUNT   // 전체 릴레이 채널 수를 나타낸다.
 } Relay_Channel_t;
 
-/**
- * @brief Turn every relay OFF.
- * @note Call once after MX_GPIO_Init().
- */
-void Relay_Init(void);
+void Relay_Init(void);                                  // 모든 릴레이를 OFF로 초기화한다.
 
-/** @brief Set one relay to the requested state. */
-void Relay_Set(Relay_Channel_t channel, bool on);
+void Relay_Set(Relay_Channel_t channel, bool on);       // 지정한 릴레이 상태를 변경한다.
 
-/** @brief Turn one relay ON. */
-void Relay_On(Relay_Channel_t channel);
+void Relay_On(Relay_Channel_t channel);                 // 지정한 릴레이를 ON으로 설정한다.
 
-/** @brief Turn one relay OFF. */
-void Relay_Off(Relay_Channel_t channel);
+void Relay_Off(Relay_Channel_t channel);                // 지정한 릴레이를 OFF로 설정한다.
 
-/** @brief Turn all three relays ON. */
-void Relay_AllOn(void);
+void Relay_AllOn(void);                                 // 모든 릴레이를 ON으로 설정한다.
 
-/** @brief Turn all three relays OFF. */
-void Relay_AllOff(void);
+void Relay_AllOff(void);                                // 모든 릴레이를 OFF로 설정한다.
 
-/** @brief Return true when the selected relay output is HIGH. */
-bool Relay_IsOn(Relay_Channel_t channel);
+bool Relay_IsOn(Relay_Channel_t channel);               // 지정한 릴레이의 ON 상태를 확인한다.
 
 #ifdef __cplusplus
 }

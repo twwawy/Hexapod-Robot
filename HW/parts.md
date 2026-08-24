@@ -199,10 +199,11 @@
 - **용도**: 로봇 수동 조종용 컨트롤러
 - **구매링크**: [SUSUNG RC](https://susungrc.com/product/%EB%9D%BC%EB%94%94%EC%98%A4%EB%A7%88%EC%8A%A4%ED%84%B0-pocket-%EC%A1%B0%EC%A2%85%EA%B8%B0-elrs/2385/)
 
-### ELRS Receiver Module
+### ELRS-2.4G-NANO ESP8285 Receiver Module
 
 - **개수**: 1개
-- **용도**: 조종기 신호를 수신하여 로봇 제어부로 전달
+- **모델**: DarwinFPV 2.4G ELRS Nano
+- **용도**: RadioMaster Pocket의 ELRS 신호를 수신하여 CRSF UART로 STM32에 전달
 - **구매링크**: [DeviceMart](https://www.devicemart.co.kr/goods/view?no=15138136)
 
 ### RYLR998 UART LoRa Module

@@ -273,7 +273,7 @@ GPS: NEO M8N GPS Module, TYE-GP001
 
 ## 8. USART3 / IMU
 
-BMI160 + RM3100 9축 IMU 모듈
+WT931 9축 IMU 모듈
 
 | 기능 | STM32 Pin |
 |---|---|
@@ -285,7 +285,7 @@ BMI160 + RM3100 9축 IMU 모듈
 | 항목 | 설정 |
 |---|---|
 | Mode | Asynchronous |
-| Baud Rate | 9600 |
+| Baud Rate | 115200 |
 | Word Length | 8 Bits |
 | Parity | None |
 | Stop Bits | 1 |
@@ -321,9 +321,12 @@ RYLR998 계열 UART LoRa 통신 모듈
 
 ## 10. USART6 / RadioMaster Pocket ELRS + ELRS Nano 수신기
 
-조종기: RadioMaster Pocket 조종기 ELRS  
-수신기: ELRS-2.4G-NANO ESP8285 수신기 / DarwinFPV 2.4G ELRS Nano  
+조종기: [RadioMaster Pocket 조종기 ELRS](https://susungrc.com/product/%EB%9D%BC%EB%94%94%EC%98%A4%EB%A7%88%EC%8A%A4%ED%84%B0-pocket-%EC%A1%B0%EC%A2%85%EA%B8%B0-elrs/2385/)
+
+수신기: [ELRS-2.4G-NANO ESP8285 수신기 / DarwinFPV 2.4G ELRS Nano](https://www.devicemart.co.kr/goods/view?no=15138136)
 통신 프로토콜: ELRS 무선 링크 + 수신기 출력 CRSF UART
+
+RadioMaster Pocket은 최대 16채널을 지원한다. 실제 조종 입력은 Mode 2 기준으로 왼쪽 짐벌에 Throttle/Yaw, 오른쪽 짐벌에 Pitch/Roll이 배치된다. 물리 입력은 SA·SD 2단 유지형 스위치, SB·SC 3단 스위치, SE 순간 버튼과 S1 가변 입력으로 구성된다. 자세한 외형과 입력 종류는 [RadioMaster Pocket 공식 매뉴얼](https://radiomasterrc.com/pages/user-manuals)을 따른다.
 
 | 기능 | STM32 Pin |
 |---|---|
@@ -342,9 +345,33 @@ PC6 TX는 설정상 잡혀 있어도 배선하지 않아도 됨.
 | Word Length | 8 Bits |
 | Parity | None |
 | Stop Bits | 1 |
-| Data Direction | Receive Only |
+| Data Direction | TX/RX |
 | Hardware Flow Control | Disable |
 | Over Sampling | 16 Samples |
+
+### 프로젝트 CRSF 채널 배치
+
+ELRS 수신기가 채널 용도를 고정하는 것은 아니다. EdgeTX의 현재 모델에 설정한 `Mixes`가 CRSF CH1~CH16의 용도를 결정하므로 이 프로젝트에서는 다음 배치를 표준으로 사용한다.
+
+| CRSF 채널 | EdgeTX Source | Pocket 물리 입력 | STM32 사용값 |
+|---:|---|---|---|
+| CH1 | Ail | 오른쪽 짐벌 좌우 | Roll |
+| CH2 | Ele | 오른쪽 짐벌 상하 | Pitch |
+| CH3 | Thr | 왼쪽 짐벌 상하 | Throttle, 중립 0의 `-1000~1000` |
+| CH4 | Rud | 왼쪽 짐벌 좌우 | Yaw |
+| CH5 | SA | 2단 유지형 스위치 | SA, OFF/ON을 0/1로 변환 |
+| CH6 | SB | 3단 스위치 | SB, 세 위치를 0/1/2로 변환 |
+| CH7 | SC | 3단 스위치 | SC, 세 위치를 0/1/2로 변환 |
+| CH8 | SD | 2단 유지형 스위치 | SD, 해제/눌림을 0/1로 변환 |
+| CH9 | SE | 순간 버튼 | SE, 해제/누름을 0/1로 변환 |
+| CH10 | S1 | 가변 입력 | 현재 미사용, 예비 채널 |
+| CH11~CH16 | - | - | 미사용 |
+
+CH1~CH4는 `AETR` 순서이다. Radio Setup의 `Default Channel Order`는 새 모델을 만들 때만 반영되며 이미 만든 모델의 채널은 바뀌지 않는다. 따라서 Pocket에서 사용할 전용 모델의 `Mixes`를 위 표대로 설정하고 채널 모니터에서 CH1~CH10을 직접 확인한다.
+
+STM32의 `user_command`는 CH1~CH4를 위 이름으로 다시 배치하고, 네 축을 중립 0의 `-1000~1000`으로 변환한다. CH5~CH9는 제어 모델이 사용하는 스위치 상태로 변환한다. 조종 모드에서 SA OFF일 때는 Throttle로 x이동, Yaw로 회전을 명령하고, SA ON일 때는 Throttle로 x이동, Yaw로 y이동을 명령하며 전환 시점의 Heading을 유지한다. 조이스틱 방향 반전, 중립값과 최종 정규화 계수는 실제 조종기 채널 모니터 및 CRSF 수신 시험에서 확인한 뒤 설정 테이블에 채운다.
+
+이 모드 변경은 기존 CH3·CH4·CH5 입력을 재해석하므로 수신기와 STM32 사이의 추가 배선은 필요하지 않다.
 
 ---
 

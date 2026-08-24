@@ -62,8 +62,8 @@ all: main-build
 main-build: Hexapod.elf secondary-outputs
 
 # Tool invocations
-Hexapod.elf Hexapod.map: $(OBJS) $(USER_OBJS) C:\Users\seung\Documents\INHA\RRC\Sophomore\Hexapod-Robot\SW\STM32\workspace\Hexapod\STM32F446RETX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
-	arm-none-eabi-gcc -o "Hexapod.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"C:\Users\seung\Documents\INHA\RRC\Sophomore\Hexapod-Robot\SW\STM32\workspace\Hexapod\STM32F446RETX_FLASH.ld" --specs=nosys.specs -Wl,-Map="Hexapod.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
+Hexapod.elf Hexapod.map: $(OBJS) $(USER_OBJS) C:\Project_TW\Hexapod\Hexapod-Robot\SW\STM32\workspace\Hexapod\STM32F446RETX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
+	arm-none-eabi-gcc -o "Hexapod.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"C:\Project_TW\Hexapod\Hexapod-Robot\SW\STM32\workspace\Hexapod\STM32F446RETX_FLASH.ld" --specs=nosys.specs -Wl,-Map="Hexapod.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
 	@echo 'Finished building target: $@'
 	@echo ' '
 

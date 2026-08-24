@@ -119,6 +119,7 @@ static void MX_USART6_UART_Init(void);
   */
 int main(void)
 {
+
   /* USER CODE BEGIN 1 */
   /* USER CODE END 1 */
 
@@ -877,8 +878,6 @@ static void MX_UART5_Init(void)
 
   /* USER CODE END UART5_Init 1 */
   huart5.Instance = UART5;
-  /* STM32-side RYLR998 remains at its factory UART baud rate.
-     The Arduino-side module may independently use 9600 baud. */
   huart5.Init.BaudRate = 115200;
   huart5.Init.WordLength = UART_WORDLENGTH_8B;
   huart5.Init.StopBits = UART_STOPBITS_1;
@@ -982,7 +981,7 @@ static void MX_USART6_UART_Init(void)
   huart6.Init.WordLength = UART_WORDLENGTH_8B;
   huart6.Init.StopBits = UART_STOPBITS_1;
   huart6.Init.Parity = UART_PARITY_NONE;
-  huart6.Init.Mode = UART_MODE_RX;
+  huart6.Init.Mode = UART_MODE_TX_RX;
   huart6.Init.HwFlowCtl = UART_HWCONTROL_NONE;
   huart6.Init.OverSampling = UART_OVERSAMPLING_16;
   if (HAL_UART_Init(&huart6) != HAL_OK)
@@ -1003,8 +1002,8 @@ static void MX_USART6_UART_Init(void)
 static void MX_GPIO_Init(void)
 {
   GPIO_InitTypeDef GPIO_InitStruct = {0};
-/* USER CODE BEGIN MX_GPIO_Init_1 */
-/* USER CODE END MX_GPIO_Init_1 */
+  /* USER CODE BEGIN MX_GPIO_Init_1 */
+  /* USER CODE END MX_GPIO_Init_1 */
 
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOC_CLK_ENABLE();
@@ -1013,30 +1012,40 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOD_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOC, CS2_Pin|CS3_Pin|INA_Pin|INB_Pin
-                          |INC_Pin|DRDY_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOC, CS2_Pin|CS3_Pin|INA1_Pin|INB1_Pin
+                          |INC1_Pin|INA2_Pin|DRDY_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(CS1_GPIO_Port, CS1_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOA, CS1_Pin|INB2_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pins : CS2_Pin CS3_Pin INA_Pin INB_Pin
-                           INC_Pin DRDY_Pin */
-  GPIO_InitStruct.Pin = CS2_Pin|CS3_Pin|INA_Pin|INB_Pin
-                          |INC_Pin|DRDY_Pin;
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(INC2_GPIO_Port, INC2_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pins : CS2_Pin CS3_Pin INA1_Pin INB1_Pin
+                           INC1_Pin INA2_Pin DRDY_Pin */
+  GPIO_InitStruct.Pin = CS2_Pin|CS3_Pin|INA1_Pin|INB1_Pin
+                          |INC1_Pin|INA2_Pin|DRDY_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : CS1_Pin */
-  GPIO_InitStruct.Pin = CS1_Pin;
+  /*Configure GPIO pins : CS1_Pin INB2_Pin */
+  GPIO_InitStruct.Pin = CS1_Pin|INB2_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(CS1_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-/* USER CODE BEGIN MX_GPIO_Init_2 */
-/* USER CODE END MX_GPIO_Init_2 */
+  /*Configure GPIO pin : INC2_Pin */
+  GPIO_InitStruct.Pin = INC2_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(INC2_GPIO_Port, &GPIO_InitStruct);
+
+  /* USER CODE BEGIN MX_GPIO_Init_2 */
+  /* USER CODE END MX_GPIO_Init_2 */
 }
 
 /* USER CODE BEGIN 4 */
@@ -1070,8 +1079,7 @@ void Error_Handler(void)
   }
   /* USER CODE END Error_Handler_Debug */
 }
-
-#ifdef  USE_FULL_ASSERT
+#ifdef USE_FULL_ASSERT
 /**
   * @brief  Reports the name of the source file and the source line number
   *         where the assert_param error has occurred.
