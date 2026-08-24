@@ -123,12 +123,18 @@ python -c "import jax; print(jax.devices())"
 
 ```bash
 python SW/mjx/train_competence_curriculum.py \
-  --run-name controller-body6d \
+  --run-name mixed-body6d \
   --flat-baseline-timesteps 1000000 \
   --stages 8 --stage-timesteps 5000000 \
   --level-progression sequential --wandb \
-  -- --num-envs 2048 --num-evals 20 --terrain-randomize
+  -- --num-envs 2048 --num-evals 20 --terrain-randomize --best-video
 ```
+
+이 명령은 flat baseline과 각 terrain stage를 W&B project
+`hexapod-rough-terrain`, group `mixed-body6d`의 별도 run으로 기록한다. 모든 run은 학습 0/25/50/75/100% 시점에 20초 영상을
+`progress/video`로 올리고, 같은 파일을 run별 `videos/progress/`에도 저장한다.
+`--progress-video-count`와 `--progress-video-duration`은 `--` 뒤 trainer 인자로
+조절한다. NEW_BEST GIF와 `best/*` 업로드도 독립적으로 계속 동작한다.
 
 이미 새 24-D/113-D flat checkpoint가 있으면 자동 baseline 대신 그것을 사용한다.
 

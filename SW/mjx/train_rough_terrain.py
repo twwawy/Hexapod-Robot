@@ -116,6 +116,15 @@ class ScoreMonitor:
         return score, is_best
 
 
+def progress_video_targets(count: int) -> tuple[float, ...]:
+    """Return deterministic 0..1 training fractions for trend snapshots."""
+    if count < 1:
+        raise ValueError("progress video count must be positive")
+    if count == 1:
+        return (1.0,)
+    return tuple(index / (count - 1) for index in range(count))
+
+
 def _arguments(default_task: str) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -319,11 +328,32 @@ def _arguments(default_task: str) -> argparse.Namespace:
             "command stage GIFs use the same directory."
         ),
     )
-    parser.add_argument("--best-video-duration", type=float, default=10.0)
-    parser.add_argument("--best-video-stage0-duration", type=float, default=10.0)
-    parser.add_argument("--best-video-stage1-duration", type=float, default=10.0)
-    parser.add_argument("--best-video-stage2-duration", type=float, default=12.0)
-    parser.add_argument("--best-video-full-duration", type=float, default=22.0)
+    parser.add_argument("--best-video-duration", type=float, default=20.0)
+    parser.add_argument("--best-video-stage0-duration", type=float, default=20.0)
+    parser.add_argument("--best-video-stage1-duration", type=float, default=20.0)
+    parser.add_argument("--best-video-stage2-duration", type=float, default=20.0)
+    parser.add_argument("--best-video-full-duration", type=float, default=20.0)
+    parser.add_argument(
+        "--progress-video",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help=(
+            "Save a deterministic 20-second policy snapshot at evenly spaced "
+            "training fractions and upload it to W&B progress/video."
+        ),
+    )
+    parser.add_argument(
+        "--progress-video-count",
+        type=int,
+        default=5,
+        help="Snapshots per run, evenly spaced from 0%% through 100%% (default: 5).",
+    )
+    parser.add_argument(
+        "--progress-video-duration",
+        type=float,
+        default=20.0,
+        help="Duration in seconds for every periodic progress snapshot.",
+    )
     parser.add_argument(
         "--stage-eval-envs",
         type=int,
@@ -616,6 +646,9 @@ def _write_run_metadata(args: argparse.Namespace, env: HexapodRoughTerrainEnv) -
             "monitor_dir": str(args.monitor_dir),
             "best_video_path": str(args.best_video_path),
             "best_video_paths": args.best_video_paths,
+            "progress_video_directory": str(args.progress_video_directory),
+            "progress_video_count": args.progress_video_count,
+            "progress_video_duration": args.progress_video_duration,
             "jax_version": jax.__version__,
             "mujoco_version": mujoco.__version__,
             "brax_version": brax_version,
@@ -749,6 +782,10 @@ def main(default_task: str = "terrain") -> None:
         raise SystemExit("--best-video-path must end with .gif")
     if args.stage_eval_envs < 1:
         raise SystemExit("--stage-eval-envs must be positive")
+    if not 1 <= args.progress_video_count <= 21:
+        raise SystemExit("--progress-video-count must be in 1..21")
+    if args.progress_video_duration <= 0:
+        raise SystemExit("--progress-video-duration must be positive")
     for duration_name in (
         "best_video_duration",
         "best_video_stage0_duration",
@@ -771,6 +808,9 @@ def main(default_task: str = "terrain") -> None:
     args.best_video_paths = {
         name: str(path.resolve()) for name, path in command_video_paths.items()
     }
+    args.progress_video_directory = (
+        args.best_video_path.parent / "progress"
+    ).resolve()
     for label, directory in (("--output", args.output), ("--monitor-dir", args.monitor_dir)):
         if directory.exists() and (
             not directory.is_dir() or any(directory.iterdir())
@@ -781,6 +821,13 @@ def main(default_task: str = "terrain") -> None:
     ]
     if existing_videos:
         raise SystemExit(f"refusing to overwrite existing best videos: {existing_videos}")
+    if args.progress_video_directory.exists() and any(
+        args.progress_video_directory.iterdir()
+    ):
+        raise SystemExit(
+            "refusing to mix progress videos into non-empty directory: "
+            f"{args.progress_video_directory}"
+        )
     print("JAX devices:", jax.devices())
     print(f"run={args.run_dir} contract={ACTION_CONTRACT_VERSION}")
     env = _make_env(args)
@@ -873,6 +920,9 @@ def main(default_task: str = "terrain") -> None:
         wandb_config["output"] = str(args.output)
         wandb_config["monitor_dir"] = str(args.monitor_dir)
         wandb_config["best_video_path"] = str(args.best_video_path)
+        wandb_config["progress_video_directory"] = str(
+            args.progress_video_directory
+        )
         wandb_config["init_checkpoint"] = (
             str(args.init_checkpoint) if args.init_checkpoint is not None else None
         )
@@ -904,6 +954,7 @@ def main(default_task: str = "terrain") -> None:
         wandb_run.define_metric("train/global_step")
         wandb_run.define_metric("eval/*", step_metric="train/global_step")
         wandb_run.define_metric("best/*", step_metric="train/global_step")
+        wandb_run.define_metric("progress/*", step_metric="train/global_step")
         if args.task == "terrain":
             wandb_run.summary["curriculum/stage"] = args.competence_stage
             wandb_run.summary["curriculum/terrain_level"] = args.terrain_level
@@ -922,17 +973,24 @@ def main(default_task: str = "terrain") -> None:
 
     latest_policy: dict[str, object] = {}
     pending_video: tuple[int, float] | None = None
+    pending_progress_videos: list[tuple[int, int, float]] = []
     best_video_metadata = args.monitor_dir / "best_video.json"
+    progress_video_history = args.monitor_dir / "progress_videos.jsonl"
     stage_metrics_latest = args.monitor_dir / "stage_metrics_latest.json"
     stage_metrics_history = args.monitor_dir / "stage_metrics_history.jsonl"
     latest_stage_metrics: dict[str, object] = {}
     stage_evaluators: dict[str, object] = {}
     progress_steps_seen: set[int] = set()
-    stage_durations = {
+    stage_video_durations = {
         "stage0": args.best_video_stage0_duration,
         "stage1": args.best_video_stage1_duration,
         "stage2": args.best_video_stage2_duration,
     }
+    # Metric evaluation remains compact even though user-facing videos are 20 s.
+    stage_eval_durations = {"stage0": 10.0, "stage1": 10.0, "stage2": 12.0}
+    progress_targets = progress_video_targets(args.progress_video_count)
+    next_progress_target = 0
+    rendered_progress_slots: set[int] = set()
 
     def evaluate_command_stages(step: int, make_policy, params) -> dict[str, float]:
         if args.task != "command":
@@ -943,7 +1001,7 @@ def main(default_task: str = "terrain") -> None:
                 stage_evaluators[name] = make_policy_evaluator(
                     env=scripted_envs[name],
                     make_policy=make_policy,
-                    duration=stage_durations[name],
+                    duration=stage_eval_durations[name],
                     num_envs=args.stage_eval_envs,
                     seed=args.seed + 10_000 + index * 100,
                 )
@@ -978,9 +1036,13 @@ def main(default_task: str = "terrain") -> None:
             return False
         if args.task == "command":
             render_specs = (
-                ("stage0", scripted_envs["stage0"], stage_durations["stage0"]),
-                ("stage1", scripted_envs["stage1"], stage_durations["stage1"]),
-                ("stage2", scripted_envs["stage2"], stage_durations["stage2"]),
+                (
+                    "stage0",
+                    scripted_envs["stage0"],
+                    stage_video_durations["stage0"],
+                ),
+                ("stage1", scripted_envs["stage1"], stage_video_durations["stage1"]),
+                ("stage2", scripted_envs["stage2"], stage_video_durations["stage2"]),
                 ("full", scripted_envs["full"], args.best_video_full_duration),
             )
         else:
@@ -1063,8 +1125,144 @@ def main(default_task: str = "terrain") -> None:
             wandb_run.log(video_payload)
         return True
 
+    def save_progress_video(step: int, slot: int, target_fraction: float) -> bool:
+        """Render one fixed progress snapshot once the matching policy is available."""
+        if not args.progress_video or slot in rendered_progress_slots:
+            return True
+        if latest_policy.get("step") != step:
+            return False
+
+        target_percent = int(round(100.0 * target_fraction))
+        if args.task == "command":
+            video_env = scripted_envs["full"]
+            stage_token = "flat"
+            terrain_name = "flat"
+            overlay_title = f"Progress {target_percent}% | Flat baseline"
+        else:
+            if terrain_video_env is None:
+                raise RuntimeError("terrain video environment was not initialized")
+            video_env = terrain_video_env
+            terrain_name = args.terrain_layout
+            if args.competence_stage is None:
+                stage_token = f"level{args.terrain_level}"
+                stage_label = f"L{args.terrain_level}"
+            else:
+                stage_token = (
+                    f"stage{args.competence_stage:02d}_level{args.terrain_level}"
+                )
+                stage_label = (
+                    f"S{args.competence_stage:02d} L{args.terrain_level}"
+                )
+            overlay_title = (
+                f"Progress {target_percent}% | {stage_label} | "
+                f"Stairs {100.0 * env._config.terrain.stair_total_rise:.1f}cm total"
+            )
+
+        output_path = args.progress_video_directory / (
+            f"{stage_token}_p{target_percent:03d}_step{step:012d}.gif"
+        )
+        record = {
+            "task": args.task,
+            "competence_stage": args.competence_stage,
+            "terrain_level": args.terrain_level if args.task == "terrain" else None,
+            "slot": slot,
+            "target_fraction": target_fraction,
+            "target_percent": target_percent,
+            "step": step,
+            "path": str(output_path),
+            "wandb_key": "progress/video",
+            "updated_at_utc": datetime.now(timezone.utc).isoformat(),
+        }
+        try:
+            video_path = render_policy_video(
+                env=video_env,
+                make_policy=latest_policy["make_policy"],
+                params=latest_policy["params"],
+                output=output_path,
+                seed=args.seed,
+                duration=args.progress_video_duration,
+                fps=args.best_video_fps,
+                width=args.best_video_width,
+                height=args.best_video_height,
+                terrain=terrain_name,
+                overlay_title=overlay_title,
+            )
+        except Exception as exc:
+            # A renderer/encoder failure must not discard a long PPO stage.
+            record["error"] = f"{type(exc).__name__}: {exc}"
+            print(
+                f"progress_video_error target={target_percent}% step={step:,}: "
+                f"{record['error']}"
+            )
+            with progress_video_history.open("a", encoding="utf-8") as history:
+                history.write(json.dumps(record, sort_keys=True) + "\n")
+            return True
+
+        rendered_progress_slots.add(slot)
+        record["path"] = str(video_path)
+        record["error"] = None
+        with progress_video_history.open("a", encoding="utf-8") as history:
+            history.write(json.dumps(record, sort_keys=True) + "\n")
+        print(
+            f"progress_video target={target_percent}% step={step:,}: {video_path}"
+        )
+
+        if wandb_run is not None and wandb_module is not None:
+            stage_caption = (
+                "flat baseline"
+                if args.task == "command"
+                else (
+                    f"stage {args.competence_stage}, level {args.terrain_level}"
+                    if args.competence_stage is not None
+                    else f"terrain level {args.terrain_level}"
+                )
+            )
+            wandb_run.log(
+                {
+                    "progress/video": wandb_module.Video(
+                        str(video_path),
+                        format="gif",
+                        caption=(
+                            f"{stage_caption} | target={target_percent}% | "
+                            f"step={step:,}"
+                        ),
+                    ),
+                    "train/global_step": step,
+                    "progress/target_fraction": target_fraction,
+                    "progress/target_percent": target_percent,
+                    "progress/video_step": step,
+                    "progress/curriculum_stage": (
+                        -1
+                        if args.competence_stage is None
+                        else args.competence_stage
+                    ),
+                    "progress/terrain_level": (
+                        args.terrain_level if args.task == "terrain" else -1
+                    ),
+                }
+            )
+            wandb_run.summary["progress/videos_rendered"] = len(
+                rendered_progress_slots
+            )
+            wandb_run.summary["progress/last_video_step"] = step
+        return True
+
+    def schedule_progress_videos(step: int) -> None:
+        nonlocal next_progress_target
+        if not args.progress_video:
+            return
+        while next_progress_target < len(progress_targets):
+            target_fraction = progress_targets[next_progress_target]
+            target_step = int(round(args.timesteps * target_fraction))
+            if step < target_step:
+                break
+            request = (step, next_progress_target, target_fraction)
+            if not save_progress_video(*request):
+                pending_progress_videos.append(request)
+            next_progress_target += 1
+
     def policy_params(step: int, make_policy, params) -> None:
-        nonlocal pending_video
+        nonlocal pending_video, pending_progress_videos
         latest_policy["step"] = step
         latest_policy["make_policy"] = make_policy
         latest_policy["params"] = params
@@ -1077,6 +1275,13 @@ def main(default_task: str = "terrain") -> None:
         if pending_video is not None and pending_video[0] == step:
             save_best_video(*pending_video)
             pending_video = None
+        still_pending = []
+        for requested_step, slot, target_fraction in pending_progress_videos:
+            if requested_step <= step:
+                save_progress_video(step, slot, target_fraction)
+            else:
+                still_pending.append((requested_step, slot, target_fraction))
+        pending_progress_videos = still_pending
 
     def progress(step: int, metrics) -> None:
         nonlocal pending_video
@@ -1104,6 +1309,7 @@ def main(default_task: str = "terrain") -> None:
                 # At step 0 Brax reports evaluation before exposing policy
                 # params.  policy_params() renders it immediately afterward.
                 pending_video = (step, score)
+        schedule_progress_videos(step)
 
     train = functools.partial(
         ppo.train,
@@ -1143,6 +1349,21 @@ def main(default_task: str = "terrain") -> None:
     )
     try:
         train(environment=env)
+        # PPO normally evaluates at the exact requested final step.  If its
+        # batching rounded differently, still provide every requested trend
+        # slot using the final policy instead of silently omitting 100%.
+        if args.progress_video and latest_policy:
+            final_step = int(latest_policy["step"])
+            for _, slot, target_fraction in pending_progress_videos:
+                save_progress_video(final_step, slot, target_fraction)
+            pending_progress_videos.clear()
+            while next_progress_target < len(progress_targets):
+                save_progress_video(
+                    final_step,
+                    next_progress_target,
+                    progress_targets[next_progress_target],
+                )
+                next_progress_target += 1
     finally:
         if wandb_run is not None:
             wandb_run.finish()

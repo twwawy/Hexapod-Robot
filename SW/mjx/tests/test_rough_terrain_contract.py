@@ -65,6 +65,7 @@ from tripod_controller import (  # noqa: E402
 )
 from domain_randomization import domain_randomize  # noqa: E402
 from best_policy_video import make_policy_evaluator  # noqa: E402
+from train_rough_terrain import progress_video_targets  # noqa: E402
 from terrain_curriculum import TERRAIN_LEVELS  # noqa: E402
 from urdf_kinematics import (  # noqa: E402
     FOOT_COLLISION_RADIUS,
@@ -82,6 +83,12 @@ SHOULDER_LATERAL = jp.array(
 
 
 class RoughTerrainContractTest(unittest.TestCase):
+    def test_progress_video_targets_cover_quarters(self) -> None:
+        self.assertEqual(progress_video_targets(5), (0.0, 0.25, 0.5, 0.75, 1.0))
+        self.assertEqual(progress_video_targets(1), (1.0,))
+        with self.assertRaises(ValueError):
+            progress_video_targets(0)
+
     def test_fixed_action_and_observation_contract(self) -> None:
         self.assertEqual(FOOT_RESIDUAL_SIZE, 18)
         self.assertEqual(BODY_RESIDUAL_SIZE, 6)

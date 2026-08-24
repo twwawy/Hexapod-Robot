@@ -68,6 +68,11 @@ def parse_args() -> tuple[argparse.Namespace, list[str]]:
     parser.add_argument("--demote-threshold", type=float, default=0.50)
     parser.add_argument("--wandb", action="store_true")
     parser.add_argument(
+        "--wandb-project",
+        default="hexapod-rough-terrain",
+        help="Shared W&B project for the flat baseline and every terrain stage.",
+    )
+    parser.add_argument(
         "trainer_args",
         nargs=argparse.REMAINDER,
         help="Additional train_rough_terrain.py arguments after '--'.",
@@ -173,6 +178,8 @@ def main() -> None:
             str(args.run_root.expanduser().resolve()),
             "--wandb-group",
             args.run_name,
+            "--wandb-project",
+            args.wandb_project,
         ]
         if args.wandb:
             baseline_command.append("--wandb")
@@ -205,6 +212,8 @@ def main() -> None:
                 "best_video": str(
                     baseline_run / "videos" / "best_curriculum_full.gif"
                 ),
+                "progress_videos": str(baseline_run / "videos" / "progress"),
+                "wandb_progress_video_key": "progress/video",
             }
         )
         temporary = state_path.with_suffix(".json.tmp")
@@ -256,6 +265,8 @@ def main() -> None:
             str(args.run_root.expanduser().resolve()),
             "--wandb-group",
             args.run_name,
+            "--wandb-project",
+            args.wandb_project,
         ]
         if args.wandb:
             command.append("--wandb")
@@ -299,6 +310,8 @@ def main() -> None:
             "checkpoint": str(init_checkpoint),
             "best_video": str(run_dir / "videos" / "best_policy.gif"),
             "wandb_video_key": f"best/video_stage{stage:02d}_level{level}",
+            "progress_videos": str(run_dir / "videos" / "progress"),
+            "wandb_progress_video_key": "progress/video",
         }
         history.append(record)
         temporary = state_path.with_suffix(".json.tmp")

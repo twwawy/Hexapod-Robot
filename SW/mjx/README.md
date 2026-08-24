@@ -116,7 +116,7 @@ python SW/mjx/train_rough_terrain.py \
 python SW/mjx/train_competence_curriculum.py \
   --run-name mixed-body6d --flat-baseline-timesteps 1000000 \
   --stages 8 --stage-timesteps 5000000 --level-progression sequential --wandb \
-  -- --num-envs 2048 --num-evals 20 --terrain-randomize
+  -- --num-envs 2048 --num-evals 20 --terrain-randomize --best-video
 ```
 
 Mixed terrain level은 경사면과 계단을 함께 올립니다. `--terrain-randomize` 사용 시
@@ -158,6 +158,13 @@ competence run은 각 stage의 로컬 `videos/best_policy.gif`를 유지하고 W
 실제 계단 전체 상승 높이가 표시됩니다. 비교 가능한 ascent 영상을 위해 mixed-terrain best
 video는 항상 stairs lane과 직진 명령(`v=0.08 m/s`, `yaw=0`)으로 렌더링합니다.
 
+추세 영상은 기본으로 모든 run의 0/25/50/75/100%에서 각각 20초씩 저장됩니다.
+Flat baseline과 competence stage 0~7은 W&B project `hexapod-rough-terrain`의 같은
+group 안에 있는 독립 run이고, 각 run의 `progress/video` history에서 시점별 영상을 넘겨볼 수 있습니다. 로컬 파일은
+`videos/progress/`에 보존됩니다. 개수와 길이는 `--progress-video-count 5`,
+`--progress-video-duration 20`으로 바꿀 수 있고, 필요 없으면 `--no-progress-video`를
+trainer 인자(`--` 뒤)에 지정합니다. NEW_BEST 영상은 이와 별도로 유지됩니다.
+
 `--level-progression sequential`은 Stage 0/1/2/3/4를 Level 0/1/2/3/4로
 확실히 올린 뒤 Level 4를 유지합니다. 기본값 `competence`는 평가 성공률이 0.8을
 넘을 때만 승급하므로 어려운 level에 도달하지 못할 수 있습니다.
@@ -165,7 +172,7 @@ video는 항상 stairs lane과 직진 명령(`v=0.08 m/s`, `yaw=0`)으로 렌더
 같은 `--run-name`을 다시 사용해도 timestamp suffix 때문에 기존 checkpoint/monitor와
 섞이지 않습니다. `--best-video-path`를 생략하면 새 run directory 안에 저장됩니다.
 
-Command 영상은 기본 Stage 0/1/2/full이 각각 `10/10/12/22초`이며 모든 frame에
+Command NEW_BEST 영상은 기본 Stage 0/1/2/full이 각각 `20초`이며 모든 frame에
 stage, `v_cmd/v`, `yaw_cmd/yaw` overlay가 들어갑니다. Full 영상은 stage 전환을
 0.8초 banner로 표시합니다. 길이는 `--best-video-stage0-duration` 등으로, 공통 품질은
 `--best-video-fps`, `--best-video-width`, `--best-video-height`로 바꿉니다. 영상이

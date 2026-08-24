@@ -259,10 +259,10 @@ def render_policy_video(
 ) -> Path:
     """Render deterministic policy inference using the exact MJX task env.
 
-    The trainer calls this only after a new evaluation best.  Dynamics and
-    observations stay in MJX; only sparse frames are copied to ``MjData`` for
-    MuJoCo's renderer.  GIF uses Pillow in-process, avoiding an ffmpeg fork
-    after JAX has created worker threads.
+    The trainer calls this for evaluation-best and fixed-progress snapshots.
+    Dynamics and observations stay in MJX; only sparse frames are copied to
+    ``MjData`` for MuJoCo's renderer.  GIF uses Pillow in-process, avoiding an
+    ffmpeg fork after JAX has created worker threads.
     """
     if duration <= 0:
         raise ValueError("video duration must be greater than zero")
@@ -277,7 +277,7 @@ def render_policy_video(
 
     output = output.resolve()
     if output.suffix.lower() != ".gif":
-        raise ValueError("best-policy video output must end with .gif")
+        raise ValueError("policy video output must end with .gif")
     output.parent.mkdir(parents=True, exist_ok=True)
     temporary = output.with_name(f".{output.stem}.tmp{output.suffix}")
     temporary.unlink(missing_ok=True)
@@ -345,7 +345,7 @@ def render_policy_video(
         renderer.close()
 
     if not frames:
-        raise RuntimeError("No frames were rendered for the best-policy video")
+        raise RuntimeError("No frames were rendered for the policy video")
     frames[0].save(
         temporary,
         save_all=True,

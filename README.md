@@ -111,12 +111,12 @@ $PY SW/mjx/train_rough_terrain.py \
 
 ```bash
 $PY SW/mjx/train_competence_curriculum.py \
-  --run-name mixed-competence \
+  --run-name mixed-body6d \
   --flat-baseline-timesteps 1000000 \
   --stages 8 --stage-timesteps 5000000 \
-  --start-level 0 --max-level 4 \
+  --level-progression sequential \
   --wandb \
-  -- --num-envs 2048 --num-evals 20 --terrain-randomize
+  -- --num-envs 2048 --num-evals 20 --terrain-randomize --best-video
 ```
 
 Checkpoint·monitor·GIF는 run directory(`SW/mjx/runs/<task>/<name>_<timestamp>_seed<seed>/`)에
@@ -133,6 +133,8 @@ Checkpoint·monitor·GIF는 run directory(`SW/mjx/runs/<task>/<name>_<timestamp>
 - 프로젝트 URL: `https://wandb.ai/<내-entity>/<project>`
   - flat command 학습 → project `hexapod-command-curriculum`
   - mixed terrain 학습 → project `hexapod-rough-terrain`
+  - competence launcher → baseline과 모든 stage를 project
+    `hexapod-rough-terrain`, group `<run-name>`에 함께 기록
   - legacy wrapper(`residual_rl_run.sh`) → project `hexapod-residual-rl`
   - entity 없이 로그인했다면 URL에서 entity 부분이 개인 계정명이 된다.
 - 공통 x축은 `train/global_step`이다. Panels에서 x축을 이 값으로 고정하면
@@ -149,6 +151,14 @@ Checkpoint·monitor·GIF는 run directory(`SW/mjx/runs/<task>/<name>_<timestamp>
 | `best/*` | NEW_BEST 시점 스냅샷 지표 |
 | `best/video_stage0_forward` ~ `best/video_curriculum_full` | flat run 최고 policy GIF (stage별 + 전체) |
 | `best/video` | terrain run 최고 policy GIF (`videos/best_policy.gif`와 동일) |
+| `progress/video` | 각 flat/stage run의 0·25·50·75·100% 시점 20초 GIF 추세 |
+
+위 curriculum 명령은 flat baseline과 terrain stage 0~7을 W&B project
+`hexapod-rough-terrain`의 group `mixed-body6d` 아래 별도 run으로 묶는다. 각 run의 `progress/video` panel에는 학습
+0/25/50/75/100% 시점 영상이 순서대로 쌓이며, 로컬 원본은 각 run의
+`videos/progress/`에 남는다. 기본은 run당 5개·각 20초이고
+`--progress-video-count`, `--progress-video-duration`으로 조절할 수 있다. NEW_BEST
+영상도 별도 `best/*` 키로 계속 저장된다.
 
 Adaptive launcher는 `eval/episode_terrain_success`(evaluation success)가 0.8보다
 크면 level을 올리고 0.5보다 낮으면 내린다. Competence curriculum 진행 상황도 이
