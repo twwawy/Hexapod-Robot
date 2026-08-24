@@ -13,7 +13,7 @@ tags:
   - brax
   - wandb
 status: active
-updated: 2026-08-23
+updated: 2026-08-24
 canonical_source: /home/huro/Downloads/mjx
 ---
 
@@ -22,8 +22,8 @@ canonical_source: /home/huro/Downloads/mjx
 > [!abstract]
 > 이 노트는 `~/Downloads/mjx` 업데이트를 `SW/mjx/`에 반영한 현재 canonical MJX 경로를 설명한다. 상세 최신 계약은 [[RESIDUAL_RL]]이며, **평지 보행+회전**과 **mixed-terrain competence curriculum**을 분리한다.
 
-> [!warning] 이전 6-D 실험과 호환되지 않음
-> 이전 custom 경로는 `6-D Δz` action과 `62-D observation`을 사용했다. 현재 경로는 `22-D action`, `110-D observation`, mesh-free flat/mixed scene 및 Brax PPO를 사용한다. 현재 observation semantic contract가 없는 옛 checkpoint는 transfer하지 않는다.
+> [!warning] 이전 6-D 및 22-D 실험과 호환되지 않음
+> 현재 경로는 `24-D action`, `113-D observation`과 body 6-DOF residual을 사용한다. `classical_wbc_cartesian_body6d_residual_v1` 이전 checkpoint는 transfer하지 않는다.
 
 ## 이 노트를 보는 방법
 
@@ -38,11 +38,11 @@ canonical_source: /home/huro/Downloads/mjx
 | 평지 command scene | `SW/mjx/generated/hexapod_flat_rl.xml`, mesh 0개 |
 | mixed terrain scene | `SW/mjx/generated/hexapod_mixed_rl.xml`, mesh 0개 |
 | RL collider | torso box, leg capsule, foot sphere, terrain box |
-| Nominal controller | tripod + quintic timing + analytical 3-DOF IK + position actuator |
-| Policy | 18 raw foot actions → swing XYZ / stance Z-only + 4 bounded gait residual |
-| Action contract | `cartesian_gait_residual_v2`; old v1 checkpoint resume 금지 |
-| Observation contract | `body_state_coarse9_touchdown6_v1` |
-| Action / observation | `22 / 110` |
+| Nominal controller | Position/Heading PI + PULL/Bezier tripod + posture PI + analytical 3-DOF IK |
+| Policy | 18 foot residual + body translation/rotation 6-DOF residual |
+| Action contract | `classical_wbc_cartesian_body6d_residual_v1`; 이전 checkpoint 금지 |
+| Observation contract | `body_state_command3_coarse9_touchdown6_v2` |
+| Action / observation | `24 / 113` |
 | Physics | MuJoCo 3.12, MJX, `sim_dt=0.0025`, `ctrl_dt=0.02` |
 | PPO | Brax PPO + `mujoco_playground` |
 | 평지 학습 | `train_command_curriculum.py --wandb` |
@@ -53,10 +53,12 @@ canonical_source: /home/huro/Downloads/mjx
 핵심 식:
 
 ```text
-p_cmd,i = Π_workspace(contact_adapter(p_nominal,i + M_phase/contact Δp_RL,i))
+p_cmd,i = Π_workspace(R_body^T(contact_adapter(p_nominal,i + M_i Δp_RL,i) - t_body))
 ```
 
-RL은 관절 토크를 직접 만들지 않는다. classical tripod가 phase·stance/swing·IK를 소유하고, RL은 swing XYZ 또는 stance의 작은 Z만 보정한다. 안전 우선순위는 `joint/rate safety > contact adaptation > RL > nominal`이다.
+RL은 관절 토크나 gait parameter를 직접 만들지 않는다. 고전제어기가 PI, phase,
+stance/swing, contact, posture와 IK를 소유하고 RL은 발과 body 6-DOF를 작게 보정한다.
+안전 우선순위는 `joint/rate safety > contact adaptation > residual > nominal`이다.
 
 ## 레포 지도
 
@@ -73,7 +75,7 @@ Hexapod-Robot/
 │   ├── view_robot.py                # CAD scene viewer
 │   ├── run_controller.py            # 평지 nominal gait demo
 │   ├── view_rl_scene.py             # 계단 zero-residual viewer/GIF
-│   ├── rough_terrain_env.py         # 공용 22-D residual environment
+│   ├── rough_terrain_env.py         # 공용 24-D foot/body residual environment
 │   ├── command_curriculum_env.py    # flat 보행+회전 curriculum task
 │   ├── train_command_curriculum.py  # flat curriculum entry point
 │   ├── train_rough_terrain.py       # mixed terrain entry point + Brax PPO/W&B
@@ -127,9 +129,9 @@ STEP_COUNT   = 7
 ```text
 command → Classical Tripod Controller → nominal local foot target
                                            ↓
-                         RL: swing XYZ / stance Z-only + bounded gait residual
+                       RL: swing XYZ / stance Z-only + body pose 6-DOF
                                            ↓
-                   Contact adaptation → workspace projection → analytical IK
+             Contact/posture PI → whole-body workspace gate → analytical IK
                                            ↓
                                 joint/rate limit → position actuator
 ```
@@ -147,23 +149,22 @@ action 의미가 바뀌지 않도록 두 task 모두 swing XY ±25/±15 mm, Z �
 stance Z ±8 mm를 사용한다. Flat에서는 residual penalty만 더 강하다.
 기존 v1 `(±40, ±30, ±90 mm)` checkpoint는 재개하지 않는다.
 
-## Action 22차원
+## Action 24차원
 
 | 범위 | 의미 |
 |---|---|
 | 0:18 | RF, RM, RB, LF, LM, LB raw local foot action → swing XYZ / stance Z-only |
-| 18 | 보폭 scale: raw 0.8~1.2, 최종 horizontal stroke ≤120 mm |
-| 19 | gait frequency scale: 0.85~1.15 |
-| 20 | global swing height: 50~110 mm |
-| 21 | radial offset: 5~25 mm |
+| 18:21 | body forward/lateral/height, 최대 ±50/±50/±100 mm |
+| 21:24 | body roll/pitch/yaw, 최대 ±45/±45/±25 deg |
 
-정책 행동은 `[-1, 1]`로 제한한다. 위상 자체를 매 주기 직접 출력하게 하지 않고
-주파수만 제한적으로 바꾸므로 Tripod A/B 순서와 기본 안정성은 유지된다. `a=0`은
-nominal gait와 동일한 target을 만든다.
+정책 행동은 `[-1, 1]`로 제한한다. gait phase/frequency/stride/swing height/radial은
+정책 action에서 제거했다. Body 후보는 single posture PI와 6-leg workspace gate를
+통과할 때만 적용하므로 Tripod A/B 순서와 기본 안정성은 유지된다. `a=0`은 nominal
+controller와 동일하다.
 
 ## Observation
 
-- 목표 전진 속도와 목표 Yaw rate
+- 목표 전진·측방 속도와 목표 Yaw rate
 - 몸체 선속도·각속도와 중력 방향
 - 18개 관절 위치·속도
 - 6개 발 위치와 접촉 추정값
@@ -174,8 +175,8 @@ nominal gait와 동일한 target을 만든다.
 ## Reward와 종료
 
 주 보상은 목표 선속도·Yaw rate 추종이다. Upright, 몸체 높이 및 전진 진행을
-보상하고 swing/stance/gait residual과 각각의 action-rate, torque, torque saturation,
-slip, body/self contact,
+보상하고 swing/stance foot residual, body translation/rotation과 각각의 action-rate,
+torque, torque saturation, slip, body/self contact,
 workspace projection을 분리된 penalty로 둔다. 몸체가 지면에 너무 가까워지거나 크게 기울면 episode를
 종료한다.
 
@@ -198,11 +199,11 @@ episode stage는 다음 command 범위를 제공한다.
 
 실제 command는 stage의 고정 순서를 암기하지 못하도록 1.5–4.0초마다 범위 안에서
 무작위로 다시 sample한다. policy는 항상 현재 command를
-observation의 첫 2개 값으로 받으며, 22D residual action과 nominal tripod/IK는 바뀌지 않는다.
+observation의 첫 3개 값으로 받으며, 24D residual action과 nominal controller/IK는 바뀌지 않는다.
 따라서 “보행 policy”와 “회전 policy”를 이어 붙이는 구조가 아니다.
 
-120 mm stride와 최대 `1.15×` frequency에서 fastest-foot 속도 한계는 약
-`0.276 m/s`다. `0.27 m/s`와 큰 yaw를 동시에 요구하지 않도록 각 forward speed에서
+140 mm controller-owned stride에서 fastest-foot 속도 한계는 약 `0.28 m/s`다.
+`0.27 m/s`와 큰 lateral/yaw를 동시에 요구하지 않도록 각 합성 선속도에서
 가능한 yaw 범위를 자동 계산한다. 따라서 최고속도는 사실상 직진으로 평가하고,
 `±0.30 rad/s` 회전은 `0.14 m/s` 고정 평가에서 좌우 각각 확인한다.
 
@@ -213,9 +214,10 @@ reset마다 선택하고, 9D coarse grid와 6D nominal touchdown height를 사�
 `train_competence_curriculum.py`는 evaluation success가 0.8보다 높으면 level을 올리고
 0.5보다 낮으면 내린 뒤 직전 checkpoint를 다음 stage에 전달한다.
 
-1. 20~50 mm 랜덤 단차
-2. 계단 높이·폭·마찰과 로봇 질량 domain randomization
-3. 외란, 센서 노이즈, actuator 지연
+1. flat에서 짧게 controller-following baseline/residual 학습
+2. blocks/rough를 먼저 늘리고 stairs 확률은 0%에서 시작
+3. 계단 전체 누적 상승을 4 → 8 → 12 → 16 → 20 cm로 증가
+4. 마지막에 마찰·질량·actuator/damping model gap 추가
 
 ---
 
@@ -494,10 +496,10 @@ full 영상의 5초·10초 경계에는 0.8초 전환 banner가 나온다. W&B M
 | network | `--network-layers` | 기본 `256 256 128`; OOM이면 `192 128` |
 | nominal gait | `--phase-time --base-swing-height --base-radial-offset` | controller 자체가 바뀌므로 기존 run과 직접 비교하지 않음 |
 | RL foot 권한 | `--swing-x --swing-y --swing-z-low --swing-z-high --stance-z` | active task만 override; stance XY는 항상 0 |
-| RL gait 권한 | `--stride-half-range --frequency-half-range --swing-height-min --swing-height-max --radial-min --radial-max --gait-filter-time-constant` | 기본 stride `0.8…1.2×`, frequency `0.85…1.15×`, filter `0.15 s` |
+| RL body 권한 | `--body-translation-limit --body-rotation-limit-deg --body-filter-time-constant` | body 6-DOF만 override; gait parameter는 제어기 소유 |
 | terrain command 범위 | `--terrain-speed-min --terrain-speed-max --terrain-yaw-limit` | stairs/mixed terrain task에서 사용 |
 | terrain 난이도 | `--terrain-layout --terrain-level --terrain-randomize` | mixed patch 확률 + level 4 per-env dynamics |
-| policy transfer | `--init-checkpoint` | 동일 22/110 semantic contract의 flat policy로 terrain 초기화 |
+| policy transfer | `--init-checkpoint` | 동일 24/113 semantic contract의 flat policy로 terrain 초기화 |
 | run 관리 | `--run-name --run-root` | checkpoint/monitor/video/config/metadata를 한 run directory에 저장 |
 | 평지 curriculum 길이 | `--curriculum-forward-only-steps --curriculum-limited-yaw-steps` | 기본 `250 250`, 마지막 stage는 episode 끝까지 |
 | 평지 curriculum 범위 | `--curriculum-speed-min`, `--curriculum-speed-max`, `--curriculum-yaw-limit` | 각 stage 순서의 값 3개 |
@@ -522,38 +524,38 @@ python SW/mjx/train_command_curriculum.py \
 
 ---
 
-## Action 22차원: index와 단위
+## Action 24차원: index와 단위
 
 정책 action은 먼저 `[-1, 1]`로 clip된다.
 
 | index | 수량 | 의미 | 변환 후 범위 |
 | --- | ---: | --- | --- |
 | `0:18` | 6×3 | `RF, RM, RB, LF, LM, LB` local foot `(x,y,z)` | swing XYZ; stance `(0,0,Δz)` only |
-| `18` | 1 | stride scale | raw `0.8 … 1.2`; forward+yaw fastest-leg stroke `≤120 mm` |
-| `19` | 1 | gait frequency scale | `0.85 … 1.15` |
-| `20` | 1 | global swing height | `50…110 mm`, 두 task 동일 |
-| `21` | 1 | radial offset | `5…25 mm`, 두 task 동일 |
+| `18:21` | 3 | body forward/lateral/height | `±50/±50/±100 mm` |
+| `21:24` | 3 | body roll/pitch/yaw | `±45/±45/±25 deg` |
 
 발 residual의 실제 계산은 다음과 같다.
 
 ```text
 raw_i = clip(action[3i:3i+3], -1, 1)
 Δp_i = swing ? [Δx, Δy, Δz_asymmetric] : [0, 0, Δz_stance]
-p_cmd = workspace_projection(contact_adapter(p_nominal + blend × Δp_i))
+p_cmd = workspace_projection(body_pose_overlay(contact_adapter(p_nominal + blend × Δp_i)))
 ```
 
-`blend`는 reset 후 약 0.75초 동안 0에서 1로 증가한다. `a=0`이면 residual/gait correction도 0이므로 nominal controller와 일치한다. early landing hold, lost-contact search, workspace projection, joint/rate limit은 RL보다 우선한다.
+`blend`는 reset 후 약 0.75초 동안 0에서 1로 증가한다. `a=0`이면 foot/body
+residual이 0이므로 nominal controller와 일치한다. early landing hold, late search,
+body candidate hold, workspace projection, joint jump/rate limit은 RL보다 우선한다.
 
 ---
 
-## Observation 110차원
+## Observation 113차원
 
 `rough_terrain_env.py`의 `_get_obs()`는 아래를 순서대로 concatenate한다. 평지
-curriculum도 동일한 110D semantic contract를 쓰며 terrain feature 15D는 0이다.
+curriculum도 동일한 113D semantic contract를 쓰며 terrain feature 15D는 0이다.
 
 | 항목 | 차원 | 내용 |
 | --- | ---: | --- |
-| command | 2 | target forward speed, yaw rate |
+| command | 3 | target forward/lateral speed, yaw rate |
 | local linear velocity | 3 | body local frame 속도 |
 | angular velocity | 3 | base angular velocity |
 | local gravity | 3 | IMU attitude 대체값 |
@@ -564,12 +566,12 @@ curriculum도 동일한 110D semantic contract를 쓰며 terrain feature 15D는 
 | coarse terrain | 9 | body heading 기준 3×3, support height 상대값 |
 | touchdown terrain | 6 | classical nominal landing 위치의 support-relative 높이 |
 | phase | 2 | `sin/cos(2πphase)` |
-| last action | 22 | 이전 policy action |
-| **합계** | **110** | policy input |
+| last action | 24 | 이전 policy action |
+| **합계** | **113** | policy input |
 
 Touchdown feature는 grid·body pose·phase를 network가 다시 조합하지 않아도 각 leg의
 다음 nominal landing 높이를 직접 알게 한다. Observation 크기는 같아도 의미가 바뀌었으므로
-metadata의 `body_state_coarse9_touchdown6_v1`을 반드시 확인한다.
+metadata의 `body_state_command3_coarse9_touchdown6_v2`를 반드시 확인한다.
 
 ---
 
@@ -606,13 +608,17 @@ Tripod A는 `RF, RB, LM`, complement tripod은 `RM, LF, LB`이다. policy는 act
 
 ```text
 L1 = 0.074 m
-L2 = 0.121 m
+shoulder lateral = ±0.0329 m
+shoulder vertical = -0.0329 m
+L2 = 0.124 m
 L3 = 0.230 m
 
-θ1 = atan2(y, x)
-ρ  = sqrt(x²+y²) - L1
-cos(θ3) = (ρ² + z² - L2² - L3²) / (2 L2 L3)
-θ2 = atan2(z, ρ) - atan2(L3 sinθ3, L2 + L3 cosθ3)
+r_planar = sqrt(x²+y²-lateral²)
+θ1 = atan2(y, x) - atan2(lateral, r_planar)
+ρ  = r_planar - L1
+z_planar = z - shoulder_vertical
+cos(θ3) = (ρ² + z_planar² - L2² - L3²) / (2 L2 L3)
+θ2 = atan2(-z_planar, ρ) - atan2(L3 sinθ3, L2 + L3 cosθ3)
 ```
 
 마지막에 servo angle은 raw URDF joint axis로 변환된다. right leg와 left leg의 sign이 다르므로 `RIGHT_LEGS` 변환은 절대 생략하지 않는다.
@@ -630,8 +636,9 @@ cos(θ3) = (ρ² + z² - L2² - L3²) / (2 L2 L3)
 | progress | 보상 | 실제 전진 진행 |
 | swing_residual | penalty | swing에서만 필요한 Cartesian 보정 사용 |
 | stance_residual | penalty | nominal stance를 덮는 Z 보정; swing보다 더 비쌈 |
-| gait_residual | penalty | stride/frequency/height/radial deviation 분리 |
-| foot/gait_action_rate | penalty | foot 보정 및 gait parameter의 50 Hz 흔들림 억제 |
+| body_translation_residual | penalty | body XYZ 보정 사용량 |
+| body_rotation_residual | penalty | body roll/pitch/yaw 보정 사용량 |
+| foot/body_action_rate | penalty | foot/body residual의 50 Hz 흔들림 억제 |
 | vertical/lateral velocity | penalty | bounce, sideways drift 억제 |
 | joint_velocity | penalty | 불필요한 관절 고속 운동 억제 |
 | torque | penalty | `mean((actuator_force / 8 Nm)^2)` |
@@ -645,13 +652,13 @@ cos(θ3) = (ρ² + z² - L2² - L3²) / (2 L2 L3)
 episode는 아래 조건에서 끝난다.
 
 ```text
-up_z < 0.35
+abs(roll) or abs(pitch) >= 80 deg
 or base clearance above terrain < 0.14 m
 or qpos/qvel contains NaN
 ```
 
 reward만 높다고 좋은 정책은 아니다. `swing_residual`, `stance_residual`,
-`gait_residual`, `slip`, `torque`, `torque_saturation`, `self_collision`,
+`body_translation_residual`, `body_rotation_residual`, `slip`, `torque`, `torque_saturation`, `self_collision`,
 `projection_cost`, torso contact와 termination 빈도를 zero-residual baseline 동영상과 함께 비교한다.
 
 ---
@@ -700,7 +707,7 @@ python SW/mjx/train_command_curriculum.py \
 
 W&B dashboard에서 최소한 `eval/episode_reward`, `train/global_step`,
 `reward/velocity`, `reward/upright`, `reward/swing_residual`, `reward/stance_residual`,
-`reward/gait_residual`, `reward/slip`, `reward/torque`, `reward/torque_saturation`,
+`reward/body_translation_residual`, `reward/body_rotation_residual`, `reward/slip`, `reward/torque`, `reward/torque_saturation`,
 `self_collision`, `effective_stride_m`, `projection_cost`를 함께 본다.
 
 ---
@@ -805,4 +812,4 @@ status: planned
 
 ## 문서 유지 규칙
 
-scene, action, observation, dependency, 실행 명령을 바꾸면 [[#30초 요약]], [[#실행 경로와 명령어]], [[#Action 22차원]], [[#Observation 110차원]], [[#PPO, rollout, W&B]]를 같이 갱신한다.
+scene, action, observation, dependency, 실행 명령을 바꾸면 [[#30초 요약]], [[#실행 경로와 명령어]], [[#Action 24차원]], [[#Observation 113차원]], [[#PPO, rollout, W&B]]를 같이 갱신한다.

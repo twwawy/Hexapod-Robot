@@ -13,11 +13,11 @@ nominal step length, gait timing, landing XY location, or body attitude.  The
 policy action is masked to zero for stance legs, and early swing contact holds
 the current foot target instead of allowing RL to pull it through the ground.
 
-The nominal path is ported from ``~/Downloads/mjx/tripod_controller.py``:
-quintic stance/swing timing, radial swing clearance, the documented analytical
-three-link IK, and its mirrored left/right servo mapping.  The policy still
-acts in Cartesian foot space; the controller alone owns conversion to joint
-targets and all clamps.
+The nominal path keeps the documented quintic stance/swing timing and radial
+swing clearance, while its analytical IK includes the fixed offsets and link
+lengths in the source URDF.  CAD-derived support-point offsets are measured
+from the converted model.  The policy still acts in Cartesian foot space; the
+controller alone owns conversion to joint targets and all clamps.
 """
 
 from collections.abc import Mapping
@@ -30,6 +30,11 @@ import mujoco
 import numpy as np
 
 from .model import FOOT_CONTACT_POINT_COUNT, HexapodModelBundle, estimate_standing_root_height
+from urdf_kinematics import (
+    FEMUR_LENGTH,
+    SHOULDER_RADIAL_OFFSET,
+    SHOULDER_VERTICAL_OFFSET,
+)
 
 
 
@@ -39,16 +44,14 @@ from .model import FOOT_CONTACT_POINT_COUNT, HexapodModelBundle, estimate_standi
 LEGS = ("LF", "LM", "LB", "RF", "RM", "RB")
 # One swing-foot vertical residual per leg: [LF, LM, LB, RF, RM, RB].
 ACTION_DIM = len(LEGS)
-RESIDUAL_INTERFACE = "downloads_tripod_ik_swing_delta_z_v3"
+RESIDUAL_INTERFACE = "urdf_contact_point_ik_swing_delta_z_v4"
 # Matches the original controller exactly.  The old project convention used
 # the complementary group as phase zero; the two are dynamically equivalent,
 # but preserving this order makes direct comparison with Downloads/mjx simple.
 REFERENCE_TRIPOD_A = frozenset(("RF", "RB", "LM"))
 RIGHT_LEGS = frozenset(("RF", "RM", "RB"))
-LINK_1 = 0.074
-LINK_2 = 0.121
-LINK_3 = 0.230
-NOMINAL_LOCAL_FOOT = (0.218728, 0.0, -0.287006)
+LINK_1 = SHOULDER_RADIAL_OFFSET
+LINK_2 = FEMUR_LENGTH
 MODEL_FORWARD = (0.0, -1.0, 0.0)
 
 
@@ -72,6 +75,9 @@ class ResidualControllerBundle(NamedTuple):
     leg_outward_body: jnp.ndarray
     leg_tangent_body: jnp.ndarray
     reference_foot_body_pos: jnp.ndarray
+    shoulder_lateral: jnp.ndarray
+    distal_length: jnp.ndarray
+    distal_angle_offset: jnp.ndarray
     right_leg_mask: jnp.ndarray
     tripod_is_a: jnp.ndarray
     foot_geom_ids: jnp.ndarray
@@ -191,6 +197,12 @@ def build_residual_controller(
     host_data.qpos[bundle.joint_qpos_adr] = np.asarray(bundle.default_joint_pose, dtype=np.float64)
     mujoco.mj_forward(model, host_data)
 
+    zero_data = mujoco.MjData(model)
+    zero_data.qpos[0:3] = np.array([0.0, 0.0, 0.0], dtype=np.float64)
+    zero_data.qpos[3:7] = np.array([1.0, 0.0, 0.0, 0.0], dtype=np.float64)
+    zero_data.qpos[bundle.joint_qpos_adr] = 0.0
+    mujoco.mj_forward(model, zero_data)
+
     root_body_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, "hexapod_root")
     root_pos = host_data.xpos[root_body_id].copy()
     root_rot = host_data.xmat[root_body_id].reshape(3, 3).copy()
@@ -205,6 +217,9 @@ def build_residual_controller(
     leg_outward_body: list[np.ndarray] = []
     leg_tangent_body: list[np.ndarray] = []
     reference_foot_body_pos: list[np.ndarray] = []
+    shoulder_lateral: list[float] = []
+    distal_length: list[float] = []
+    distal_angle_offset: list[float] = []
     right_leg_mask: list[bool] = []
 
 
@@ -241,11 +256,8 @@ def build_residual_controller(
         outward[2] = 0.0
         outward /= np.linalg.norm(outward)
         tangent = np.asarray((-outward[1], outward[0], 0.0), dtype=np.float64)
-        reference_foot = hip_body + outward * NOMINAL_LOCAL_FOOT[0]
-        reference_foot[2] = hip_body[2] + NOMINAL_LOCAL_FOOT[2]
         leg_outward_body.append(outward.astype(np.float32))
         leg_tangent_body.append(tangent.astype(np.float32))
-        reference_foot_body_pos.append(reference_foot.astype(np.float32))
         right_leg_mask.append(leg in RIGHT_LEGS)
         tripod_is_a.append(leg in REFERENCE_TRIPOD_A)
 
@@ -255,7 +267,39 @@ def build_residual_controller(
             mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_GEOM, f"{leg}_motor_horn_3_1_contact_{idx}")
             for idx in range(FOOT_CONTACT_POINT_COUNT)
         ]
-        foot_support_geom_ids.append([support_id if support_id >= 0 else foot_geom_id for support_id in support_ids])
+        resolved_support_ids = [
+            support_id if support_id >= 0 else foot_geom_id
+            for support_id in support_ids
+        ]
+        foot_support_geom_ids.append(resolved_support_ids)
+
+        # The residual controller tracks the mean CAD-derived support point.
+        # Infer its exact serial-chain constants at q=0 so early-contact holds
+        # are inverted as that same point rather than as an idealized toe.
+        reference_world = np.mean(host_data.geom_xpos[resolved_support_ids], axis=0)
+        reference_foot = root_rot.T @ (reference_world - root_pos)
+        reference_foot_body_pos.append(reference_foot.astype(np.float32))
+
+        zero_root_pos = zero_data.xpos[root_body_id]
+        zero_root_rot = zero_data.xmat[root_body_id].reshape(3, 3)
+        zero_hip = zero_root_rot.T @ (
+            zero_data.xpos[hip_body_id] - zero_root_pos
+        )
+        zero_foot_world = np.mean(
+            zero_data.geom_xpos[resolved_support_ids], axis=0
+        )
+        zero_foot = zero_root_rot.T @ (zero_foot_world - zero_root_pos)
+        joint3_id = name_to_joint_id[f"{leg}_3"]
+        joint3_anchor = zero_root_rot.T @ (
+            zero_data.xanchor[joint3_id] - zero_root_pos
+        )
+        zero_relative = zero_foot - zero_hip
+        distal_vector = zero_foot - joint3_anchor
+        shoulder_lateral.append(float(np.dot(zero_relative, tangent)))
+        distal_radial = float(np.dot(distal_vector, outward))
+        distal_vertical = float(distal_vector[2])
+        distal_length.append(float(np.hypot(distal_radial, distal_vertical)))
+        distal_angle_offset.append(float(np.arctan2(-distal_vertical, distal_radial)))
     reset_root_height = np.asarray(float(estimate_standing_root_height(bundle)), dtype=np.float32)
 
     return ResidualControllerBundle(
@@ -267,6 +311,9 @@ def build_residual_controller(
         leg_outward_body=jnp.asarray(np.asarray(leg_outward_body, dtype=np.float32)),
         leg_tangent_body=jnp.asarray(np.asarray(leg_tangent_body, dtype=np.float32)),
         reference_foot_body_pos=jnp.asarray(np.asarray(reference_foot_body_pos, dtype=np.float32)),
+        shoulder_lateral=jnp.asarray(np.asarray(shoulder_lateral, dtype=np.float32)),
+        distal_length=jnp.asarray(np.asarray(distal_length, dtype=np.float32)),
+        distal_angle_offset=jnp.asarray(np.asarray(distal_angle_offset, dtype=np.float32)),
         right_leg_mask=jnp.asarray(np.asarray(right_leg_mask, dtype=bool)),
         tripod_is_a=jnp.asarray(np.asarray(tripod_is_a, dtype=bool)),
         foot_geom_ids=jnp.asarray(np.asarray(foot_geom_ids, dtype=np.int32)),
@@ -525,7 +572,7 @@ def _documented_inverse_kinematics(
     foot_body: jnp.ndarray,
     controller_bundle: ResidualControllerBundle,
 ) -> jnp.ndarray:
-    """Port of ``TripodGaitController._inverse_kinematics`` in batch form.
+    """Invert the URDF chain for each CAD-derived foot support point.
 
     ``foot_body`` is first expressed in each leg's outward/tangent frame.  The
     branch and left/right raw-axis conversion are deliberately identical to
@@ -537,14 +584,28 @@ def _documented_inverse_kinematics(
     y = jnp.sum(relative * controller_bundle.leg_tangent_body[None, :, :], axis=-1)
     z = relative[:, :, 2]
     radius = jnp.hypot(x, y)
-    rho = radius - LINK_1
-    cosine3 = (rho * rho + z * z - LINK_2**2 - LINK_3**2) / (2.0 * LINK_2 * LINK_3)
-    cosine3 = jnp.clip(cosine3, -1.0, 1.0)
-    theta3 = jnp.arctan2(-jnp.sqrt(jnp.maximum(0.0, 1.0 - cosine3 * cosine3)), cosine3)
-    theta2 = jnp.arctan2(z, rho) - jnp.arctan2(
-        LINK_3 * jnp.sin(theta3), LINK_2 + LINK_3 * jnp.cos(theta3)
+    shoulder_lateral = controller_bundle.shoulder_lateral[None, :]
+    planar_radius = jnp.sqrt(
+        jnp.maximum(radius * radius - shoulder_lateral * shoulder_lateral, 0.0)
     )
-    servo = jnp.stack([jnp.arctan2(y, x), -theta2, -theta3], axis=-1)
+    theta1 = jnp.arctan2(y, x) - jnp.arctan2(
+        shoulder_lateral, planar_radius
+    )
+    theta1 = jnp.arctan2(jnp.sin(theta1), jnp.cos(theta1))
+    rho = planar_radius - LINK_1
+    planar_z = z - SHOULDER_VERTICAL_OFFSET
+    distal_length = controller_bundle.distal_length[None, :]
+    cosine3 = (
+        rho * rho + planar_z * planar_z - LINK_2**2 - distal_length**2
+    ) / (2.0 * LINK_2 * distal_length)
+    cosine3 = jnp.clip(cosine3, -1.0, 1.0)
+    distal_angle = jnp.arccos(cosine3)
+    theta2 = jnp.arctan2(-planar_z, rho) - jnp.arctan2(
+        distal_length * jnp.sin(distal_angle),
+        LINK_2 + distal_length * jnp.cos(distal_angle),
+    )
+    theta3 = distal_angle - controller_bundle.distal_angle_offset[None, :]
+    servo = jnp.stack([theta1, theta2, theta3], axis=-1)
     right = controller_bundle.right_leg_mask[None, :]
     raw_joint_2 = jnp.where(right, -servo[:, :, 1], servo[:, :, 1])
     raw_joint_3 = jnp.where(right, servo[:, :, 2], -servo[:, :, 2])

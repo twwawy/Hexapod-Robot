@@ -57,22 +57,22 @@ MUJOCO_GL=egl python SW/mjx/run_controller.py --headless --duration 5
 
 ## MJX Residual RL: 평지 명령과 mixed-terrain curriculum
 
-기본 Tripod/IK 제어기 위에서 **swing XYZ / stance Z-only** 권한으로만 보정하는
-`cartesian_gait_residual_v2` 22차원 residual 환경입니다. contact adaptation과
-workspace projection이 policy보다 먼저 적용됩니다. 110-D observation의 terrain
-부분은 3×3 coarse grid와 6개 nominal touchdown 높이로 구성됩니다. 평지에서
-보행·회전을 먼저 학습한 뒤 flat checkpoint로 flat/curb/ramp/blocks/stairs/rough가
-같은 XML에 들어 있는 mixed terrain을 초기화합니다. 자세한 최신 명세는
+Position/Heading PI, Tripod PULL/Bezier, contact adaptation, 단일 자세 PI와 IK가
+보행 전체를 소유하고 policy는 **swing XYZ / stance Z-only + body 6-DOF**만 보정하는
+`classical_wbc_cartesian_body6d_residual_v1` 24차원 환경입니다. 113-D observation의
+terrain 부분은 3×3 coarse grid와 6개 nominal touchdown 높이로 구성됩니다. 평지에서
+짧게 baseline/residual을 잡고 rough를 거친 뒤 전체 상승 최대 20 cm 계단으로 갑니다.
+자세한 최신 명세는
 [`docs/RESIDUAL_RL.md`](../../docs/RESIDUAL_RL.md)를 참고합니다.
 
 Flat command는 Stage 0/1/2에서 각각 최대 `0.10/0.18/0.27 m/s`를 학습합니다.
 `phase_time=0.50 s`는
-유지하고, forward+yaw를 합친 가장 빠른 다리 기준 horizontal stroke를 120 mm로
+유지하고, forward+lateral+yaw를 합친 가장 빠른 다리 기준 horizontal stroke를 140 mm로
 제한합니다. 고속에서는 gait가 낼 수 있는 범위 안으로 yaw command를 자동 축소합니다.
 Actuator hard clamp ±8 Nm와 함께 torque saturation(6.8 Nm 초과), slip,
-self-collision을 별도 reward/metric으로 감시합니다. 네트워크는 마지막 4-D action으로
-stride/frequency/swing-height/radial-offset을 제한 범위 안에서 조절하며, 기본 0.15초
-filter가 급격한 gait 변화를 막습니다. 평지 contact는 건조 아스팔트 nominal
+self-collision을 별도 reward/metric으로 감시합니다. 보폭·주파수·Swing Height
+`0.20 m`·Radial Offset `0.07 m`는 policy가 아닌 제어기 소유입니다. 마지막 6-D
+body residual은 기본 0.15초 filter와 전체 workspace 승인 단계를 거칩니다. 평지 contact는 건조 아스팔트 nominal
 `friction=0.8`이고 `--flat-friction`으로 바꿀 수 있습니다. Terrain 속도 상한은
 0.18 m/s입니다.
 
@@ -97,7 +97,7 @@ python -m pip install --upgrade "jax[cuda12]==0.6.2"
 unset LD_LIBRARY_PATH
 python -c "import jax; print(jax.devices())"
 python SW/mjx/train_command_curriculum.py \
-  --smoke --smoke-steps 100 --run-name command-v2-smoke
+  --smoke --smoke-steps 100 --run-name command-body6d-smoke
 python SW/mjx/train_command_curriculum.py \
   --run-name flat-transfer-source --num-evals 100 --wandb
 
@@ -112,11 +112,33 @@ python SW/mjx/train_rough_terrain.py \
   --init-checkpoint SW/mjx/runs/command/<flat-run>/checkpoints \
   --num-evals 100 --wandb
 
-# 평가 성공률로 level을 올리고 내리는 전체 curriculum
+# checkpoint가 없으면 짧은 flat baseline부터 자동 실행하는 전체 curriculum
 python SW/mjx/train_competence_curriculum.py \
-  --run-name mixed-competence --stages 8 --stage-timesteps 5000000 \
-  --init-checkpoint SW/mjx/runs/command/<flat-run>/checkpoints --wandb \
+  --run-name mixed-body6d --flat-baseline-timesteps 1000000 \
+  --stages 8 --stage-timesteps 5000000 --level-progression sequential --wandb \
   -- --num-envs 2048 --num-evals 20 --terrain-randomize
+```
+
+Mixed terrain level은 경사면과 계단을 함께 올립니다. `--terrain-randomize` 사용 시
+각 stage는 해당 범위에서 재현 가능한 지형 하나를 뽑고, 각 environment reset은 그
+지형의 lane을 확률적으로 선택합니다.
+
+| Level | 계단 전체 상승 | 경사면 상승 높이 | yaw 제한 | 계단 lane 확률 |
+|---|---:|---:|---:|---:|
+| 0 | 2–4 cm | 4–8 cm | 0.00 rad/s | 0% |
+| 1 | 4–8 cm | 8–12 cm | 0.05 rad/s | 5% |
+| 2 | 8–12 cm | 12–16 cm | 0.10 rad/s | 15% |
+| 3 | 12–16 cm | 16–20 cm | 0.20 rad/s | 25% |
+| 4 | 16–20 cm | 20–24 cm | 0.35 rad/s | 30% |
+
+학습 없이 모든 level의 ramp/stairs를 직진 명령으로 짧게 확인하고 한 W&B run에
+10개 영상을 모으려면 다음 preview를 사용합니다. `--checkpoint`를 생략하면
+zero-residual 기본 보행을 사용합니다.
+
+```bash
+python SW/mjx/preview_terrain_curriculum.py \
+  --checkpoint SW/mjx/runs/terrain/<terrain-run>/checkpoints \
+  --wandb
 ```
 
 실제 학습 전 장치 출력에 `GpuDevice`가 있어야 합니다. 이 프로젝트가 고정한 JAX
@@ -130,7 +152,15 @@ python SW/mjx/train_competence_curriculum.py \
 `best_stage2_full_command.gif`, `best_curriculum_full.gif` 네 파일을 갱신합니다.
 W&B에도 각각 `best/video_stage0_forward`, `best/video_stage1_limited_yaw`,
 `best/video_stage2_full_command`, `best/video_curriculum_full`로 올라갑니다. Terrain
-run은 `videos/best_policy.gif`와 W&B `best/video` 한 개를 유지합니다.
+competence run은 각 stage의 로컬 `videos/best_policy.gif`를 유지하고 W&B에는
+`best/video_stage00_level0`, `best/video_stage01_level1`처럼 stage/level이 명시된
+키로 새 best를 즉시 갱신합니다. GIF overlay에도 curriculum stage, terrain level,
+실제 계단 전체 상승 높이가 표시됩니다. 비교 가능한 ascent 영상을 위해 mixed-terrain best
+video는 항상 stairs lane과 직진 명령(`v=0.08 m/s`, `yaw=0`)으로 렌더링합니다.
+
+`--level-progression sequential`은 Stage 0/1/2/3/4를 Level 0/1/2/3/4로
+확실히 올린 뒤 Level 4를 유지합니다. 기본값 `competence`는 평가 성공률이 0.8을
+넘을 때만 승급하므로 어려운 level에 도달하지 못할 수 있습니다.
 
 같은 `--run-name`을 다시 사용해도 timestamp suffix 때문에 기존 checkpoint/monitor와
 섞이지 않습니다. `--best-video-path`를 생략하면 새 run directory 안에 저장됩니다.

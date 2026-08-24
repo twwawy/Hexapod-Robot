@@ -4,28 +4,31 @@
 
 ## 현재 기준 경로
 
-Canonical contract: `cartesian_gait_residual_v2` action + `body_state_coarse9_touchdown6_v1` observation(110-D)
+Canonical contract: `classical_wbc_cartesian_body6d_residual_v1` action(24-D) +
+`body_state_command3_coarse9_touchdown6_v2` observation(113-D)
 
 ```text
-command → classical tripod nominal foot targets
-        → phase-masked 22-D residual → airborne/contact adaptation
-        → 120 mm effective-stride clamp (forward+yaw, fastest leg basis)
-        → reachable-workspace projection → analytical IK
-        → joint speed/position limits + fixed ±8 Nm actuator safety
+forward/lateral/yaw command → Position/Heading PI → final body twist
+        → controller-owned Tripod PULL/Bezier trajectory
+        → phase/contact-masked 18-D foot residual + contact adaptation
+        → attitude PI + 6-D body pose residual → six-leg workspace gate
+        → URDF analytical IK → joint speed/position + fixed ±8 Nm safety
 ```
 
-- Action 22-D: 다리 순서 `LF, LM, LB, RF, RM, RB`의 `[Δx, Δy, Δz] × 6` + gait 파라미터 4-D(`stride`, `frequency`, `swing-height`, `radial`)
+- Action 24-D: 다리 순서 `RF, RM, RB, LF, LM, LB`의 발 `[Δx, Δy, Δz] × 6` + 몸체 병진/회전 6-D
 - Swing leg는 XYZ residual을, stance leg는 Z-only residual을 쓴다. stance 착지 XY는 항상 정확히 0이다.
-- 마지막 4-D는 각각 `stride 0.8–1.2×`, `frequency 0.85–1.15×`, `swing height 50–110 mm`, `radial offset 5–25 mm` 범위에서 gait를 조절하며, 0.15초 time constant의 1차 filter를 거친다.
+- 마지막 6-D는 몸체 forward/lateral/height `±50/±50/±100 mm`, roll/pitch/yaw `±45/±45/±25 deg`이며 0.15초 filter와 전체 workspace 승인을 거친다.
+- gait phase/stride/frequency와 nominal swing height `0.20 m`, radial offset `0.07 m`는 정책이 아니라 제어기가 소유한다.
+- 0.5초 phase가 끝나도 swing 3발 착지가 확인되지 않으면 다음 tripod를 들지 않고 late-landing 탐색을 계속한다.
 - 우선순위는 `safety > contact > RL residual > nominal gait`다. early landing이면 contact/safety 계층이 현재 발 위치를 유지해 residual을 무시한다.
-- 이전 6-D/7-D residual checkpoint는 action/observation 계약이 달라 재사용할 수 없다. `fresh`로 새 학습을 시작해야 한다.
+- 이전 6-D/7-D/22-D residual checkpoint는 action/observation 계약이 달라 재사용할 수 없다. `fresh`로 새 학습을 시작해야 한다.
 
 설계·관측·보상·실행 방법은 [docs/RESIDUAL_RL.md](docs/RESIDUAL_RL.md)에만 최신 기준으로 정리한다.
 
 ## 주요 위치
 
-- `SW/mjx/hexapod_mjx/residual_controller.py`: nominal gait, residual, contact safety, IK
-- `SW/mjx/hexapod_mjx/residual_env.py`: MJX observation, reward, termination
+- `SW/mjx/tripod_core.py`: source-controller PI, Tripod PULL/Bezier, contact phase, body overlay, IK safety
+- `SW/mjx/rough_terrain_env.py`: 24-D residual action, 113-D observation, reward와 termination
 - `SW/mjx/train_command_curriculum.py`: flat walking+turning curriculum 학습 진입점
 - `SW/mjx/train_rough_terrain.py`: mixed terrain 학습(task 엔진, command 학습도 여기서 재사용)
 - `SW/mjx/train_competence_curriculum.py`: evaluation success로 level을 올리고 내리는 전체 curriculum launcher
@@ -81,7 +84,7 @@ $PY SW/mjx/train_rough_terrain.py \
   --smoke --smoke-steps 100 --terrain-layout mixed --terrain-level 4 \
   --terrain-randomize --run-name terrain-smoke
 
-$PY -m unittest SW.mjx.tests.test_rough_terrain_contract -v
+$PY -m unittest discover -s SW/mjx/tests -v
 ```
 
 본 학습 — flat walking+turning부터 fresh로 시작한다:
@@ -104,14 +107,14 @@ $PY SW/mjx/train_rough_terrain.py \
   --wandb --wandb-project hexapod-rough-terrain
 ```
 
-Evaluation success 기준으로 level을 올리고 내리는 전체 curriculum:
+짧은 flat baseline부터 시작해 rough→총 20 cm 계단으로 진행하는 전체 curriculum:
 
 ```bash
 $PY SW/mjx/train_competence_curriculum.py \
   --run-name mixed-competence \
+  --flat-baseline-timesteps 1000000 \
   --stages 8 --stage-timesteps 5000000 \
   --start-level 0 --max-level 4 \
-  --init-checkpoint SW/mjx/runs/command/<flat-run>/checkpoints \
   --wandb \
   -- --num-envs 2048 --num-evals 20 --terrain-randomize
 ```

@@ -16,7 +16,7 @@ class HexapodCommandCurriculumEnv(HexapodRoughTerrainEnv):
     but an exact command is sampled every 1.5--4.0 seconds inside the active
     bounds.  There is no deterministic forward/turn command script for the
     policy to memorize.  The policy sees `[forward_speed, yaw_rate]` and
-    always controls the same 22-D Cartesian/gait residual action.
+    always controls the same 24-D Cartesian-foot/body-6DOF residual action.
     """
 
     def __init__(

@@ -37,6 +37,8 @@ from rough_terrain_env import (
     HexapodRoughTerrainEnv,
     default_config,
 )
+from prepare_rl_scene import MIXED_PATCH_NAMES, MIXED_STAIR_COUNT
+from terrain_curriculum import terrain_level
 
 
 class ScoreMonitor:
@@ -128,6 +130,12 @@ def _arguments(default_task: str) -> argparse.Namespace:
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--run-name", default=None, help="Optional readable experiment name.")
     parser.add_argument(
+        "--competence-stage",
+        type=int,
+        default=None,
+        help="Outer mixed-terrain curriculum stage used for metadata/video labels.",
+    )
+    parser.add_argument(
         "--run-root",
         type=Path,
         default=Path(__file__).resolve().parent / "runs",
@@ -195,28 +203,43 @@ def _arguments(default_task: str) -> argparse.Namespace:
         help="Also initialize the critic; disabled by default because terrain rewards differ.",
     )
     parser.add_argument("--phase-time", type=float, default=0.5)
-    parser.add_argument("--base-swing-height", type=float, default=0.07)
-    parser.add_argument("--base-radial-offset", type=float, default=0.01)
+    parser.add_argument("--base-swing-height", type=float, default=0.20)
+    parser.add_argument("--base-radial-offset", type=float, default=0.07)
     parser.add_argument("--swing-x", type=float, default=None, help="Active task swing X residual limit [m].")
     parser.add_argument("--swing-y", type=float, default=None, help="Active task swing Y residual limit [m].")
     parser.add_argument("--swing-z-low", type=float, default=None, help="Active task negative swing Z limit [m].")
     parser.add_argument("--swing-z-high", type=float, default=None, help="Active task positive swing Z limit [m].")
     parser.add_argument("--stance-z", type=float, default=None, help="Active task stance-only Z residual limit [m].")
-    parser.add_argument("--stride-half-range", type=float, default=None, help="Stride scale authority around one; 0.2 = 0.8..1.2.")
-    parser.add_argument("--frequency-half-range", type=float, default=None, help="Frequency authority around one; 0.15 = 0.85..1.15.")
     parser.add_argument(
-        "--gait-filter-time-constant",
+        "--body-filter-time-constant",
         type=float,
         default=0.15,
-        help="Smoothing time constant for the four global gait actions [s].",
+        help="Smoothing time constant for the six body residual actions [s].",
     )
-    parser.add_argument("--swing-height-min", type=float, default=None, help="Active task global swing height minimum [m].")
-    parser.add_argument("--swing-height-max", type=float, default=None, help="Active task global swing height maximum [m].")
-    parser.add_argument("--radial-min", type=float, default=None, help="Active task radial offset minimum [m].")
-    parser.add_argument("--radial-max", type=float, default=None, help="Active task radial offset maximum [m].")
+    parser.add_argument(
+        "--body-translation-limit",
+        type=float,
+        nargs=3,
+        default=None,
+        metavar=("FORWARD", "LATERAL", "HEIGHT"),
+        help="Override active-task body residual translation limits [m].",
+    )
+    parser.add_argument(
+        "--body-rotation-limit-deg",
+        type=float,
+        nargs=3,
+        default=None,
+        metavar=("ROLL", "PITCH", "YAW"),
+        help="Override active-task body residual rotation limits [deg].",
+    )
     parser.add_argument("--terrain-speed-min", type=float, default=0.03)
     parser.add_argument("--terrain-speed-max", type=float, default=0.18)
-    parser.add_argument("--terrain-yaw-limit", type=float, default=0.35)
+    parser.add_argument(
+        "--terrain-yaw-limit",
+        type=float,
+        default=None,
+        help="Override level yaw limit; defaults to the terrain curriculum schedule.",
+    )
     parser.add_argument(
         "--terrain-layout",
         choices=("mixed", "stairs"),
@@ -235,8 +258,20 @@ def _arguments(default_task: str) -> argparse.Namespace:
         action="store_true",
         help="Randomize terrain; level 4 adds per-env friction/mass/servo/damping.",
     )
-    parser.add_argument("--terrain-step-height", type=float, default=None, help="Override fixed stair height [m].")
+    parser.add_argument(
+        "--terrain-total-rise",
+        type=float,
+        default=None,
+        help="Override total elevation gain across the complete staircase [m].",
+    )
+    parser.add_argument(
+        "--terrain-step-height",
+        type=float,
+        default=None,
+        help="Advanced override for one stair riser [m]; mutually exclusive with --terrain-total-rise.",
+    )
     parser.add_argument("--terrain-step-depth", type=float, default=None, help="Override fixed stair depth [m].")
+    parser.add_argument("--terrain-ramp-rise", type=float, default=None, help="Override mixed-lane ramp rise [m].")
     parser.add_argument("--terrain-friction", type=float, default=None, help="Override fixed terrain/foot friction scale.")
     parser.add_argument(
         "--flat-friction",
@@ -254,6 +289,9 @@ def _arguments(default_task: str) -> argparse.Namespace:
     )
     parser.add_argument(
         "--curriculum-yaw-limit", type=float, nargs=3, default=(0.00, 0.15, 0.35)
+    )
+    parser.add_argument(
+        "--curriculum-lateral-limit", type=float, nargs=3, default=(0.00, 0.05, 0.10)
     )
     parser.add_argument(
         "--monitor-dir",
@@ -295,6 +333,12 @@ def _arguments(default_task: str) -> argparse.Namespace:
     parser.add_argument("--best-video-fps", type=int, default=20)
     parser.add_argument("--best-video-width", type=int, default=640)
     parser.add_argument("--best-video-height", type=int, default=360)
+    parser.add_argument(
+        "--best-video-terrain-patch",
+        choices=MIXED_PATCH_NAMES,
+        default="stairs",
+        help="Fixed mixed-terrain lane used for comparable straight best videos.",
+    )
     parser.add_argument("--wandb", action="store_true", help="Log Brax PPO progress to the currently logged-in W&B account.")
     parser.add_argument(
         "--wandb-project",
@@ -314,12 +358,12 @@ def _make_env(args: argparse.Namespace) -> HexapodRoughTerrainEnv:
     config.controller.nominal.phase_time = args.phase_time
     config.controller.nominal.base_swing_height = args.base_swing_height
     config.controller.nominal.base_radial_offset = args.base_radial_offset
-    if args.gait_filter_time_constant < 0.0:
-        raise ValueError("--gait-filter-time-constant must be non-negative")
+    if args.body_filter_time_constant < 0.0:
+        raise ValueError("--body-filter-time-constant must be non-negative")
     if args.flat_friction <= 0.0:
         raise ValueError("--flat-friction must be positive")
-    config.controller.residual.gait_filter_time_constant = (
-        args.gait_filter_time_constant
+    config.controller.residual.body_filter_time_constant = (
+        args.body_filter_time_constant
     )
     config.terrain.flat_friction = args.flat_friction
     authority = (
@@ -333,23 +377,30 @@ def _make_env(args: argparse.Namespace) -> HexapodRoughTerrainEnv:
         "swing_z_low",
         "swing_z_high",
         "stance_z",
-        "stride_half_range",
-        "frequency_half_range",
-        "swing_height_min",
-        "swing_height_max",
-        "radial_min",
-        "radial_max",
     ):
         value = getattr(args, name)
         if value is not None:
             setattr(authority, name, value)
+    if args.body_translation_limit is not None:
+        if any(value <= 0.0 for value in args.body_translation_limit):
+            raise ValueError("--body-translation-limit values must be positive")
+        authority.body_translation_limit = tuple(args.body_translation_limit)
+    if args.body_rotation_limit_deg is not None:
+        if any(not 0.0 < value <= 45.0 for value in args.body_rotation_limit_deg):
+            raise ValueError("--body-rotation-limit-deg values must be in (0, 45]")
+        authority.body_rotation_limit = tuple(
+            np.deg2rad(args.body_rotation_limit_deg)
+        )
     config.command_min_speed = args.terrain_speed_min
     config.command_max_speed = args.terrain_speed_max
-    config.command_max_yaw_rate = args.terrain_yaw_limit
+    config.command_max_yaw_rate = 0.35
     config.command_curriculum.forward_only_steps = args.curriculum_forward_only_steps
     config.command_curriculum.limited_yaw_steps = args.curriculum_limited_yaw_steps
     config.command_curriculum.speed_min = tuple(args.curriculum_speed_min)
     config.command_curriculum.speed_max = tuple(args.curriculum_speed_max)
+    config.command_curriculum.lateral_limit = tuple(
+        args.curriculum_lateral_limit
+    )
     config.command_curriculum.yaw_limit = tuple(args.curriculum_yaw_limit)
     if any(
         minimum < 0.0 or maximum < minimum
@@ -361,31 +412,56 @@ def _make_env(args: argparse.Namespace) -> HexapodRoughTerrainEnv:
     if args.task == "command":
         gait_speed_capacity = (
             config.controller.safety.max_effective_stride
-            * (1.0 + authority.frequency_half_range)
             / config.controller.nominal.phase_time
         )
         if max(args.curriculum_speed_max) > gait_speed_capacity + 1e-6:
             raise ValueError(
-                "command curriculum exceeds the configured stride/frequency "
+                "command curriculum exceeds the controller-owned stride "
                 f"capacity ({gait_speed_capacity:.3f} m/s)"
             )
     # Curriculum changes terrain geometry before model-gap difficulty.  Mixed
     # terrain itself is sampled per reset; optional level-4 dynamics are
     # sampled per vectorized environment by domain_randomization.py.
-    level_ranges = (
-        (0.001, 0.020),
-        (0.020, 0.035),
-        (0.035, 0.050),
-        (0.020, 0.060),
-        (0.020, 0.060),
+    level_spec = terrain_level(args.terrain_level)
+    config.command_max_yaw_rate = (
+        args.terrain_yaw_limit
+        if args.terrain_yaw_limit is not None
+        else level_spec.yaw_limit_rps
     )
     rng = np.random.default_rng(args.seed)
-    height_low, height_high = level_ranges[args.terrain_level]
+    total_low, total_high = level_spec.stair_total_rise_range_m
+    ramp_low, ramp_high = level_spec.ramp_rise_range_m
     randomize_terrain = args.terrain_randomize and args.task == "terrain"
-    config.terrain.step_height = (
-        args.terrain_step_height
-        if args.terrain_step_height is not None
-        else (float(rng.uniform(height_low, height_high)) if randomize_terrain else height_high)
+    if args.terrain_total_rise is not None and args.terrain_step_height is not None:
+        raise ValueError(
+            "--terrain-total-rise and --terrain-step-height are mutually exclusive"
+        )
+    stair_count = (
+        MIXED_STAIR_COUNT
+        if args.terrain_layout == "mixed"
+        else int(config.terrain.step_count)
+    )
+    stair_total_rise = (
+        args.terrain_total_rise
+        if args.terrain_total_rise is not None
+        else (
+            args.terrain_step_height * stair_count
+            if args.terrain_step_height is not None
+            else (
+                float(rng.uniform(total_low, total_high))
+                if randomize_terrain
+                else total_high
+            )
+        )
+    )
+    if not 0.0 <= stair_total_rise <= 0.20:
+        raise ValueError("stair total rise must stay within 0..0.20 m")
+    config.terrain.stair_total_rise = stair_total_rise
+    config.terrain.step_height = stair_total_rise / stair_count
+    config.terrain.ramp_rise = (
+        args.terrain_ramp_rise
+        if args.terrain_ramp_rise is not None
+        else (float(rng.uniform(ramp_low, ramp_high)) if randomize_terrain else ramp_high)
     )
     config.terrain.step_depth = (
         args.terrain_step_depth
@@ -397,31 +473,25 @@ def _make_env(args: argparse.Namespace) -> HexapodRoughTerrainEnv:
         if args.terrain_friction is not None
         else (float(rng.uniform(0.6, 1.3)) if randomize_terrain and args.terrain_level >= 3 else 1.0)
     )
-    patch_probabilities = (
-        (0.70, 0.20, 0.10, 0.00, 0.00, 0.00),
-        (0.40, 0.20, 0.20, 0.10, 0.05, 0.05),
-        (0.25, 0.15, 0.20, 0.15, 0.15, 0.10),
-        (0.15, 0.15, 0.20, 0.20, 0.15, 0.15),
-        (0.10, 0.15, 0.20, 0.20, 0.20, 0.15),
-    )
     if args.task == "terrain":
-        config.terrain.patch_probabilities = patch_probabilities[args.terrain_level]
+        config.terrain.patch_probabilities = level_spec.patch_probabilities
     # Physical action semantics stay fixed across levels.  Curriculum changes
     # how expensive intervention is: easy stages strongly prefer the nominal
     # controller, while hard terrain permits the same bounded residual more
     # readily.
     residual_penalties = (
-        (-0.040, -0.120, -0.060),
-        (-0.030, -0.100, -0.050),
-        (-0.022, -0.080, -0.040),
-        (-0.015, -0.060, -0.030),
-        (-0.010, -0.040, -0.020),
+        (-0.040, -0.120, -0.100, -0.060),
+        (-0.030, -0.100, -0.080, -0.050),
+        (-0.022, -0.080, -0.060, -0.040),
+        (-0.015, -0.060, -0.040, -0.030),
+        (-0.010, -0.040, -0.025, -0.020),
     )
     if args.task == "terrain":
         (
             config.reward.swing_residual,
             config.reward.stance_residual,
-            config.reward.gait_residual,
+            config.reward.body_translation_residual,
+            config.reward.body_rotation_residual,
         ) = residual_penalties[args.terrain_level]
     config.randomization.enabled = randomize_terrain
     # Level 4 dynamics are randomized per vectorized environment by the Brax
@@ -437,6 +507,14 @@ def _safe_run_component(value: str) -> str:
     if not cleaned:
         raise SystemExit("--run-name must contain at least one letter or number")
     return cleaned
+
+
+def _infer_competence_stage(run_name: str | None) -> int | None:
+    """Recover the outer curriculum stage from launcher-generated run names."""
+    if not run_name:
+        return None
+    match = re.search(r"(?:^|-)stage(\d+)(?:-|$)", run_name)
+    return int(match.group(1)) if match is not None else None
 
 
 def _resolve_init_checkpoint(path: Path, network_layers: tuple[int, ...]) -> Path:
@@ -471,7 +549,8 @@ def _resolve_init_checkpoint(path: Path, network_layers: tuple[int, ...]) -> Pat
     )
     if checkpoint_config.get("action_size") != ACTION_SIZE or observation_shape != [OBSERVATION_SIZE]:
         raise SystemExit(
-            "--init-checkpoint contract mismatch: expected action=22 and observation=110"
+            "--init-checkpoint contract mismatch: "
+            f"expected action={ACTION_SIZE} and observation={OBSERVATION_SIZE}"
         )
     if saved_layers is not None and tuple(saved_layers) != tuple(network_layers):
         raise SystemExit(
@@ -533,6 +612,7 @@ def _write_run_metadata(args: argparse.Namespace, env: HexapodRoughTerrainEnv) -
             ),
             "terrain_layout": args.terrain_layout,
             "terrain_level": args.terrain_level,
+            "competence_stage": args.competence_stage,
             "monitor_dir": str(args.monitor_dir),
             "best_video_path": str(args.best_video_path),
             "best_video_paths": args.best_video_paths,
@@ -621,6 +701,10 @@ def _smoke_test(env: HexapodRoughTerrainEnv, seed: int, steps: int) -> None:
 
 def main(default_task: str = "terrain") -> None:
     args = _arguments(default_task)
+    if args.competence_stage is None:
+        args.competence_stage = _infer_competence_stage(args.run_name)
+    if args.competence_stage is not None and args.competence_stage < 0:
+        raise SystemExit("--competence-stage must be non-negative")
     if args.discounting is None:
         args.discounting = 0.97 if args.task == "command" else 0.99
     if args.unroll_length is None:
@@ -700,6 +784,15 @@ def main(default_task: str = "terrain") -> None:
     print("JAX devices:", jax.devices())
     print(f"run={args.run_dir} contract={ACTION_CONTRACT_VERSION}")
     env = _make_env(args)
+    if args.task == "terrain":
+        print(
+            f"terrain_geometry stage={args.competence_stage} "
+            f"level={args.terrain_level} "
+            f"stair_total_rise={100.0 * env._config.terrain.stair_total_rise:.2f}cm "
+            f"riser={100.0 * env._config.terrain.step_height:.2f}cm "
+            f"ramp_rise={100.0 * env._config.terrain.ramp_rise:.2f}cm "
+            f"patch_probabilities={tuple(env._config.terrain.patch_probabilities)}"
+        )
     _write_run_metadata(args, env)
     if args.smoke:
         _smoke_test(env, args.seed, args.smoke_steps)
@@ -728,6 +821,7 @@ def main(default_task: str = "terrain") -> None:
         )
 
     scripted_envs: dict[str, HexapodCommandCurriculumEnv] = {}
+    terrain_video_env: HexapodRoughTerrainEnv | None = None
     if args.task == "command":
         for name, fixed_stage in (
             ("stage0", 0),
@@ -740,6 +834,20 @@ def main(default_task: str = "terrain") -> None:
                 fixed_curriculum_stage=fixed_stage,
                 scripted_commands=True,
             )
+    else:
+        fixed_patch = (
+            MIXED_PATCH_NAMES.index(args.best_video_terrain_patch)
+            if args.terrain_layout == "mixed"
+            else None
+        )
+        terrain_video_env = HexapodRoughTerrainEnv(
+            config=config_dict.ConfigDict(env._config.to_dict()),
+            terrain=args.terrain_layout,
+            command_curriculum=True,
+            fixed_curriculum_stage=0,
+            scripted_commands=True,
+            fixed_terrain_patch=fixed_patch,
+        )
 
     args.output.mkdir(parents=True, exist_ok=True)
     network_factory = functools.partial(
@@ -773,6 +881,14 @@ def main(default_task: str = "terrain") -> None:
             entity=args.wandb_entity,
             name=args.wandb_name or args.run_id,
             group=args.wandb_group,
+            tags=(
+                [
+                    f"competence-stage-{args.competence_stage:02d}",
+                    f"terrain-level-{args.terrain_level}",
+                ]
+                if args.task == "terrain" and args.competence_stage is not None
+                else None
+            ),
             mode=args.wandb_mode,
             config={
                 **wandb_config,
@@ -780,7 +896,7 @@ def main(default_task: str = "terrain") -> None:
                 "observation_size": int(env.reset(jax.random.PRNGKey(args.seed)).obs.shape[-1]),
                 "scene": env.xml_path,
                 "task": args.task,
-                "controller": "classical tripod + contact/workspace-safe 22D residual",
+                "controller": "position/heading/posture PI + tripod + 24D foot/body residual",
                 "action_contract_version": env.action_contract_version,
                 "observation_contract_version": env.observation_contract_version,
             },
@@ -788,6 +904,21 @@ def main(default_task: str = "terrain") -> None:
         wandb_run.define_metric("train/global_step")
         wandb_run.define_metric("eval/*", step_metric="train/global_step")
         wandb_run.define_metric("best/*", step_metric="train/global_step")
+        if args.task == "terrain":
+            wandb_run.summary["curriculum/stage"] = args.competence_stage
+            wandb_run.summary["curriculum/terrain_level"] = args.terrain_level
+            wandb_run.summary["curriculum/stair_total_rise_cm"] = (
+                100.0 * env._config.terrain.stair_total_rise
+            )
+            wandb_run.summary["curriculum/ramp_rise_cm"] = (
+                100.0 * env._config.terrain.ramp_rise
+            )
+            wandb_run.summary["curriculum/yaw_limit_rps"] = (
+                env._config.command_max_yaw_rate
+            )
+            wandb_run.summary["best/video_terrain_patch"] = (
+                args.best_video_terrain_patch
+            )
 
     latest_policy: dict[str, object] = {}
     pending_video: tuple[int, float] | None = None
@@ -853,7 +984,9 @@ def main(default_task: str = "terrain") -> None:
                 ("full", scripted_envs["full"], args.best_video_full_duration),
             )
         else:
-            render_specs = (("policy", env, args.best_video_duration),)
+            if terrain_video_env is None:
+                raise RuntimeError("terrain video environment was not initialized")
+            render_specs = (("policy", terrain_video_env, args.best_video_duration),)
 
         rendered: dict[str, Path] = {}
         errors: dict[str, str] = {}
@@ -870,6 +1003,13 @@ def main(default_task: str = "terrain") -> None:
                     width=args.best_video_width,
                     height=args.best_video_height,
                     terrain="flat" if args.task == "command" else args.terrain_layout,
+                    overlay_title=(
+                        f"S{args.competence_stage:02d} L{args.terrain_level} | "
+                        f"{args.best_video_terrain_patch.title()} | "
+                        f"Stairs {100.0 * env._config.terrain.stair_total_rise:.1f}cm total"
+                        if args.task == "terrain" and args.competence_stage is not None
+                        else None
+                    ),
                 )
             except Exception as exc:
                 # Rendering must not throw away an otherwise valid, long PPO run.
@@ -900,6 +1040,11 @@ def main(default_task: str = "terrain") -> None:
                 "full": "best/video_curriculum_full",
                 "policy": "best/video",
             }
+            if args.task == "terrain" and args.competence_stage is not None:
+                wandb_keys["policy"] = (
+                    f"best/video_stage{args.competence_stage:02d}_"
+                    f"level{args.terrain_level}"
+                )
             video_payload = {
                 wandb_keys[name]: wandb_module.Video(
                     str(path),

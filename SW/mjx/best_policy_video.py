@@ -39,6 +39,7 @@ def _overlay_frame(
     data: Any,
     command: np.ndarray,
     stage: int,
+    title: str | None,
     elapsed: float,
     transition: str | None,
 ) -> Any:
@@ -60,16 +61,18 @@ def _overlay_frame(
     )
     # MODEL_FORWARD is [0, -1, 0].
     forward_velocity = -float(local_velocity[1])
+    lateral_velocity = float(local_velocity[0])
     yaw_rate = float(data.qvel[5])
     lines = (
-        STAGE_LABELS.get(stage, f"Stage {stage}"),
+        title or STAGE_LABELS.get(stage, f"Stage {stage}"),
         f"t          {elapsed:6.2f} s",
         f"v_cmd / v  {command[0]:+6.3f} / {forward_velocity:+6.3f} m/s",
-        f"yaw_cmd/yaw {command[1]:+6.3f} / {yaw_rate:+6.3f} rad/s",
+        f"vy_cmd/vy   {command[1]:+6.3f} / {lateral_velocity:+6.3f} m/s",
+        f"yaw_cmd/yaw {command[2]:+6.3f} / {yaw_rate:+6.3f} rad/s",
     )
     panel_width = min(image.width - 20, 410)
     draw.rounded_rectangle(
-        (10, 10, panel_width, 126), radius=8, fill=(0, 0, 0, 175)
+        (10, 10, panel_width, 149), radius=8, fill=(0, 0, 0, 175)
     )
     draw.text((22, 18), lines[0], font=title_font, fill=(255, 255, 255, 255))
     for index, line in enumerate(lines[1:]):
@@ -252,6 +255,7 @@ def render_policy_video(
     height: int,
     terrain: str,
     overlay: bool = True,
+    overlay_title: str | None = None,
 ) -> Path:
     """Render deterministic policy inference using the exact MJX task env.
 
@@ -326,6 +330,7 @@ def render_policy_video(
                     data=host_data,
                     command=displayed_command,
                     stage=displayed_stage,
+                    title=overlay_title,
                     elapsed=elapsed,
                     transition=(
                         transition_text if elapsed <= transition_until else None

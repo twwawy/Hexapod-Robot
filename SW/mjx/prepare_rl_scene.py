@@ -10,6 +10,7 @@ import numpy as np
 
 from prepare_scene import SCENE_OUTPUT, prepare_scene
 from tripod_controller import LEG_PREFIXES
+from urdf_kinematics import FOOT_COLLISION_RADIUS
 
 
 RL_SCENE_OUTPUT = Path(__file__).resolve().parent / "generated/hexapod_rl.xml"
@@ -25,6 +26,8 @@ MIXED_PATCH_Y = (0.0, 3.0, 6.0, 9.0, 12.0, 15.0)
 MIXED_LANE_HALF_WIDTH = 0.9
 MIXED_CURB = (0.55, 0.55, 0.04)  # start, length, height
 MIXED_RAMP = (0.45, 1.20, 0.10)  # start, length, rise
+MIXED_STAIR_START_X = 0.50
+MIXED_STAIR_COUNT = 6
 MIXED_BLOCKS = (
     (0.50, -0.28, 0.22, 0.22, 0.035),
     (0.82, 0.20, 0.20, 0.28, 0.060),
@@ -165,7 +168,7 @@ def _add_robot_colliders(root: ET.Element, *, foot_friction: float = 1.2) -> Non
                     "name": f"{prefix}_foot_collision",
                     "type": "sphere",
                     "pos": _numbers(segment3),
-                    "size": "0.032",
+                    "size": f"{FOOT_COLLISION_RADIUS:.6g}",
                     "friction": f"{foot_friction:.6g} 0.01 0.001",
                     "rgba": "0.85 0.45 0.12 1",
                 },
@@ -244,7 +247,14 @@ def _add_patch_box(
     )
 
 
-def _add_mixed_patches(root: ET.Element, *, friction: float) -> None:
+def _add_mixed_patches(
+    root: ET.Element,
+    *,
+    friction: float,
+    stair_step_depth: float,
+    stair_step_height: float,
+    ramp_rise: float,
+) -> None:
     """Add several terrain families as parallel lanes in one MJX model."""
     worldbody = root.find("worldbody")
     if worldbody is None:
@@ -263,7 +273,7 @@ def _add_mixed_patches(root: ET.Element, *, friction: float) -> None:
         rgba="0.35 0.48 0.58 1",
     )
 
-    ramp_start, ramp_length, ramp_rise = MIXED_RAMP
+    ramp_start, ramp_length, _ = MIXED_RAMP
     angle = float(np.arctan2(ramp_rise, ramp_length))
     thickness = 0.04
     worldbody.append(
@@ -307,10 +317,10 @@ def _add_mixed_patches(root: ET.Element, *, friction: float) -> None:
 
     _add_stairs(
         root,
-        step_start_x=0.50,
-        step_depth=0.28,
-        step_height=0.035,
-        step_count=6,
+        step_start_x=MIXED_STAIR_START_X,
+        step_depth=stair_step_depth,
+        step_height=stair_step_height,
+        step_count=MIXED_STAIR_COUNT,
         friction=friction,
         center_y=MIXED_PATCH_Y[4],
         name_prefix="mixed_stair",
@@ -338,6 +348,7 @@ def prepare_rl_scene(
     step_depth: float = STEP_DEPTH,
     step_height: float = STEP_HEIGHT,
     step_count: int = STEP_COUNT,
+    ramp_rise: float = MIXED_RAMP[2],
     friction: float = 1.0,
 ) -> Path:
     """Create a mesh-free RL scene for ``flat``, ``stairs``, or ``mixed`` terrain.
@@ -360,7 +371,7 @@ def prepare_rl_scene(
     if option is not None:
         option.set("timestep", "0.0025")
 
-    if step_depth <= 0.0 or step_height < 0.0 or step_count < 0:
+    if step_depth <= 0.0 or step_height < 0.0 or step_count < 0 or ramp_rise < 0.0:
         raise ValueError("terrain dimensions must satisfy depth > 0, height >= 0, count >= 0")
     if friction <= 0.0:
         raise ValueError("terrain friction must be positive")
@@ -385,7 +396,13 @@ def prepare_rl_scene(
             friction=1.1 * friction,
         )
     elif terrain == "mixed":
-        _add_mixed_patches(root, friction=1.1 * friction)
+        _add_mixed_patches(
+            root,
+            friction=1.1 * friction,
+            stair_step_depth=step_depth,
+            stair_step_height=step_height,
+            ramp_rise=ramp_rise,
+        )
 
     output.parent.mkdir(parents=True, exist_ok=True)
     ET.indent(tree, space="  ")

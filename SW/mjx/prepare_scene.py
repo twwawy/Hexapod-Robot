@@ -9,12 +9,13 @@ import xml.etree.ElementTree as ET
 
 from prepare_urdf import DEFAULT_OUTPUT as URDF_OUTPUT
 from prepare_urdf import SOURCE_URDF, prepare_urdf
+from urdf_kinematics import STAND_ROOT_HEIGHT
 
 
 SCENE_OUTPUT = Path(__file__).resolve().parent / "generated/hexapod_scene.xml"
 LEG_PREFIXES = ("RB", "RM", "RF", "LB", "LM", "LF")
 RIGHT_LEGS = frozenset(("RB", "RM", "RF"))
-STAND_HEIGHT = 0.287006
+STAND_HEIGHT = STAND_ROOT_HEIGHT
 ROOT_QUATERNION = (math.sqrt(0.5), 0.0, 0.0, math.sqrt(0.5))
 HIP_ANGLE = math.radians(0.0)
 KNEE_ANGLE = math.radians(30.0)

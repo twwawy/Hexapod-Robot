@@ -7,6 +7,16 @@ import math
 
 import numpy as np
 
+from urdf_kinematics import (
+    FEMUR_LENGTH,
+    NOMINAL_FOOT_RADIAL,
+    NOMINAL_FOOT_VERTICAL,
+    SHOULDER_RADIAL_OFFSET,
+    SHOULDER_VERTICAL_OFFSET,
+    TIBIA_LENGTH,
+    shoulder_lateral_offset,
+)
+
 
 LEG_PREFIXES = ("RF", "RM", "RB", "LF", "LM", "LB")
 TRIPOD_A = frozenset(("RF", "RB", "LM"))
@@ -17,22 +27,21 @@ RIGHT_LEGS = frozenset(("RF", "RM", "RB"))
 class GaitConfig:
     control_dt: float = 0.005
     phase_time: float = 0.5
-    stand_time: float = 1.0
+    stand_time: float = 5.6
     ramp_time: float = 1.0
     speed: float = 0.06
-    swing_height: float = 0.06
-    radial_offset: float = 0.01
-    max_joint_speed: float = math.radians(240.0)
+    swing_height: float = 0.20
+    radial_offset: float = 0.07
+    max_joint_speed: float = math.radians(315.8)
     joint_limit: float = math.radians(135.0)
 
 
 class TripodGaitController:
     """Generate position-actuator targets for the documented tripod gait."""
 
-    L1 = 0.074
-    L2 = 0.121
-    L3 = 0.230
-    NOMINAL_FOOT = np.array((0.218728, 0.0, -0.287006))
+    L1 = SHOULDER_RADIAL_OFFSET
+    L2 = FEMUR_LENGTH
+    L3 = TIBIA_LENGTH
     # The CAD/URDF frame is rotated -90 degrees around z from the controller
     # document frame: documented +x (forward) is model-local -y.
     MODEL_FORWARD = np.array((0.0, -1.0, 0.0))
@@ -77,24 +86,39 @@ class TripodGaitController:
         return 10.0 * tau**3 - 15.0 * tau**4 + 6.0 * tau**5
 
     @classmethod
-    def _inverse_kinematics(cls, foot: np.ndarray) -> np.ndarray:
+    def _inverse_kinematics(
+        cls, foot: np.ndarray, shoulder_lateral: float
+    ) -> np.ndarray:
         x, y, z = foot
-        theta1 = math.atan2(y, x)
         radius = math.hypot(x, y)
-        rho = radius - cls.L1
+        if radius + 1e-9 < abs(shoulder_lateral):
+            raise ValueError(f"IK target crosses the shoulder offset: {foot.tolist()}")
+        planar_radius = math.sqrt(max(0.0, radius * radius - shoulder_lateral**2))
+        theta1 = math.atan2(y, x) - math.atan2(shoulder_lateral, planar_radius)
+        theta1 = math.atan2(math.sin(theta1), math.cos(theta1))
+        rho = planar_radius - cls.L1
+        planar_z = z - SHOULDER_VERTICAL_OFFSET
         cosine3 = (
-            rho * rho + z * z - cls.L2**2 - cls.L3**2
+            rho * rho + planar_z * planar_z - cls.L2**2 - cls.L3**2
         ) / (2.0 * cls.L2 * cls.L3)
         if cosine3 < -1.000001 or cosine3 > 1.000001:
             raise ValueError(f"IK target is outside workspace: {foot.tolist()}")
         cosine3 = float(np.clip(cosine3, -1.0, 1.0))
-        theta3 = math.atan2(-math.sqrt(max(0.0, 1.0 - cosine3**2)), cosine3)
-        theta2 = math.atan2(z, rho) - math.atan2(
+        theta3 = math.acos(cosine3)
+        theta2 = math.atan2(-planar_z, rho) - math.atan2(
             cls.L3 * math.sin(theta3), cls.L2 + cls.L3 * math.cos(theta3)
         )
-        # The design document's servo convention is the opposite sign of the
-        # planar geometric angles for joints 2 and 3.
-        return np.array((theta1, -theta2, -theta3))
+        return np.array((theta1, theta2, theta3))
+
+    @staticmethod
+    def _nominal_foot(prefix: str) -> np.ndarray:
+        return np.array(
+            (
+                NOMINAL_FOOT_RADIAL,
+                shoulder_lateral_offset(right=prefix in RIGHT_LEGS),
+                NOMINAL_FOOT_VERTICAL,
+            )
+        )
 
     @staticmethod
     def _servo_to_model(prefix: str, servo_angles: np.ndarray) -> np.ndarray:
@@ -105,8 +129,11 @@ class TripodGaitController:
 
     def home_targets(self) -> np.ndarray:
         targets = np.zeros(self.model.nu)
-        servo = self._inverse_kinematics(self.NOMINAL_FOOT)
         for prefix in LEG_PREFIXES:
+            servo = self._inverse_kinematics(
+                self._nominal_foot(prefix),
+                shoulder_lateral_offset(right=prefix in RIGHT_LEGS),
+            )
             raw = self._servo_to_model(prefix, servo)
             for index, value in enumerate(raw, start=1):
                 targets[self._actuator_ids[(prefix, index)]] = value
@@ -117,7 +144,8 @@ class TripodGaitController:
     ) -> np.ndarray:
         smooth = self._quintic(tau)
         if swing:
-            offset = step_length * (smooth - 0.5)
+            bezier_progress = smooth * smooth * (3.0 - 2.0 * smooth)
+            offset = step_length * (bezier_progress - 0.5)
             lift = 4.0 * self.config.swing_height * smooth * (1.0 - smooth)
             radial = 4.0 * self.config.radial_offset * smooth * (1.0 - smooth)
         else:
@@ -127,8 +155,10 @@ class TripodGaitController:
 
         origin = self._origins[prefix]
         outward = self._outward[prefix]
-        nominal_body = origin + outward * self.NOMINAL_FOOT[0]
-        nominal_body[2] = origin[2] + self.NOMINAL_FOOT[2]
+        tangent = np.array((-outward[1], outward[0], 0.0))
+        nominal = self._nominal_foot(prefix)
+        nominal_body = origin + outward * nominal[0] + tangent * nominal[1]
+        nominal_body[2] = origin[2] + nominal[2]
         target_body = (
             nominal_body
             + self.MODEL_FORWARD * offset
@@ -136,7 +166,6 @@ class TripodGaitController:
             + np.array((0.0, 0.0, lift))
         )
 
-        tangent = np.array((-outward[1], outward[0], 0.0))
         relative = target_body - origin
         return np.array(
             (np.dot(relative, outward), np.dot(relative, tangent), relative[2])
@@ -163,19 +192,22 @@ class TripodGaitController:
         first_half = phase < 0.5
         tau = phase * 2.0 if first_half else (phase - 0.5) * 2.0
         smooth = self._quintic(tau)
+        bezier_progress = smooth * smooth * (3.0 - 2.0 * smooth)
         height = self.config.swing_height if swing_height is None else swing_height
         radial_limit = self.config.radial_offset if radial_offset is None else radial_offset
         desired = np.zeros(self.model.nu)
 
         for prefix in LEG_PREFIXES:
             swing = (prefix in TRIPOD_A) == first_half
-            phase_position = smooth - 0.5 if swing else 0.5 - tau
+            phase_position = bezier_progress - 0.5 if swing else 0.5 - tau
             lift = 4.0 * height * smooth * (1.0 - smooth) if swing else 0.0
             radial = 4.0 * radial_limit * smooth * (1.0 - smooth) if swing else 0.0
             origin = self._origins[prefix]
             outward = self._outward[prefix]
-            nominal_body = origin + outward * self.NOMINAL_FOOT[0]
-            nominal_body[2] = origin[2] + self.NOMINAL_FOOT[2]
+            tangent = np.array((-outward[1], outward[0], 0.0))
+            nominal = self._nominal_foot(prefix)
+            nominal_body = origin + outward * nominal[0] + tangent * nominal[1]
+            nominal_body[2] = origin[2] + nominal[2]
             yaw_velocity = np.cross(
                 np.array((0.0, 0.0, command[1])), nominal_body
             )
@@ -187,7 +219,6 @@ class TripodGaitController:
                 + outward * radial
                 + np.array((0.0, 0.0, lift))
             )
-            tangent = np.array((-outward[1], outward[0], 0.0))
             relative = target_body - origin
             foot = np.array(
                 (
@@ -196,7 +227,12 @@ class TripodGaitController:
                     relative[2],
                 )
             )
-            raw = self._servo_to_model(prefix, self._inverse_kinematics(foot))
+            raw = self._servo_to_model(
+                prefix,
+                self._inverse_kinematics(
+                    foot, shoulder_lateral_offset(right=prefix in RIGHT_LEGS)
+                ),
+            )
             for index, value in enumerate(raw, start=1):
                 desired[self._actuator_ids[(prefix, index)]] = value
 
@@ -217,7 +253,9 @@ class TripodGaitController:
             for prefix in LEG_PREFIXES:
                 swing = (prefix in TRIPOD_A) == phase_a
                 foot = self._foot_target(prefix, tau, swing, step_length)
-                servo = self._inverse_kinematics(foot)
+                servo = self._inverse_kinematics(
+                    foot, shoulder_lateral_offset(right=prefix in RIGHT_LEGS)
+                )
                 raw = self._servo_to_model(prefix, servo)
                 for index, value in enumerate(raw, start=1):
                     desired[self._actuator_ids[(prefix, index)]] = value
