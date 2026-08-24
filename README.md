@@ -2,6 +2,12 @@
 
 6족 로봇의 하드웨어 자산과 MuJoCo MJX 기반 보행 실험을 함께 관리하는 저장소다. 현재 강화학습의 기준 경로는 **classical tripod gait + Cartesian residual RL**이다.
 
+> 이 작업 브랜치의 STM32 펌웨어 직접 이식 기반 계단 학습은 루트
+> `mjx/`에 있다. 실제 펌웨어의 gait/contact/posture/IK를 base controller로
+> 고정하고 안전-gated 18-D 발끝 residual만 학습한다. 실행 명령, W&B,
+> best/stage/progress 영상과 checkpoint 규칙은
+> [mjx/RL_DESIGN.md](mjx/RL_DESIGN.md)를 따른다.
+
 ## 현재 기준 경로
 
 Canonical contract: `classical_wbc_cartesian_body6d_residual_v1` action(24-D) +
