@@ -5,7 +5,12 @@
 #include <stddef.h>
 #include <string.h>
 
-/* SPI2 Slave의 물리 인터페이스만 초기화한다. */
+static const uint8_t jetson_spi_start_message[JETSON_SPI_FRAME_SIZE] =
+{
+    'S', 'T', 'M', '3', '2', 'O', 'K', '!'
+};
+
+/* SPI2 Slave와 현재 사용 중인 32바이트 링크 테스트를 초기화한다. */
 void JetsonSpi_Init(JetsonSpi_Handle_t *handle,
                     SPI_HandleTypeDef *spi)
 {
@@ -14,19 +19,57 @@ void JetsonSpi_Init(JetsonSpi_Handle_t *handle,
         return;
     }
 
-    memset(handle, 0, sizeof(*handle));                  // 이전 통신 상태를 제거한다.
-    handle->spi = spi;                                   // CubeMX SPI2 Handle을 연결한다.
-    handle->protocol_ready = false;                      // 미정 프로토콜을 비활성화한다.
-    HAL_GPIO_WritePin(DRDY_GPIO_Port, DRDY_Pin, GPIO_PIN_RESET);  // DRDY를 기본 Low로 둔다.
+    memset(handle, 0, sizeof(*handle));
+    handle->spi = spi;
+
+    if (spi == NULL)
+    {
+        HAL_GPIO_WritePin(DRDY_GPIO_Port, DRDY_Pin, GPIO_PIN_RESET);
+        return;
+    }
+
+    memcpy(handle->tx_frame,
+           jetson_spi_start_message,
+           JETSON_SPI_FRAME_SIZE);
+    handle->protocol_ready = true;
+
+    /* Jetson에 첫 번째 32바이트 트랜잭션을 시작해도 된다고 알린다. */
+    HAL_GPIO_WritePin(DRDY_GPIO_Port, DRDY_Pin, GPIO_PIN_SET);
 }
 
-/* 프로토콜 확정 전에는 SPI 송수신을 시작하지 않는다. */
+/*
+ * 첫 응답은 "STM32OK!"이고, 이후 응답은 직전 트랜잭션에서 받은
+ * 32바이트다. 현재 하드웨어 링크 확인용이며 호출 중에는 블로킹된다.
+ */
 bool JetsonSpi_Process(JetsonSpi_Handle_t *handle)
 {
+    HAL_StatusTypeDef status;
+
     if ((handle == NULL) || (handle->spi == NULL) || !handle->protocol_ready)
     {
         return false;
     }
 
-    return false;  // 프레임과 DRDY 순서 확정 후 구현한다.
+    status = HAL_SPI_TransmitReceive(handle->spi,
+                                     handle->tx_frame,
+                                     handle->rx_frame,
+                                     JETSON_SPI_FRAME_SIZE,
+                                     HAL_MAX_DELAY);
+
+    HAL_GPIO_WritePin(DRDY_GPIO_Port, DRDY_Pin, GPIO_PIN_RESET);
+
+    if (status != HAL_OK)
+    {
+        handle->error_count++;
+        return false;
+    }
+
+    memcpy(handle->tx_frame,
+           handle->rx_frame,
+           JETSON_SPI_FRAME_SIZE);
+    handle->transfer_count++;
+
+    /* 다음 32바이트 트랜잭션을 받을 준비가 끝났다. */
+    HAL_GPIO_WritePin(DRDY_GPIO_Port, DRDY_Pin, GPIO_PIN_SET);
+    return true;
 }
