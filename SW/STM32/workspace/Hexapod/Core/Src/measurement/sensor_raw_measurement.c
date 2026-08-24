@@ -21,6 +21,8 @@ void SensorRawMeasurement_Init(SensorRawMeasurement_t *measurement,
     measurement->sensors = sensors;                // 실제 센서 통합기를 연결한다.
     g_measurement_debug.sensor_sample_count = 0U;  // 전역 정상 측정 횟수를 초기화한다.
     g_measurement_debug.sensor_error_count = 0U;   // 전역 오류 횟수를 초기화한다.
+    g_measurement_debug.adc_last_error_device = MCP3008_INVALID_INDEX;  // ADC 오류 장치를 미발생으로 둔다.
+    g_measurement_debug.adc_last_error_channel = MCP3008_INVALID_INDEX; // ADC 오류 채널을 미발생으로 둔다.
     for (device = 0U; device < MCP3008_DEVICE_COUNT; ++device)
     {
         for (channel = 0U; channel < MCP3008_CHANNEL_COUNT; ++channel)
@@ -38,21 +40,43 @@ bool SensorRawMeasurement_Sample(SensorRawMeasurement_t *measurement)
 {
     uint32_t device;   // ADC 장치 번호를 저장한다.
     uint32_t channel;  // ADC 채널 번호를 저장한다.
+    bool adc_ok;       // ADC 전체 읽기 결과를 저장한다.
 
     if ((measurement == NULL) || (measurement->sensors == NULL))
     {
         return false;
     }
 
-    if (!SensorManager_Update(measurement->sensors))
+    adc_ok = SensorManager_Update(measurement->sensors);  // 센서 파싱과 ADC 읽기를 실행한다.
+    (void)SensorManager_GetSnapshot(measurement->sensors,
+                                    &measurement->latest);  // ADC 실패와 무관하게 최신 센서를 보관한다.
+    g_measurement_debug.latest_sensor = measurement->latest; // GPS·IMU 최신값을 디버거에 갱신한다.
+    g_measurement_debug.gps_update_count =
+        measurement->sensors->gps->data.update_counter;  // GPS 갱신 횟수를 표시한다.
+    g_measurement_debug.gps_rx_overflow_count =
+        measurement->sensors->gps->rx_overflow_count;    // GPS 버퍼 초과를 표시한다.
+    g_measurement_debug.imu_frame_count =
+        measurement->sensors->imu->data.frame_counter;   // WT931 정상 프레임 수를 표시한다.
+    g_measurement_debug.imu_checksum_error_count =
+        measurement->sensors->imu->data.checksum_error_count;  // WT931 체크섬 오류를 표시한다.
+    g_measurement_debug.imu_rx_overflow_count =
+        measurement->sensors->imu->rx_overflow_count;          // WT931 버퍼 초과를 표시한다.
+    g_measurement_debug.adc_update_count =
+        measurement->sensors->adc.update_counter;         // ADC 정상 갱신 횟수를 표시한다.
+    g_measurement_debug.adc_driver_error_count =
+        measurement->sensors->adc.error_count;            // ADC 드라이버 오류 수를 표시한다.
+    g_measurement_debug.adc_last_error_device =
+        measurement->sensors->adc.last_error_device;      // ADC 마지막 실패 장치를 표시한다.
+    g_measurement_debug.adc_last_error_channel =
+        measurement->sensors->adc.last_error_channel;     // ADC 마지막 실패 채널을 표시한다.
+
+    if (!adc_ok)
     {
         measurement->read_error_count++;  // 실제 ADC 읽기 실패를 기록한다.
         g_measurement_debug.sensor_error_count = measurement->read_error_count;  // 디버거 오류 횟수를 갱신한다.
         return false;
     }
 
-    (void)SensorManager_GetSnapshot(measurement->sensors, &measurement->latest);  // 최신 스냅샷을 보관한다.
-    g_measurement_debug.latest_sensor = measurement->latest;                      // 디버거 최신 센서값을 갱신한다.
     for (device = 0U; device < MCP3008_DEVICE_COUNT; ++device)
     {
         for (channel = 0U; channel < MCP3008_CHANNEL_COUNT; ++channel)
