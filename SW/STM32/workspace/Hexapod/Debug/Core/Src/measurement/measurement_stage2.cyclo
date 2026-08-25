@@ -1,0 +1,8 @@
+../Core/Src/measurement/measurement_stage2.c:39:13:MeasurementStage2_UpdateTarget	1
+../Core/Src/measurement/measurement_stage2.c:48:13:MeasurementStage2_ResetRange	3
+../Core/Src/measurement/measurement_stage2.c:77:13:MeasurementStage2_PrepareNext	1
+../Core/Src/measurement/measurement_stage2.c:86:13:MeasurementStage2_FindCandidate	6
+../Core/Src/measurement/measurement_stage2.c:125:13:MeasurementStage2_UpdateRange	6
+../Core/Src/measurement/measurement_stage2.c:157:13:MeasurementStage2_TryCapture	13
+../Core/Src/measurement/measurement_stage2.c:235:6:MeasurementStage2_Init	3
+../Core/Src/measurement/measurement_stage2.c:276:6:MeasurementStage2_Process	9

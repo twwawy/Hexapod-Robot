@@ -48,6 +48,16 @@ typedef struct
     bool imu_check_complete;                                           // WT931 최종 확인 완료를 저장한다.
 
     bool adc_mapping_recorded[MCP3008_LEG_COUNT][MCP3008_LEG_INPUT_COUNT]; // ADC 입력별 매핑 확인을 저장한다.
+    uint16_t adc_range[MCP3008_DEVICE_COUNT][MCP3008_CHANNEL_COUNT];       // 대상 동작 중 채널별 변화 폭을 저장한다.
+    uint8_t adc_mapping_target_leg;                                       // 현재 움직일 다리 번호 1~6을 저장한다.
+    uint8_t adc_mapping_target_input;                                     // 현재 움직일 J1·J2·J3·압력 번호 1~4를 저장한다.
+    uint8_t adc_mapping_candidate_device;                                 // 변화가 가장 큰 MCP3008 번호 1~3을 저장한다.
+    uint8_t adc_mapping_candidate_channel;                                // 변화가 가장 큰 채널 번호 0~7을 저장한다.
+    uint16_t adc_mapping_candidate_range;                                 // 후보 채널의 변화 폭을 저장한다.
+    uint8_t adc_mapping_completed_count;                                  // 완료한 센서 매핑 수를 저장한다.
+    bool adc_mapping_waiting_motion;                                      // 대상 센서를 움직여도 되는 상태를 저장한다.
+    bool adc_mapping_complete;                                            // 24채널 매핑 완료를 저장한다.
+    bool adc_mapping_ambiguous;                                           // 후보 채널 구분 실패를 저장한다.
 
     uint16_t joint_minimum_raw[ROBOT_JOINT_COUNT];                     // 최소 자세 관절 ADC를 저장한다.
     uint16_t joint_zero_raw[ROBOT_JOINT_COUNT];                        // 영점 자세 관절 ADC를 저장한다.
