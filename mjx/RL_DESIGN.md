@@ -14,7 +14,7 @@
   → contact-gated Tripod / Early·Late Landing
   → PULL/Bezier foot trajectory
   → roll/pitch posture feedback
-  → bounded RL foot residual
+  → bounded RL foot residual + phase-gated adaptive swing height
   → workspace gate / IK hold / 315.8 deg/s joint limit
   → MuJoCo DS51150 position actuators (12.6 V, ±14.709975 Nm stall)
 ```
@@ -53,19 +53,23 @@ joint armature/damping/friction과 5초 powered-home 자세 유지를 회귀 검
 
 | 범위 | 의미 | 한계 |
 |---|---|---|
-| `0:18` | 다리별 local XYZ 발끝 residual | X ±40 mm, Y ±20 mm, Z ±90 mm |
+| `0:18` | 다리별 local XYZ action | Swing X ±40 mm, Y ±20 mm; Z는 높이 4~25 cm |
 
-- Swing 다리에는 XYZ를 적용한다.
-- Stance와 Late-Landing 다리에는 Z만 적용해 지지발 XY 미끄럼 명령을 막는다.
+- Swing X/Y는 Cartesian residual로 적용한다.
+- Swing Z는 `-1/0/+1 → 4/6/25 cm` 높이 명령이며, phase envelope를 곱해
+  이륙점과 착지점의 Z offset은 항상 0이다.
+- Stance Z는 ±20 mm만 허용하고 XY는 0이다.
+- Late-Landing에는 RL residual을 적용하지 않고 펌웨어 하강 탐색만 사용한다.
 - residual은 0.10초 low-pass filter를 지난다.
 - IK 2-link 작업공간은 경계 안쪽 1 mm에서 제한한다.
 - 도달 불가능한 residual은 다리별로 거부되고 펌웨어 nominal 목표를 사용한다.
-- 정책은 gait phase/frequency, swing height 0.20 m, radial offset 0.07 m,
-  contact state machine, 자세 PI, IK 또는 관절 속도 제한을 바꿀 수 없다.
+- 정책은 4~25 cm 범위 안에서 다리별 Swing 높이만 선택할 수 있다. gait
+  phase/frequency, radial offset 0.07 m, contact state machine, 자세 PI, IK 또는
+  관절 속도 제한은 바꿀 수 없다.
 
-계약 이름은 `stm32_firmware_cartesian_foot_residual_v2`이다. v1과 tensor shape은
-같으므로 초기 policy로 불러올 수 있지만, Y residual 폭과 IK 여유는 새 값으로 적용된다.
-과거 22-D checkpoint는 호환되지 않는다.
+계약 이름은 `stm32_firmware_adaptive_swing_residual_v3`이다. tensor 크기는 계속
+18-D지만 v2의 Z는 Cartesian endpoint offset이고 v3의 Z는 phase-gated 높이 명령이라
+의미가 다르다. 따라서 v1/v2 및 과거 22-D checkpoint는 직접 복원하지 않는다.
 
 ## Observation 142-D
 
@@ -79,8 +83,8 @@ joint armature/damping/friction과 5초 powered-home 자세 유지를 회귀 검
 - 이전 action
 
 계약 이름은 `firmware_state_collision_terrain_curriculum_v2`이다. 관측 배열의
-위치와 크기는 기존 stairs v1과 같아서 검증된 18-D/142-D checkpoint는 초기화에
-사용할 수 있다.
+위치와 크기는 기존 stairs v1과 같다. 다만 adaptive swing v3에서는 action 의미가
+달라졌으므로 전체 checkpoint 직접 복원은 action contract 검사에서 차단한다.
 
 ## 제어기 발산 종료 조건
 
@@ -108,7 +112,7 @@ failure로 종료하며 **시간 간격을 곱하지 않은 -30**을 준다.
 
 | Level | 지형 | 상세 |
 |---:|---|---|
-| 0 | 평지 | 고정 최소 budget만 학습하고 종료 |
+| 0 | 평지 | 최소 baseline 후 competence 미달 시 한 번 더 시도 |
 | 1 | 울퉁불퉁 | 최대 2.5 cm 높이 타일 |
 | 2 | 강한 울퉁불퉁 | 최대 5 cm 높이 타일 |
 | 3 | 경사면 | 8° 연속 경사 |
@@ -117,11 +121,13 @@ failure로 종료하며 **시간 간격을 곱하지 않은 -30**을 준다.
 | 9~12 | 연속 10단 계단 | 한 riser 5/10/15/20 cm |
 
 최종 level 12는 **20 cm riser가 10번 연속**되며 최상단은 바닥에서 2 m다.
-Level 0은 기본 262,144 step(기본 PPO 설정의 4 update)만 실행한다. Level 1 이후는
-각 stage 평가의 `eval/episode_terrain_success`가 기본 0.80 이상일 때만 다음 level로
-올라가며, 미달하면 같은 level을 새 stage에서 반복한다. `--max-stages-per-level 3`을
-주면 한 level을 최대 세 번만 시도한 뒤 다음 level로 강제 승급한다. stage 사이에
-최고 평가 checkpoint를 이어가려면 `--checkpoint-selection best`를 사용한다.
+Level 0은 기본 262,144 step(기본 PPO 설정의 4 update) baseline으로 시작하고,
+competence 미달이면 한 번 더 시도한다. Level 0~3(평지, 두 rough, 8° 경사)은
+level당 최대 2회, Level 4~12(15° 경사부터 최종 계단)는 최대 4회 시도한다.
+각 stage의 `eval/episode_terrain_success`가 기본 0.80 이상이면 제한에 닿기 전에도
+즉시 다음 level로 올라간다. `--max-stages-per-level N`을 명시하면 이 2/4 규칙을
+전체 level 공통 N회로 override한다. stage 사이에 최고 평가 checkpoint를
+이어가려면 `--checkpoint-selection best`를 사용한다.
 
 ## 보상과 성공
 
@@ -130,6 +136,8 @@ Level 0은 기본 262,144 step(기본 PPO 설정의 4 update)만 실행한다. L
   각각 더 강하게 감점해, 제한에 걸리는 동작보다 작은 안전 residual을 우선 학습한다.
 - torque/saturation, joint velocity, lateral/vertical velocity, residual 크기와 변화,
   controller/policy rejection, body/self collision을 페널티로 둔다.
+- Swing 높이 자체와 공중에 뜬 뒤 Swing 전반부에 다시 충돌하는 toe scuff를 별도
+  페널티로 둬, 평지에서는 낮게 들고 장애물 통과에 필요한 경우에만 높이를 사용한다.
 - 경사면/계단에서 새 최고 높이에 처음 도달할 때만 ascent bonus를 지급해 접촉 높이 떨림으로
   보상을 반복 획득할 수 없게 한다.
 - 지형 끝을 몸체가 통과하고 경사면/계단의 최종 높이 지지가 확인되며 roll/pitch가 20°
@@ -167,7 +175,7 @@ $PY mjx/train_rough_terrain.py \
 $PY mjx/train_competence_curriculum.py \
   --run-name firmware-terrain-final-stairs \
   --flat-baseline-timesteps 262144 \
-  --stages 36 --stage-timesteps 5000000 \
+  --stages 44 --stage-timesteps 5000000 \
   --start-level 1 --max-level 12 \
   --level-progression competence \
   --wandb --wandb-project hexapod-firmware-terrain \
@@ -192,20 +200,17 @@ episode evaluation과 렌더링을 건너뛸 수 있다. Curriculum 실행에는
 `--init-checkpoint mjx/runs/terrain/<run>/checkpoints`를 지정한다. 로더는 18-D,
 142-D, network layer 및 semantic contract가 모두 맞을 때만 승계를 허용한다.
 
-현재 검증된 level 4 actor에서 10 kg/DS51150 동역학으로 새 run을 시작하는 명령은
-다음과 같다. 기본값인 `--no-init-value-function`으로 critic은 새 plant에 맞춰 다시
-학습하고 actor만 초기화한다. `mjx/runs/`는 Git에서 제외되므로 아래 checkpoint
-디렉터리는 실행 장비에 별도로 존재해야 한다.
+adaptive swing v3는 Z action 의미가 바뀌므로 기존 level 4 actor를 직접 이어받지
+않고 level 0부터 새 run을 시작한다.
 
 ```bash
 /home/huro/bin/hexapod-mjx-python mjx/train_competence_curriculum.py \
-  --run-name firmware-terrain-10kg-level4 \
-  --seed 8 --flat-baseline-timesteps 0 \
-  --start-level 4 --max-level 12 \
-  --stages 36 --stage-timesteps 5000000 \
-  --level-progression competence --max-stages-per-level 3 \
+  --run-name firmware-terrain-adaptive-swing \
+  --seed 8 --flat-baseline-timesteps 262144 \
+  --start-level 1 --max-level 12 \
+  --stages 44 --stage-timesteps 5000000 \
+  --level-progression competence \
   --checkpoint-selection best \
-  --init-checkpoint mjx/runs/terrain/firmware-terrain-ik-safe-max3-v3-stage07-level4_20260825-151107_seed8/checkpoints/000003407872 \
   --wandb --wandb-project hexapod-firmware-terrain \
   -- --num-envs 1024 --num-evals 4 --num-eval-envs 32
 ```

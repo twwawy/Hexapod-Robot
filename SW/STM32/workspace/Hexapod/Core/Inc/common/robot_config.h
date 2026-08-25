@@ -36,8 +36,8 @@
 
 #define ROBOT_GAIT_LINEAR_THRESHOLD_MPS 0.005f      // 보행 시작 선속도 기준을 정의한다.
 #define ROBOT_GAIT_YAW_THRESHOLD_RADPS  (1.0f * ROBOT_DEG_TO_RAD_F)
-#define ROBOT_SWING_HEIGHT_M            0.20f       // 기본 Swing 높이를 정의한다.
-#define ROBOT_SWING_HEIGHT_MIN_M        0.15f       // 최소 Swing 높이를 정의한다.
+#define ROBOT_SWING_HEIGHT_M            0.06f       // 평지 기본 Swing 높이를 정의한다.
+#define ROBOT_SWING_HEIGHT_MIN_M        0.04f       // 최소 Swing 높이를 정의한다.
 #define ROBOT_SWING_HEIGHT_MAX_M        0.25f       // 최대 Swing 높이를 정의한다.
 #define ROBOT_SWING_RADIAL_OFFSET_M     0.07f       // Swing 방사 오프셋을 정의한다.
 #define ROBOT_EARLY_LANDING_PROGRESS    0.50f       // Early Landing 시작점을 정의한다.

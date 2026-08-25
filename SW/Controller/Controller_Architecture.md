@@ -16,8 +16,8 @@
 | 최대 Roll·Pitch 목표각 | ±45 deg |
 | 보정 모드 이동 속도 | 각 축 ±0.05 m/s |
 | 보정 모드 Yaw 목표각 | ±10 deg |
-| 기본 Swing Height | 0.20 m |
-| Swing Height 범위 | 0.15~0.25 m |
+| 기본 Swing Height | 0.06 m |
+| Swing Height 범위 | 0.04~0.25 m |
 | Swing 방사 오프셋 | 0.07 m |
 | IK 작업공간 여유 | 0.001 m (1 mm) |
 | 관절 범위 | -135~135 deg |
@@ -180,7 +180,9 @@ Swing 착지점은 다음 Stance 동안 예상되는 몸체 이동과 회전을 
 
 Swing 중간에는 다리 장착 방향 바깥쪽으로 최대 0.07 m의 방사 오프셋을 추가한다. 오프셋은 시작과 착지에서 0이므로 착지점은 바뀌지 않는다.
 
-Swing Height 기본값은 0.20 m이고 몸체 z Offset에 따라 0.15~0.25 m 범위에서 변한다.
+Swing Height 기본값은 0.06 m이고 몸체 z Offset에 따라 0.04~0.25 m 범위에서 변한다.
+RL 경로에서는 다리별 Z action이 같은 범위의 phase-gated 높이를 선택하며 이륙점과
+착지점에는 Z offset을 남기지 않는다.
 
 ## 10. 접촉 적응
 

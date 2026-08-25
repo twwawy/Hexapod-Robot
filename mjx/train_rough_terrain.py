@@ -27,7 +27,6 @@ from policy_video import render_policy_video
 from rough_terrain_env import (
     ACTION_CONTRACT_VERSION,
     ACTION_SIZE,
-    LEGACY_ACTION_CONTRACT_VERSION,
     LEGACY_OBSERVATION_CONTRACT_VERSION,
     OBSERVATION_CONTRACT_VERSION,
     OBSERVATION_SIZE,
@@ -263,10 +262,10 @@ def _resolve_checkpoint(path: Path, network_layers: tuple[int, ...]) -> Path:
     if not metadata_path.exists():
         raise SystemExit(f"checkpoint is missing semantic metadata: {metadata_path}")
     metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
-    compatible_action_contracts = {
-        ACTION_CONTRACT_VERSION,
-        LEGACY_ACTION_CONTRACT_VERSION,
-    }
+    # v3 changes every Z output from a Cartesian endpoint offset into a
+    # phase-gated swing-height command.  Tensor shape alone is therefore not
+    # enough for safe restoration from v1/v2 policies.
+    compatible_action_contracts = {ACTION_CONTRACT_VERSION}
     if metadata.get("action_contract_version") not in compatible_action_contracts:
         raise SystemExit("checkpoint action semantics do not match this firmware policy")
     saved_observation_contract = metadata.get("observation_contract_version")
@@ -435,6 +434,10 @@ def _smoke_test(env: HexapodRoughTerrainEnv, seed: int, steps: int) -> None:
         f"level={env.curriculum_level} terrain={env.terrain_description} | "
         f"obs={state.obs.shape[-1]} action={env.action_size} | "
         f"reward={float(state.reward):.4f} done={int(state.done)} | "
+        f"swing_mean={float(state.metrics['swing_height_mean_m']):.3f}m "
+        f"swing_max={float(state.metrics['swing_height_max_m']):.3f}m "
+        f"boost={float(state.metrics['swing_height_boost_fraction']):.3f} "
+        f"scuff={float(state.metrics['early_swing_contact_fraction']):.3f} | "
         f"wall={time.monotonic() - started:.2f}s"
     )
 

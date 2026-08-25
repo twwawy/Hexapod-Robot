@@ -341,7 +341,7 @@ STANCE 발이 지면의 같은 위치를 유지하도록 몸체 이동과 회전
 
 ### `high_control/swing_trajectory.h`
 
-착지점, Quintic 시간 스케일링, Bezier 궤적과 방사 오프셋을 계산한다. Swing Height 기본값은 0.20 m이며 0.15~0.25 m 범위에서 사용한다.
+착지점, Quintic 시간 스케일링, Bezier 궤적과 방사 오프셋을 계산한다. Swing Height 기본값은 0.06 m이며 0.04~0.25 m 범위에서 사용한다.
 
 ### `high_control/contact_adaptation.h`
 
@@ -522,7 +522,7 @@ Kill 상태를 반영한 Relay 출력
 | 최대 x·y 속도 | 각 ±0.28 m/s |
 | 최대 Yaw 속도 | ±45 deg/s |
 | 최대 Roll·Pitch | ±45 deg |
-| Swing Height | 기본 0.20 m, 범위 0.15~0.25 m |
+| Swing Height | 기본 0.06 m, 범위 0.04~0.25 m |
 | Early Landing 시작 | Swing 진행률 50% |
 | Late Landing 하강 | 0.20 m/s |
 | 작업공간 여유 | 0.001 m (1 mm) |

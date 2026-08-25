@@ -17,10 +17,21 @@ class FirmwareMjxControllerTest(unittest.TestCase):
     def test_policy_y_authority_and_workspace_margin_are_conservative(self) -> None:
         np.testing.assert_allclose(
             np.asarray(firmware_mjx.RESIDUAL_SCALE),
-            np.asarray((0.04, 0.02, 0.09)),
+            np.asarray((0.04, 0.02, 0.02)),
             atol=1.0e-8,
         )
         self.assertAlmostEqual(firmware_mjx.WORKSPACE_MARGIN, 0.001)
+        self.assertAlmostEqual(firmware_mjx.SWING_HEIGHT, 0.06)
+        self.assertAlmostEqual(firmware_mjx.SWING_HEIGHT_MIN, 0.04)
+        self.assertAlmostEqual(firmware_mjx.SWING_HEIGHT_MAX, 0.25)
+        peak = firmware_mjx._swing(
+            jp.asarray(0.5), firmware_mjx.BASE_FEET, firmware_mjx.BASE_FEET
+        )
+        np.testing.assert_allclose(
+            np.asarray(peak[:, 2] - firmware_mjx.BASE_FEET[:, 2]),
+            np.full(6, 0.06),
+            atol=1.0e-7,
+        )
 
         outer_local = jp.tile(
             jp.asarray(
@@ -46,6 +57,47 @@ class FirmwareMjxControllerTest(unittest.TestCase):
             + firmware_mjx.LINK_3
             - firmware_mjx.WORKSPACE_MARGIN,
             places=6,
+        )
+
+    def test_adaptive_swing_height_is_phase_gated_and_state_specific(self) -> None:
+        action = np.zeros((6, 3), dtype=np.float32)
+        action[:, 0] = 1.0
+        action[:, 1] = 1.0
+        action[:, 2] = np.asarray((1.0, -1.0, 0.5, -0.5, 1.0, 1.0))
+        gait_state = jp.asarray(
+            (
+                firmware_mjx.LEG_SWING,
+                firmware_mjx.LEG_SWING,
+                firmware_mjx.LEG_STANCE,
+                firmware_mjx.LEG_STANCE,
+                firmware_mjx.LEG_LATE_LANDING,
+                firmware_mjx.LEG_SWING,
+            )
+        )
+        progress = jp.asarray((0.5, 0.5, 0.5, 0.5, 0.5, 0.0))
+        residual, heights = firmware_mjx._phase_gated_policy_residual(
+            jp.asarray(action.reshape(-1)), gait_state, progress
+        )
+        residual = np.asarray(residual)
+        heights = np.asarray(heights)
+
+        self.assertAlmostEqual(heights[0], 0.25, places=6)
+        self.assertAlmostEqual(heights[1], 0.04, places=6)
+        self.assertAlmostEqual(heights[2], 0.155, places=6)
+        self.assertAlmostEqual(residual[0, 2], 0.19, places=6)
+        self.assertAlmostEqual(residual[1, 2], -0.02, places=6)
+        self.assertAlmostEqual(residual[2, 2], 0.01, places=6)
+        self.assertAlmostEqual(residual[3, 2], -0.01, places=6)
+        np.testing.assert_allclose(residual[4], np.zeros(3), atol=1.0e-8)
+        self.assertAlmostEqual(residual[5, 2], 0.0, places=7)
+
+        endpoint_residual, _ = firmware_mjx._phase_gated_policy_residual(
+            jp.asarray(action.reshape(-1)),
+            jp.full(6, firmware_mjx.LEG_SWING),
+            jp.asarray((0.0, 1.0, 0.0, 1.0, 0.0, 1.0)),
+        )
+        np.testing.assert_allclose(
+            np.asarray(endpoint_residual)[:, 2], np.zeros(6), atol=1.0e-7
         )
 
     def test_initial_model_targets_match_home_pose(self) -> None:

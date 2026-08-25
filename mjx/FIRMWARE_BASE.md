@@ -53,6 +53,10 @@ RL scene은 원본 링크 질량과 관성을 비례 스케일해 로봇 전체�
 - `servo_model.py`: DS51150 사양과 교체 가능한 calibration prior를 한 곳에서 정의
 - `rough_terrain_env.py`: 펌웨어 base 위 18-D 발끝 residual과 안전 종료/계단 보상
 
+기본 Swing 높이는 평지 기준 6 cm다. RL Z action은 Swing에서 4~25 cm 높이를
+선택하지만 이륙·착지점 Z는 바꾸지 않는다. Stance에서는 ±20 mm만 허용하며
+Late Landing은 정책 개입 없이 펌웨어가 처리한다.
+
 생성되는 `generated/libhexapod_firmware_controller.so`는 빌드 산출물이므로 Git에
 포함하지 않는다. STM32 high-control 소스가 변경되면 다음 실행 때 자동으로 다시
 빌드된다.

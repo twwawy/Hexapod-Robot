@@ -18,29 +18,30 @@
 | 액추에이터 | DS51150-270, 12.6 V 기준 geared position servo |
 | 정격 모델 | 357:1, 150 kgf·cm = `14.709975 Nm`, 0.19 s/60° = `315.8 deg/s` |
 | MuJoCo servo prior | `kp=500`, `kv=10`, armature `0.02 kg·m²`, damping `0.15 Nms/rad`, friction loss `0.8 Nm` |
-| 정책 계약 | 18-D foot residual / 142-D observation |
+| 정책 계약 | 18-D adaptive-swing foot residual v3 / 142-D observation |
 
 토크·기어비·무부하 속도는 DS51150 제조사 사양을 사용한다. `kp`, `kv`, armature,
 damping, friction loss는 제조사가 제공한 식별값이 아니라 실기 벤치시험 전 사용하는
 명시적 초기값이다. 실제 로봇 자체의 실측 질량을 10 kg로 단정하는 값도 아니다.
 
-Level 4 checkpoint에서 새 동역학으로 이어서 학습하는 명령은 다음과 같다. 환경 생성 시
-`mjx/generated/hexapod_rl.xml`이 자동 재생성되므로 별도 변환 명령은 필요 없다.
-아래 checkpoint는 `mjx/runs/` 아래의 로컬 학습 산출물이며 Git에는 포함되지 않으므로,
-다른 장비에서 실행할 때는 해당 디렉터리를 별도로 복사하거나 경로를 바꿔야 한다.
+기본 Swing은 6 cm이며 정책의 다리별 Z action이 Swing 중간 높이를 4~25 cm로
+조절한다. 위상 envelope 때문에 이륙점과 착지점의 Z는 바뀌지 않는다. Stance Z는
+±20 mm로 제한하고 Late Landing은 펌웨어가 단독으로 제어한다.
+
+기존 v2 Level 4 actor는 Z 출력이 Cartesian 위치 offset이라 v3 높이 명령과 의미가
+다르므로 직접 restore하지 않는다. 새 동역학과 adaptive swing은 level 0부터 새로
+학습한다. 환경 생성 시 `mjx/generated/hexapod_rl.xml`은 자동 재생성된다.
 
 ```bash
 cd /home/huro/Hexapod-Robot
 /home/huro/bin/hexapod-mjx-python mjx/train_competence_curriculum.py \
-  --run-name firmware-terrain-10kg-level4 \
+  --run-name firmware-terrain-adaptive-swing \
   --seed 8 \
-  --flat-baseline-timesteps 0 \
-  --start-level 4 --max-level 12 \
-  --stages 36 --stage-timesteps 5000000 \
+  --flat-baseline-timesteps 262144 \
+  --start-level 1 --max-level 12 \
+  --stages 44 --stage-timesteps 5000000 \
   --level-progression competence \
-  --max-stages-per-level 3 \
   --checkpoint-selection best \
-  --init-checkpoint mjx/runs/terrain/firmware-terrain-ik-safe-max3-v3-stage07-level4_20260825-151107_seed8/checkpoints/000003407872 \
   --wandb --wandb-project hexapod-firmware-terrain \
   -- --num-envs 1024 --num-evals 4 --num-eval-envs 32
 ```

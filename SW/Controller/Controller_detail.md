@@ -707,14 +707,16 @@ h
 =
 \operatorname{clamp}
 \left(
-0.20+\Delta z_B,
-0.15,
+0.06+\Delta z_B,
+0.04,
 0.25
 \right)
 \ \mathrm{m}
 \]
 
-\(\Delta z_B\)는 몸체 기준점에 대한 몸체 원점의 z Offset이다. 현재 기본값은 0.20 m이며 0.25 m가 아니다.
+\(\Delta z_B\)는 몸체 기준점에 대한 몸체 원점의 z Offset이다. 기본값은 0.06 m다.
+RL의 Swing Z action은 `-1/0/+1`을 각각 `0.04/0.06/0.25 m`에 대응시키며,
+Swing phase envelope를 적용해 이륙점과 착지점의 Z 위치는 바꾸지 않는다.
 
 ## 11. 발 접촉과 착지 적응
 
@@ -1068,8 +1070,8 @@ GPS, LoRa와 Jetson SPI는 필요한 주기에 따라 백그라운드에서 처�
 | Feedback | Heading 최대 | ±15 deg/s |
 | Posture | 명령 속도 제한 | ±15 deg/s |
 | Gait | Phase 시간 | 0.5 s |
-| Swing | 기본 높이 | 0.20 m |
-| Swing | 높이 범위 | 0.15~0.25 m |
+| Swing | 기본 높이 | 0.06 m |
+| Swing | 높이 범위 | 0.04~0.25 m |
 | Swing | 방사 오프셋 | 0.07 m |
 | Early | 판정 시작 | Swing 50% |
 | Late | 하강 속도 | 0.20 m/s |

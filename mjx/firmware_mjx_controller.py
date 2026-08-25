@@ -21,7 +21,9 @@ FIRMWARE_CONTROL_DT = 0.005
 GAIT_PHASE_TIME = 0.5
 MAX_LINEAR_SPEED = 0.28
 MAX_YAW_RATE = jp.deg2rad(45.0)
-SWING_HEIGHT = 0.20
+SWING_HEIGHT = 0.06
+SWING_HEIGHT_MIN = 0.04
+SWING_HEIGHT_MAX = 0.25
 SWING_RADIAL_OFFSET = 0.07
 EARLY_LANDING_PROGRESS = 0.50
 LATE_LANDING_SPEED = 0.20
@@ -73,10 +75,10 @@ MODEL_SIGNS = jp.array(
         (1.0, 1.0, -1.0),
     )
 )
-# Local Cartesian residual limits.  The Y/tangential authority is deliberately
-# narrower so the policy cannot spend most of its action range pushing feet
-# sideways into the IK boundary.
-RESIDUAL_SCALE = jp.array((0.04, 0.02, 0.09))
+# Local Cartesian residual limits.  Swing X/Y remain Cartesian offsets, while
+# Z has phase-dependent semantics: swing Z selects a 4--25 cm arc height,
+# stance Z is limited to 2 cm and late-landing Z is controller-owned.
+RESIDUAL_SCALE = jp.array((0.04, 0.02, 0.02))
 
 
 class FirmwareState(NamedTuple):
@@ -112,6 +114,7 @@ class FirmwareOutput(NamedTuple):
     applied_twist: jax.Array
     gait_progress: jax.Array
     gait_state: jax.Array
+    swing_height_command: jax.Array
     ik_valid: jax.Array
     policy_valid: jax.Array
     foot_limited: jax.Array
@@ -265,6 +268,37 @@ def _swing(
     )
 
 
+def _adaptive_swing_height(action_z: jax.Array) -> jax.Array:
+    """Map zero action to the 6 cm nominal and use the full signed range."""
+    action_z = jp.clip(action_z, -1.0, 1.0)
+    return jp.where(
+        action_z >= 0.0,
+        SWING_HEIGHT + action_z * (SWING_HEIGHT_MAX - SWING_HEIGHT),
+        SWING_HEIGHT + action_z * (SWING_HEIGHT - SWING_HEIGHT_MIN),
+    )
+
+
+def _phase_gated_policy_residual(
+    filtered_action: jax.Array,
+    gait_state: jax.Array,
+    gait_progress: jax.Array,
+) -> tuple[jax.Array, jax.Array]:
+    """Return local residuals without moving swing takeoff or touchdown Z."""
+    action = filtered_action.reshape(6, 3)
+    swing = gait_state == LEG_SWING
+    stance = gait_state == LEG_STANCE
+    swing_height = _adaptive_swing_height(action[:, 2])
+    scaled_progress = _quintic(gait_progress)
+    swing_envelope = 4.0 * scaled_progress * (1.0 - scaled_progress)
+
+    xy = action[:, :2] * RESIDUAL_SCALE[:2]
+    xy = jp.where(swing[:, None], xy, 0.0)
+    swing_z = (swing_height - SWING_HEIGHT) * swing_envelope
+    stance_z = action[:, 2] * RESIDUAL_SCALE[2]
+    z = jp.where(swing, swing_z, jp.where(stance, stance_z, 0.0))
+    return jp.concatenate((xy, z[:, None]), axis=-1), swing_height
+
+
 def _preview_gait(candidate: jax.Array, posture: jax.Array) -> jax.Array:
     displacement = jp.stack(
         (
@@ -328,6 +362,7 @@ def initial_output() -> FirmwareOutput:
         applied_twist=jp.zeros(4),
         gait_progress=jp.zeros(6),
         gait_state=jp.zeros(6, dtype=jp.int32),
+        swing_height_command=jp.full(6, SWING_HEIGHT),
         ik_valid=jp.ones(6, dtype=jp.bool_),
         policy_valid=jp.ones(6, dtype=jp.bool_),
         foot_limited=jp.zeros(6, dtype=jp.bool_),
@@ -603,14 +638,12 @@ def step(
     residual_filter = residual_alpha * state.residual_filter + (
         1.0 - residual_alpha
     ) * jp.clip(policy_action, -1.0, 1.0)
-    residual_local = residual_filter.reshape(6, 3) * RESIDUAL_SCALE
-    swing_mask = gait["state"] == LEG_SWING
-    residual_mask = jp.stack(
-        (swing_mask, swing_mask, jp.ones(6, dtype=jp.bool_)), axis=-1
+    residual_local, swing_height_command = _phase_gated_policy_residual(
+        residual_filter,
+        gait["state"],
+        gait["progress"],
     )
-    candidate_local = _body_to_leg(nominal_feet) + jp.where(
-        residual_mask, residual_local, 0.0
-    )
+    candidate_local = _body_to_leg(nominal_feet) + residual_local
     residual_feet = _rotate_inverse(_leg_to_body(candidate_local), posture_command)
     _, policy_valid = _solve_ik(residual_feet)
     safe_feet = jp.where(policy_valid[:, None], residual_feet, nominal_posture_feet)
@@ -649,6 +682,7 @@ def step(
         applied_twist=gait_applied,
         gait_progress=gait["progress"],
         gait_state=gait["state"],
+        swing_height_command=swing_height_command,
         ik_valid=ik_valid,
         policy_valid=policy_valid,
         foot_limited=foot_limited,

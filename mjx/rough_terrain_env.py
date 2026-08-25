@@ -40,8 +40,7 @@ from servo_model import (
 
 ACTION_SIZE = 18
 OBSERVATION_SIZE = 142
-ACTION_CONTRACT_VERSION = "stm32_firmware_cartesian_foot_residual_v2"
-LEGACY_ACTION_CONTRACT_VERSION = "stm32_firmware_cartesian_foot_residual_v1"
+ACTION_CONTRACT_VERSION = "stm32_firmware_adaptive_swing_residual_v3"
 OBSERVATION_CONTRACT_VERSION = "firmware_state_collision_terrain_curriculum_v2"
 LEGACY_OBSERVATION_CONTRACT_VERSION = "firmware_state_collision_contact_stairs_v1"
 MODEL_FORWARD = jp.array((0.0, -1.0, 0.0))
@@ -81,6 +80,8 @@ def default_config() -> config_dict.ConfigDict:
             joint_margin=1.0,
             action_rate=-0.02,
             residual=-0.005,
+            swing_height=-0.10,
+            early_swing_contact=-1.0,
             vertical_velocity=-0.10,
             lateral_velocity=-0.10,
             joint_velocity=-0.04,
@@ -610,6 +611,10 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
                 "root_linear_speed": jp.zeros(()),
                 "root_angular_speed": jp.zeros(()),
                 "joint_speed_max": jp.zeros(()),
+                "swing_height_mean_m": jp.asarray(firmware.SWING_HEIGHT),
+                "swing_height_max_m": jp.asarray(firmware.SWING_HEIGHT),
+                "swing_height_boost_fraction": jp.zeros(()),
+                "early_swing_contact_fraction": jp.zeros(()),
                 "termination/controller_invalid": jp.zeros(()),
                 "termination/joint_limit": jp.zeros(()),
                 "termination/dynamics": jp.zeros(()),
@@ -726,6 +731,51 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
         )
         policy_rejected = jp.mean((~controller.policy_valid).astype(jp.float32))
         foot_limited = jp.mean(controller.foot_limited.astype(jp.float32))
+        swing_mask = controller.gait_state == firmware.LEG_SWING
+        swing_count = jp.maximum(jp.sum(swing_mask.astype(jp.float32)), 1.0)
+        normalized_swing_height = jp.clip(
+            (
+                controller.swing_height_command - firmware.SWING_HEIGHT_MIN
+            )
+            / (firmware.SWING_HEIGHT_MAX - firmware.SWING_HEIGHT_MIN),
+            0.0,
+            1.0,
+        )
+        swing_height_cost = jp.sum(
+            jp.where(swing_mask, jp.square(normalized_swing_height), 0.0)
+        ) / swing_count
+        swing_height_mean = jp.sum(
+            jp.where(swing_mask, controller.swing_height_command, 0.0)
+        ) / swing_count
+        swing_height_mean = jp.where(
+            jp.any(swing_mask), swing_height_mean, firmware.SWING_HEIGHT
+        )
+        swing_height_max = jp.max(
+            jp.where(
+                swing_mask,
+                controller.swing_height_command,
+                firmware.SWING_HEIGHT,
+            )
+        )
+        swing_height_boost = jp.sum(
+            jp.where(
+                swing_mask,
+                jp.maximum(
+                    controller.swing_height_command - firmware.SWING_HEIGHT,
+                    0.0,
+                )
+                / (firmware.SWING_HEIGHT_MAX - firmware.SWING_HEIGHT),
+                0.0,
+            )
+        ) / swing_count
+        early_swing_contact = jp.mean(
+            (
+                swing_mask
+                & controller_state.airborne_seen
+                & contacts
+                & (controller.gait_progress < firmware.EARLY_LANDING_PROGRESS)
+            ).astype(jp.float32)
+        )
         reward_terms = {
             "velocity": jp.exp(
                 -jp.square(forward_velocity - state.info["command"][0]) / 0.01
@@ -742,6 +792,8 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
             "joint_margin": 1.0 - jp.mean(joint_proximity),
             "action_rate": jp.mean(jp.square(action - state.info["last_action"])),
             "residual": jp.mean(jp.square(action)),
+            "swing_height": swing_height_cost,
+            "early_swing_contact": early_swing_contact,
             "vertical_velocity": jp.square(data.qvel[2]),
             "lateral_velocity": jp.square(lateral_velocity),
             "joint_velocity": jp.mean(
@@ -806,6 +858,10 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
         state.metrics["root_linear_speed"] = root_linear_speed
         state.metrics["root_angular_speed"] = root_angular_speed
         state.metrics["joint_speed_max"] = joint_speed_max
+        state.metrics["swing_height_mean_m"] = swing_height_mean
+        state.metrics["swing_height_max_m"] = swing_height_max
+        state.metrics["swing_height_boost_fraction"] = swing_height_boost
+        state.metrics["early_swing_contact_fraction"] = early_swing_contact
         state.metrics["termination/controller_invalid"] = controller_invalid.astype(jp.float32)
         state.metrics["termination/joint_limit"] = joint_limit_failure.astype(jp.float32)
         state.metrics["termination/dynamics"] = dynamics_failure.astype(jp.float32)

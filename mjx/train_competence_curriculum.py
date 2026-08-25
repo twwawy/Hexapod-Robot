@@ -14,6 +14,20 @@ from typing import Any
 from terrain_curriculum import MAX_TERRAIN_LEVEL, terrain_level
 
 
+EASY_LEVEL_LAST = 3
+EASY_MAX_STAGES_PER_LEVEL = 2
+HARD_MAX_STAGES_PER_LEVEL = 4
+
+
+def _max_stages_for_level(level: int, override: int | None = None) -> int:
+    """Return the competence-attempt cap for one terrain level."""
+    if override is not None:
+        return override
+    if level <= EASY_LEVEL_LAST:
+        return EASY_MAX_STAGES_PER_LEVEL
+    return HARD_MAX_STAGES_PER_LEVEL
+
+
 def _arguments() -> tuple[argparse.Namespace, list[str]]:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--run-name", default="firmware-terrain-final-stairs")
@@ -24,7 +38,7 @@ def _arguments() -> tuple[argparse.Namespace, list[str]]:
     )
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument(
-        "--stages", type=int, default=36, help="Maximum competence attempts."
+        "--stages", type=int, default=44, help="Maximum competence attempts."
     )
     parser.add_argument("--stage-timesteps", type=int, default=5_000_000)
     parser.add_argument("--stage-0-timesteps", type=int, default=None)
@@ -32,7 +46,10 @@ def _arguments() -> tuple[argparse.Namespace, list[str]]:
         "--flat-baseline-timesteps",
         type=int,
         default=262_144,
-        help="Minimal fixed level-0 budget; default is four PPO updates.",
+        help=(
+            "Initial level-0 budget; default is four PPO updates. "
+            "Competence mode may run one additional flat stage."
+        ),
     )
     parser.add_argument(
         "--start-level", type=int, choices=range(MAX_TERRAIN_LEVEL + 1), default=1
@@ -54,8 +71,8 @@ def _arguments() -> tuple[argparse.Namespace, list[str]]:
         type=int,
         default=None,
         help=(
-            "In competence mode, promote after this many attempts even when "
-            "the success threshold is not met."
+            "Override the default per-level cap (levels 0-3: 2 attempts, "
+            "levels 4-12: 4 attempts)."
         ),
     )
     parser.add_argument(
@@ -304,6 +321,8 @@ def main() -> None:
         if args.init_checkpoint is not None
         else None
     )
+    level = args.start_level
+    level_attempt = 0
 
     if init_checkpoint is None and args.flat_baseline_timesteps > 0:
         prefix = f"{args.run_name}-flat-baseline"
@@ -339,21 +358,59 @@ def main() -> None:
             terrain_root=terrain_root,
         )
         init_checkpoint = _selected_checkpoint(run_dir, args.checkpoint_selection)
+        latest = json.loads(
+            (run_dir / "monitor" / "latest_metrics.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        success = float(
+            latest.get("metrics", {}).get("eval/episode_terrain_success", 0.0)
+        )
+        level_attempt = 1
+        stage_limit = _max_stages_for_level(0, args.max_stages_per_level)
+        next_level, completed, promotion_reason = _level_transition(
+            level=0,
+            max_level=args.max_level,
+            progression=args.level_progression,
+            success=success,
+            threshold=args.promote_threshold,
+            level_attempt=level_attempt,
+            max_stages_per_level=stage_limit,
+        )
+        if next_level != 0:
+            next_level = max(next_level, args.start_level)
         history.append(
             {
                 "phase": "flat_baseline",
                 "terrain_level": 0,
                 "terrain_name": terrain_level(0).name,
                 "timesteps": args.flat_baseline_timesteps,
+                "success_rate": success,
+                "promote_threshold": args.promote_threshold,
+                "level_attempt": level_attempt,
+                "max_stages_per_level": stage_limit,
+                "promotion_reason": promotion_reason,
+                "next_level": next_level,
+                "curriculum_complete": completed,
                 "run_dir": str(run_dir),
                 "checkpoint": str(init_checkpoint),
                 **_video_paths(run_dir),
             }
         )
         _write_history(state_path, history)
+        print(
+            f"complete stage=flat_baseline success={success:.3f} "
+            f"level=0->{next_level} attempt={level_attempt}/{stage_limit} "
+            f"reason={promotion_reason} checkpoint={init_checkpoint}"
+        )
+        if completed:
+            print(f"CURRICULUM_COMPLETE level=0 success={success:.3f}")
+            print(f"CURRICULUM_HISTORY={state_path}")
+            return
+        if next_level != 0:
+            level_attempt = 0
+        level = next_level
 
-    level = args.start_level
-    level_attempt = 0
     for stage in range(args.stages):
         timesteps = (
             args.stage_0_timesteps
@@ -371,7 +428,9 @@ def main() -> None:
             level=level,
             stage=stage,
             init_checkpoint=init_checkpoint,
-            restore_value=(stage > 0 or args.init_value_function),
+            restore_value=(
+                stage > 0 or level_attempt > 0 or args.init_value_function
+            ),
             terrain_root=terrain_root,
         )
         latest = json.loads(
@@ -380,6 +439,7 @@ def main() -> None:
         success = float(latest.get("metrics", {}).get("eval/episode_terrain_success", 0.0))
         checkpoint = _selected_checkpoint(run_dir, args.checkpoint_selection)
         level_attempt += 1
+        stage_limit = _max_stages_for_level(level, args.max_stages_per_level)
         next_level, completed, promotion_reason = _level_transition(
             level=level,
             max_level=args.max_level,
@@ -387,8 +447,10 @@ def main() -> None:
             success=success,
             threshold=args.promote_threshold,
             level_attempt=level_attempt,
-            max_stages_per_level=args.max_stages_per_level,
+            max_stages_per_level=stage_limit,
         )
+        if level == 0 and next_level != 0:
+            next_level = max(next_level, args.start_level)
         spec = terrain_level(level)
         history.append(
             {
@@ -401,7 +463,7 @@ def main() -> None:
                 "success_rate": success,
                 "promote_threshold": args.promote_threshold,
                 "level_attempt": level_attempt,
-                "max_stages_per_level": args.max_stages_per_level,
+                "max_stages_per_level": stage_limit,
                 "promotion_reason": promotion_reason,
                 "next_level": next_level,
                 "curriculum_complete": completed,
@@ -414,7 +476,7 @@ def main() -> None:
         _write_history(state_path, history)
         print(
             f"complete stage={stage} success={success:.3f} "
-            f"level={level}->{next_level} attempt={level_attempt} "
+            f"level={level}->{next_level} attempt={level_attempt}/{stage_limit} "
             f"reason={promotion_reason} checkpoint={checkpoint}"
         )
         init_checkpoint = checkpoint

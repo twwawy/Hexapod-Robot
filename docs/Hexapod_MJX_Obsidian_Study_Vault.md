@@ -42,11 +42,12 @@ canonical_source: /home/huro/Hexapod-Robot/mjx/RL_DESIGN.md
 | RL robot mass | `10.0 kg` 전체 질량 |
 | RL collider | torso box, leg capsule, foot sphere, 선택된 terrain primitive |
 | Base controller | STM32 제어 순서와 상수를 옮긴 JAX firmware controller |
-| Policy | 여섯 발 local XYZ residual, stance/late-landing은 Z-only |
-| Action contract | `stm32_firmware_cartesian_foot_residual_v2` |
+| Policy | Swing XY + adaptive height, Stance Z-only, Late-Landing residual 차단 |
+| Action contract | `stm32_firmware_adaptive_swing_residual_v3` |
 | Observation contract | `firmware_state_collision_terrain_curriculum_v2` |
 | Action / observation | `18 / 142` |
 | Servo | DS51150-270, 12.6 V, 357:1, ±14.709975 Nm, 315.8 deg/s |
+| Swing | 기본 6 cm, 다리별 adaptive 4~25 cm, 이륙·착지 Z offset 0 |
 | Physics | MuJoCo 3.12, MJX, `sim_dt=0.0025`, `ctrl_dt=0.02` |
 | PPO | Brax PPO + `mujoco_playground` |
 | Curriculum | level 0 평지 → rough → ramp → 7단 → 10×20 cm 최종 계단 |

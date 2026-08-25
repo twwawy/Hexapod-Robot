@@ -26,6 +26,7 @@ from terrain_curriculum import (  # noqa: E402
 )
 from train_competence_curriculum import (  # noqa: E402
     _level_transition,
+    _max_stages_for_level,
     _replace_trainer_arg,
     _selected_checkpoint,
     _trainer_int_arg,
@@ -38,6 +39,18 @@ from train_rough_terrain import (  # noqa: E402
 
 
 class TrainingArtifactTest(unittest.TestCase):
+    def test_stage_caps_switch_from_two_to_four_at_steep_ramp(self) -> None:
+        self.assertEqual(
+            tuple(_max_stages_for_level(level) for level in range(4)),
+            (2, 2, 2, 2),
+        )
+        self.assertEqual(
+            tuple(_max_stages_for_level(level) for level in range(4, 13)),
+            (4,) * 9,
+        )
+        self.assertEqual(_max_stages_for_level(0, override=3), 3)
+        self.assertEqual(_max_stages_for_level(12, override=3), 3)
+
     def test_default_progress_targets_are_exact_quarters(self) -> None:
         self.assertEqual(progress_video_targets(5), (0.0, 0.25, 0.5, 0.75, 1.0))
 
