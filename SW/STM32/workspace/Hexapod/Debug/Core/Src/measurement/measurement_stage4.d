@@ -1,4 +1,6 @@
-Core/Src/main.o: ../Core/Src/main.c ../Core/Inc/main.h \
+Core/Src/measurement/measurement_stage4.o: \
+ ../Core/Src/measurement/measurement_stage4.c \
+ ../Core/Inc/measurement/measurement_stage4.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal.h \
  ../Core/Inc/stm32f4xx_hal_conf.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_rcc.h \
@@ -28,8 +30,14 @@ Core/Src/main.o: ../Core/Src/main.c ../Core/Inc/main.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_tim.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_tim_ex.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_uart.h \
- ../Core/Inc/measurement/measurement_stage4.h
-../Core/Inc/main.h:
+ ../Core/Inc/common/robot_calibration.h ../Core/Inc/low_control/relay.h \
+ ../Core/Inc/low_control/servo_pwm.h ../Core/Inc/common/robot_types.h \
+ ../Core/Inc/common/robot_config.h ../Core/Inc/sensor/foot_pressure.h \
+ ../Core/Inc/sensor/imu.h ../Core/Inc/sensor/joint_feedback.h \
+ ../Core/Inc/sensor/mcp3008.h ../Core/Inc/user_command/user_command.h \
+ ../Core/Inc/measurement/measurement_debug.h \
+ ../Core/Inc/measurement/measurement_runner.h
+../Core/Inc/measurement/measurement_stage4.h:
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal.h:
 ../Core/Inc/stm32f4xx_hal_conf.h:
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_rcc.h:
@@ -59,4 +67,15 @@ Core/Src/main.o: ../Core/Src/main.c ../Core/Inc/main.h \
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_tim.h:
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_tim_ex.h:
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_uart.h:
-../Core/Inc/measurement/measurement_stage4.h:
+../Core/Inc/common/robot_calibration.h:
+../Core/Inc/low_control/relay.h:
+../Core/Inc/low_control/servo_pwm.h:
+../Core/Inc/common/robot_types.h:
+../Core/Inc/common/robot_config.h:
+../Core/Inc/sensor/foot_pressure.h:
+../Core/Inc/sensor/imu.h:
+../Core/Inc/sensor/joint_feedback.h:
+../Core/Inc/sensor/mcp3008.h:
+../Core/Inc/user_command/user_command.h:
+../Core/Inc/measurement/measurement_debug.h:
+../Core/Inc/measurement/measurement_runner.h:

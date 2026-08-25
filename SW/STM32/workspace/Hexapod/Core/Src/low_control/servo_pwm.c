@@ -68,8 +68,8 @@ void ServoPwm_Init(ServoPwm_Handle_t *handle,
     ServoPwm_Map(handle, 7U, timers->tim3, TIM_CHANNEL_2);   // 3_2 채널을 연결한다.
     ServoPwm_Map(handle, 8U, timers->tim3, TIM_CHANNEL_3);   // 3_3 채널을 연결한다.
     ServoPwm_Map(handle, 9U, timers->tim4, TIM_CHANNEL_1);   // 4_1 채널을 연결한다.
-    ServoPwm_Map(handle, 10U, timers->tim4, TIM_CHANNEL_2);  // 4_2 채널을 연결한다.
-    ServoPwm_Map(handle, 11U, timers->tim4, TIM_CHANNEL_3);  // 4_3 채널을 연결한다.
+    ServoPwm_Map(handle, 10U, timers->tim4, TIM_CHANNEL_3);  // 4_2를 PB8의 TIM4 CH3에 연결한다.
+    ServoPwm_Map(handle, 11U, timers->tim4, TIM_CHANNEL_2);  // 4_3을 PB7의 TIM4 CH2에 연결한다.
     ServoPwm_Map(handle, 12U, timers->tim5, TIM_CHANNEL_1);  // 5_1 채널을 연결한다.
     ServoPwm_Map(handle, 13U, timers->tim5, TIM_CHANNEL_2);  // 5_2 채널을 연결한다.
     ServoPwm_Map(handle, 14U, timers->tim8, TIM_CHANNEL_3);  // 5_3 채널을 연결한다.

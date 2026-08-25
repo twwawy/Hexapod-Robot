@@ -1,0 +1,4 @@
+../Core/Src/measurement/measurement_stage4.c:26:13:MeasurementStage4_StopOutputs	8	static
+../Core/Src/measurement/measurement_stage4.c:35:13:MeasurementStage4_UpdateAdc	24	static
+../Core/Src/measurement/measurement_stage4.c:70:6:MeasurementStage4_Init	56	static
+../Core/Src/measurement/measurement_stage4.c:162:6:MeasurementStage4_Process	16	static

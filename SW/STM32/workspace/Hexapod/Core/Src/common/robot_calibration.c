@@ -6,6 +6,9 @@
 #include <stddef.h>
 
 #define DEFAULT_SERVO_PULSE_PER_RAD (2000.0f / (270.0f * ROBOT_DEG_TO_RAD_F))
+#define SERVO_CALIBRATION(angle_deg, direction_sign) \
+    {1500U, 500U, 2500U, (angle_deg) * ROBOT_DEG_TO_RAD_F, \
+     DEFAULT_SERVO_PULSE_PER_RAD, (direction_sign), true}
 
 const RobotCalibration_t g_robot_calibration =
 {
@@ -63,24 +66,24 @@ const RobotCalibration_t g_robot_calibration =
 
     .servo =
     {
-        {1500U, 500U, 2500U, 0.0f, DEFAULT_SERVO_PULSE_PER_RAD, 1, false}, // L1 J1 값을 넣는다.
-        {1500U, 500U, 2500U, 0.0f, DEFAULT_SERVO_PULSE_PER_RAD, 1, false}, // L1 J2 값을 넣는다.
-        {1500U, 500U, 2500U, 0.0f, DEFAULT_SERVO_PULSE_PER_RAD, 1, false}, // L1 J3 값을 넣는다.
-        {1500U, 500U, 2500U, 0.0f, DEFAULT_SERVO_PULSE_PER_RAD, 1, false}, // L2 J1 값을 넣는다.
-        {1500U, 500U, 2500U, 0.0f, DEFAULT_SERVO_PULSE_PER_RAD, 1, false}, // L2 J2 값을 넣는다.
-        {1500U, 500U, 2500U, 0.0f, DEFAULT_SERVO_PULSE_PER_RAD, 1, false}, // L2 J3 값을 넣는다.
-        {1500U, 500U, 2500U, 0.0f, DEFAULT_SERVO_PULSE_PER_RAD, 1, false}, // L3 J1 값을 넣는다.
-        {1500U, 500U, 2500U, 0.0f, DEFAULT_SERVO_PULSE_PER_RAD, 1, false}, // L3 J2 값을 넣는다.
-        {1500U, 500U, 2500U, 0.0f, DEFAULT_SERVO_PULSE_PER_RAD, 1, false}, // L3 J3 값을 넣는다.
-        {1500U, 500U, 2500U, 0.0f, DEFAULT_SERVO_PULSE_PER_RAD, 1, false}, // L4 J1 값을 넣는다.
-        {1500U, 500U, 2500U, 0.0f, DEFAULT_SERVO_PULSE_PER_RAD, 1, false}, // L4 J2 값을 넣는다.
-        {1500U, 500U, 2500U, 0.0f, DEFAULT_SERVO_PULSE_PER_RAD, 1, false}, // L4 J3 값을 넣는다.
-        {1500U, 500U, 2500U, 0.0f, DEFAULT_SERVO_PULSE_PER_RAD, 1, false}, // L5 J1 값을 넣는다.
-        {1500U, 500U, 2500U, 0.0f, DEFAULT_SERVO_PULSE_PER_RAD, 1, false}, // L5 J2 값을 넣는다.
-        {1500U, 500U, 2500U, 0.0f, DEFAULT_SERVO_PULSE_PER_RAD, 1, false}, // L5 J3 값을 넣는다.
-        {1500U, 500U, 2500U, 0.0f, DEFAULT_SERVO_PULSE_PER_RAD, 1, false}, // L6 J1 값을 넣는다.
-        {1500U, 500U, 2500U, 0.0f, DEFAULT_SERVO_PULSE_PER_RAD, 1, false}, // L6 J2 값을 넣는다.
-        {1500U, 500U, 2500U, 0.0f, DEFAULT_SERVO_PULSE_PER_RAD, 1, false}  // L6 J3 값을 넣는다.
+        SERVO_CALIBRATION(-12.0f,  1),  // L1 J1의 중립각과 방향을 저장한다.
+        SERVO_CALIBRATION(  7.0f, -1),  // L1 J2의 중립각과 방향을 저장한다.
+        SERVO_CALIBRATION(  8.0f,  1),  // L1 J3의 중립각과 방향을 저장한다.
+        SERVO_CALIBRATION(  6.0f,  1),  // L2 J1의 중립각과 방향을 저장한다.
+        SERVO_CALIBRATION(  9.0f, -1),  // L2 J2의 중립각과 방향을 저장한다.
+        SERVO_CALIBRATION(  1.0f,  1),  // L2 J3의 중립각과 방향을 저장한다.
+        SERVO_CALIBRATION( -2.0f,  1),  // L3 J1의 중립각과 방향을 저장한다.
+        SERVO_CALIBRATION(  4.0f, -1),  // L3 J2의 중립각과 방향을 저장한다.
+        SERVO_CALIBRATION( -7.0f,  1),  // L3 J3의 중립각과 방향을 저장한다.
+        SERVO_CALIBRATION(  0.0f,  1),  // L4 J1의 중립각과 방향을 저장한다.
+        SERVO_CALIBRATION( -9.0f,  1),  // L4 J2의 중립각과 방향을 저장한다.
+        SERVO_CALIBRATION( 11.0f, -1),  // L4 J3의 중립각과 방향을 저장한다.
+        SERVO_CALIBRATION(-12.0f,  1),  // L5 J1의 중립각과 방향을 저장한다.
+        SERVO_CALIBRATION(  1.0f,  1),  // L5 J2의 중립각과 방향을 저장한다.
+        SERVO_CALIBRATION( -3.0f, -1),  // L5 J3의 중립각과 방향을 저장한다.
+        SERVO_CALIBRATION(-10.0f,  1),  // L6 J1의 중립각과 방향을 저장한다.
+        SERVO_CALIBRATION(  4.0f,  1),  // L6 J2의 중립각과 방향을 저장한다.
+        SERVO_CALIBRATION(  5.0f, -1)   // L6 J3의 중립각과 방향을 저장한다.
     },
 
     .relay_for_leg =

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<section name="Workbench">
+	<section name="java.lang.Class">
+		<item key="replaceBarOpen" value="false"/>
+		<list key="findhistory">
+			<item value="imu_axis_confirmed"/>
+			<item value="imu_axis_confirmed[0]"/>
+			<item value="stage0_relay_enable"/>
+		</list>
+	</section>
+</section>

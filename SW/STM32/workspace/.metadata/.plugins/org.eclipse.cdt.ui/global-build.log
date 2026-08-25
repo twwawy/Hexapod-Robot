@@ -1,139 +1,4 @@
-12:15:25 **** Incremental Build of configuration Debug for project Hexapod ****
-make -j16 all 
-arm-none-eabi-gcc "../Core/Src/communication/robot_telemetry.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/communication/robot_telemetry.d" -MT"Core/Src/communication/robot_telemetry.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/communication/robot_telemetry.o"
-arm-none-eabi-gcc "../Core/Src/common/robot_calibration.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/common/robot_calibration.d" -MT"Core/Src/common/robot_calibration.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/common/robot_calibration.o"
-arm-none-eabi-gcc "../Core/Src/app/hexapod_app.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/app/hexapod_app.d" -MT"Core/Src/app/hexapod_app.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/app/hexapod_app.o"
-arm-none-eabi-gcc "../Core/Src/main.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/main.d" -MT"Core/Src/main.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/main.o"
-arm-none-eabi-gcc "../Core/Src/stm32f4xx_hal_msp.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/stm32f4xx_hal_msp.d" -MT"Core/Src/stm32f4xx_hal_msp.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/stm32f4xx_hal_msp.o"
-arm-none-eabi-gcc "../Core/Src/stm32f4xx_it.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/stm32f4xx_it.d" -MT"Core/Src/stm32f4xx_it.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/stm32f4xx_it.o"
-arm-none-eabi-gcc "../Core/Src/syscalls.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/syscalls.d" -MT"Core/Src/syscalls.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/syscalls.o"
-arm-none-eabi-gcc "../Core/Src/sysmem.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/sysmem.d" -MT"Core/Src/sysmem.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/sysmem.o"
-arm-none-eabi-gcc "../Core/Src/system_stm32f4xx.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/system_stm32f4xx.d" -MT"Core/Src/system_stm32f4xx.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/system_stm32f4xx.o"
-arm-none-eabi-gcc -o "Hexapod.elf" @"objects.list"   -mcpu=cortex-m4 -T"C:\Project_TW\Hexapod\Hexapod-Robot\SW\STM32\workspace\Hexapod\STM32F446RETX_FLASH.ld" --specs=nosys.specs -Wl,-Map="Hexapod.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
-Finished building target: Hexapod.elf
- 
-arm-none-eabi-size  Hexapod.elf 
-arm-none-eabi-objdump -h -S Hexapod.elf  > "Hexapod.list"
-   text	   data	    bss	    dec	    hex	filename
-  52136	    468	   7392	  59996	   ea5c	Hexapod.elf
-Finished building: default.size.stdout
- 
-Finished building: Hexapod.list
- 
-12:18:17 **** Incremental Build of configuration Debug for project Hexapod ****
-make -j16 all 
-arm-none-eabi-size  Hexapod.elf 
-   text	   data	    bss	    dec	    hex	filename
-  52136	    468	   7392	  59996	   ea5c	Hexapod.elf
-Finished building: default.size.stdout
- 
-12:19:10 **** Incremental Build of configuration Debug for project Hexapod ****
-make -j16 all 
-arm-none-eabi-size  Hexapod.elf 
-   text	   data	    bss	    dec	    hex	filename
-  52136	    468	   7392	  59996	   ea5c	Hexapod.elf
-Finished building: default.size.stdout
- 
-12:21:29 **** Incremental Build of configuration Debug for project Hexapod ****
-make -j16 all 
-arm-none-eabi-gcc "../Core/Src/measurement/measurement_stage0.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/measurement/measurement_stage0.d" -MT"Core/Src/measurement/measurement_stage0.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/measurement/measurement_stage0.o"
-arm-none-eabi-gcc -o "Hexapod.elf" @"objects.list"   -mcpu=cortex-m4 -T"C:\Project_TW\Hexapod\Hexapod-Robot\SW\STM32\workspace\Hexapod\STM32F446RETX_FLASH.ld" --specs=nosys.specs -Wl,-Map="Hexapod.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
-Finished building target: Hexapod.elf
- 
-arm-none-eabi-size  Hexapod.elf 
-arm-none-eabi-objdump -h -S Hexapod.elf  > "Hexapod.list"
-   text	   data	    bss	    dec	    hex	filename
-  52136	    468	   7392	  59996	   ea5c	Hexapod.elf
-Finished building: default.size.stdout
- 
-Finished building: Hexapod.list
- 
-13:15:15 **** Incremental Build of configuration Debug for project Hexapod ****
-make -j16 all 
-arm-none-eabi-gcc "../Core/Src/measurement/adc_mapping_measurement.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/measurement/adc_mapping_measurement.d" -MT"Core/Src/measurement/adc_mapping_measurement.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/measurement/adc_mapping_measurement.o"
-arm-none-eabi-gcc "../Core/Src/measurement/crsf_calibration_measurement.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/measurement/crsf_calibration_measurement.d" -MT"Core/Src/measurement/crsf_calibration_measurement.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/measurement/crsf_calibration_measurement.o"
-arm-none-eabi-gcc "../Core/Src/measurement/foot_pressure_measurement.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/measurement/foot_pressure_measurement.d" -MT"Core/Src/measurement/foot_pressure_measurement.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/measurement/foot_pressure_measurement.o"
-arm-none-eabi-gcc "../Core/Src/measurement/joint_calibration_measurement.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/measurement/joint_calibration_measurement.d" -MT"Core/Src/measurement/joint_calibration_measurement.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/measurement/joint_calibration_measurement.o"
-arm-none-eabi-gcc "../Core/Src/measurement/measurement_debug.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/measurement/measurement_debug.d" -MT"Core/Src/measurement/measurement_debug.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/measurement/measurement_debug.o"
-arm-none-eabi-gcc "../Core/Src/measurement/measurement_runner.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/measurement/measurement_runner.d" -MT"Core/Src/measurement/measurement_runner.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/measurement/measurement_runner.o"
-arm-none-eabi-gcc "../Core/Src/measurement/measurement_stage0.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/measurement/measurement_stage0.d" -MT"Core/Src/measurement/measurement_stage0.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/measurement/measurement_stage0.o"
-arm-none-eabi-gcc "../Core/Src/measurement/measurement_stage1.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/measurement/measurement_stage1.d" -MT"Core/Src/measurement/measurement_stage1.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/measurement/measurement_stage1.o"
-arm-none-eabi-gcc "../Core/Src/measurement/sensor_raw_measurement.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/measurement/sensor_raw_measurement.d" -MT"Core/Src/measurement/sensor_raw_measurement.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/measurement/sensor_raw_measurement.o"
-arm-none-eabi-gcc "../Core/Src/measurement/servo_relay_measurement.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/measurement/servo_relay_measurement.d" -MT"Core/Src/measurement/servo_relay_measurement.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/measurement/servo_relay_measurement.o"
-arm-none-eabi-gcc "../Core/Src/main.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/main.d" -MT"Core/Src/main.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/main.o"
-arm-none-eabi-gcc -o "Hexapod.elf" @"objects.list"   -mcpu=cortex-m4 -T"C:\Project_TW\Hexapod\Hexapod-Robot\SW\STM32\workspace\Hexapod\STM32F446RETX_FLASH.ld" --specs=nosys.specs -Wl,-Map="Hexapod.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
-Finished building target: Hexapod.elf
- 
-arm-none-eabi-size  Hexapod.elf 
-arm-none-eabi-objdump -h -S Hexapod.elf  > "Hexapod.list"
-   text	   data	    bss	    dec	    hex	filename
-  22864	     12	   4952	  27828	   6cb4	Hexapod.elf
-Finished building: default.size.stdout
- 
-Finished building: Hexapod.list
- 
-13:26:25 **** Incremental Build of configuration Debug for project Hexapod ****
-make -j16 all 
-arm-none-eabi-gcc "../Core/Src/measurement/measurement_stage1.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/measurement/measurement_stage1.d" -MT"Core/Src/measurement/measurement_stage1.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/measurement/measurement_stage1.o"
-arm-none-eabi-gcc "../Core/Src/common/robot_calibration.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/common/robot_calibration.d" -MT"Core/Src/common/robot_calibration.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/common/robot_calibration.o"
-arm-none-eabi-gcc -o "Hexapod.elf" @"objects.list"   -mcpu=cortex-m4 -T"C:\Project_TW\Hexapod\Hexapod-Robot\SW\STM32\workspace\Hexapod\STM32F446RETX_FLASH.ld" --specs=nosys.specs -Wl,-Map="Hexapod.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
-Finished building target: Hexapod.elf
- 
-arm-none-eabi-size  Hexapod.elf 
-arm-none-eabi-objdump -h -S Hexapod.elf  > "Hexapod.list"
-   text	   data	    bss	    dec	    hex	filename
-  22852	     12	   4952	  27816	   6ca8	Hexapod.elf
-Finished building: default.size.stdout
- 
-Finished building: Hexapod.list
- 
-13:34:30 **** Incremental Build of configuration Debug for project Hexapod ****
-make -j16 all 
-arm-none-eabi-gcc "../Core/Src/measurement/adc_mapping_measurement.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/measurement/adc_mapping_measurement.d" -MT"Core/Src/measurement/adc_mapping_measurement.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/measurement/adc_mapping_measurement.o"
-arm-none-eabi-gcc "../Core/Src/measurement/crsf_calibration_measurement.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/measurement/crsf_calibration_measurement.d" -MT"Core/Src/measurement/crsf_calibration_measurement.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/measurement/crsf_calibration_measurement.o"
-arm-none-eabi-gcc "../Core/Src/measurement/foot_pressure_measurement.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/measurement/foot_pressure_measurement.d" -MT"Core/Src/measurement/foot_pressure_measurement.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/measurement/foot_pressure_measurement.o"
-arm-none-eabi-gcc "../Core/Src/measurement/joint_calibration_measurement.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/measurement/joint_calibration_measurement.d" -MT"Core/Src/measurement/joint_calibration_measurement.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/measurement/joint_calibration_measurement.o"
-arm-none-eabi-gcc "../Core/Src/measurement/measurement_debug.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/measurement/measurement_debug.d" -MT"Core/Src/measurement/measurement_debug.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/measurement/measurement_debug.o"
-arm-none-eabi-gcc "../Core/Src/measurement/measurement_runner.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/measurement/measurement_runner.d" -MT"Core/Src/measurement/measurement_runner.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/measurement/measurement_runner.o"
-arm-none-eabi-gcc "../Core/Src/measurement/measurement_stage0.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/measurement/measurement_stage0.d" -MT"Core/Src/measurement/measurement_stage0.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/measurement/measurement_stage0.o"
-arm-none-eabi-gcc "../Core/Src/measurement/measurement_stage1.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/measurement/measurement_stage1.d" -MT"Core/Src/measurement/measurement_stage1.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/measurement/measurement_stage1.o"
-arm-none-eabi-gcc "../Core/Src/measurement/measurement_stage2.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/measurement/measurement_stage2.d" -MT"Core/Src/measurement/measurement_stage2.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/measurement/measurement_stage2.o"
-arm-none-eabi-gcc "../Core/Src/measurement/sensor_raw_measurement.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/measurement/sensor_raw_measurement.d" -MT"Core/Src/measurement/sensor_raw_measurement.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/measurement/sensor_raw_measurement.o"
-arm-none-eabi-gcc "../Core/Src/measurement/servo_relay_measurement.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/measurement/servo_relay_measurement.d" -MT"Core/Src/measurement/servo_relay_measurement.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/measurement/servo_relay_measurement.o"
-arm-none-eabi-gcc "../Core/Src/main.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/main.d" -MT"Core/Src/main.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/main.o"
-arm-none-eabi-gcc -o "Hexapod.elf" @"objects.list"   -mcpu=cortex-m4 -T"C:\Project_TW\Hexapod\Hexapod-Robot\SW\STM32\workspace\Hexapod\STM32F446RETX_FLASH.ld" --specs=nosys.specs -Wl,-Map="Hexapod.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
-Finished building target: Hexapod.elf
- 
-arm-none-eabi-size  Hexapod.elf 
-arm-none-eabi-objdump -h -S Hexapod.elf  > "Hexapod.list"
-   text	   data	    bss	    dec	    hex	filename
-  25552	     12	   4736	  30300	   765c	Hexapod.elf
-Finished building: default.size.stdout
- 
-Finished building: Hexapod.list
- 
-13:34:51 **** Incremental Build of configuration Debug for project Hexapod ****
-make -j16 all 
-arm-none-eabi-size  Hexapod.elf 
-   text	   data	    bss	    dec	    hex	filename
-  25552	     12	   4736	  30300	   765c	Hexapod.elf
-Finished building: default.size.stdout
- 
-13:47:37 **** Incremental Build of configuration Debug for project Hexapod ****
-make -j16 all 
-arm-none-eabi-size  Hexapod.elf 
-   text	   data	    bss	    dec	    hex	filename
-  25552	     12	   4736	  30300	   765c	Hexapod.elf
-Finished building: default.size.stdout
- 
-13:50:25 **** Incremental Build of configuration Debug for project Hexapod ****
-make -j16 all 
-arm-none-eabi-size  Hexapod.elf 
-   text	   data	    bss	    dec	    hex	filename
-  25552	     12	   4736	  30300	   765c	Hexapod.elf
-Finished building: default.size.stdout
- 
-14:21:53 **** Incremental Build of configuration Debug for project Hexapod ****
+00:41:26 **** Incremental Build of configuration Debug for project Hexapod ****
 make -j16 all 
 arm-none-eabi-gcc "../Core/Src/measurement/adc_mapping_measurement.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/measurement/adc_mapping_measurement.d" -MT"Core/Src/measurement/adc_mapping_measurement.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/measurement/adc_mapping_measurement.o"
 arm-none-eabi-gcc "../Core/Src/measurement/crsf_calibration_measurement.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/measurement/crsf_calibration_measurement.d" -MT"Core/Src/measurement/crsf_calibration_measurement.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/measurement/crsf_calibration_measurement.o"
@@ -145,6 +10,7 @@ arm-none-eabi-gcc "../Core/Src/measurement/measurement_stage0.c" -mcpu=cortex-m4
 arm-none-eabi-gcc "../Core/Src/measurement/measurement_stage1.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/measurement/measurement_stage1.d" -MT"Core/Src/measurement/measurement_stage1.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/measurement/measurement_stage1.o"
 arm-none-eabi-gcc "../Core/Src/measurement/measurement_stage2.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/measurement/measurement_stage2.d" -MT"Core/Src/measurement/measurement_stage2.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/measurement/measurement_stage2.o"
 arm-none-eabi-gcc "../Core/Src/measurement/measurement_stage3.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/measurement/measurement_stage3.d" -MT"Core/Src/measurement/measurement_stage3.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/measurement/measurement_stage3.o"
+arm-none-eabi-gcc "../Core/Src/measurement/measurement_stage4.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/measurement/measurement_stage4.d" -MT"Core/Src/measurement/measurement_stage4.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/measurement/measurement_stage4.o"
 arm-none-eabi-gcc "../Core/Src/measurement/sensor_raw_measurement.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/measurement/sensor_raw_measurement.d" -MT"Core/Src/measurement/sensor_raw_measurement.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/measurement/sensor_raw_measurement.o"
 arm-none-eabi-gcc "../Core/Src/measurement/servo_relay_measurement.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/measurement/servo_relay_measurement.d" -MT"Core/Src/measurement/servo_relay_measurement.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/measurement/servo_relay_measurement.o"
 arm-none-eabi-gcc "../Core/Src/common/robot_calibration.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/common/robot_calibration.d" -MT"Core/Src/common/robot_calibration.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/common/robot_calibration.o"
@@ -155,71 +21,140 @@ Finished building target: Hexapod.elf
 arm-none-eabi-size  Hexapod.elf 
 arm-none-eabi-objdump -h -S Hexapod.elf  > "Hexapod.list"
    text	   data	    bss	    dec	    hex	filename
-  24588	     12	   4728	  29328	   7290	Hexapod.elf
+  27216	     12	   5224	  32452	   7ec4	Hexapod.elf
 Finished building: default.size.stdout
  
 Finished building: Hexapod.list
  
-14:22:07 **** Incremental Build of configuration Debug for project Hexapod ****
+00:42:56 **** Incremental Build of configuration Debug for project Hexapod ****
 make -j16 all 
 arm-none-eabi-size  Hexapod.elf 
    text	   data	    bss	    dec	    hex	filename
-  24588	     12	   4728	  29328	   7290	Hexapod.elf
+  27216	     12	   5224	  32452	   7ec4	Hexapod.elf
 Finished building: default.size.stdout
  
-14:30:07 **** Incremental Build of configuration Debug for project Hexapod ****
+00:43:14 **** Incremental Build of configuration Debug for project Hexapod ****
 make -j16 all 
-arm-none-eabi-gcc "../Core/Src/measurement/adc_mapping_measurement.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/measurement/adc_mapping_measurement.d" -MT"Core/Src/measurement/adc_mapping_measurement.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/measurement/adc_mapping_measurement.o"
-arm-none-eabi-gcc "../Core/Src/measurement/crsf_calibration_measurement.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/measurement/crsf_calibration_measurement.d" -MT"Core/Src/measurement/crsf_calibration_measurement.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/measurement/crsf_calibration_measurement.o"
-arm-none-eabi-gcc "../Core/Src/measurement/foot_pressure_measurement.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/measurement/foot_pressure_measurement.d" -MT"Core/Src/measurement/foot_pressure_measurement.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/measurement/foot_pressure_measurement.o"
-arm-none-eabi-gcc "../Core/Src/measurement/joint_calibration_measurement.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/measurement/joint_calibration_measurement.d" -MT"Core/Src/measurement/joint_calibration_measurement.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/measurement/joint_calibration_measurement.o"
-arm-none-eabi-gcc "../Core/Src/measurement/measurement_debug.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/measurement/measurement_debug.d" -MT"Core/Src/measurement/measurement_debug.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/measurement/measurement_debug.o"
-arm-none-eabi-gcc "../Core/Src/measurement/measurement_runner.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/measurement/measurement_runner.d" -MT"Core/Src/measurement/measurement_runner.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/measurement/measurement_runner.o"
-arm-none-eabi-gcc "../Core/Src/measurement/measurement_stage0.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/measurement/measurement_stage0.d" -MT"Core/Src/measurement/measurement_stage0.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/measurement/measurement_stage0.o"
-arm-none-eabi-gcc "../Core/Src/measurement/measurement_stage1.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/measurement/measurement_stage1.d" -MT"Core/Src/measurement/measurement_stage1.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/measurement/measurement_stage1.o"
-arm-none-eabi-gcc "../Core/Src/measurement/measurement_stage2.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/measurement/measurement_stage2.d" -MT"Core/Src/measurement/measurement_stage2.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/measurement/measurement_stage2.o"
-arm-none-eabi-gcc "../Core/Src/measurement/measurement_stage3.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/measurement/measurement_stage3.d" -MT"Core/Src/measurement/measurement_stage3.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/measurement/measurement_stage3.o"
-arm-none-eabi-gcc "../Core/Src/measurement/sensor_raw_measurement.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/measurement/sensor_raw_measurement.d" -MT"Core/Src/measurement/sensor_raw_measurement.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/measurement/sensor_raw_measurement.o"
-arm-none-eabi-gcc "../Core/Src/measurement/servo_relay_measurement.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/measurement/servo_relay_measurement.d" -MT"Core/Src/measurement/servo_relay_measurement.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/measurement/servo_relay_measurement.o"
+arm-none-eabi-size  Hexapod.elf 
+   text	   data	    bss	    dec	    hex	filename
+  27216	     12	   5224	  32452	   7ec4	Hexapod.elf
+Finished building: default.size.stdout
+ 
+00:43:27 **** Incremental Build of configuration Debug for project Hexapod ****
+make -j16 all 
+arm-none-eabi-size  Hexapod.elf 
+   text	   data	    bss	    dec	    hex	filename
+  27216	     12	   5224	  32452	   7ec4	Hexapod.elf
+Finished building: default.size.stdout
+ 
+00:50:42 **** Incremental Build of configuration Debug for project Hexapod ****
+make -j16 all 
+arm-none-eabi-gcc "../Core/Src/common/robot_calibration.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/common/robot_calibration.d" -MT"Core/Src/common/robot_calibration.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/common/robot_calibration.o"
 arm-none-eabi-gcc -o "Hexapod.elf" @"objects.list"   -mcpu=cortex-m4 -T"C:\Project_TW\Hexapod\Hexapod-Robot\SW\STM32\workspace\Hexapod\STM32F446RETX_FLASH.ld" --specs=nosys.specs -Wl,-Map="Hexapod.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
 Finished building target: Hexapod.elf
  
 arm-none-eabi-size  Hexapod.elf 
 arm-none-eabi-objdump -h -S Hexapod.elf  > "Hexapod.list"
    text	   data	    bss	    dec	    hex	filename
-  24980	     12	   4736	  29728	   7420	Hexapod.elf
+  27216	     12	   5224	  32452	   7ec4	Hexapod.elf
 Finished building: default.size.stdout
  
 Finished building: Hexapod.list
  
-14:30:51 **** Incremental Build of configuration Debug for project Hexapod ****
+01:03:44 **** Incremental Build of configuration Debug for project Hexapod ****
 make -j16 all 
-arm-none-eabi-size  Hexapod.elf 
-   text	   data	    bss	    dec	    hex	filename
-  24980	     12	   4736	  29728	   7420	Hexapod.elf
-Finished building: default.size.stdout
- 
-14:37:24 **** Incremental Build of configuration Debug for project Hexapod ****
-make -j16 all 
-arm-none-eabi-gcc "../Core/Src/measurement/adc_mapping_measurement.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/measurement/adc_mapping_measurement.d" -MT"Core/Src/measurement/adc_mapping_measurement.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/measurement/adc_mapping_measurement.o"
-arm-none-eabi-gcc "../Core/Src/measurement/crsf_calibration_measurement.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/measurement/crsf_calibration_measurement.d" -MT"Core/Src/measurement/crsf_calibration_measurement.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/measurement/crsf_calibration_measurement.o"
-arm-none-eabi-gcc "../Core/Src/measurement/foot_pressure_measurement.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/measurement/foot_pressure_measurement.d" -MT"Core/Src/measurement/foot_pressure_measurement.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/measurement/foot_pressure_measurement.o"
-arm-none-eabi-gcc "../Core/Src/measurement/joint_calibration_measurement.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/measurement/joint_calibration_measurement.d" -MT"Core/Src/measurement/joint_calibration_measurement.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/measurement/joint_calibration_measurement.o"
-arm-none-eabi-gcc "../Core/Src/measurement/measurement_debug.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/measurement/measurement_debug.d" -MT"Core/Src/measurement/measurement_debug.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/measurement/measurement_debug.o"
-arm-none-eabi-gcc "../Core/Src/measurement/measurement_runner.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/measurement/measurement_runner.d" -MT"Core/Src/measurement/measurement_runner.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/measurement/measurement_runner.o"
-arm-none-eabi-gcc "../Core/Src/measurement/measurement_stage0.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/measurement/measurement_stage0.d" -MT"Core/Src/measurement/measurement_stage0.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/measurement/measurement_stage0.o"
-arm-none-eabi-gcc "../Core/Src/measurement/measurement_stage1.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/measurement/measurement_stage1.d" -MT"Core/Src/measurement/measurement_stage1.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/measurement/measurement_stage1.o"
-arm-none-eabi-gcc "../Core/Src/measurement/measurement_stage2.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/measurement/measurement_stage2.d" -MT"Core/Src/measurement/measurement_stage2.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/measurement/measurement_stage2.o"
-arm-none-eabi-gcc "../Core/Src/measurement/measurement_stage3.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/measurement/measurement_stage3.d" -MT"Core/Src/measurement/measurement_stage3.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/measurement/measurement_stage3.o"
-arm-none-eabi-gcc "../Core/Src/measurement/sensor_raw_measurement.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/measurement/sensor_raw_measurement.d" -MT"Core/Src/measurement/sensor_raw_measurement.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/measurement/sensor_raw_measurement.o"
-arm-none-eabi-gcc "../Core/Src/measurement/servo_relay_measurement.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/measurement/servo_relay_measurement.d" -MT"Core/Src/measurement/servo_relay_measurement.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/measurement/servo_relay_measurement.o"
+arm-none-eabi-gcc "../Core/Src/common/robot_calibration.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/common/robot_calibration.d" -MT"Core/Src/common/robot_calibration.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/common/robot_calibration.o"
 arm-none-eabi-gcc -o "Hexapod.elf" @"objects.list"   -mcpu=cortex-m4 -T"C:\Project_TW\Hexapod\Hexapod-Robot\SW\STM32\workspace\Hexapod\STM32F446RETX_FLASH.ld" --specs=nosys.specs -Wl,-Map="Hexapod.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
 Finished building target: Hexapod.elf
  
 arm-none-eabi-size  Hexapod.elf 
 arm-none-eabi-objdump -h -S Hexapod.elf  > "Hexapod.list"
    text	   data	    bss	    dec	    hex	filename
-  23892	     12	   4560	  28464	   6f30	Hexapod.elf
+  27216	     12	   5224	  32452	   7ec4	Hexapod.elf
+Finished building: default.size.stdout
+ 
+Finished building: Hexapod.list
+ 
+01:03:51 **** Incremental Build of configuration Debug for project Hexapod ****
+make -j16 all 
+arm-none-eabi-size  Hexapod.elf 
+   text	   data	    bss	    dec	    hex	filename
+  27216	     12	   5224	  32452	   7ec4	Hexapod.elf
+Finished building: default.size.stdout
+ 
+01:07:47 **** Incremental Build of configuration Debug for project Hexapod ****
+make -j16 all 
+arm-none-eabi-gcc "../Core/Src/common/robot_calibration.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/common/robot_calibration.d" -MT"Core/Src/common/robot_calibration.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/common/robot_calibration.o"
+arm-none-eabi-gcc -o "Hexapod.elf" @"objects.list"   -mcpu=cortex-m4 -T"C:\Project_TW\Hexapod\Hexapod-Robot\SW\STM32\workspace\Hexapod\STM32F446RETX_FLASH.ld" --specs=nosys.specs -Wl,-Map="Hexapod.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
+Finished building target: Hexapod.elf
+ 
+arm-none-eabi-size  Hexapod.elf 
+arm-none-eabi-objdump -h -S Hexapod.elf  > "Hexapod.list"
+   text	   data	    bss	    dec	    hex	filename
+  27216	     12	   5224	  32452	   7ec4	Hexapod.elf
+Finished building: default.size.stdout
+ 
+Finished building: Hexapod.list
+ 
+01:07:56 **** Incremental Build of configuration Debug for project Hexapod ****
+make -j16 all 
+arm-none-eabi-size  Hexapod.elf 
+   text	   data	    bss	    dec	    hex	filename
+  27216	     12	   5224	  32452	   7ec4	Hexapod.elf
+Finished building: default.size.stdout
+ 
+01:11:21 **** Incremental Build of configuration Debug for project Hexapod ****
+make -j16 all 
+arm-none-eabi-gcc "../Core/Src/common/robot_calibration.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/common/robot_calibration.d" -MT"Core/Src/common/robot_calibration.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/common/robot_calibration.o"
+arm-none-eabi-gcc -o "Hexapod.elf" @"objects.list"   -mcpu=cortex-m4 -T"C:\Project_TW\Hexapod\Hexapod-Robot\SW\STM32\workspace\Hexapod\STM32F446RETX_FLASH.ld" --specs=nosys.specs -Wl,-Map="Hexapod.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
+Finished building target: Hexapod.elf
+ 
+arm-none-eabi-size  Hexapod.elf 
+arm-none-eabi-objdump -h -S Hexapod.elf  > "Hexapod.list"
+   text	   data	    bss	    dec	    hex	filename
+  27216	     12	   5224	  32452	   7ec4	Hexapod.elf
+Finished building: default.size.stdout
+ 
+Finished building: Hexapod.list
+ 
+01:15:12 **** Incremental Build of configuration Debug for project Hexapod ****
+make -j16 all 
+arm-none-eabi-gcc "../Core/Src/common/robot_calibration.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/common/robot_calibration.d" -MT"Core/Src/common/robot_calibration.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/common/robot_calibration.o"
+arm-none-eabi-gcc -o "Hexapod.elf" @"objects.list"   -mcpu=cortex-m4 -T"C:\Project_TW\Hexapod\Hexapod-Robot\SW\STM32\workspace\Hexapod\STM32F446RETX_FLASH.ld" --specs=nosys.specs -Wl,-Map="Hexapod.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
+Finished building target: Hexapod.elf
+ 
+arm-none-eabi-size  Hexapod.elf 
+arm-none-eabi-objdump -h -S Hexapod.elf  > "Hexapod.list"
+   text	   data	    bss	    dec	    hex	filename
+  27216	     12	   5224	  32452	   7ec4	Hexapod.elf
+Finished building: default.size.stdout
+ 
+Finished building: Hexapod.list
+ 
+01:18:05 **** Incremental Build of configuration Debug for project Hexapod ****
+make -j16 all 
+arm-none-eabi-gcc "../Core/Src/common/robot_calibration.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/common/robot_calibration.d" -MT"Core/Src/common/robot_calibration.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/common/robot_calibration.o"
+arm-none-eabi-gcc -o "Hexapod.elf" @"objects.list"   -mcpu=cortex-m4 -T"C:\Project_TW\Hexapod\Hexapod-Robot\SW\STM32\workspace\Hexapod\STM32F446RETX_FLASH.ld" --specs=nosys.specs -Wl,-Map="Hexapod.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
+Finished building target: Hexapod.elf
+ 
+arm-none-eabi-size  Hexapod.elf 
+arm-none-eabi-objdump -h -S Hexapod.elf  > "Hexapod.list"
+   text	   data	    bss	    dec	    hex	filename
+  27216	     12	   5224	  32452	   7ec4	Hexapod.elf
+Finished building: default.size.stdout
+ 
+Finished building: Hexapod.list
+ 
+01:21:42 **** Incremental Build of configuration Debug for project Hexapod ****
+make -j16 all 
+arm-none-eabi-gcc "../Core/Src/common/robot_calibration.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/common/robot_calibration.d" -MT"Core/Src/common/robot_calibration.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/common/robot_calibration.o"
+arm-none-eabi-gcc -o "Hexapod.elf" @"objects.list"   -mcpu=cortex-m4 -T"C:\Project_TW\Hexapod\Hexapod-Robot\SW\STM32\workspace\Hexapod\STM32F446RETX_FLASH.ld" --specs=nosys.specs -Wl,-Map="Hexapod.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
+Finished building target: Hexapod.elf
+ 
+arm-none-eabi-size  Hexapod.elf 
+arm-none-eabi-objdump -h -S Hexapod.elf  > "Hexapod.list"
+   text	   data	    bss	    dec	    hex	filename
+  27216	     12	   5224	  32452	   7ec4	Hexapod.elf
 Finished building: default.size.stdout
  
 Finished building: Hexapod.list

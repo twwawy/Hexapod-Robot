@@ -21,7 +21,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "measurement/measurement_stage3.h"
+#include "measurement/measurement_stage4.h"
 
 /* USER CODE END Includes */
 
@@ -128,7 +128,13 @@ int main(void)
   MX_USART3_UART_Init();
   MX_USART6_UART_Init();
   /* USER CODE BEGIN 2 */
-  if (!MeasurementStage3_Init(&hspi1))
+  if (!MeasurementStage4_Init(&hspi1,
+                              &htim1,
+                              &htim2,
+                              &htim3,
+                              &htim4,
+                              &htim5,
+                              &htim8))
   {
     Error_Handler();  // 초기화 오류를 디버거에서 확인한다.
   }
@@ -142,7 +148,7 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-    MeasurementStage3_Process();  // 3단계 릴레이 대응 시험을 계속 진행한다.
+    MeasurementStage4_Process();  // 4단계 전체 서보 보정 영점 시험을 계속 진행한다.
   }
   /* USER CODE END 3 */
 }

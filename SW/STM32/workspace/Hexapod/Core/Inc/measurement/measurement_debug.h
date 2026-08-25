@@ -81,8 +81,17 @@ typedef struct
     uint16_t crsf_maximum[USER_COMMAND_USED_CHANNELS];                 // CRSF 채널별 최대 raw를 저장한다.
     bool crsf_center_captured;                                         // CRSF 중립 기록 여부를 저장한다.
 
-    uint8_t active_servo_joint;                                        // 현재 실측 중인 서보 번호를 저장한다.
-    uint16_t active_servo_pulse_us;                                    // 현재 실측 서보 Pulse를 저장한다.
+    uint8_t active_servo_joint;                                        // 전체 활성일 때 UINT8_MAX를 저장한다.
+    uint16_t active_servo_pulse_us;                                    // 공통 Pulse가 없을 때 0을 저장한다.
+    uint16_t servo_test_joint_pulse_us[ROBOT_JOINT_COUNT];             // 보정된 관절별 0도 Pulse를 저장한다.
+    uint8_t servo_test_active_leg;                                     // 전체 다리 시험일 때 0을 저장한다.
+    uint8_t servo_test_active_joint;                                   // 전체 관절 시험일 때 0을 저장한다.
+    uint8_t servo_test_phase;                                          // 보정 0도 고정 단계 번호를 저장한다.
+    uint32_t servo_test_phase_elapsed_seconds;                         // 전체 영점 측정 시간을 저장한다.
+    uint16_t servo_test_target_pulse_us;                               // 공통 목표가 없을 때 0을 저장한다.
+    uint16_t servo_test_active_joint_raw;                              // 단일 관절 시험에서 사용할 ADC를 저장한다.
+    uint32_t servo_test_cycle_count;                                   // 순차 시험에서 사용할 반복 횟수를 저장한다.
+    bool servo_test_output_active;                                     // 전체 PWM과 릴레이 활성 상태를 저장한다.
     bool stage0_relay_enable;                                          // 0단계 서보 전원 요청을 저장한다.
     uint8_t relay_state_mask;                                          // 현재 릴레이 출력 비트를 저장한다.
 
