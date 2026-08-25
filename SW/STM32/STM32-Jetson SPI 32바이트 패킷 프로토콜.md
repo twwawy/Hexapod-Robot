@@ -1,8 +1,8 @@
-# STM32–Jetson SPI 32바이트 패킷 프로토콜
+# STM32–Jetson SPI 32바이트 패킷 프로토콜 v2
 
 ## 1. 문서 목적
 
-STM32F446RE와 Jetson Orin Nano Super 사이에서 SPI로 전달할 32바이트 고정 길이 센서 패킷을 정의한다. 이 문서의 패킷은 STM32가 측정한 18개 관절각과 IMU 자세를 Jetson으로 전달하는 상태 패킷이다.
+STM32F446RE와 Jetson Orin Nano Super 사이에서 SPI로 전달할 32바이트 고정 길이 센서 패킷을 정의한다. 이 문서의 패킷은 STM32가 측정한 18개 관절각, 6개 발 접촉 상태와 IMU 자세를 Jetson으로 전달하는 상태 패킷이다. 발압 ADC raw 값은 전송하지 않는다.
 
 `workspace/Hexapod/Core/Inc/communication/jetson_spi.h`와 `workspace/Hexapod/Core/Src/communication/jetson_spi.c`에 아래 프로토콜의 패킹, CRC, 공통 수신 파싱과 SPI 송수신 코드가 구현되어 있다. Jetson 명령 Payload의 구체적인 의미와 제어 적용은 아직 정의하지 않는다.
 
@@ -26,7 +26,7 @@ Jetson에서 STM32로 보내는 패킷도 동일한 32바이트 헤더와 CRC �
 ## 3. 32바이트 패킷 구조
 
 ```text
-[A5][VER/TYPE][SEQ 2B][DT 2B][JOINT x18][ROLL 2B][PITCH 2B][YAW 2B][CRC16 2B]
+[A5][VER/TYPE][SEQ 2B][DT 1B][FOOT CONTACT 1B][JOINT x18][ROLL 2B][PITCH 2B][YAW 2B][CRC16 2B]
 ```
 
 | 바이트 | 크기 | 필드 | 자료형 | 설명 |
@@ -34,7 +34,8 @@ Jetson에서 STM32로 보내는 패킷도 동일한 32바이트 헤더와 CRC �
 | 0 | 1 | `MAGIC` | `uint8_t` | 패킷 시작 확인값 `0xA5` |
 | 1 | 1 | `VERSION_TYPE` | `uint8_t` | 상위 4비트 프로토콜 버전, 하위 4비트 패킷 종류 |
 | 2~3 | 2 | `SEQUENCE` | `uint16_t` | 패킷 순번, Little Endian |
-| 4~5 | 2 | `DELTA_TIME` | `uint16_t` | 이전 패킷 생성 후 경과 시간, 10 us/LSB |
+| 4 | 1 | `DELTA_TIME` | `uint8_t` | 이전 패킷 생성 후 경과 시간, 100 us/LSB |
+| 5 | 1 | `FLAGS` | `uint8_t` | SENSOR: Bit 0~5 = Leg 1~6 접촉, COMMAND: 현재 0 |
 | 6~23 | 18 | `JOINT[18]` | `uint8_t[18]` | 18개 관절 측정각 |
 | 24~25 | 2 | `IMU_ROLL` | `int16_t` | Roll rad x 10000 |
 | 26~27 | 2 | `IMU_PITCH` | `int16_t` | Pitch rad x 10000 |
@@ -44,7 +45,7 @@ Jetson에서 STM32로 보내는 패킷도 동일한 32바이트 헤더와 CRC �
 전체 크기는 다음과 같다.
 
 ```text
-1 + 1 + 2 + 2 + 18 + 6 + 2 = 32바이트
+1 + 1 + 2 + 1 + 1 + 18 + 6 + 2 = 32바이트
 ```
 
 ## 4. 헤더 정의
@@ -67,7 +68,7 @@ Bit 3~0: 패킷 종류
 ```
 
 ```c
-#define JETSON_SPI_PROTOCOL_VERSION  1U
+#define JETSON_SPI_PROTOCOL_VERSION  2U
 
 typedef enum
 {
@@ -82,7 +83,7 @@ typedef enum
     (uint8_t)((((version) & 0x0FU) << 4U) | ((type) & 0x0FU))
 ```
 
-버전 1의 센서 패킷은 `0x11`이다.
+버전 2의 센서 패킷은 `0x21`이다. v1과 Delta time 배치가 호환되지 않으므로 버전을 증가시켰다.
 
 ### 4.3 패킷 순번
 
@@ -98,16 +99,26 @@ uint16_t sequence_gap = (uint16_t)(current_sequence - previous_sequence);
 
 ### 4.4 Delta time
 
-`DELTA_TIME`은 이번 센서 스냅샷 패킷을 만든 시각과 이전 패킷을 만든 시각의 차이다. 단위는 10 us로 정의한다.
+`DELTA_TIME`은 이번 센서 스냅샷 패킷을 만든 시각과 이전 패킷을 만든 시각의 차이다. 단위는 100 us로 정의한다.
 
 ```text
-전송값 = 경과 시간[us] / 10
-복원 시간[s] = 전송값 x 0.00001
+전송값 = 경과 시간[us] / 100
+복원 시간[s] = 전송값 x 0.0001
 ```
 
-정상적인 5 ms 주기에서는 `500`이 들어간다. 표현 가능한 최대 시간은 655.35 ms다. `HAL_GetTick()`만 사용하면 측정 분해능은 1 ms이므로 `delta_ms * 100`으로 저장한다. 실제 10 us 수준의 주기 측정이 필요하면 별도의 마이크로초 타이머를 사용한다.
+정상적인 5 ms 주기에서는 `50`이 들어간다. `uint8_t`이므로 최대 표현 시간은 25.5 ms이며 현재 `HAL_GetTick()` 기준 구현은 25 ms에서 포화한다. 패킷 유실 여부는 16비트 `SEQUENCE`로 별도 판별한다.
 
 관절 ADC와 IMU가 서로 다른 시각에 갱신될 수 있으므로 이 필드는 개별 센서의 내부 샘플 주기가 아니라 패킷 생성 주기를 의미한다.
+
+### 4.5 발 접촉 상태
+
+SENSOR 패킷에서 Byte 5 `FLAGS`의 Bit 0~5는 각각 Leg 1~6의 접촉 상태다. STM32가 발압 센서 raw 값에 보정 임계값과 히스테리시스를 적용해 만든 `foot_contact[6]`을 비트마스크로 변환한다. 발압 ADC raw 값 자체는 전송하지 않는다. COMMAND 패킷에서는 Byte 5를 예약 영역으로 두고 현재 0으로 송신한다.
+
+```text
+Bit 0 = Leg 1, Bit 1 = Leg 2, ... Bit 5 = Leg 6
+0 = 비접촉, 1 = 접촉
+Bit 6~7 = 예약, 항상 0
+```
 
 ## 5. 관절각 인코딩
 
@@ -254,6 +265,7 @@ static uint16_t JetsonSpi_Crc16CcittFalse(const uint8_t *data,
 #define SPI_OFFSET_VERSION_TYPE          1U
 #define SPI_OFFSET_SEQUENCE              2U
 #define SPI_OFFSET_DELTA_TIME             4U
+#define SPI_OFFSET_FLAGS                  5U
 #define SPI_OFFSET_JOINTS                6U
 #define SPI_OFFSET_IMU_ROLL             24U
 #define SPI_OFFSET_IMU_PITCH            26U
@@ -273,7 +285,8 @@ static void JetsonSpi_WriteI16Le(uint8_t *destination, int16_t value)
 
 static void JetsonSpi_BuildSensorFrame(uint8_t frame[JETSON_SPI_FRAME_SIZE],
                                        uint16_t sequence,
-                                       uint16_t delta_time_10us,
+                                       uint8_t delta_time_100us,
+                                       const bool foot_contact[6],
                                        const float joint_angle_rad[18],
                                        float roll_rad,
                                        float pitch_rad,
@@ -281,6 +294,7 @@ static void JetsonSpi_BuildSensorFrame(uint8_t frame[JETSON_SPI_FRAME_SIZE],
 {
     uint16_t crc;
     uint32_t joint;
+    uint32_t leg;
 
     frame[SPI_OFFSET_MAGIC] = JETSON_SPI_MAGIC;
     frame[SPI_OFFSET_VERSION_TYPE] =
@@ -288,7 +302,16 @@ static void JetsonSpi_BuildSensorFrame(uint8_t frame[JETSON_SPI_FRAME_SIZE],
                                      JETSON_SPI_TYPE_SENSOR);
 
     JetsonSpi_WriteU16Le(&frame[SPI_OFFSET_SEQUENCE], sequence);
-    JetsonSpi_WriteU16Le(&frame[SPI_OFFSET_DELTA_TIME], delta_time_10us);
+    frame[SPI_OFFSET_DELTA_TIME] = delta_time_100us;
+    frame[SPI_OFFSET_FLAGS] = 0U;
+
+    for (leg = 0U; leg < 6U; ++leg)
+    {
+        if (foot_contact[leg])
+        {
+            frame[SPI_OFFSET_FLAGS] |= (uint8_t)(1U << leg);
+        }
+    }
 
     for (joint = 0U; joint < JETSON_SPI_JOINT_COUNT; ++joint)
     {
@@ -365,7 +388,7 @@ from dataclasses import dataclass
 
 FRAME_SIZE = 32
 MAGIC = 0xA5
-PROTOCOL_VERSION = 1
+PROTOCOL_VERSION = 2
 PACKET_TYPE_SENSOR = 1
 
 JOINT_MIN_RAD = -2.35619449
@@ -397,6 +420,7 @@ def decode_joint(encoded: int) -> float:
 class SensorPacket:
     sequence: int
     delta_time_s: float
+    foot_contact: list[bool]
     joint_angle_rad: list[float]
     roll_rad: float
     pitch_rad: float
@@ -429,13 +453,16 @@ def parse_sensor_packet(frame: bytes) -> SensorPacket:
         )
 
     sequence = struct.unpack_from("<H", frame, 2)[0]
-    delta_time_10us = struct.unpack_from("<H", frame, 4)[0]
+    delta_time_100us = frame[4]
+    contact_mask = frame[5]
+    foot_contact = [bool(contact_mask & (1 << leg)) for leg in range(6)]
     joints = [decode_joint(value) for value in frame[6:24]]
     roll_raw, pitch_raw, yaw_raw = struct.unpack_from("<hhh", frame, 24)
 
     return SensorPacket(
         sequence=sequence,
-        delta_time_s=delta_time_10us * 0.00001,
+        delta_time_s=delta_time_100us * 0.0001,
+        foot_contact=foot_contact,
         joint_angle_rad=joints,
         roll_rad=roll_raw / 10000.0,
         pitch_rad=pitch_raw / 10000.0,
@@ -500,7 +527,7 @@ CRC 오류 패킷의 순번은 마지막 정상 순번으로 갱신하지 않는
 
 현재 구현된 기능은 다음과 같다.
 
-- 18개 관절각과 IMU 자세의 32바이트 센서 프레임 생성
+- 18개 관절각, 6개 발 접촉 상태와 IMU 자세의 32바이트 센서 프레임 생성
 - 순번 증가와 패킷 생성 Delta time 계산
 - CRC-16/CCITT-FALSE 생성 및 검증
 - 수신 패킷의 시작값, 버전, 순번, 종류와 Payload 파싱

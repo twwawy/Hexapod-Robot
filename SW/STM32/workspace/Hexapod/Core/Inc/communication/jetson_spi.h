@@ -11,18 +11,21 @@
 #define JETSON_SPI_PAYLOAD_SIZE            24U
 #define JETSON_SPI_CRC_INPUT_SIZE          30U
 #define JETSON_SPI_MAGIC                   0xA5U
-#define JETSON_SPI_PROTOCOL_VERSION        1U
+#define JETSON_SPI_PROTOCOL_VERSION        2U
 
 #define JETSON_SPI_OFFSET_MAGIC             0U
 #define JETSON_SPI_OFFSET_VERSION_TYPE      1U
 #define JETSON_SPI_OFFSET_SEQUENCE          2U
 #define JETSON_SPI_OFFSET_DELTA_TIME        4U
+#define JETSON_SPI_OFFSET_FLAGS             5U
 #define JETSON_SPI_OFFSET_PAYLOAD           6U
 #define JETSON_SPI_OFFSET_JOINTS            6U
 #define JETSON_SPI_OFFSET_IMU_ROLL         24U
 #define JETSON_SPI_OFFSET_IMU_PITCH        26U
 #define JETSON_SPI_OFFSET_IMU_YAW          28U
 #define JETSON_SPI_OFFSET_CRC              30U
+
+#define JETSON_SPI_SENSOR_FOOT_CONTACT_MASK 0x3FU
 
 #define JETSON_SPI_MAKE_VERSION_TYPE(version, type) \
     ((uint8_t)((((uint8_t)(version) & 0x0FU) << 4U) | \
@@ -41,14 +44,16 @@ typedef struct
 {
     JetsonSpi_PacketType_t type;                  // 하위 4비트의 패킷 종류를 저장한다.
     uint16_t sequence;                            // 송신 측 패킷 순번을 저장한다.
-    uint16_t delta_time_10us;                     // 이전 패킷과의 간격을 10 us 단위로 저장한다.
+    uint8_t delta_time_100us;                     // 이전 패킷과의 간격을 100 us 단위로 저장한다.
+    uint8_t flags;                                // SENSOR에서는 Bit 0~5가 Leg 1~6 접촉 상태다.
     uint8_t payload[JETSON_SPI_PAYLOAD_SIZE];     // Byte 6~29의 해석 전 Payload를 저장한다.
 } JetsonSpi_ParsedPacket_t;
 
 typedef struct
 {
     uint16_t sequence;                            // Jetson 명령 패킷 순번을 저장한다.
-    uint16_t delta_time_10us;                     // Jetson 명령 생성 간격을 10 us 단위로 저장한다.
+    uint8_t delta_time_100us;                     // Jetson 명령 생성 간격을 100 us 단위로 저장한다.
+    uint8_t flags;                                // COMMAND에서는 예약값이며 현재 0으로 송신한다.
     uint8_t payload[JETSON_SPI_PAYLOAD_SIZE];     // 아직 할당하지 않은 24바이트 명령 Payload다.
 } JetsonSpi_CommandFrame_t;
 
@@ -89,7 +94,7 @@ bool JetsonSpi_ParseCommandFrame(const uint8_t frame[JETSON_SPI_FRAME_SIZE],
 
 bool JetsonSpi_PrepareSensorFrame(JetsonSpi_Handle_t *handle,
                                   const RobotSensorSnapshot_t *snapshot,
-                                  uint32_t now_ms);  // 최신 관절각과 IMU 자세로 송신 프레임을 만든다.
+                                  uint32_t now_ms);  // 관절각, 발 접촉 상태와 IMU 자세로 송신 프레임을 만든다.
 
 /*
  * 준비된 32바이트를 SPI2 Slave로 동시 송수신한다.
