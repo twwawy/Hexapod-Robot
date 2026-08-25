@@ -1,5 +1,6 @@
 Core/Src/app/hexapod_app.o: ../Core/Src/app/hexapod_app.c \
  ../Core/Inc/app/hexapod_app.h ../Core/Inc/communication/jetson_spi.h \
+ ../Core/Inc/common/robot_types.h ../Core/Inc/common/robot_config.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal.h \
  ../Core/Inc/stm32f4xx_hal_conf.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_rcc.h \
@@ -31,7 +32,6 @@ Core/Src/app/hexapod_app.o: ../Core/Src/app/hexapod_app.c \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_uart.h \
  ../Core/Inc/communication/lora.h \
  ../Core/Inc/communication/robot_telemetry.h \
- ../Core/Inc/common/robot_types.h ../Core/Inc/common/robot_config.h \
  ../Core/Inc/high_control/body_position_estimator.h \
  ../Core/Inc/high_control/body_posture_controller.h \
  ../Core/Inc/high_control/control_priority.h \
@@ -53,6 +53,8 @@ Core/Src/app/hexapod_app.o: ../Core/Src/app/hexapod_app.c \
  ../Core/Inc/high_control/stand_landing.h
 ../Core/Inc/app/hexapod_app.h:
 ../Core/Inc/communication/jetson_spi.h:
+../Core/Inc/common/robot_types.h:
+../Core/Inc/common/robot_config.h:
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal.h:
 ../Core/Inc/stm32f4xx_hal_conf.h:
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_rcc.h:
@@ -84,8 +86,6 @@ Core/Src/app/hexapod_app.o: ../Core/Src/app/hexapod_app.c \
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_uart.h:
 ../Core/Inc/communication/lora.h:
 ../Core/Inc/communication/robot_telemetry.h:
-../Core/Inc/common/robot_types.h:
-../Core/Inc/common/robot_config.h:
 ../Core/Inc/high_control/body_position_estimator.h:
 ../Core/Inc/high_control/body_posture_controller.h:
 ../Core/Inc/high_control/control_priority.h:
