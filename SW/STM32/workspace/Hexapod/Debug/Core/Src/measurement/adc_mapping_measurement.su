@@ -1,0 +1,3 @@
+../Core/Src/measurement/adc_mapping_measurement.c:9:6:AdcMappingMeasurement_Init	24	static
+../Core/Src/measurement/adc_mapping_measurement.c:29:6:AdcMappingMeasurement_Record	16	static
+../Core/Src/measurement/adc_mapping_measurement.c:54:6:AdcMappingMeasurement_IsComplete	56	static

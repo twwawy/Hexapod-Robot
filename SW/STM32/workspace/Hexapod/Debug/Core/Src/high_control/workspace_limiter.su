@@ -1,0 +1,5 @@
+../Core/Src/high_control/workspace_limiter.c:12:20:WorkspaceLimiter_RotateInverse	120	static
+../Core/Src/high_control/workspace_limiter.c:39:13:WorkspaceLimiter_PreviewGait	240	static
+../Core/Src/high_control/workspace_limiter.c:101:6:WorkspaceLimiter_Init	16	static
+../Core/Src/high_control/workspace_limiter.c:110:6:WorkspaceLimiter_AllFeetValid	32	static
+../Core/Src/high_control/workspace_limiter.c:134:18:WorkspaceLimiter_Gait	80	static

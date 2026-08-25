@@ -1,0 +1,5 @@
+../Core/Src/test/rc_command_generator.c:12:16:RcCommandGenerator_Clamp	16	static
+../Core/Src/test/rc_command_generator.c:26:16:RcCommandGenerator_Move	24	static
+../Core/Src/test/rc_command_generator.c:42:6:RcCommandGenerator_Init	24	static
+../Core/Src/test/rc_command_generator.c:56:6:RcCommandGenerator_SetTarget	24	static
+../Core/Src/test/rc_command_generator.c:72:20:RcCommandGenerator_Step	48	static

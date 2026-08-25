@@ -236,11 +236,8 @@ bool IMU_GetLatest(const IMU_Handle_t *handle, IMU_Data_t *out)
 
 bool IMU_HasNavigationData(const IMU_Data_t *data)
 {
-    const uint32_t required = IMU_VALID_ACCELEROMETER
-                            | IMU_VALID_GYROSCOPE
-                            | IMU_VALID_ANGLE;
-
-    return (data != NULL) && ((data->valid_mask & required) == required);
+    return (data != NULL) &&
+           ((data->valid_mask & IMU_VALID_ANGLE) != 0U);  // 각도 프레임만 제어 유효값으로 인정한다.
 }
 
 /* 실측한 WT931 장착 방향과 자세 Offset을 적용한다. */

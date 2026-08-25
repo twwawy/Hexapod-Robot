@@ -1,0 +1,5 @@
+../Core/Src/communication/robot_telemetry.c:13:6:RobotTelemetry_Init	16	static
+../Core/Src/communication/robot_telemetry.c:24:12:RobotTelemetry_BuildStatus	96	static
+../Core/Src/communication/robot_telemetry.c:60:12:RobotTelemetry_BuildJoint	56	static
+../Core/Src/communication/robot_telemetry.c:101:12:RobotTelemetry_BuildGps	72	static
+../Core/Src/communication/robot_telemetry.c:119:6:RobotTelemetry_BuildNext	56	static

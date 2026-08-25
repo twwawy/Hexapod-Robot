@@ -1,0 +1,10 @@
+../Core/Src/low_control/relay.c:27:13:Relay_IsValidChannel	16	static
+../Core/Src/low_control/relay.c:33:6:Relay_Init	8	static
+../Core/Src/low_control/relay.c:40:6:Relay_Set	16	static
+../Core/Src/low_control/relay.c:62:6:Relay_On	16	static
+../Core/Src/low_control/relay.c:68:6:Relay_Off	16	static
+../Core/Src/low_control/relay.c:74:6:Relay_AllOn	16	static
+../Core/Src/low_control/relay.c:85:6:Relay_AllOff	16	static
+../Core/Src/low_control/relay.c:96:6:Relay_ApplySafety	24	static
+../Core/Src/low_control/relay.c:118:6:Relay_IsOn	16	static
+../Core/Src/low_control/relay.c:129:9:Relay_GetStateMask	4	static

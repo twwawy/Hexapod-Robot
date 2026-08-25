@@ -1,0 +1,8 @@
+../Core/Src/app/hexapod_app.c:11:13:HexapodApp_InitializeJointCommand	4
+../Core/Src/app/hexapod_app.c:34:19:HexapodApp_Init	20
+../Core/Src/app/hexapod_app.c:151:6:HexapodApp_Process	6
+../Core/Src/app/hexapod_app.c:197:13:HexapodApp_ControlStep	17
+../Core/Src/app/hexapod_app.c:313:6:HexapodApp_RunControlIfDue	4
+../Core/Src/app/hexapod_app.c:326:6:HexapodApp_TimerCallback	4
+../Core/Src/app/hexapod_app.c:342:6:HexapodApp_UartRxCallback	2
+../Core/Src/app/hexapod_app.c:357:6:HexapodApp_UartErrorCallback	2

@@ -1,0 +1,5 @@
+../Core/Src/user_command/crsf_receiver.c:10:6:CRSF_Receiver_Init	16	static
+../Core/Src/user_command/crsf_receiver.c:23:19:CRSF_Receiver_Start	16	static
+../Core/Src/user_command/crsf_receiver.c:34:6:CRSF_Receiver_RxCpltCallback	24	static
+../Core/Src/user_command/crsf_receiver.c:61:6:CRSF_Receiver_ErrorCallback	16	static
+../Core/Src/user_command/crsf_receiver.c:76:6:CRSF_Receiver_PopByte	16	static

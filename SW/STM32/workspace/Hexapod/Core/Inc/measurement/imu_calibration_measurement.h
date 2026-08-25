@@ -16,9 +16,7 @@ void ImuCalibrationMeasurement_Init(ImuCalibrationMeasurement_t *measurement);  
 bool ImuCalibrationMeasurement_AddSample(ImuCalibrationMeasurement_t *measurement,
                                          const IMU_Data_t *data);  // 수평 정지 표본을 추가한다.
 bool ImuCalibrationMeasurement_Build(const ImuCalibrationMeasurement_t *measurement,
-                                     const int8_t acceleration_sign[3],
-                                     const int8_t angular_velocity_sign[3],
                                      const int8_t euler_angle_sign[3],
-                                     IMU_Calibration_t *calibration);  // 축 부호와 평균 Offset을 만든다.
+                                     IMU_Calibration_t *calibration);  // 자세 부호와 평균 Offset을 만든다.
 
 #endif

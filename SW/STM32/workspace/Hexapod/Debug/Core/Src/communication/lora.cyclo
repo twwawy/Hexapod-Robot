@@ -1,0 +1,15 @@
+../Core/Src/communication/lora.c:7:17:LoRa_NextIndex	2
+../Core/Src/communication/lora.c:19:13:LoRa_QueueRxByte	2
+../Core/Src/communication/lora.c:33:13:LoRa_PopRxByte	2
+../Core/Src/communication/lora.c:45:13:LoRa_ParseReceivedLine	13
+../Core/Src/communication/lora.c:123:13:LoRa_StoreResponse	2
+../Core/Src/communication/lora.c:137:6:LoRa_Init	2
+../Core/Src/communication/lora.c:149:19:LoRa_AutoBaud	10
+../Core/Src/communication/lora.c:255:19:LoRa_Start	3
+../Core/Src/communication/lora.c:265:6:LoRa_RxCpltCallback	4
+../Core/Src/communication/lora.c:278:6:LoRa_ErrorCallback	4
+../Core/Src/communication/lora.c:291:10:LoRa_Process	8
+../Core/Src/communication/lora.c:341:6:LoRa_GetLatest	4
+../Core/Src/communication/lora.c:353:19:LoRa_SendCommand	7
+../Core/Src/communication/lora.c:388:19:LoRa_Configure	7
+../Core/Src/communication/lora.c:435:19:LoRa_SendText	12

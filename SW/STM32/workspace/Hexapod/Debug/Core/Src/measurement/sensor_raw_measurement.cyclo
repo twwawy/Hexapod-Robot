@@ -1,0 +1,2 @@
+../Core/Src/measurement/sensor_raw_measurement.c:9:6:SensorRawMeasurement_Init	4
+../Core/Src/measurement/sensor_raw_measurement.c:39:6:SensorRawMeasurement_Sample	8

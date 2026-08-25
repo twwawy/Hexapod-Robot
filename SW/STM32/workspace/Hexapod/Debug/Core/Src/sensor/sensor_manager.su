@@ -1,0 +1,3 @@
+../Core/Src/sensor/sensor_manager.c:7:6:SensorManager_Init	24	static
+../Core/Src/sensor/sensor_manager.c:26:6:SensorManager_Update	200	static
+../Core/Src/sensor/sensor_manager.c:95:6:SensorManager_GetSnapshot	16	static

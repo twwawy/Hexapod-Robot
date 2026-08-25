@@ -1,0 +1,5 @@
+../Core/Src/sensor/joint_feedback.c:6:14:JointFeedback_Clamp	24	static
+../Core/Src/sensor/joint_feedback.c:20:13:JointFeedback_ConvertOne	40	static
+../Core/Src/sensor/joint_feedback.c:58:6:JointFeedback_Init	24	static
+../Core/Src/sensor/joint_feedback.c:81:6:JointFeedback_SetCalibration	32	static
+../Core/Src/sensor/joint_feedback.c:98:6:JointFeedback_Convert	32	static

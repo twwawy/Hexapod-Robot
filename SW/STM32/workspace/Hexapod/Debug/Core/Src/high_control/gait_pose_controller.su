@@ -1,0 +1,5 @@
+../Core/Src/high_control/gait_pose_controller.c:19:14:GaitPoseController_Clamp	24	static
+../Core/Src/high_control/gait_pose_controller.c:25:14:GaitPoseController_WrapPi	16	static
+../Core/Src/high_control/gait_pose_controller.c:39:14:GaitPoseController_RateLimit	32	static
+../Core/Src/high_control/gait_pose_controller.c:48:6:GaitPoseController_Init	16	static
+../Core/Src/high_control/gait_pose_controller.c:57:29:GaitPoseController_Step	120	static

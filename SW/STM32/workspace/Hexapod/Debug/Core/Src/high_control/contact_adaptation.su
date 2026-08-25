@@ -1,0 +1,2 @@
+../Core/Src/high_control/contact_adaptation.c:7:6:ContactAdaptation_IsEarlyLanding	16	static
+../Core/Src/high_control/contact_adaptation.c:17:6:ContactAdaptation_ApplyLateLanding	24	static

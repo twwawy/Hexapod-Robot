@@ -1,0 +1,6 @@
+../Core/Src/high_control/foot_trajectory.c:23:20:FootTrajectory_PhaseDisplacement	56	static
+../Core/Src/high_control/foot_trajectory.c:37:13:FootTrajectory_IntegrateStance	24	static
+../Core/Src/high_control/foot_trajectory.c:49:20:FootTrajectory_ResetLeg	56	static
+../Core/Src/high_control/foot_trajectory.c:61:20:FootTrajectory_AdaptiveLeg	128	static
+../Core/Src/high_control/foot_trajectory.c:205:6:FootTrajectory_Init	96	static
+../Core/Src/high_control/foot_trajectory.c:228:20:FootTrajectory_Step	400	static

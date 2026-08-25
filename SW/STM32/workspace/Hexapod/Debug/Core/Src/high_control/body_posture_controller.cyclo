@@ -1,0 +1,6 @@
+../Core/Src/high_control/body_posture_controller.c:15:14:BodyPosture_Clamp	1
+../Core/Src/high_control/body_posture_controller.c:21:14:BodyPosture_WrapPi	3
+../Core/Src/high_control/body_posture_controller.c:35:14:BodyPosture_MoveToward	1
+../Core/Src/high_control/body_posture_controller.c:44:20:BodyPosture_RotateInverse	1
+../Core/Src/high_control/body_posture_controller.c:71:6:BodyPostureController_Init	2
+../Core/Src/high_control/body_posture_controller.c:80:32:BodyPostureController_Step	14

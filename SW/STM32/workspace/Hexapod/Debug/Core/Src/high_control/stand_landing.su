@@ -1,0 +1,2 @@
+../Core/Src/high_control/stand_landing.c:10:14:StandLanding_QuinticInterval	32	static
+../Core/Src/high_control/stand_landing.c:20:6:StandLanding_Calculate	128	static

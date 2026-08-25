@@ -81,7 +81,7 @@ void IMU_ProcessByte(IMU_Handle_t *handle, uint8_t byte);
 /** Copy the most recent complete sensor values. */
 bool IMU_GetLatest(const IMU_Handle_t *handle, IMU_Data_t *out);
 
-/** True after acceleration, angular velocity, and Euler angle frames arrived. */
+/** True after an Euler angle frame arrived. */
 bool IMU_HasNavigationData(const IMU_Data_t *data);
 
 void IMU_SetCalibration(IMU_Handle_t *handle,

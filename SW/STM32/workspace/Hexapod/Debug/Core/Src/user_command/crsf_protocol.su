@@ -1,0 +1,6 @@
+../Core/Src/user_command/crsf_protocol.c:10:13:CRSF_Protocol_IsAddress	16	static
+../Core/Src/user_command/crsf_protocol.c:17:13:CRSF_Protocol_UnpackChannels	32	static
+../Core/Src/user_command/crsf_protocol.c:40:6:CRSF_Protocol_Init	16	static
+../Core/Src/user_command/crsf_protocol.c:51:9:CRSF_Protocol_Crc8	24	static
+../Core/Src/user_command/crsf_protocol.c:80:6:CRSF_Protocol_ProcessByte	24	static
+../Core/Src/user_command/crsf_protocol.c:144:10:CRSF_Protocol_ProcessReceiver	24	static

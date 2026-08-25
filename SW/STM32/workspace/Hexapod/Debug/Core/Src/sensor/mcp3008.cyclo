@@ -3,8 +3,9 @@
 ../Core/Src/sensor/mcp3008.c:30:13:MCP3008_DeselectAll	2
 ../Core/Src/sensor/mcp3008.c:42:13:MCP3008_Select	1
 ../Core/Src/sensor/mcp3008.c:49:13:MCP3008_Deselect	1
-../Core/Src/sensor/mcp3008.c:56:19:MCP3008_Init	3
-../Core/Src/sensor/mcp3008.c:71:19:MCP3008_ReadChannel	7
-../Core/Src/sensor/mcp3008.c:111:19:MCP3008_ReadAll	8
-../Core/Src/sensor/mcp3008.c:167:6:MCP3008_GetRaw	5
-../Core/Src/sensor/mcp3008.c:182:7:MCP3008_RawToVoltage	2
+../Core/Src/sensor/mcp3008.c:56:19:MCP3008_Init	5
+../Core/Src/sensor/mcp3008.c:84:19:MCP3008_ReadChannel	7
+../Core/Src/sensor/mcp3008.c:124:19:MCP3008_ReadAll	8
+../Core/Src/sensor/mcp3008.c:180:6:MCP3008_SetInputMapping	7
+../Core/Src/sensor/mcp3008.c:198:6:MCP3008_GetRaw	5
+../Core/Src/sensor/mcp3008.c:213:7:MCP3008_RawToVoltage	2

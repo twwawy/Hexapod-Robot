@@ -46,17 +46,14 @@ bool ImuCalibrationMeasurement_AddSample(ImuCalibrationMeasurement_t *measuremen
     return true;
 }
 
-/* 확인한 축 부호와 수평 자세 평균으로 WT931 보정값을 만든다. */
+/* 확인한 자세 부호와 수평 자세 평균으로 WT931 보정값을 만든다. */
 bool ImuCalibrationMeasurement_Build(const ImuCalibrationMeasurement_t *measurement,
-                                     const int8_t acceleration_sign[3],
-                                     const int8_t angular_velocity_sign[3],
                                      const int8_t euler_angle_sign[3],
                                      IMU_Calibration_t *calibration)
 {
     uint32_t axis;  // 보정할 축 번호를 저장한다.
 
-    if ((measurement == NULL) || (acceleration_sign == NULL) ||
-        (angular_velocity_sign == NULL) || (euler_angle_sign == NULL) ||
+    if ((measurement == NULL) || (euler_angle_sign == NULL) ||
         (calibration == NULL) || (measurement->sample_count == 0U))
     {
         return false;
@@ -64,15 +61,13 @@ bool ImuCalibrationMeasurement_Build(const ImuCalibrationMeasurement_t *measurem
 
     for (axis = 0U; axis < 3U; ++axis)
     {
-        if (((acceleration_sign[axis] != 1) && (acceleration_sign[axis] != -1)) ||
-            ((angular_velocity_sign[axis] != 1) && (angular_velocity_sign[axis] != -1)) ||
-            ((euler_angle_sign[axis] != 1) && (euler_angle_sign[axis] != -1)))
+        if ((euler_angle_sign[axis] != 1) && (euler_angle_sign[axis] != -1))
         {
             return false;
         }
 
-        calibration->acceleration_sign[axis] = acceleration_sign[axis];          // 가속도 장착 부호를 저장한다.
-        calibration->angular_velocity_sign[axis] = angular_velocity_sign[axis];  // 각속도 장착 부호를 저장한다.
+        calibration->acceleration_sign[axis] = 1;                                // 미사용 가속도 부호를 기본값으로 둔다.
+        calibration->angular_velocity_sign[axis] = 1;                            // 미사용 각속도 부호를 기본값으로 둔다.
         calibration->euler_angle_sign[axis] = euler_angle_sign[axis];            // 자세 장착 부호를 저장한다.
         calibration->euler_offset_rad[axis] = (float)euler_angle_sign[axis] *
             (float)(measurement->euler_sum_rad[axis] /

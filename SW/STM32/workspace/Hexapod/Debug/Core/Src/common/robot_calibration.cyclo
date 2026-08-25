@@ -1,0 +1,3 @@
+../Core/Src/common/robot_calibration.c:105:13:RobotCalibration_IsSignValid	3
+../Core/Src/common/robot_calibration.c:111:6:RobotCalibration_IsComplete	39
+../Core/Src/common/robot_calibration.c:211:6:RobotCalibration_Apply	19

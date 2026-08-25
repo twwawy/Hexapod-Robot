@@ -1,0 +1,2 @@
+../Core/Src/communication/jetson_spi.c:14:6:JetsonSpi_Init	24	static
+../Core/Src/communication/jetson_spi.c:44:6:JetsonSpi_Process	32	static

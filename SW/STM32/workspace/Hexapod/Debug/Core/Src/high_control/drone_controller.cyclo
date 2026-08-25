@@ -1,0 +1,5 @@
+../Core/Src/high_control/drone_controller.c:8:14:DroneController_Clamp	1
+../Core/Src/high_control/drone_controller.c:14:14:DroneController_WrapPi	3
+../Core/Src/high_control/drone_controller.c:28:14:DroneController_Normalize	2
+../Core/Src/high_control/drone_controller.c:42:6:DroneController_Init	2
+../Core/Src/high_control/drone_controller.c:55:20:DroneController_Step	54

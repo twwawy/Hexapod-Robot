@@ -1,0 +1,4 @@
+../Core/Src/measurement/foot_pressure_measurement.c:9:6:FootPressureMeasurement_Init	3
+../Core/Src/measurement/foot_pressure_measurement.c:28:6:FootPressureMeasurement_AddUnloaded	5
+../Core/Src/measurement/foot_pressure_measurement.c:50:6:FootPressureMeasurement_AddLoaded	5
+../Core/Src/measurement/foot_pressure_measurement.c:72:6:FootPressureMeasurement_Build	9

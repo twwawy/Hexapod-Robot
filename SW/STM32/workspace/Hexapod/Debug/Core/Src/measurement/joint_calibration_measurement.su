@@ -1,0 +1,5 @@
+../Core/Src/measurement/joint_calibration_measurement.c:9:6:JointCalibrationMeasurement_Init	24	static
+../Core/Src/measurement/joint_calibration_measurement.c:27:6:JointCalibrationMeasurement_CaptureMinimum	24	static
+../Core/Src/measurement/joint_calibration_measurement.c:45:6:JointCalibrationMeasurement_CaptureZero	24	static
+../Core/Src/measurement/joint_calibration_measurement.c:63:6:JointCalibrationMeasurement_CaptureMaximum	24	static
+../Core/Src/measurement/joint_calibration_measurement.c:81:6:JointCalibrationMeasurement_Build	48	static

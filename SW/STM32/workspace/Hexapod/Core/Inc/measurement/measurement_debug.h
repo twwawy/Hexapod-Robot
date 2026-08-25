@@ -66,6 +66,7 @@ typedef struct
 
     uint8_t active_servo_joint;                                        // 현재 실측 중인 서보 번호를 저장한다.
     uint16_t active_servo_pulse_us;                                    // 현재 실측 서보 Pulse를 저장한다.
+    bool stage0_relay_enable;                                          // 0단계 서보 전원 요청을 저장한다.
     uint8_t relay_state_mask;                                          // 현재 릴레이 출력 비트를 저장한다.
 
     RobotCalibration_t calibration;                                    // 중앙 테이블에 옮길 최종 실측값을 저장한다.
