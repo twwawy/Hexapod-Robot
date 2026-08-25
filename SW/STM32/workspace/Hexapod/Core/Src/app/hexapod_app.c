@@ -119,7 +119,7 @@ HAL_StatusTypeDef HexapodApp_Init(HexapodApp_Handle_t *handle,
 
     if (hardware->jetson_spi != NULL)
     {
-        JetsonSpi_Init(&handle->jetson, hardware->jetson_spi);  // 미정 SPI 인터페이스만 준비한다.
+        JetsonSpi_Init(&handle->jetson, hardware->jetson_spi);  // 32바이트 SPI 센서 프로토콜을 준비한다.
     }
 
     status = GPS_Start(&handle->gps);  // GPS 인터럽트 수신을 시작한다.
@@ -190,7 +190,13 @@ void HexapodApp_Process(HexapodApp_Handle_t *handle)
                             telemetry_text);  // 주기가 된 관제 패킷 하나를 전송한다.
     }
 
-    (void)JetsonSpi_Process(&handle->jetson);  // 프로토콜 확정 전에는 아무 전송도 하지 않는다.
+    if ((handle->hardware.jetson_spi != NULL) &&
+        JetsonSpi_PrepareSensorFrame(&handle->jetson,
+                                     &handle->sensor_snapshot,
+                                     now_ms))
+    {
+        (void)JetsonSpi_Process(&handle->jetson);  // 준비된 센서 패킷을 Jetson과 교환한다.
+    }
 }
 
 /* 센서에서 서보와 릴레이까지 제어 체인을 한 주기 실행한다. */
