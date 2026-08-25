@@ -42,8 +42,10 @@ typedef struct
     uint8_t adc_last_error_device;                                      // 마지막 실패 MCP3008 번호를 저장한다.
     uint8_t adc_last_error_channel;                                     // 마지막 실패 채널 번호를 저장한다.
 
-    uint32_t imu_sample_count;                                         // WT931 수평 표본 수를 저장한다.
-    double imu_euler_sum_rad[3];                                       // WT931 자세 누적값을 저장한다.
+    float imu_euler_current_rad[3];                                    // WT931 최근 자세값을 rad로 저장한다.
+    float imu_euler_current_deg[3];                                    // WT931 최근 자세값을 deg로 저장한다.
+    bool imu_axis_confirmed[3];                                        // Roll·Pitch·Yaw 방향 확인을 저장한다.
+    bool imu_check_complete;                                           // WT931 최종 확인 완료를 저장한다.
 
     bool adc_mapping_recorded[MCP3008_LEG_COUNT][MCP3008_LEG_INPUT_COUNT]; // ADC 입력별 매핑 확인을 저장한다.
 

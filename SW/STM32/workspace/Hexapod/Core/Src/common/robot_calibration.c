@@ -11,12 +11,12 @@ const RobotCalibration_t g_robot_calibration =
 {
     .imu =
     {
-        .acceleration_sign = {1, 1, 1},       // 실측한 X·Y·Z 가속도 부호로 바꾼다.
-        .angular_velocity_sign = {1, 1, 1},   // 실측한 Roll·Pitch·Yaw 각속도 부호로 바꾼다.
-        .euler_angle_sign = {1, 1, 1},        // 실측한 Roll·Pitch·Yaw 자세 부호로 바꾼다.
-        .euler_offset_rad = {0.0f, 0.0f, 0.0f}// 실측한 수평 자세 Offset으로 바꾼다.
+        .acceleration_sign = {1, 1, 1},        // WT931에서 설정한 X·Y·Z 방향을 그대로 사용한다.
+        .angular_velocity_sign = {1, 1, 1},    // WT931에서 설정한 회전 방향을 그대로 사용한다.
+        .euler_angle_sign = {1, 1, 1},         // 확인한 Roll·Pitch·Yaw 부호를 그대로 사용한다.
+        .euler_offset_rad = {0.0f, 0.0f, 0.0f} // WT931에서 설정한 자세 영점을 그대로 사용한다.
     },
-    .imu_calibrated = false,                  // 실측값을 넣은 뒤 true로 바꾼다.
+    .imu_calibrated = true,                   // WT931 축·부호·영점 확인 완료를 표시한다.
 
     .adc =
     {
@@ -282,4 +282,3 @@ bool RobotCalibration_Apply(const RobotCalibration_t *calibration,
 
     return complete;
 }
-

@@ -21,7 +21,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "measurement/measurement_stage0.h"
+#include "measurement/measurement_stage1.h"
 
 /* USER CODE END Includes */
 
@@ -128,7 +128,7 @@ int main(void)
   MX_USART3_UART_Init();
   MX_USART6_UART_Init();
   /* USER CODE BEGIN 2 */
-  if (!MeasurementStage0_Init(&huart2, &huart3, &hspi1))
+  if (!MeasurementStage1_Init(&huart3))
   {
     Error_Handler();  // 초기화 오류를 디버거에서 확인한다.
   }
@@ -142,7 +142,7 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-    MeasurementStage0_Process();  // 0단계 센서 Raw를 계속 기록한다.
+    MeasurementStage1_Process();  // 1단계 WT931 자세를 계속 기록한다.
   }
   /* USER CODE END 3 */
 }
@@ -919,16 +919,16 @@ static void MX_GPIO_Init(void)
 
 /* USER CODE BEGIN 4 */
 
-/* GPS·WT931 UART 수신 완료를 0단계 실측 코드에 전달한다. */
+/* WT931 UART 수신 완료를 1단계 실측 코드에 전달한다. */
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
-  MeasurementStage0_UartRxCallback(huart);  // 사용 중인 센서 UART를 갱신한다.
+  MeasurementStage1_UartRxCallback(huart);  // USART3 WT931 수신을 갱신한다.
 }
 
-/* GPS·WT931 UART 오류를 0단계 실측 코드에 전달한다. */
+/* WT931 UART 오류를 1단계 실측 코드에 전달한다. */
 void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
 {
-  MeasurementStage0_UartErrorCallback(huart);  // 센서 UART 수신을 복구한다.
+  MeasurementStage1_UartErrorCallback(huart);  // USART3 WT931 수신을 복구한다.
 }
 
 /* USER CODE END 4 */

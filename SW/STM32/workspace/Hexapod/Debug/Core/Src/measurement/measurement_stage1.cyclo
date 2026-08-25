@@ -1,0 +1,5 @@
+../Core/Src/measurement/measurement_stage1.c:17:13:MeasurementStage1_UpdateConfirmation	5
+../Core/Src/measurement/measurement_stage1.c:48:6:MeasurementStage1_Init	4
+../Core/Src/measurement/measurement_stage1.c:85:6:MeasurementStage1_Process	5
+../Core/Src/measurement/measurement_stage1.c:124:6:MeasurementStage1_UartRxCallback	1
+../Core/Src/measurement/measurement_stage1.c:130:6:MeasurementStage1_UartErrorCallback	1

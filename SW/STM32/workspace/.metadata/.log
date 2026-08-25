@@ -2234,3 +2234,19 @@ COM14
 
 !ENTRY com.st.stm32cube.ide.mpu.remote.serial 1 1 2026-08-25 12:12:22.829
 !MESSAGE port: COM14
+
+!ENTRY com.st.stm32cube.ide.mpu.remote.serial 1 1 2026-08-25 13:15:14.542
+!MESSAGE Executed PowerShell command powershell.exe -Command "Get-CimInstance -ClassName Win32_SerialPort | Select-Object -ExpandProperty DeviceID":
+COM12
+COM13
+COM14
+
+
+!ENTRY com.st.stm32cube.ide.mpu.remote.serial 1 1 2026-08-25 13:15:14.544
+!MESSAGE port: COM12
+
+!ENTRY com.st.stm32cube.ide.mpu.remote.serial 1 1 2026-08-25 13:15:14.546
+!MESSAGE port: COM13
+
+!ENTRY com.st.stm32cube.ide.mpu.remote.serial 1 1 2026-08-25 13:15:14.547
+!MESSAGE port: COM14
