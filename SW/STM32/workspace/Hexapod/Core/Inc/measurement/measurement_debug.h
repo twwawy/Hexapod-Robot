@@ -59,6 +59,11 @@ typedef struct
     bool adc_mapping_complete;                                            // 24채널 매핑 완료를 저장한다.
     bool adc_mapping_ambiguous;                                           // 후보 채널 구분 실패를 저장한다.
 
+    uint8_t relay_test_active_channel;                                    // 현재 ON인 릴레이 번호 1~6을 저장한다.
+    uint8_t relay_test_elapsed_seconds;                                   // 현재 릴레이의 경과 시간 0~9초를 저장한다.
+    uint32_t relay_test_cycle_count;                                      // 여섯 릴레이 전체 반복 횟수를 저장한다.
+    uint16_t relay_test_leg3_raw[ROBOT_LEG_COUNT];                        // 다리 1~6의 3번 관절 ADC를 저장한다.
+
     uint16_t joint_minimum_raw[ROBOT_JOINT_COUNT];                     // 최소 자세 관절 ADC를 저장한다.
     uint16_t joint_zero_raw[ROBOT_JOINT_COUNT];                        // 영점 자세 관절 ADC를 저장한다.
     uint16_t joint_maximum_raw[ROBOT_JOINT_COUNT];                     // 최대 자세 관절 ADC를 저장한다.

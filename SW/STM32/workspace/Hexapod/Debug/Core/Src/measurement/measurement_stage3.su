@@ -1,0 +1,4 @@
+../Core/Src/measurement/measurement_stage3.c:24:13:MeasurementStage3_ActivateRelay	16	static
+../Core/Src/measurement/measurement_stage3.c:36:13:MeasurementStage3_UpdateLeg3Raw	16	static
+../Core/Src/measurement/measurement_stage3.c:51:6:MeasurementStage3_Init	16	static
+../Core/Src/measurement/measurement_stage3.c:88:6:MeasurementStage3_Process	16	static

@@ -83,8 +83,16 @@ const RobotCalibration_t g_robot_calibration =
         {1500U, 500U, 2500U, 0.0f, DEFAULT_SERVO_PULSE_PER_RAD, 1, false}  // L6 J3 값을 넣는다.
     },
 
-    .relay_for_leg = {RELAY_INA1, RELAY_INB1, RELAY_INC1, RELAY_INA2, RELAY_INB2, RELAY_INC2}, // 다리 1~6 대응을 넣는다.
-    .relay_mapped = {false, false, false, false, false, false},                                  // 확인한 다리부터 true로 바꾼다.
+    .relay_for_leg =
+    {
+        RELAY_INB1,  // 실측한 1번 다리 릴레이를 저장한다.
+        RELAY_INC1,  // 실측한 2번 다리 릴레이를 저장한다.
+        RELAY_INA1,  // 실측한 3번 다리 릴레이를 저장한다.
+        RELAY_INB2,  // 실측한 4번 다리 릴레이를 저장한다.
+        RELAY_INA2,  // 실측한 5번 다리 릴레이를 저장한다.
+        RELAY_INC2   // 실측한 6번 다리 릴레이를 저장한다.
+    },
+    .relay_mapped = {true, true, true, true, true, true},  // 여섯 다리 대응 확인 완료를 표시한다.
 
     .crsf =
     {
