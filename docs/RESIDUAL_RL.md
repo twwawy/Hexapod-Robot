@@ -1,5 +1,11 @@
 # Hexapod Classical Whole-Body + Residual RL
 
+> **레거시 문서:** 이 문서는 `SW/mjx/`의 24-D/113-D whole-body residual 실험을
+> 설명한다. 현재 학습 기준은 루트 `mjx/`의 18-D/142-D STM32 firmware residual이며,
+> [현재 RL 설계](../mjx/RL_DESIGN.md)를 따른다. 현재 RL scene은 전체 질량 10.0 kg과
+> DS51150-270 12.6 V geared-servo 모델(357:1, ±14.709975 Nm, 315.8 deg/s)을 사용한다.
+> 레거시 `SW/mjx/` checkpoint와 물리 모델을 현재 경로에 혼용하지 않는다.
+
 현재 기준 계약은 다음 두 버전이다.
 
 - action: `classical_wbc_cartesian_body6d_residual_v1` (24-D)

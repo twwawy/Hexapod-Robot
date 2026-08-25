@@ -35,7 +35,9 @@ LINK_3 = 0.230
 ROOT_DISTANCE = 0.1845
 BASE_FOOT_RADIUS = 0.218728
 BASE_FOOT_Z = -0.287006
-WORKSPACE_MARGIN = 0.0001
+# Keep commanded feet one millimetre inside the analytic 2-link workspace.
+# This mirrors ROBOT_WORKSPACE_MARGIN_M in the deployable STM32 controller.
+WORKSPACE_MARGIN = 0.001
 
 LEG_STANCE = 0
 LEG_SWING = 1
@@ -71,7 +73,10 @@ MODEL_SIGNS = jp.array(
         (1.0, 1.0, -1.0),
     )
 )
-RESIDUAL_SCALE = jp.array((0.04, 0.03, 0.09))
+# Local Cartesian residual limits.  The Y/tangential authority is deliberately
+# narrower so the policy cannot spend most of its action range pushing feet
+# sideways into the IK boundary.
+RESIDUAL_SCALE = jp.array((0.04, 0.02, 0.09))
 
 
 class FirmwareState(NamedTuple):

@@ -19,7 +19,7 @@
 #define ROBOT_LINK_3_M                  0.230f      // 세 번째 링크 길이를 정의한다.
 #define ROBOT_BASE_FOOT_RADIUS_M        0.218728f   // 기본 발의 수평 반경을 정의한다.
 #define ROBOT_BASE_FOOT_Z_M             (-0.287006f) // 기본 발 높이를 정의한다.
-#define ROBOT_WORKSPACE_MARGIN_M        0.0001f     // IK 작업공간 여유를 정의한다.
+#define ROBOT_WORKSPACE_MARGIN_M        0.001f      // IK 작업공간 안쪽 1 mm 여유를 정의한다.
 
 #define ROBOT_GAIT_PHASE_TIME_S         0.5f        // 한 Tripod 위상 시간을 정의한다.
 #define ROBOT_STAND_TIME_S              5.6f        // 서기 시간을 정의한다.

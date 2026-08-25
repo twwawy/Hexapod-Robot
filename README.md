@@ -2,13 +2,56 @@
 
 6족 로봇의 하드웨어 자산과 MuJoCo MJX 기반 보행 실험을 함께 관리하는 저장소다. 현재 강화학습의 기준 경로는 **classical tripod gait + Cartesian residual RL**이다.
 
-> 이 작업 브랜치의 STM32 펌웨어 직접 이식 기반 계단 학습은 루트
+> 이 작업 브랜치의 STM32 펌웨어 직접 이식 기반 지형 curriculum 학습은 루트
 > `mjx/`에 있다. 실제 펌웨어의 gait/contact/posture/IK를 base controller로
 > 고정하고 안전-gated 18-D 발끝 residual만 학습한다. 실행 명령, W&B,
-> best/stage/progress 영상과 checkpoint 규칙은
+> 평지→울퉁불퉁→경사면→10×20cm 최종 계단, best/stage/progress 영상과 checkpoint 규칙은
 > [mjx/RL_DESIGN.md](mjx/RL_DESIGN.md)를 따른다.
 
-## 현재 기준 경로
+## 현재 MJX 기준
+
+현재 학습 경로는 루트 `mjx/`이며 다음 물리 계약을 사용한다.
+
+| 항목 | 현재 값 |
+|---|---|
+| RL 로봇 총질량 | 정확히 `10.0 kg` (`prepare_rl_scene.py`에서 원본 링크 질량·관성을 비례 스케일) |
+| 액추에이터 | DS51150-270, 12.6 V 기준 geared position servo |
+| 정격 모델 | 357:1, 150 kgf·cm = `14.709975 Nm`, 0.19 s/60° = `315.8 deg/s` |
+| MuJoCo servo prior | `kp=500`, `kv=10`, armature `0.02 kg·m²`, damping `0.15 Nms/rad`, friction loss `0.8 Nm` |
+| 정책 계약 | 18-D foot residual / 142-D observation |
+
+토크·기어비·무부하 속도는 DS51150 제조사 사양을 사용한다. `kp`, `kv`, armature,
+damping, friction loss는 제조사가 제공한 식별값이 아니라 실기 벤치시험 전 사용하는
+명시적 초기값이다. 실제 로봇 자체의 실측 질량을 10 kg로 단정하는 값도 아니다.
+
+Level 4 checkpoint에서 새 동역학으로 이어서 학습하는 명령은 다음과 같다. 환경 생성 시
+`mjx/generated/hexapod_rl.xml`이 자동 재생성되므로 별도 변환 명령은 필요 없다.
+
+```bash
+cd /home/huro/Hexapod-Robot
+/home/huro/bin/hexapod-mjx-python mjx/train_competence_curriculum.py \
+  --run-name firmware-terrain-10kg-level4 \
+  --seed 8 \
+  --flat-baseline-timesteps 0 \
+  --start-level 4 --max-level 12 \
+  --stages 36 --stage-timesteps 5000000 \
+  --level-progression competence \
+  --max-stages-per-level 3 \
+  --checkpoint-selection best \
+  --init-checkpoint mjx/runs/terrain/firmware-terrain-ik-safe-max3-v3-stage07-level4_20260825-151107_seed8/checkpoints/000003407872 \
+  --wandb --wandb-project hexapod-firmware-terrain \
+  -- --num-envs 1024 --num-evals 4 --num-eval-envs 32
+```
+
+자세한 active contract, curriculum, 테스트와 실행 옵션은
+[mjx/RL_DESIGN.md](mjx/RL_DESIGN.md)와 [mjx/FIRMWARE_BASE.md](mjx/FIRMWARE_BASE.md)를
+기준으로 한다.
+
+## 레거시 `SW/mjx/` 경로
+
+아래 24-D/113-D `SW/mjx/` 설명은 과거 classical whole-body residual 실험을
+재현하기 위한 참고 자료다. 현재 루트 `mjx/`의 18-D/142-D firmware residual이나
+10 kg/DS51150 동역학 계약과 checkpoint를 섞어 사용하지 않는다.
 
 Canonical contract: `classical_wbc_cartesian_body6d_residual_v1` action(24-D) +
 `gt_attitude_collision_contact6_coarse9_touchdown6_v3` observation(113-D)
@@ -18,7 +61,7 @@ forward/lateral/yaw command → Position/Heading PI → final body twist
         → controller-owned Tripod PULL/Bezier trajectory
         → phase/contact-masked 18-D foot residual + contact adaptation
         → attitude PI + 6-D body pose residual → six-leg workspace gate
-        → URDF analytical IK → joint speed/position + fixed ±8 Nm safety
+        → URDF analytical IK → joint speed/position + fixed ±8 Nm legacy actuator
 ```
 
 - Action 24-D: 다리 순서 `RF, RM, RB, LF, LM, LB`의 발 `[Δx, Δy, Δz] × 6` + 몸체 병진/회전 6-D

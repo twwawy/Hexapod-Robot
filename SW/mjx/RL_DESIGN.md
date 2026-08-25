@@ -1,5 +1,10 @@
 # MJX Classical Whole-Body + Residual RL
 
+> **레거시 계약:** 이 문서는 `SW/mjx/`의 24-D/113-D 및 fixed ±8 Nm 모델을
+> 보존하기 위한 것이다. 현재 루트 `mjx/` 학습은 전체 질량 10.0 kg과
+> DS51150-270 geared-servo 모델(12.6 V, 357:1, ±14.709975 Nm, 315.8 deg/s)을
+> 사용하며 [`../../mjx/RL_DESIGN.md`](../../mjx/RL_DESIGN.md)를 기준으로 한다.
+
 전체 실행법은 [docs/RESIDUAL_RL.md](../../docs/RESIDUAL_RL.md)를 따른다. 기준 제어
 순서는 원본 `SW/Controller/Controller_Architecture.md`의 2차 완성본과 같다.
 

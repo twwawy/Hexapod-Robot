@@ -33,8 +33,15 @@ MuJoCo 18 position actuators
 MuJoCo 상태와 contact pair에서 직접 읽는다. 다음 단계에서 GT를 센서 모델로
 교체할 때 이 어댑터 경계만 바꾸면 된다.
 
-계단은 7단이며 최상단 높이는 바닥 기준 정확히 20 cm다. 따라서 한 riser는
-`20/7 ≈ 2.86 cm`이고 펌웨어 baseline과 RL level 4가 같은 형상을 사용한다.
+RL scene은 원본 링크 질량과 관성을 비례 스케일해 로봇 전체를 `10.0 kg`으로 맞춘다.
+18개 관절은 DS51150-270의 12.6 V 사양(357:1, stall `14.709975 Nm`, 무부하
+`315.8 deg/s`)을 기준으로 한다. MuJoCo에는 `kp=500`, `kv=10`, output armature
+`0.02 kg·m²`, damping `0.15 Nms/rad`, friction loss `0.8 Nm`을 적용한다. 뒤의
+동역학 계수는 제조사 보증값이 아니라 실기 식별 전 calibration prior다.
+
+`--terrain stairs`는 최종 curriculum과 같은 10단을 사용한다. 한 riser는 20 cm,
+최상단은 바닥 기준 2 m다. 낮은 계단·울퉁불퉁 바닥·경사면은 RL environment가
+같은 고정-shape scene에서 level별 collision geom을 선택한다.
 
 ## 파일
 
@@ -42,6 +49,8 @@ MuJoCo 상태와 contact pair에서 직접 읽는다. 다음 단계에서 GT를 
 - `firmware_controller.py`: C 소스 변경 감지, 공유 라이브러리 빌드, ctypes 연결
 - `run_firmware_base.py`: MuJoCo GT 어댑터, actuator 좌우 부호 변환, 뷰어
 - `firmware_mjx_controller.py`: 위 C 제어기를 GPU 병렬 학습용 JAX 상태로 옮긴 구현
+- `terrain_curriculum.py`: level 0~12의 지형 치수·목표 위치를 한 곳에서 정의
+- `servo_model.py`: DS51150 사양과 교체 가능한 calibration prior를 한 곳에서 정의
 - `rough_terrain_env.py`: 펌웨어 base 위 18-D 발끝 residual과 안전 종료/계단 보상
 
 생성되는 `generated/libhexapod_firmware_controller.so`는 빌드 산출물이므로 Git에

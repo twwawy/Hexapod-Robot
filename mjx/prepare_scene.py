@@ -9,6 +9,14 @@ import xml.etree.ElementTree as ET
 
 from prepare_urdf import DEFAULT_OUTPUT as URDF_OUTPUT
 from prepare_urdf import SOURCE_URDF, prepare_urdf
+from servo_model import (
+    SERVO_GEAR_FRICTION_NM,
+    SERVO_OUTPUT_ARMATURE_KGM2,
+    SERVO_OUTPUT_DAMPING_NMS_RAD,
+    SERVO_POSITION_KP,
+    SERVO_POSITION_KV,
+    SERVO_STALL_TORQUE_NM,
+)
 
 
 SCENE_OUTPUT = Path(__file__).resolve().parent / "generated/hexapod_scene.xml"
@@ -117,6 +125,19 @@ def _add_scene_elements(root: ET.Element) -> None:
         robot.append(part)
     worldbody.append(robot)
 
+    # The CAD URDF contains ideal revolute joints.  Add the output-side
+    # inertia, damping and dry friction of the powered 357:1 servo gearbox so
+    # a saturated actuator does not become an unrealistically free hinge.
+    for prefix in LEG_PREFIXES:
+        for joint_number in (1, 2, 3):
+            joint_name = f"{prefix}_{joint_number}"
+            joint = root.find(f".//joint[@name='{joint_name}']")
+            if joint is None:
+                raise ValueError(f"Missing joint: {joint_name}")
+            joint.set("armature", f"{SERVO_OUTPUT_ARMATURE_KGM2:.9g}")
+            joint.set("damping", f"{SERVO_OUTPUT_DAMPING_NMS_RAD:.9g}")
+            joint.set("frictionloss", f"{SERVO_GEAR_FRICTION_NM:.9g}")
+
     actuator = ET.SubElement(root, "actuator")
     for prefix in LEG_PREFIXES:
         for joint_number in (1, 2, 3):
@@ -127,10 +148,13 @@ def _add_scene_elements(root: ET.Element) -> None:
                 {
                     "name": f"{joint_name}_position",
                     "joint": joint_name,
-                    "kp": "120",
-                    "kv": "3",
+                    "kp": f"{SERVO_POSITION_KP:.9g}",
+                    "kv": f"{SERVO_POSITION_KV:.9g}",
                     "ctrlrange": "-2.356194 2.356194",
-                    "forcerange": "-8 8",
+                    "forcerange": (
+                        f"{-SERVO_STALL_TORQUE_NM:.9g} "
+                        f"{SERVO_STALL_TORQUE_NM:.9g}"
+                    ),
                 },
             )
 

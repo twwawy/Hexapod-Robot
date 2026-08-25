@@ -325,7 +325,7 @@ Roll·Pitch와 보정 Yaw의 자세 PI를 계산하고 발끝 목표에 몸체 �
 - Roll·Pitch와 보정 Yaw 자세
 - 보정 모드 X/Y/Z 이동
 
-후보가 유효하면 새 명령을 채택하고 유효하지 않으면 직전에 채택한 명령을 유지한다. 최종 IK 앞의 0.0001 m 수치 여유 검사는 `leg_kinematics`가 한 번 더 수행한다.
+후보가 유효하면 새 명령을 채택하고 유효하지 않으면 직전에 채택한 명령을 유지한다. 최종 IK 앞의 0.001 m(1 mm) 수치 여유 검사는 `leg_kinematics`가 한 번 더 수행한다.
 
 ### `high_control/gait_manager.h`
 
@@ -442,7 +442,7 @@ GPS, WT931과 MCP3008 24채널 raw 값, 수신 주기와 오류 횟수를 확인
 
 ### `test/workspace_test.h`
 
-Roll·Pitch ±45 deg, x·y 0.28 m/s, Yaw 45 deg/s와 보정 명령의 경계값을 넣어 동적 제한을 검사한다. 여러 축 동시 입력, 직전 명령 유지와 최종 0.0001 m 여유도 확인한다.
+Roll·Pitch ±45 deg, x·y 0.28 m/s, Yaw 45 deg/s와 보정 명령의 경계값을 넣어 동적 제한을 검사한다. 여러 축 동시 입력, 직전 명령 유지와 최종 0.001 m(1 mm) 여유도 확인한다.
 
 ### `test/gait_test.h`
 
@@ -525,7 +525,7 @@ Kill 상태를 반영한 Relay 출력
 | Swing Height | 기본 0.20 m, 범위 0.15~0.25 m |
 | Early Landing 시작 | Swing 진행률 50% |
 | Late Landing 하강 | 0.20 m/s |
-| 작업공간 여유 | 0.0001 m |
+| 작업공간 여유 | 0.001 m (1 mm) |
 | Stance Foot Slip | 0.05 m, 5회 연속 |
 | 관절 명령 속도 | 315.8 deg/s, 5 ms당 1.579 deg |
 | Rollover Fault | Roll 또는 Pitch 절댓값 80 deg 이상 |

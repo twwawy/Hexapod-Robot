@@ -14,6 +14,40 @@ import firmware_mjx_controller as firmware_mjx
 
 
 class FirmwareMjxControllerTest(unittest.TestCase):
+    def test_policy_y_authority_and_workspace_margin_are_conservative(self) -> None:
+        np.testing.assert_allclose(
+            np.asarray(firmware_mjx.RESIDUAL_SCALE),
+            np.asarray((0.04, 0.02, 0.09)),
+            atol=1.0e-8,
+        )
+        self.assertAlmostEqual(firmware_mjx.WORKSPACE_MARGIN, 0.001)
+
+        outer_local = jp.tile(
+            jp.asarray(
+                (
+                    firmware_mjx.LINK_1
+                    + firmware_mjx.LINK_2
+                    + firmware_mjx.LINK_3,
+                    0.0,
+                    0.0,
+                )
+            ),
+            (6, 1),
+        )
+        limited_body, was_limited = firmware_mjx._limit_foot_reach(
+            firmware_mjx._leg_to_body(outer_local)
+        )
+        limited_local = firmware_mjx._body_to_leg(limited_body)
+        planar_reach = jp.linalg.norm(limited_local[0, :2]) - firmware_mjx.LINK_1
+        self.assertTrue(bool(was_limited[0]))
+        self.assertAlmostEqual(
+            float(planar_reach),
+            firmware_mjx.LINK_2
+            + firmware_mjx.LINK_3
+            - firmware_mjx.WORKSPACE_MARGIN,
+            places=6,
+        )
+
     def test_initial_model_targets_match_home_pose(self) -> None:
         output = firmware_mjx.initial_output()
         expected_servo = np.tile(np.deg2rad((0.0, 30.0, 50.0)), (6, 1))

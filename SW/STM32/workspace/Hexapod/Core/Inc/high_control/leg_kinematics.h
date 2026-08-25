@@ -38,6 +38,6 @@ bool LegKinematics_IsReachable(uint8_t leg,
 bool LegKinematics_LimitFoot(uint8_t leg,
                              const RobotVec3_t *input_body,
                              RobotVec3_t *output_body,
-                             bool *limited);  // 최종 발 위치를 0.0001 m 여유로 제한한다.
+                             bool *limited);  // 최종 발 위치를 0.001 m(1 mm) 여유로 제한한다.
 
 #endif

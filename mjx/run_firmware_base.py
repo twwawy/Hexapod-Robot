@@ -12,7 +12,8 @@ import numpy as np
 
 from firmware_controller import FirmwareController, FirmwareControllerState
 from prepare_rl_scene import STEP_START_X, prepare_rl_scene
-from prepare_rl_scene import STEP_COUNT, STEP_DEPTH, STEP_HEIGHT
+from prepare_rl_scene import STAIR_TOTAL_RISE, STEP_COUNT, STEP_DEPTH, STEP_HEIGHT
+from terrain_curriculum import PLATEAU_DEPTH
 from tripod_controller import LEG_PREFIXES, RIGHT_LEGS
 
 
@@ -207,8 +208,12 @@ class Simulation:
         heights = [
             STEP_HEIGHT * (index + 1)
             for index in range(STEP_COUNT)
-            if abs(x - (STEP_START_X + STEP_DEPTH * index)) <= STEP_DEPTH / 2.0
+            if abs(x - (STEP_START_X + STEP_DEPTH * (index + 0.5)))
+            <= STEP_DEPTH / 2.0
         ]
+        stair_end = STEP_START_X + STEP_COUNT * STEP_DEPTH
+        if stair_end < x <= stair_end + PLATEAU_DEPTH:
+            heights.append(STAIR_TOTAL_RISE)
         return max(heights, default=0.0)
 
     def _unsafe_reason(self) -> str | None:

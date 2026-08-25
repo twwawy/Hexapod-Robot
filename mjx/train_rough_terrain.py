@@ -27,12 +27,15 @@ from policy_video import render_policy_video
 from rough_terrain_env import (
     ACTION_CONTRACT_VERSION,
     ACTION_SIZE,
-    CURRICULUM_TOTAL_RISES,
+    LEGACY_ACTION_CONTRACT_VERSION,
+    LEGACY_OBSERVATION_CONTRACT_VERSION,
     OBSERVATION_CONTRACT_VERSION,
     OBSERVATION_SIZE,
     HexapodRoughTerrainEnv,
     default_config,
 )
+from terrain_curriculum import MAX_TERRAIN_LEVEL, terrain_level as terrain_level_spec
+from servo_model import metadata as servo_model_metadata
 
 
 class ScoreMonitor:
@@ -102,7 +105,12 @@ def _arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--timesteps", type=int, default=50_000_000)
     parser.add_argument("--num-envs", type=int, default=2048)
-    parser.add_argument("--episode-length", type=int, default=2000)
+    parser.add_argument(
+        "--episode-length",
+        type=int,
+        default=None,
+        help="Default: 1000 for flat, 2500 for levels 1-8, 5000 for levels 9-12.",
+    )
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--run-name", default=None)
     parser.add_argument(
@@ -122,15 +130,30 @@ def _arguments() -> argparse.Namespace:
     parser.add_argument(
         "--terrain-level",
         type=int,
-        choices=range(len(CURRICULUM_TOTAL_RISES)),
-        default=4,
-        help="0=flat, 1/2/3/4=5/10/15/20 cm total staircase rise.",
+        choices=range(MAX_TERRAIN_LEVEL + 1),
+        default=0,
+        help="0 flat, 1-2 rough, 3-4 ramps, 5-12 stairs.",
     )
     parser.add_argument("--command-min-speed", type=float, default=0.06)
     parser.add_argument("--command-max-speed", type=float, default=0.12)
     parser.add_argument("--command-delay", type=float, default=1.0)
+    parser.add_argument(
+        "--collision-mode",
+        choices=("lower_leg", "terrain", "feet", "full"),
+        default="lower_leg",
+        help=(
+            "lower_leg keeps foot/tibia/torso terrain contacts without costly "
+            "robot self-collision; full restores every collider."
+        ),
+    )
     parser.add_argument("--num-evals", type=int, default=10)
-    parser.add_argument("--num-eval-envs", type=int, default=64)
+    parser.add_argument("--num-eval-envs", type=int, default=32)
+    parser.add_argument(
+        "--eval",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Run policy evaluations; use --no-eval only for throughput checks.",
+    )
     parser.add_argument("--learning-rate", type=float, default=3e-4)
     parser.add_argument("--entropy-cost", type=float, default=0.01)
     parser.add_argument("--discounting", type=float, default=0.99)
@@ -149,7 +172,7 @@ def _arguments() -> argparse.Namespace:
     )
     parser.add_argument("--score-key", default="eval/episode_reward")
     parser.add_argument(
-        "--best-video", action=argparse.BooleanOptionalAction, default=True
+        "--best-video", action=argparse.BooleanOptionalAction, default=False
     )
     parser.add_argument("--best-video-path", type=Path, default=None)
     parser.add_argument("--best-video-duration", type=float, default=20.0)
@@ -158,7 +181,7 @@ def _arguments() -> argparse.Namespace:
     )
     parser.add_argument("--stage-video-duration", type=float, default=20.0)
     parser.add_argument(
-        "--progress-video", action=argparse.BooleanOptionalAction, default=True
+        "--progress-video", action=argparse.BooleanOptionalAction, default=False
     )
     parser.add_argument("--progress-video-count", type=int, default=5)
     parser.add_argument("--progress-video-duration", type=float, default=20.0)
@@ -166,7 +189,7 @@ def _arguments() -> argparse.Namespace:
     parser.add_argument("--video-width", type=int, default=640)
     parser.add_argument("--video-height", type=int, default=360)
     parser.add_argument("--wandb", action="store_true")
-    parser.add_argument("--wandb-project", default="hexapod-firmware-stairs")
+    parser.add_argument("--wandb-project", default="hexapod-firmware-terrain")
     parser.add_argument("--wandb-entity", default=None)
     parser.add_argument("--wandb-name", default=None)
     parser.add_argument("--wandb-group", default=None)
@@ -176,6 +199,12 @@ def _arguments() -> argparse.Namespace:
     parser.add_argument("--smoke", action="store_true")
     parser.add_argument("--smoke-steps", type=int, default=10)
     parser.add_argument("--allow-cpu", action="store_true")
+    parser.add_argument(
+        "--jax-cache-dir",
+        type=Path,
+        default=Path.home() / ".cache" / "hexapod-mjx" / "jax",
+        help="Persistent XLA cache reused by restarts with identical shapes.",
+    )
     return parser.parse_args()
 
 
@@ -234,9 +263,18 @@ def _resolve_checkpoint(path: Path, network_layers: tuple[int, ...]) -> Path:
     if not metadata_path.exists():
         raise SystemExit(f"checkpoint is missing semantic metadata: {metadata_path}")
     metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
-    if metadata.get("action_contract_version") != ACTION_CONTRACT_VERSION:
+    compatible_action_contracts = {
+        ACTION_CONTRACT_VERSION,
+        LEGACY_ACTION_CONTRACT_VERSION,
+    }
+    if metadata.get("action_contract_version") not in compatible_action_contracts:
         raise SystemExit("checkpoint action semantics do not match this firmware policy")
-    if metadata.get("observation_contract_version") != OBSERVATION_CONTRACT_VERSION:
+    saved_observation_contract = metadata.get("observation_contract_version")
+    compatible_observation_contracts = {
+        OBSERVATION_CONTRACT_VERSION,
+        LEGACY_OBSERVATION_CONTRACT_VERSION,
+    }
+    if saved_observation_contract not in compatible_observation_contracts:
         raise SystemExit("checkpoint observation semantics do not match this environment")
     return resolved
 
@@ -255,9 +293,42 @@ def _git_commit() -> str:
     return result.stdout.strip() or "unknown"
 
 
+def _configure_jax_cache(path: Path) -> Path:
+    resolved = path.expanduser().resolve()
+    resolved.mkdir(parents=True, exist_ok=True)
+    jax.config.update("jax_compilation_cache_dir", str(resolved))
+    return resolved
+
+
+def _training_schedule(args: argparse.Namespace) -> dict[str, int]:
+    samples_per_training_step = (
+        args.batch_size * args.num_minibatches * args.unroll_length
+    )
+    epochs = max(args.num_evals - 1, 1)
+    training_steps_per_epoch = math.ceil(
+        args.timesteps / (epochs * samples_per_training_step)
+    )
+    return {
+        "samples_per_training_step": samples_per_training_step,
+        "training_steps_per_epoch": training_steps_per_epoch,
+        "samples_per_epoch": training_steps_per_epoch * samples_per_training_step,
+        "actual_timesteps": (
+            epochs * training_steps_per_epoch * samples_per_training_step
+        ),
+        "evaluation_timesteps": (
+            args.num_evals * args.num_eval_envs * args.episode_length
+            if getattr(args, "eval", True)
+            else 0
+        ),
+        "rollout_batches_per_training_step": (
+            args.batch_size * args.num_minibatches // args.num_envs
+        ),
+    }
+
+
 def _prepare_run(args: argparse.Namespace) -> None:
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
-    prefix = _safe_component(args.run_name) if args.run_name else "firmware-stairs"
+    prefix = _safe_component(args.run_name) if args.run_name else "firmware-terrain"
     args.run_id = f"{prefix}_{timestamp}_seed{args.seed}"
     args.run_dir = (args.run_root.expanduser() / "terrain" / args.run_id).resolve()
     try:
@@ -306,6 +377,15 @@ def _write_metadata(args: argparse.Namespace, env: HexapodRoughTerrainEnv) -> No
             "observation_size": env.observation_size,
             "curriculum_stage": args.curriculum_stage,
             "terrain_level": env.curriculum_level,
+            "terrain_name": env.terrain_name,
+            "terrain_kind": env.terrain_kind,
+            "terrain_description": env.terrain_description,
+            "terrain_goal_x_m": env.terrain_goal_x,
+            "terrain_stair_count": env.terrain_stair_count,
+            "mjx_contact_slots": env.contact_slots,
+            "mjx_constraint_rows": env.constraint_rows,
+            "collision_mode": env.collision_mode,
+            "servo_model": servo_model_metadata(),
             "terrain_step_height_m": env.terrain_step_height,
             "terrain_total_rise_m": env.terrain_total_rise,
             "checkpoint_dir": str(args.output),
@@ -323,6 +403,7 @@ def _write_metadata(args: argparse.Namespace, env: HexapodRoughTerrainEnv) -> No
                 "episode_length": args.episode_length,
                 "num_evals": args.num_evals,
                 "num_eval_envs": args.num_eval_envs,
+                "eval": args.eval,
                 "learning_rate": args.learning_rate,
                 "entropy_cost": args.entropy_cost,
                 "discounting": args.discounting,
@@ -331,6 +412,7 @@ def _write_metadata(args: argparse.Namespace, env: HexapodRoughTerrainEnv) -> No
                 "num_minibatches": args.num_minibatches,
                 "num_updates_per_batch": args.num_updates_per_batch,
                 "network_layers": list(args.network_layers),
+                **_training_schedule(args),
             },
         },
     )
@@ -350,7 +432,7 @@ def _smoke_test(env: HexapodRoughTerrainEnv, seed: int, steps: int) -> None:
         raise RuntimeError("MJX smoke test produced NaN/Inf")
     print(
         f"MJX smoke OK | backend={jax.default_backend()} | "
-        f"level={env.curriculum_level} riser={100.0 * env.terrain_step_height:.1f}cm | "
+        f"level={env.curriculum_level} terrain={env.terrain_description} | "
         f"obs={state.obs.shape[-1]} action={env.action_size} | "
         f"reward={float(state.reward):.4f} done={int(state.done)} | "
         f"wall={time.monotonic() - started:.2f}s"
@@ -371,8 +453,14 @@ def _wandb_config(args: argparse.Namespace, env: HexapodRoughTerrainEnv) -> dict
             "observation_size": env.observation_size,
             "action_contract_version": ACTION_CONTRACT_VERSION,
             "observation_contract_version": OBSERVATION_CONTRACT_VERSION,
+            "terrain_name": env.terrain_name,
+            "terrain_kind": env.terrain_kind,
+            "terrain_description": env.terrain_description,
             "terrain_step_height_m": env.terrain_step_height,
             "terrain_total_rise_m": env.terrain_total_rise,
+            "mjx_contact_slots": env.contact_slots,
+            "mjx_constraint_rows": env.constraint_rows,
+            "collision_mode": env.collision_mode,
         }
     )
     return config
@@ -380,6 +468,12 @@ def _wandb_config(args: argparse.Namespace, env: HexapodRoughTerrainEnv) -> dict
 
 def main() -> None:
     args = _arguments()
+    args.jax_cache_dir = _configure_jax_cache(args.jax_cache_dir)
+    spec = terrain_level_spec(args.terrain_level)
+    if args.episode_length is None:
+        args.episode_length = (
+            1000 if spec.level == 0 else (2500 if spec.level <= 8 else 5000)
+        )
     if args.curriculum_stage is None:
         args.curriculum_stage = _infer_stage(args.run_name)
     if args.curriculum_stage is not None and args.curriculum_stage < 0:
@@ -390,6 +484,12 @@ def main() -> None:
         raise SystemExit("command speeds must satisfy 0 <= min <= max")
     if args.num_evals < 1 or args.num_eval_envs < 1:
         raise SystemExit("num-evals and num-eval-envs must be positive")
+    rollout_envs = args.batch_size * args.num_minibatches
+    if rollout_envs % args.num_envs:
+        raise SystemExit(
+            "batch-size * num-minibatches must be divisible by num-envs: "
+            f"{args.batch_size} * {args.num_minibatches} % {args.num_envs} != 0"
+        )
     if not 1 <= args.progress_video_count <= 21:
         raise SystemExit("--progress-video-count must be in 1..21")
     if min(
@@ -410,13 +510,24 @@ def main() -> None:
     config.command_min_speed = args.command_min_speed
     config.command_max_speed = args.command_max_speed
     config.command_delay = args.command_delay
+    config.collision_mode = args.collision_mode
     env = HexapodRoughTerrainEnv(config=config, terrain_level=args.terrain_level)
     print("JAX devices:", jax.devices())
     print(
         f"contract action={ACTION_CONTRACT_VERSION} observation={OBSERVATION_CONTRACT_VERSION} | "
         f"stage={args.curriculum_stage} level={env.curriculum_level} "
-        f"riser={100.0 * env.terrain_step_height:.1f}cm "
-        f"total_rise={100.0 * env.terrain_total_rise:.1f}cm"
+        f"terrain={env.terrain_description} episode={args.episode_length} "
+        f"collision={env.collision_mode} contact_slots={env.contact_slots} "
+        f"constraint_rows={env.constraint_rows}"
+    )
+    schedule = _training_schedule(args)
+    print(
+        "schedule "
+        f"requested={args.timesteps:,} actual={schedule['actual_timesteps']:,} "
+        f"per_eval={schedule['samples_per_epoch']:,} "
+        f"rollout_batches={schedule['rollout_batches_per_training_step']} "
+        f"eval_sim_steps={schedule['evaluation_timesteps']:,} "
+        f"jax_cache={args.jax_cache_dir}"
     )
     if args.smoke:
         _smoke_test(env, args.seed, args.smoke_steps)
@@ -469,6 +580,8 @@ def main() -> None:
             wandb_run.define_metric(namespace, step_metric="train/global_step")
         wandb_run.summary["curriculum/stage"] = args.curriculum_stage
         wandb_run.summary["curriculum/terrain_level"] = args.terrain_level
+        wandb_run.summary["curriculum/terrain_name"] = env.terrain_name
+        wandb_run.summary["curriculum/terrain_kind"] = env.terrain_kind
         wandb_run.summary["curriculum/stair_riser_cm"] = 100.0 * env.terrain_step_height
         wandb_run.summary["curriculum/stair_total_rise_cm"] = 100.0 * env.terrain_total_rise
 
@@ -486,17 +599,6 @@ def main() -> None:
         artifact_history.parent.mkdir(parents=True, exist_ok=True)
         with artifact_history.open("a", encoding="utf-8") as history:
             history.write(json.dumps(record, sort_keys=True) + "\n")
-
-    def video_title(kind: str, detail: str = "") -> str:
-        stage = (
-            f"S{args.curriculum_stage:02d} "
-            if args.curriculum_stage is not None
-            else ""
-        )
-        return (
-            f"{kind} {detail} | {stage}L{args.terrain_level} | "
-            f"riser {100.0 * env.terrain_step_height:.1f}cm"
-        ).strip()
 
     def save_best_artifacts(step: int, score: float) -> bool:
         if latest_policy.get("step") != step:
@@ -526,7 +628,6 @@ def main() -> None:
                     fps=args.video_fps,
                     width=args.video_width,
                     height=args.video_height,
-                    overlay_title=video_title("NEW BEST", f"score {score:.3f}"),
                 )
                 rendered = True
                 print(f"best_video step={step:,}: {args.best_video_path}")
@@ -594,7 +695,6 @@ def main() -> None:
                 fps=args.video_fps,
                 width=args.video_width,
                 height=args.video_height,
-                overlay_title=video_title("PROGRESS", f"{percent}%"),
             )
         except Exception as exc:
             record["error"] = f"{type(exc).__name__}: {exc}"
@@ -700,7 +800,6 @@ def main() -> None:
                 fps=args.video_fps,
                 width=args.video_width,
                 height=args.video_height,
-                overlay_title=video_title("STAGE FINAL"),
             )
         except Exception as exc:
             errors["video"] = f"{type(exc).__name__}: {exc}"
@@ -758,6 +857,7 @@ def main() -> None:
         num_evals=args.num_evals,
         num_eval_envs=args.num_eval_envs,
         deterministic_eval=True,
+        run_evals=args.eval,
         network_factory=network_factory,
         wrap_env_fn=functools.partial(wrapper.wrap_for_brax_training, full_reset=True),
         save_checkpoint_path=str(args.output),

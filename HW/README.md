@@ -24,6 +24,9 @@ Jetson Orin Nano Super는 LiDAR와 Depth Camera를 이용한 인지·자율주�
 
 기구와 제작 자료는 다음 폴더에 있다.
 
+현재 루트 `mjx/` 학습 scene의 로봇 총질량 `10.0 kg`은 시뮬레이션 목표값이다.
+완성된 실물의 배터리·배선·센서를 포함한 질량은 별도로 계측해 갱신해야 한다.
+
 | 경로 | 내용 |
 |---|---|
 | [stl_file](stl_file) | 3D 프린팅용 STL |

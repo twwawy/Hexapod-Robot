@@ -1,4 +1,4 @@
-"""Firmware-based MJX residual environment for staircase locomotion."""
+"""Firmware-based MJX residual environment for the terrain curriculum."""
 
 from __future__ import annotations
 
@@ -15,28 +15,37 @@ import numpy as np
 import firmware_mjx_controller as firmware
 from prepare_rl_scene import (
     RL_SCENE_OUTPUT,
-    STAIR_TOTAL_RISE,
-    STEP_COUNT,
-    STEP_DEPTH,
-    STEP_START_X,
     prepare_rl_scene,
 )
+from terrain_curriculum import (
+    MAX_STAIR_COUNT,
+    PLATEAU_DEPTH,
+    RAMP_END_X,
+    RAMP_LENGTH,
+    ROUGH_HFIELD_NCOL,
+    ROUGH_HFIELD_NROW,
+    ROUGH_LENGTH,
+    STAIR_DEPTH,
+    TERRAIN_HALF_WIDTH,
+    TERRAIN_START_X,
+    rough_heightfield_grid,
+    terrain_level as terrain_level_spec,
+)
 from tripod_controller import LEG_PREFIXES
+from servo_model import (
+    SERVO_SATURATION_START_FRACTION,
+    SERVO_STALL_TORQUE_NM,
+)
 
 
 ACTION_SIZE = 18
 OBSERVATION_SIZE = 142
-ACTION_CONTRACT_VERSION = "stm32_firmware_cartesian_foot_residual_v1"
-OBSERVATION_CONTRACT_VERSION = "firmware_state_collision_contact_stairs_v1"
+ACTION_CONTRACT_VERSION = "stm32_firmware_cartesian_foot_residual_v2"
+LEGACY_ACTION_CONTRACT_VERSION = "stm32_firmware_cartesian_foot_residual_v1"
+OBSERVATION_CONTRACT_VERSION = "firmware_state_collision_terrain_curriculum_v2"
+LEGACY_OBSERVATION_CONTRACT_VERSION = "firmware_state_collision_contact_stairs_v1"
 MODEL_FORWARD = jp.array((0.0, -1.0, 0.0))
 MODEL_LATERAL = jp.array((1.0, 0.0, 0.0))
-STAIR_TOP_X = STEP_START_X + STEP_DEPTH * (STEP_COUNT - 1) + STEP_DEPTH / 2.0
-# Difficulty is defined by the height of the complete seven-step staircase,
-# not by one riser.  Level 4 therefore ends exactly 20 cm above the floor.
-CURRICULUM_TOTAL_RISES = (0.0, 0.05, 0.10, 0.15, STAIR_TOTAL_RISE)
-CURRICULUM_STEP_HEIGHTS = tuple(
-    total_rise / STEP_COUNT for total_rise in CURRICULUM_TOTAL_RISES
-)
 
 
 def default_config() -> config_dict.ConfigDict:
@@ -48,6 +57,7 @@ def default_config() -> config_dict.ConfigDict:
         impl="jax",
         nconmax=256,
         njmax=128,
+        collision_mode="lower_leg",
         command_min_speed=0.06,
         command_max_speed=0.12,
         command_max_yaw_rate=0.0,
@@ -68,7 +78,7 @@ def default_config() -> config_dict.ConfigDict:
             height=0.6,
             progress=1.0,
             stability=0.5,
-            joint_margin=0.3,
+            joint_margin=1.0,
             action_rate=-0.02,
             residual=-0.005,
             vertical_velocity=-0.10,
@@ -76,10 +86,10 @@ def default_config() -> config_dict.ConfigDict:
             joint_velocity=-0.04,
             torque=-0.03,
             torque_saturation=-0.25,
-            gait_rejected=-0.20,
-            posture_rejected=-0.20,
-            policy_rejected=-0.50,
-            foot_limited=-0.25,
+            gait_rejected=-0.50,
+            posture_rejected=-0.50,
+            policy_rejected=-2.0,
+            foot_limited=-2.0,
             body_contact=-2.0,
             self_collision=-0.5,
         ),
@@ -167,15 +177,14 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
         config: config_dict.ConfigDict = default_config(),
         config_overrides: Optional[dict[str, Any]] = None,
         *,
-        terrain_level: int = 4,
+        terrain_level: int = 0,
     ) -> None:
-        if terrain_level not in range(len(CURRICULUM_STEP_HEIGHTS)):
-            raise ValueError(
-                f"terrain_level must be 0..{len(CURRICULUM_STEP_HEIGHTS) - 1}"
-            )
+        spec = terrain_level_spec(terrain_level)
         self._terrain_level = terrain_level
-        self._terrain_total_rise = CURRICULUM_TOTAL_RISES[terrain_level]
-        self._terrain_step_height = self._terrain_total_rise / STEP_COUNT
+        self._terrain_spec = spec
+        self._terrain_total_rise = spec.final_height
+        self._terrain_step_height = spec.stair_riser
+        self._terrain_goal_x = spec.goal_x
         super().__init__(config, config_overrides)
         ratio = self.dt / firmware.FIRMWARE_CONTROL_DT
         if abs(ratio - round(ratio)) > 1.0e-9:
@@ -186,17 +195,22 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
         self._xml_path = str(RL_SCENE_OUTPUT)
         self._mj_model = mujoco.MjModel.from_xml_path(self._xml_path)
         self._mj_model.opt.timestep = self.sim_dt
-        for index in range(STEP_COUNT):
-            geom = self._mj_model.geom(f"stair_{index + 1}")
-            height = self._terrain_step_height * (index + 1)
-            if terrain_level == 0:
-                self._mj_model.geom_contype[geom.id] = 0
-                self._mj_model.geom_conaffinity[geom.id] = 0
-                self._mj_model.geom_rgba[geom.id, 3] = 0.0
-            else:
-                self._mj_model.geom_pos[geom.id, 2] = height / 2.0
-                self._mj_model.geom_size[geom.id, 2] = height / 2.0
+        self._configure_terrain_geometry()
+        self._configure_collision_masks()
         self._mjx_model = mjx.put_model(self._mj_model, impl=self._config.impl)
+        template_data = mjx.make_data(
+            self._mj_model,
+            impl=self._mjx_model.impl.value,
+            naconmax=self._config.nconmax,
+            njmax=self._config.njmax,
+        )
+        self._contact_slots = int(template_data._impl.contact.geom.shape[0])
+        self._constraint_rows = int(template_data._impl.efc_J.shape[0])
+        if self._contact_slots > 1024:
+            raise ValueError(
+                "MJX collision graph is unexpectedly large: "
+                f"{self._contact_slots} contact slots"
+            )
 
         home_id = self._mj_model.key("home").id
         self._home_qpos = jp.array(self._mj_model.key_qpos[home_id])
@@ -234,11 +248,20 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
         )
         self._geom_body_ids = jp.array(self._mj_model.geom_bodyid)
         self._torso_geom_id = self._mj_model.geom("torso_collision").id
+        self._rough_height_grid = jp.array(
+            rough_heightfield_grid(spec.rough_amplitude)
+        )
         self._step_centers = jp.array(
-            [STEP_START_X + STEP_DEPTH * index for index in range(STEP_COUNT)]
+            [
+                TERRAIN_START_X + STAIR_DEPTH * (index + 0.5)
+                for index in range(spec.stair_count)
+            ]
         )
         self._step_heights = jp.array(
-            [self._terrain_step_height * (index + 1) for index in range(STEP_COUNT)]
+            [
+                self._terrain_step_height * (index + 1)
+                for index in range(spec.stair_count)
+            ]
         )
         sample_x, sample_y = np.meshgrid(
             np.array((-0.10, 0.15, 0.40, 0.65, 0.90)),
@@ -248,6 +271,121 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
             np.stack((sample_x.ravel(), sample_y.ravel()), axis=-1)
         )
 
+    def _set_geom_active(
+        self, name: str, active: bool, rgba: tuple[float, float, float, float]
+    ) -> Any:
+        geom = self._mj_model.geom(name)
+        self._mj_model.geom_contype[geom.id] = int(active)
+        self._mj_model.geom_conaffinity[geom.id] = int(active)
+        self._mj_model.geom_rgba[geom.id] = rgba if active else (0.0, 0.0, 0.0, 0.0)
+        return geom
+
+    def _configure_terrain_geometry(self) -> None:
+        self._set_geom_active("rough_hfield_geom", False, (0, 0, 0, 0))
+        self._set_geom_active("terrain_ramp", False, (0, 0, 0, 0))
+        for index in range(MAX_STAIR_COUNT):
+            self._set_geom_active(f"stair_{index + 1}", False, (0, 0, 0, 0))
+        self._set_geom_active("terrain_plateau", False, (0, 0, 0, 0))
+
+        spec = self._terrain_spec
+        if spec.kind == "rough":
+            self._set_geom_active(
+                "rough_hfield_geom", True, (0.32, 0.42, 0.31, 1.0)
+            )
+            hfield = self._mj_model.hfield("rough_hfield")
+            grid = np.asarray(rough_heightfield_grid(spec.rough_amplitude))
+            start = self._mj_model.hfield_adr[hfield.id]
+            count = (
+                self._mj_model.hfield_nrow[hfield.id]
+                * self._mj_model.hfield_ncol[hfield.id]
+            )
+            self._mj_model.hfield_data[start : start + count] = (
+                grid.reshape(-1) / spec.rough_amplitude
+            )
+            self._mj_model.hfield_size[hfield.id, 2] = spec.rough_amplitude
+        elif spec.kind == "ramp":
+            angle = np.deg2rad(spec.slope_degrees)
+            rise = spec.final_height
+            half_thickness = 0.025
+            ramp = self._set_geom_active(
+                "terrain_ramp", True, (0.37, 0.39, 0.45, 1.0)
+            )
+            self._mj_model.geom_pos[ramp.id] = (
+                TERRAIN_START_X + RAMP_LENGTH / 2.0,
+                0.0,
+                rise / 2.0 - half_thickness * np.cos(angle),
+            )
+            self._mj_model.geom_size[ramp.id] = (
+                RAMP_LENGTH / (2.0 * np.cos(angle)),
+                TERRAIN_HALF_WIDTH,
+                half_thickness,
+            )
+            self._mj_model.geom_quat[ramp.id] = (
+                np.cos(angle / 2.0),
+                0.0,
+                -np.sin(angle / 2.0),
+                0.0,
+            )
+            self._configure_plateau(RAMP_END_X, rise)
+        elif spec.kind == "stairs":
+            for index in range(spec.stair_count):
+                height = spec.stair_riser * (index + 1)
+                geom = self._set_geom_active(
+                    f"stair_{index + 1}", True, (0.34, 0.42, 0.50, 1.0)
+                )
+                self._mj_model.geom_pos[geom.id, 2] = height / 2.0
+                self._mj_model.geom_size[geom.id, 2] = height / 2.0
+            stair_end = TERRAIN_START_X + spec.stair_count * STAIR_DEPTH
+            self._configure_plateau(stair_end, spec.final_height)
+
+    def _configure_collision_masks(self) -> None:
+        """Limit collision pairs while retaining locomotion-critical contacts."""
+        mode = self._config.collision_mode
+        if mode == "full":
+            return
+        if mode not in {"terrain", "lower_leg", "feet"}:
+            raise ValueError(f"unsupported collision_mode: {mode}")
+
+        for geom_id in range(self._mj_model.ngeom):
+            if self._mj_model.geom_bodyid[geom_id] == 0:
+                if (
+                    self._mj_model.geom_contype[geom_id]
+                    or self._mj_model.geom_conaffinity[geom_id]
+                ):
+                    self._mj_model.geom_contype[geom_id] = 1
+                    self._mj_model.geom_conaffinity[geom_id] = 0
+                continue
+
+            name = self._mj_model.geom(geom_id).name or ""
+            terrain_contact = mode == "terrain"
+            if mode in {"lower_leg", "feet"}:
+                terrain_contact = name == "torso_collision" or name.endswith(
+                    "_foot_collision"
+                )
+            if mode == "lower_leg":
+                terrain_contact |= name.endswith("_tibia_collision")
+
+            # World geoms advertise collision bit 1.  Robot geoms only accept
+            # that bit, so robot-vs-robot pairs are absent from the static MJX
+            # graph while selected robot-vs-terrain pairs remain physical.
+            self._mj_model.geom_contype[geom_id] = 0
+            self._mj_model.geom_conaffinity[geom_id] = int(terrain_contact)
+
+    def _configure_plateau(self, start_x: float, height: float) -> None:
+        plateau = self._set_geom_active(
+            "terrain_plateau", True, (0.30, 0.39, 0.48, 1.0)
+        )
+        self._mj_model.geom_pos[plateau.id] = (
+            start_x + PLATEAU_DEPTH / 2.0,
+            0.0,
+            height / 2.0,
+        )
+        self._mj_model.geom_size[plateau.id] = (
+            PLATEAU_DEPTH / 2.0,
+            TERRAIN_HALF_WIDTH,
+            height / 2.0,
+        )
+
     def _relative_attitude(self, data: mjx.Data) -> jax.Array:
         relative = _quat_multiply(
             data.qpos[3:7], _quat_conjugate(self._home_quaternion)
@@ -255,12 +393,70 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
         return _quat_to_euler(relative)
 
     def _terrain_height(self, xy: jax.Array) -> jax.Array:
-        x, y = xy[..., 0, None], xy[..., 1, None]
-        inside = (
-            (jp.abs(x - self._step_centers) <= STEP_DEPTH / 2.0)
-            & (jp.abs(y) <= 1.0)
+        x, y = xy[..., 0], xy[..., 1]
+        spec = self._terrain_spec
+        if spec.kind == "flat":
+            return jp.zeros(x.shape)
+        if spec.kind == "rough":
+            column = (x - TERRAIN_START_X) * (ROUGH_HFIELD_NCOL - 1) / ROUGH_LENGTH
+            row = (y + TERRAIN_HALF_WIDTH) * (ROUGH_HFIELD_NROW - 1) / (
+                2.0 * TERRAIN_HALF_WIDTH
+            )
+            column0 = jp.clip(
+                jp.floor(column).astype(jp.int32), 0, ROUGH_HFIELD_NCOL - 2
+            )
+            row0 = jp.clip(
+                jp.floor(row).astype(jp.int32), 0, ROUGH_HFIELD_NROW - 2
+            )
+            column_fraction = jp.clip(column - column0, 0.0, 1.0)
+            row_fraction = jp.clip(row - row0, 0.0, 1.0)
+            low = (
+                self._rough_height_grid[row0, column0] * (1.0 - column_fraction)
+                + self._rough_height_grid[row0, column0 + 1] * column_fraction
+            )
+            high = (
+                self._rough_height_grid[row0 + 1, column0]
+                * (1.0 - column_fraction)
+                + self._rough_height_grid[row0 + 1, column0 + 1]
+                * column_fraction
+            )
+            height = low * (1.0 - row_fraction) + high * row_fraction
+            inside = (
+                (x >= TERRAIN_START_X)
+                & (x <= TERRAIN_START_X + ROUGH_LENGTH)
+                & (jp.abs(y) <= TERRAIN_HALF_WIDTH)
+            )
+            return jp.where(inside, height, 0.0)
+        inside_width = jp.abs(y) <= TERRAIN_HALF_WIDTH
+        if spec.kind == "ramp":
+            on_ramp = (
+                (x >= TERRAIN_START_X) & (x <= RAMP_END_X) & inside_width
+            )
+            on_plateau = (
+                (x > RAMP_END_X)
+                & (x <= RAMP_END_X + PLATEAU_DEPTH)
+                & inside_width
+            )
+            ramp_height = (x - TERRAIN_START_X) * jp.tan(
+                jp.deg2rad(spec.slope_degrees)
+            )
+            return jp.where(
+                on_ramp,
+                jp.clip(ramp_height, 0.0, spec.final_height),
+                jp.where(on_plateau, spec.final_height, 0.0),
+            )
+        inside_step = (
+            (jp.abs(x[..., None] - self._step_centers) <= STAIR_DEPTH / 2.0)
+            & inside_width[..., None]
         )
-        return jp.max(jp.where(inside, self._step_heights, 0.0), axis=-1)
+        stair_height = jp.max(jp.where(inside_step, self._step_heights, 0.0), axis=-1)
+        stair_end = TERRAIN_START_X + spec.stair_count * STAIR_DEPTH
+        on_plateau = (
+            (x > stair_end)
+            & (x <= stair_end + PLATEAU_DEPTH)
+            & inside_width
+        )
+        return jp.where(on_plateau, spec.final_height, stair_height)
 
     def _foot_contacts(self, data: mjx.Data) -> jax.Array:
         contact = data._impl.contact
@@ -494,19 +690,29 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
             | body_contact
             | (~finite)
         )
+        final_height_ready = (
+            support_height >= self._terrain_total_rise - 1.0e-3
+            if self._terrain_spec.requires_final_height
+            else jp.ones((), dtype=jp.bool_)
+        )
         success = (
-            (data.qpos[0] >= STAIR_TOP_X + 0.10)
-            & (
-                support_height >= self._terrain_total_rise - 1.0e-3
-            )
+            (data.qpos[0] >= self._terrain_goal_x)
+            & final_height_ready
             & (jp.max(jp.abs(attitude[:2])) < jp.deg2rad(20.0))
             & (~failure)
         )
         terminated = failure | success
 
-        torque_limit = 8.0
+        torque_limit = SERVO_STALL_TORQUE_NM
+        saturation_start = (
+            SERVO_SATURATION_START_FRACTION * SERVO_STALL_TORQUE_NM
+        )
+        saturation_width = SERVO_STALL_TORQUE_NM - saturation_start
         torque_saturation = jp.mean(
-            jp.square(jp.maximum(jp.abs(data.actuator_force) - 6.8, 0.0) / 1.2)
+            jp.square(
+                jp.maximum(jp.abs(data.actuator_force) - saturation_start, 0.0)
+                / saturation_width
+            )
         )
         joint_proximity = jp.clip(
             (jp.abs(controller.servo_joint_targets) - jp.deg2rad(105.0))
@@ -564,7 +770,9 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
         ascent_bonus = (
             self._config.ascent_bonus
             * positive_ascent
-            / max(self._terrain_total_rise, 1.0e-3)
+            / self._terrain_total_rise
+            if self._terrain_spec.requires_final_height
+            else jp.zeros(())
         )
         success_bonus = jp.where(success, self._config.success_bonus, 0.0)
         failure_penalty = jp.where(failure, self._config.failure_penalty, 0.0)
@@ -589,9 +797,7 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
         state.metrics["reward/ascent"] = ascent_bonus
         state.metrics["reward/success"] = success_bonus
         state.metrics["reward/failure"] = failure_penalty
-        state.metrics["terrain_level"] = max_terrain_height / max(
-            self._terrain_step_height, 1.0e-3
-        )
+        state.metrics["terrain_level"] = jp.asarray(float(self._terrain_level))
         state.metrics["terrain_success"] = success.astype(jp.float32)
         state.metrics["controller_rejection_steps"] = rejection_steps.astype(jp.float32)
         state.metrics["policy_rejection_fraction"] = policy_rejected
@@ -637,6 +843,40 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
     @property
     def terrain_total_rise(self) -> float:
         return self._terrain_total_rise
+
+    @property
+    def terrain_name(self) -> str:
+        return self._terrain_spec.name
+
+    @property
+    def terrain_kind(self) -> str:
+        return self._terrain_spec.kind
+
+    @property
+    def terrain_description(self) -> str:
+        return self._terrain_spec.description
+
+    @property
+    def terrain_goal_x(self) -> float:
+        return self._terrain_goal_x
+
+    @property
+    def terrain_stair_count(self) -> int:
+        return self._terrain_spec.stair_count
+
+    @property
+    def contact_slots(self) -> int:
+        """Static MJX contact slots compiled for one environment."""
+        return self._contact_slots
+
+    @property
+    def constraint_rows(self) -> int:
+        """Static scalar constraint rows compiled for one environment."""
+        return self._constraint_rows
+
+    @property
+    def collision_mode(self) -> str:
+        return str(self._config.collision_mode)
 
     @property
     def xml_path(self) -> str:

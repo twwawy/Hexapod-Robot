@@ -12,18 +12,22 @@ tags:
   - mjx
   - brax
   - wandb
-status: active
-updated: 2026-08-24
-canonical_source: /home/huro/Downloads/mjx
+status: legacy-reference
+updated: 2026-08-26
+canonical_source: /home/huro/Hexapod-Robot/mjx/RL_DESIGN.md
 ---
 
 # Hexapod MJX Residual RL Study Guide
 
 > [!abstract]
-> 이 노트는 `~/Downloads/mjx` 업데이트를 `SW/mjx/`에 반영한 현재 canonical MJX 경로를 설명한다. 상세 최신 계약은 [[RESIDUAL_RL]]이며, **평지 보행+회전**과 **mixed-terrain competence curriculum**을 분리한다.
+> 현재 canonical MJX 경로는 저장소 루트 `mjx/`다. 상세 최신 계약은
+> [`mjx/RL_DESIGN.md`](../mjx/RL_DESIGN.md)이며, 이 노트의 나머지 본문은
+> `SW/mjx/`의 과거 whole-body residual 실험을 공부하기 위한 레거시 자료다.
 
-> [!warning] 이전 6-D 및 22-D 실험과 호환되지 않음
-> 현재 경로는 `24-D action`, `113-D observation`과 body 6-DOF residual을 사용한다. `classical_wbc_cartesian_body6d_residual_v1` 이전 checkpoint는 transfer하지 않는다.
+> [!warning] 현재 경로와 레거시 checkpoint를 혼용하지 않음
+> 현재 경로는 `18-D action`, `142-D observation`, 10.0 kg RL plant와 DS51150
+> geared-servo 모델을 사용한다. 아래 `24-D/113-D`, body 6-DOF, fixed ±8 Nm 설명은
+> `SW/mjx/`에만 해당한다.
 
 ## 이 노트를 보는 방법
 
@@ -33,22 +37,29 @@ canonical_source: /home/huro/Downloads/mjx
 
 | 항목 | 현재 값 |
 | --- | --- |
-| 기준 원본 | `~/Downloads/mjx` |
-| CAD viewer scene | `SW/mjx/generated/hexapod_scene.xml`, CAD mesh 유지 |
-| 평지 command scene | `SW/mjx/generated/hexapod_flat_rl.xml`, mesh 0개 |
-| mixed terrain scene | `SW/mjx/generated/hexapod_mixed_rl.xml`, mesh 0개 |
-| RL collider | torso box, leg capsule, foot sphere, terrain box |
-| Nominal controller | Position/Heading PI + PULL/Bezier tripod + posture PI + analytical 3-DOF IK |
-| Policy | 18 foot residual + body translation/rotation 6-DOF residual |
-| Action contract | `classical_wbc_cartesian_body6d_residual_v1`; 이전 checkpoint 금지 |
-| Observation contract | `gt_attitude_collision_contact6_coarse9_touchdown6_v3` |
-| Action / observation | `24 / 113` |
+| 기준 경로 | `mjx/` |
+| RL scene | `mjx/generated/hexapod_rl.xml`, 실행 시 자동 재생성 |
+| RL robot mass | `10.0 kg` 전체 질량 |
+| RL collider | torso box, leg capsule, foot sphere, 선택된 terrain primitive |
+| Base controller | STM32 제어 순서와 상수를 옮긴 JAX firmware controller |
+| Policy | 여섯 발 local XYZ residual, stance/late-landing은 Z-only |
+| Action contract | `stm32_firmware_cartesian_foot_residual_v2` |
+| Observation contract | `firmware_state_collision_terrain_curriculum_v2` |
+| Action / observation | `18 / 142` |
+| Servo | DS51150-270, 12.6 V, 357:1, ±14.709975 Nm, 315.8 deg/s |
 | Physics | MuJoCo 3.12, MJX, `sim_dt=0.0025`, `ctrl_dt=0.02` |
 | PPO | Brax PPO + `mujoco_playground` |
-| 평지 학습 | `train_command_curriculum.py --wandb` |
-| mixed terrain 학습 | `train_rough_terrain.py --terrain-layout mixed --wandb` |
-| 실시간 최고 점수 | `SW/mjx/runs/<task>/<run-id>/monitor/best_score.txt` |
-| 최고 policy 영상 | command는 `runs/.../videos/` 4종, terrain은 `videos/best_policy.gif` |
+| Curriculum | level 0 평지 → rough → ramp → 7단 → 10×20 cm 최종 계단 |
+| 학습 | `mjx/train_competence_curriculum.py --wandb` |
+| Run | `mjx/runs/terrain/<run-id>/` |
+
+현재 정책은 gait/contact/posture/IK를 직접 바꾸지 않으며 제한된 foot residual만
+추가한다. servo의 `kp=500`, `kv=10`, armature `0.02`, damping `0.15`, friction
+loss `0.8`은 실기 식별 전 calibration prior다.
+
+## 이하 내용: 레거시 `SW/mjx/` 참고
+
+아래 핵심 식부터는 과거 24-D/113-D whole-body residual 구현을 설명한다.
 
 핵심 식:
 
@@ -587,7 +598,7 @@ metadata의 `gt_attitude_collision_contact6_coarse9_touchdown6_v3`를 반드시 
 | speed | 0.06 m/s | 평지 기준 속도 |
 | swing_height | 0.06 m | 기본 foot lift |
 | radial_offset | 0.01 m | swing outward clearance |
-| actuator | kp=120, kv=3, ±8 Nm | native position actuator |
+| actuator | kp=120, kv=3, ±8 Nm | legacy native position actuator |
 
 ### quintic tripod trajectory
 

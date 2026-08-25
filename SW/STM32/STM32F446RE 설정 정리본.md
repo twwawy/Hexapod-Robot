@@ -24,6 +24,9 @@ PA15, PB3, PB4를 PWM으로 사용하므로 `SYS → Debug = Serial Wire`로 설
 | 항목 | 설정 |
 |---|---|
 | 서보모터 | DS51150-270 |
+| 12.6 V stall torque | 150 kgf·cm (`14.709975 Nm`) |
+| 12.6 V no-load speed | 0.19 s/60° (`315.8 deg/s`) |
+| Gear ratio | 357:1 |
 | 제어 방식 | PWM |
 | PWM 주기 | 5 ms |
 | PWM 주파수 | 200 Hz |

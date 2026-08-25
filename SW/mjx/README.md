@@ -1,4 +1,11 @@
 # Hexapod-Robot
+
+> **레거시 경로:** `SW/mjx/`는 과거 24-D/113-D classical whole-body residual
+> 실험을 보존한다. 현재 학습은 저장소 루트 `mjx/`와
+> [`mjx/RL_DESIGN.md`](../../mjx/RL_DESIGN.md)를 사용한다. 현재 모델은 로봇 전체
+> 10.0 kg, DS51150-270 12.6 V geared servo(357:1, ±14.709975 Nm, 315.8 deg/s)다.
+> 아래의 ±8 Nm 설명은 이 레거시 코드에만 해당하며 현재 checkpoint와 혼용하지 않는다.
+
 This is a hexapod walking robot project developed by the Inha University Robot Research Society since 2024. It focuses on stable autonomous locomotion across diverse terrains.
 
 > Integration note: this README was imported from `~/Downloads/mjx`. In this repository the directory is `SW/mjx/`, not `<repo>/mjx/`; use the exact commands in `docs/Hexapod_MJX_Obsidian_Study_Vault.md` for the current virtualenv and paths.

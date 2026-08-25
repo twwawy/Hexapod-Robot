@@ -32,6 +32,10 @@ Hexapod Robot 제작에 사용하는 주요 부품의 수량, 용도와 구매�
 
 - **개수**: 20개
 - **용도**: 로봇 다리 관절 구동용 서보모터
+- **12.6 V 사양**: gear ratio 357:1, stall torque 150 kgf·cm
+  (`14.709975 Nm`), no-load speed 0.19 s/60° (`315.8 deg/s`)
+- **시뮬레이션 주의**: 현재 RL 모델의 `kp/kv`, armature, damping, friction loss는
+  제조사 사양이 아니라 실기 벤치시험 전 calibration prior다.
 - **구매링크**: [AliExpress](https://ko.aliexpress.com/)
 
 ### DS51150-270 Servo Horn 5pcs
