@@ -1,6 +1,7 @@
 Core/Src/communication/jetson_spi.o: \
  ../Core/Src/communication/jetson_spi.c \
- ../Core/Inc/communication/jetson_spi.h \
+ ../Core/Inc/communication/jetson_spi.h ../Core/Inc/common/robot_types.h \
+ ../Core/Inc/common/robot_config.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal.h \
  ../Core/Inc/stm32f4xx_hal_conf.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_rcc.h \
@@ -32,6 +33,8 @@ Core/Src/communication/jetson_spi.o: \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_uart.h \
  ../Core/Inc/main.h
 ../Core/Inc/communication/jetson_spi.h:
+../Core/Inc/common/robot_types.h:
+../Core/Inc/common/robot_config.h:
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal.h:
 ../Core/Inc/stm32f4xx_hal_conf.h:
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_rcc.h:

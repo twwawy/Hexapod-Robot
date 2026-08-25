@@ -60,12 +60,12 @@ const RobotCalibration_t g_robot_calibration =
 
     .pressure =
     {
-        {1023U, 1022U, true, false}, // 다리 1 값을 넣는다.
-        {1023U, 1022U, true, false}, // 다리 2 값을 넣는다.
-        {1023U, 1022U, true, false}, // 다리 3 값을 넣는다.
-        {1023U, 1022U, true, false}, // 다리 4 값을 넣는다.
-        {1023U, 1022U, true, false}, // 다리 5 값을 넣는다.
-        {1023U, 1022U, true, false}  // 다리 6 값을 넣는다.
+        {283U, 188U, true, true},  // 다리 1의 접촉·해제 임계값을 저장한다.
+        {377U, 251U, true, true},  // 다리 2의 접촉·해제 임계값을 저장한다.
+        {253U, 169U, true, true},  // 다리 3의 접촉·해제 임계값을 저장한다.
+        {277U, 185U, true, true},  // 다리 4의 접촉·해제 임계값을 저장한다.
+        {254U, 169U, true, true},  // 다리 5의 접촉·해제 임계값을 저장한다.
+        {262U, 174U, true, true}   // 다리 6의 접촉·해제 임계값을 저장한다.
     },
 
     .servo =

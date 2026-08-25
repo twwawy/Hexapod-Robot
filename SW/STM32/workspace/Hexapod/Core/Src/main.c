@@ -21,7 +21,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "measurement/measurement_stage5.h"
+#include "measurement/measurement_stage6.h"
 
 /* USER CODE END Includes */
 
@@ -128,13 +128,7 @@ int main(void)
   MX_USART3_UART_Init();
   MX_USART6_UART_Init();
   /* USER CODE BEGIN 2 */
-  if (!MeasurementStage5_Init(&hspi1,
-                              &htim1,
-                              &htim2,
-                              &htim3,
-                              &htim4,
-                              &htim5,
-                              &htim8))
+  if (!MeasurementStage6_Init(&hspi1))
   {
     Error_Handler();  // 초기화 오류를 디버거에서 확인한다.
   }
@@ -148,7 +142,7 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-    MeasurementStage5_Process();  // 5단계 관절 ADC 보정을 계속 진행한다.
+    MeasurementStage6_Process();  // 6단계 압력센서 보정을 계속 진행한다.
   }
   /* USER CODE END 3 */
 }

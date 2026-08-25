@@ -1,0 +1,6 @@
+../Core/Src/measurement/measurement_stage6.c:35:13:MeasurementStage6_SetPhase	16	static
+../Core/Src/measurement/measurement_stage6.c:45:13:MeasurementStage6_UpdateDebugValues	16	static
+../Core/Src/measurement/measurement_stage6.c:83:13:MeasurementStage6_ReadPressure	24	static
+../Core/Src/measurement/measurement_stage6.c:127:13:MeasurementStage6_BuildTable	24	static
+../Core/Src/measurement/measurement_stage6.c:166:6:MeasurementStage6_Init	24	static
+../Core/Src/measurement/measurement_stage6.c:216:6:MeasurementStage6_Process	16	static

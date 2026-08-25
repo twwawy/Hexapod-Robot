@@ -1,8 +1,8 @@
 ../Core/Src/app/hexapod_app.c:11:13:HexapodApp_InitializeJointCommand	112	static
 ../Core/Src/app/hexapod_app.c:34:19:HexapodApp_Init	48	static
 ../Core/Src/app/hexapod_app.c:151:6:HexapodApp_Process	240	static
-../Core/Src/app/hexapod_app.c:197:13:HexapodApp_ControlStep	568	static
-../Core/Src/app/hexapod_app.c:313:6:HexapodApp_RunControlIfDue	16	static
-../Core/Src/app/hexapod_app.c:326:6:HexapodApp_TimerCallback	16	static
-../Core/Src/app/hexapod_app.c:342:6:HexapodApp_UartRxCallback	16	static
-../Core/Src/app/hexapod_app.c:357:6:HexapodApp_UartErrorCallback	16	static
+../Core/Src/app/hexapod_app.c:203:13:HexapodApp_ControlStep	568	static
+../Core/Src/app/hexapod_app.c:319:6:HexapodApp_RunControlIfDue	16	static
+../Core/Src/app/hexapod_app.c:332:6:HexapodApp_TimerCallback	16	static
+../Core/Src/app/hexapod_app.c:348:6:HexapodApp_UartRxCallback	16	static
+../Core/Src/app/hexapod_app.c:363:6:HexapodApp_UartErrorCallback	16	static

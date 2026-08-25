@@ -87,6 +87,17 @@ typedef struct
     uint32_t pressure_loaded_sum[ROBOT_PRESSURE_COUNT];                // 압력센서 접촉 합계를 저장한다.
     uint16_t pressure_unloaded_count;                                  // 무부하 표본 수를 저장한다.
     uint16_t pressure_loaded_count;                                    // 접촉 표본 수를 저장한다.
+    uint16_t pressure_current_raw[ROBOT_PRESSURE_COUNT];               // 최근 압력센서 raw를 저장한다.
+    uint16_t pressure_unloaded_average[ROBOT_PRESSURE_COUNT];          // 무부하 평균 raw를 저장한다.
+    uint16_t pressure_loaded_average[ROBOT_PRESSURE_COUNT];            // 접촉 평균 raw를 저장한다.
+    uint16_t pressure_loaded_sample_count[ROBOT_PRESSURE_COUNT];       // 다리별 접촉 표본 수를 저장한다.
+    int16_t pressure_difference_raw[ROBOT_PRESSURE_COUNT];             // 접촉에 따른 raw 변화량을 저장한다.
+    uint8_t pressure_measurement_active_leg;                           // 현재 눌러야 할 다리 번호를 저장한다.
+    uint8_t pressure_measurement_phase;                                // 현재 압력 실측 단계를 저장한다.
+    uint8_t pressure_phase_elapsed_seconds;                            // 현재 단계 경과 시간을 저장한다.
+    uint8_t pressure_measurement_error_leg;                            // 변화가 부족한 다리 번호를 저장한다.
+    bool pressure_measurement_complete;                               // 여섯 압력센서 보정 완료를 저장한다.
+    bool pressure_measurement_failed;                                 // 압력센서 보정 실패를 저장한다.
 
     uint16_t crsf_minimum[USER_COMMAND_USED_CHANNELS];                 // CRSF 채널별 최소 raw를 저장한다.
     uint16_t crsf_center[USER_COMMAND_USED_CHANNELS];                  // CRSF 채널별 중립 raw를 저장한다.

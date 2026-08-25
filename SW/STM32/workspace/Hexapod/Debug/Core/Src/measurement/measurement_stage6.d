@@ -1,6 +1,6 @@
-Core/Src/app/hexapod_app.o: ../Core/Src/app/hexapod_app.c \
- ../Core/Inc/app/hexapod_app.h ../Core/Inc/communication/jetson_spi.h \
- ../Core/Inc/common/robot_types.h ../Core/Inc/common/robot_config.h \
+Core/Src/measurement/measurement_stage6.o: \
+ ../Core/Src/measurement/measurement_stage6.c \
+ ../Core/Inc/measurement/measurement_stage6.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal.h \
  ../Core/Inc/stm32f4xx_hal_conf.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_rcc.h \
@@ -30,31 +30,15 @@ Core/Src/app/hexapod_app.o: ../Core/Src/app/hexapod_app.c \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_tim.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_tim_ex.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_uart.h \
- ../Core/Inc/communication/lora.h \
- ../Core/Inc/communication/robot_telemetry.h \
- ../Core/Inc/high_control/body_position_estimator.h \
- ../Core/Inc/high_control/body_posture_controller.h \
- ../Core/Inc/high_control/control_priority.h \
- ../Core/Inc/high_control/drone_controller.h \
- ../Core/Inc/high_control/foot_trajectory.h \
- ../Core/Inc/high_control/gait_manager.h \
- ../Core/Inc/high_control/gait_pose_controller.h \
- ../Core/Inc/high_control/leg_kinematics.h \
- ../Core/Inc/high_control/safety.h \
- ../Core/Inc/high_control/workspace_limiter.h \
- ../Core/Inc/low_control/servo_pwm.h ../Core/Inc/sensor/gps.h \
- ../Core/Inc/sensor/imu.h ../Core/Inc/sensor/mcp3008.h \
- ../Core/Inc/sensor/sensor_manager.h ../Core/Inc/sensor/foot_pressure.h \
- ../Core/Inc/sensor/joint_feedback.h \
- ../Core/Inc/user_command/crsf_protocol.h \
- ../Core/Inc/user_command/crsf_receiver.h \
- ../Core/Inc/user_command/user_command.h \
  ../Core/Inc/common/robot_calibration.h ../Core/Inc/low_control/relay.h \
- ../Core/Inc/high_control/stand_landing.h
-../Core/Inc/app/hexapod_app.h:
-../Core/Inc/communication/jetson_spi.h:
-../Core/Inc/common/robot_types.h:
-../Core/Inc/common/robot_config.h:
+ ../Core/Inc/low_control/servo_pwm.h ../Core/Inc/common/robot_types.h \
+ ../Core/Inc/common/robot_config.h ../Core/Inc/sensor/foot_pressure.h \
+ ../Core/Inc/sensor/imu.h ../Core/Inc/sensor/joint_feedback.h \
+ ../Core/Inc/sensor/mcp3008.h ../Core/Inc/user_command/user_command.h \
+ ../Core/Inc/measurement/foot_pressure_measurement.h \
+ ../Core/Inc/measurement/measurement_debug.h \
+ ../Core/Inc/measurement/measurement_runner.h
+../Core/Inc/measurement/measurement_stage6.h:
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal.h:
 ../Core/Inc/stm32f4xx_hal_conf.h:
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_rcc.h:
@@ -84,28 +68,16 @@ Core/Src/app/hexapod_app.o: ../Core/Src/app/hexapod_app.c \
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_tim.h:
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_tim_ex.h:
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_uart.h:
-../Core/Inc/communication/lora.h:
-../Core/Inc/communication/robot_telemetry.h:
-../Core/Inc/high_control/body_position_estimator.h:
-../Core/Inc/high_control/body_posture_controller.h:
-../Core/Inc/high_control/control_priority.h:
-../Core/Inc/high_control/drone_controller.h:
-../Core/Inc/high_control/foot_trajectory.h:
-../Core/Inc/high_control/gait_manager.h:
-../Core/Inc/high_control/gait_pose_controller.h:
-../Core/Inc/high_control/leg_kinematics.h:
-../Core/Inc/high_control/safety.h:
-../Core/Inc/high_control/workspace_limiter.h:
-../Core/Inc/low_control/servo_pwm.h:
-../Core/Inc/sensor/gps.h:
-../Core/Inc/sensor/imu.h:
-../Core/Inc/sensor/mcp3008.h:
-../Core/Inc/sensor/sensor_manager.h:
-../Core/Inc/sensor/foot_pressure.h:
-../Core/Inc/sensor/joint_feedback.h:
-../Core/Inc/user_command/crsf_protocol.h:
-../Core/Inc/user_command/crsf_receiver.h:
-../Core/Inc/user_command/user_command.h:
 ../Core/Inc/common/robot_calibration.h:
 ../Core/Inc/low_control/relay.h:
-../Core/Inc/high_control/stand_landing.h:
+../Core/Inc/low_control/servo_pwm.h:
+../Core/Inc/common/robot_types.h:
+../Core/Inc/common/robot_config.h:
+../Core/Inc/sensor/foot_pressure.h:
+../Core/Inc/sensor/imu.h:
+../Core/Inc/sensor/joint_feedback.h:
+../Core/Inc/sensor/mcp3008.h:
+../Core/Inc/user_command/user_command.h:
+../Core/Inc/measurement/foot_pressure_measurement.h:
+../Core/Inc/measurement/measurement_debug.h:
+../Core/Inc/measurement/measurement_runner.h:

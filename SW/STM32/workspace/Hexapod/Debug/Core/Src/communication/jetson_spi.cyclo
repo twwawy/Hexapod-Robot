@@ -1,2 +1,15 @@
-../Core/Src/communication/jetson_spi.c:14:6:JetsonSpi_Init	3
-../Core/Src/communication/jetson_spi.c:44:6:JetsonSpi_Process	5
+../Core/Src/communication/jetson_spi.c:14:17:JetsonSpi_ReadU16Le	1
+../Core/Src/communication/jetson_spi.c:20:13:JetsonSpi_WriteU16Le	1
+../Core/Src/communication/jetson_spi.c:26:13:JetsonSpi_WriteI16Le	1
+../Core/Src/communication/jetson_spi.c:31:16:JetsonSpi_RoundFloat	2
+../Core/Src/communication/jetson_spi.c:41:16:JetsonSpi_EncodeJoint	5
+../Core/Src/communication/jetson_spi.c:71:16:JetsonSpi_EncodeImu	3
+../Core/Src/communication/jetson_spi.c:87:13:JetsonSpi_IsEmptyFrame	3
+../Core/Src/communication/jetson_spi.c:102:6:JetsonSpi_Init	3
+../Core/Src/communication/jetson_spi.c:120:10:JetsonSpi_Crc16CcittFalse	5
+../Core/Src/communication/jetson_spi.c:152:6:JetsonSpi_ParseFrame	6
+../Core/Src/communication/jetson_spi.c:197:6:JetsonSpi_ParseCommandFrame	4
+../Core/Src/communication/jetson_spi.c:214:6:JetsonSpi_PrepareSensorFrame	8
+../Core/Src/communication/jetson_spi.c:277:6:JetsonSpi_Process	11
+../Core/Src/communication/jetson_spi.c:348:6:JetsonSpi_GetLastRxPacket	4
+../Core/Src/communication/jetson_spi.c:360:6:JetsonSpi_TakeCommand	4
