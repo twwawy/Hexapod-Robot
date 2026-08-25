@@ -47,10 +47,10 @@ static bool JointFeedback_ConvertOne(const JointFeedback_Calibration_t *calibrat
                 ratio * (calibration->angle_max_rad - calibration->angle_zero_rad);      // 위 구간을 선형 보간한다.
     }
 
-    angle = JointFeedback_Clamp(angle,
-                                calibration->angle_min_rad,
-                                calibration->angle_max_rad);                              // 센서 범위 밖 결과를 제한한다.
-    *angle_rad = (calibration->direction < 0) ? -angle : angle;                            // 관절 방향을 적용한다.
+    angle = (calibration->direction < 0) ? -angle : angle;               // 관절 방향을 적용한다.
+    *angle_rad = JointFeedback_Clamp(angle,
+                                     ROBOT_JOINT_MIN_RAD,
+                                     ROBOT_JOINT_MAX_RAD);               // 실측점 밖은 관절 한계까지 선형 확장한다.
     return true;
 }
 

@@ -70,6 +70,18 @@ typedef struct
     bool joint_minimum_captured;                                       // 최소 자세 기록 여부를 저장한다.
     bool joint_zero_captured;                                          // 영점 자세 기록 여부를 저장한다.
     bool joint_maximum_captured;                                       // 최대 자세 기록 여부를 저장한다.
+    int8_t joint_calibration_direction[ROBOT_JOINT_COUNT];             // ADC 증가에 따른 관절 방향을 저장한다.
+    uint8_t joint_calibration_active_leg;                              // 현재 측정 다리 번호 1~6을 저장한다.
+    uint8_t joint_calibration_active_joint;                            // 현재 측정 관절 번호 1~3을 저장한다.
+    uint8_t joint_calibration_phase;                                   // -20·0·+20·복귀·OFF 단계를 저장한다.
+    int16_t joint_calibration_target_deg;                              // 현재 목표 관절각을 deg로 저장한다.
+    uint8_t joint_calibration_phase_elapsed_seconds;                   // 현재 단계 경과 시간을 저장한다.
+    uint16_t joint_calibration_active_raw;                             // 현재 관절 ADC Raw를 저장한다.
+    uint16_t joint_calibration_sample_count;                           // 현재 평균에 사용한 표본 수를 저장한다.
+    uint8_t joint_calibration_completed_count;                         // 완료한 관절 수를 저장한다.
+    uint8_t joint_calibration_error_joint;                             // 실패한 전체 관절 번호 1~18을 저장한다.
+    bool joint_calibration_complete;                                   // 18개 관절 보정 완료를 저장한다.
+    bool joint_calibration_failed;                                     // ADC 보정 실패를 저장한다.
 
     uint32_t pressure_unloaded_sum[ROBOT_PRESSURE_COUNT];              // 압력센서 무부하 합계를 저장한다.
     uint32_t pressure_loaded_sum[ROBOT_PRESSURE_COUNT];                // 압력센서 접촉 합계를 저장한다.

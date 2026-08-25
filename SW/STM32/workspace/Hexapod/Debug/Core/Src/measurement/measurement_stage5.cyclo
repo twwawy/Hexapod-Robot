@@ -1,0 +1,10 @@
+../Core/Src/measurement/measurement_stage5.c:54:13:MeasurementStage5_StopOutputs	1
+../Core/Src/measurement/measurement_stage5.c:63:13:MeasurementStage5_Fail	1
+../Core/Src/measurement/measurement_stage5.c:73:13:MeasurementStage5_SetPhase	4
+../Core/Src/measurement/measurement_stage5.c:108:13:MeasurementStage5_StartJoint	2
+../Core/Src/measurement/measurement_stage5.c:128:13:MeasurementStage5_CapturePosition	5
+../Core/Src/measurement/measurement_stage5.c:162:13:MeasurementStage5_ValidateJoint	5
+../Core/Src/measurement/measurement_stage5.c:184:13:MeasurementStage5_BuildTable	2
+../Core/Src/measurement/measurement_stage5.c:210:13:MeasurementStage5_UpdateAdc	9
+../Core/Src/measurement/measurement_stage5.c:261:6:MeasurementStage5_Init	14
+../Core/Src/measurement/measurement_stage5.c:354:6:MeasurementStage5_Process	20

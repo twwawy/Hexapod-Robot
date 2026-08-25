@@ -9,6 +9,10 @@
 #define SERVO_CALIBRATION(angle_deg, direction_sign) \
     {1500U, 500U, 2500U, (angle_deg) * ROBOT_DEG_TO_RAD_F, \
      DEFAULT_SERVO_PULSE_PER_RAD, (direction_sign), true}
+#define JOINT_CALIBRATION(raw_min_value, raw_zero_value, raw_max_value, direction_sign) \
+    {(raw_min_value), (raw_zero_value), (raw_max_value), \
+     (-20.0f * ROBOT_DEG_TO_RAD_F), 0.0f, (20.0f * ROBOT_DEG_TO_RAD_F), \
+     (direction_sign), true}
 
 const RobotCalibration_t g_robot_calibration =
 {
@@ -34,24 +38,24 @@ const RobotCalibration_t g_robot_calibration =
 
     .joint =
     {
-        {0U, 512U, 1023U, ROBOT_JOINT_MIN_RAD, 0.0f, ROBOT_JOINT_MAX_RAD, 1, false}, // L1 J1 값을 넣는다.
-        {0U, 512U, 1023U, ROBOT_JOINT_MIN_RAD, 0.0f, ROBOT_JOINT_MAX_RAD, 1, false}, // L1 J2 값을 넣는다.
-        {0U, 512U, 1023U, ROBOT_JOINT_MIN_RAD, 0.0f, ROBOT_JOINT_MAX_RAD, 1, false}, // L1 J3 값을 넣는다.
-        {0U, 512U, 1023U, ROBOT_JOINT_MIN_RAD, 0.0f, ROBOT_JOINT_MAX_RAD, 1, false}, // L2 J1 값을 넣는다.
-        {0U, 512U, 1023U, ROBOT_JOINT_MIN_RAD, 0.0f, ROBOT_JOINT_MAX_RAD, 1, false}, // L2 J2 값을 넣는다.
-        {0U, 512U, 1023U, ROBOT_JOINT_MIN_RAD, 0.0f, ROBOT_JOINT_MAX_RAD, 1, false}, // L2 J3 값을 넣는다.
-        {0U, 512U, 1023U, ROBOT_JOINT_MIN_RAD, 0.0f, ROBOT_JOINT_MAX_RAD, 1, false}, // L3 J1 값을 넣는다.
-        {0U, 512U, 1023U, ROBOT_JOINT_MIN_RAD, 0.0f, ROBOT_JOINT_MAX_RAD, 1, false}, // L3 J2 값을 넣는다.
-        {0U, 512U, 1023U, ROBOT_JOINT_MIN_RAD, 0.0f, ROBOT_JOINT_MAX_RAD, 1, false}, // L3 J3 값을 넣는다.
-        {0U, 512U, 1023U, ROBOT_JOINT_MIN_RAD, 0.0f, ROBOT_JOINT_MAX_RAD, 1, false}, // L4 J1 값을 넣는다.
-        {0U, 512U, 1023U, ROBOT_JOINT_MIN_RAD, 0.0f, ROBOT_JOINT_MAX_RAD, 1, false}, // L4 J2 값을 넣는다.
-        {0U, 512U, 1023U, ROBOT_JOINT_MIN_RAD, 0.0f, ROBOT_JOINT_MAX_RAD, 1, false}, // L4 J3 값을 넣는다.
-        {0U, 512U, 1023U, ROBOT_JOINT_MIN_RAD, 0.0f, ROBOT_JOINT_MAX_RAD, 1, false}, // L5 J1 값을 넣는다.
-        {0U, 512U, 1023U, ROBOT_JOINT_MIN_RAD, 0.0f, ROBOT_JOINT_MAX_RAD, 1, false}, // L5 J2 값을 넣는다.
-        {0U, 512U, 1023U, ROBOT_JOINT_MIN_RAD, 0.0f, ROBOT_JOINT_MAX_RAD, 1, false}, // L5 J3 값을 넣는다.
-        {0U, 512U, 1023U, ROBOT_JOINT_MIN_RAD, 0.0f, ROBOT_JOINT_MAX_RAD, 1, false}, // L6 J1 값을 넣는다.
-        {0U, 512U, 1023U, ROBOT_JOINT_MIN_RAD, 0.0f, ROBOT_JOINT_MAX_RAD, 1, false}, // L6 J2 값을 넣는다.
-        {0U, 512U, 1023U, ROBOT_JOINT_MIN_RAD, 0.0f, ROBOT_JOINT_MAX_RAD, 1, false}  // L6 J3 값을 넣는다.
+        JOINT_CALIBRATION( 91U, 104U, 118U, -1),  // L1 J1의 ADC 보정값과 방향을 저장한다.
+        JOINT_CALIBRATION( 98U, 112U, 126U,  1),  // L1 J2의 ADC 보정값과 방향을 저장한다.
+        JOINT_CALIBRATION(106U, 121U, 133U, -1),  // L1 J3의 ADC 보정값과 방향을 저장한다.
+        JOINT_CALIBRATION(100U, 113U, 127U, -1),  // L2 J1의 ADC 보정값과 방향을 저장한다.
+        JOINT_CALIBRATION( 96U, 109U, 123U,  1),  // L2 J2의 ADC 보정값과 방향을 저장한다.
+        JOINT_CALIBRATION(101U, 115U, 129U, -1),  // L2 J3의 ADC 보정값과 방향을 저장한다.
+        JOINT_CALIBRATION(101U, 114U, 129U, -1),  // L3 J1의 ADC 보정값과 방향을 저장한다.
+        JOINT_CALIBRATION(100U, 113U, 127U,  1),  // L3 J2의 ADC 보정값과 방향을 저장한다.
+        JOINT_CALIBRATION( 93U, 106U, 119U, -1),  // L3 J3의 ADC 보정값과 방향을 저장한다.
+        JOINT_CALIBRATION( 99U, 113U, 126U, -1),  // L4 J1의 ADC 보정값과 방향을 저장한다.
+        JOINT_CALIBRATION( 97U, 111U, 125U, -1),  // L4 J2의 ADC 보정값과 방향을 저장한다.
+        JOINT_CALIBRATION( 94U, 108U, 122U,  1),  // L4 J3의 ADC 보정값과 방향을 저장한다.
+        JOINT_CALIBRATION( 92U, 106U, 119U, -1),  // L5 J1의 ADC 보정값과 방향을 저장한다.
+        JOINT_CALIBRATION(103U, 117U, 131U, -1),  // L5 J2의 ADC 보정값과 방향을 저장한다.
+        JOINT_CALIBRATION( 99U, 112U, 125U,  1),  // L5 J3의 ADC 보정값과 방향을 저장한다.
+        JOINT_CALIBRATION( 91U, 105U, 118U, -1),  // L6 J1의 ADC 보정값과 방향을 저장한다.
+        JOINT_CALIBRATION(105U, 118U, 133U, -1),  // L6 J2의 ADC 보정값과 방향을 저장한다.
+        JOINT_CALIBRATION( 97U, 111U, 124U,  1)   // L6 J3의 ADC 보정값과 방향을 저장한다.
     },
 
     .pressure =

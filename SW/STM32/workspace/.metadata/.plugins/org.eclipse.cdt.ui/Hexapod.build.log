@@ -1,17 +1,10 @@
-01:21:42 **** Incremental Build of configuration Debug for project Hexapod ****
+01:52:19 **** Incremental Build of configuration Debug for project Hexapod ****
 make -j16 all 
-arm-none-eabi-gcc "../Core/Src/common/robot_calibration.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/common/robot_calibration.d" -MT"Core/Src/common/robot_calibration.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/common/robot_calibration.o"
-arm-none-eabi-gcc -o "Hexapod.elf" @"objects.list"   -mcpu=cortex-m4 -T"C:\Project_TW\Hexapod\Hexapod-Robot\SW\STM32\workspace\Hexapod\STM32F446RETX_FLASH.ld" --specs=nosys.specs -Wl,-Map="Hexapod.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
-Finished building target: Hexapod.elf
- 
 arm-none-eabi-size  Hexapod.elf 
-arm-none-eabi-objdump -h -S Hexapod.elf  > "Hexapod.list"
    text	   data	    bss	    dec	    hex	filename
-  27216	     12	   5224	  32452	   7ec4	Hexapod.elf
+  29304	     12	   6120	  35436	   8a6c	Hexapod.elf
 Finished building: default.size.stdout
  
-Finished building: Hexapod.list
- 
 
-01:21:44 Build Finished. 0 errors, 0 warnings. (took 1s.536ms)
+01:52:20 Build Finished. 0 errors, 0 warnings. (took 817ms)
 
