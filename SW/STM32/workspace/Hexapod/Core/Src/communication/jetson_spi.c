@@ -8,8 +8,8 @@
 #define JETSON_SPI_JOINT_MIN_RAD      (-2.35619449f)
 #define JETSON_SPI_JOINT_MAX_RAD      ( 2.35619449f)
 #define JETSON_SPI_IMU_SCALE          10000.0f
-#define JETSON_SPI_FIRST_DELTA_10US   500U
-#define JETSON_SPI_MAX_DELTA_MS       655U
+#define JETSON_SPI_FIRST_DELTA_100US  50U
+#define JETSON_SPI_MAX_DELTA_MS       25U
 
 static uint16_t JetsonSpi_ReadU16Le(const uint8_t *source)
 {
@@ -185,8 +185,8 @@ bool JetsonSpi_ParseFrame(const uint8_t frame[JETSON_SPI_FRAME_SIZE],
         (frame[JETSON_SPI_OFFSET_VERSION_TYPE] & 0x0FU);
     packet->sequence = JetsonSpi_ReadU16Le(
         &frame[JETSON_SPI_OFFSET_SEQUENCE]);
-    packet->delta_time_10us = JetsonSpi_ReadU16Le(
-        &frame[JETSON_SPI_OFFSET_DELTA_TIME]);
+    packet->delta_time_100us = frame[JETSON_SPI_OFFSET_DELTA_TIME];
+    packet->flags = frame[JETSON_SPI_OFFSET_FLAGS];
     memcpy(packet->payload,
            &frame[JETSON_SPI_OFFSET_PAYLOAD],
            JETSON_SPI_PAYLOAD_SIZE);
@@ -206,7 +206,8 @@ bool JetsonSpi_ParseCommandFrame(const uint8_t frame[JETSON_SPI_FRAME_SIZE],
     }
 
     command->sequence = parsed.sequence;
-    command->delta_time_10us = parsed.delta_time_10us;
+    command->delta_time_100us = parsed.delta_time_100us;
+    command->flags = parsed.flags;
     memcpy(command->payload, parsed.payload, JETSON_SPI_PAYLOAD_SIZE);
     return true;
 }
@@ -216,9 +217,11 @@ bool JetsonSpi_PrepareSensorFrame(JetsonSpi_Handle_t *handle,
                                   uint32_t now_ms)
 {
     uint32_t elapsed_ms;
-    uint16_t delta_time_10us;
+    uint8_t delta_time_100us;
     uint16_t crc;
     uint32_t joint;
+    uint32_t leg;
+    uint8_t contact_mask = 0U;
 
     if ((handle == NULL) || (snapshot == NULL) ||
         (handle->spi == NULL) || !handle->protocol_ready)
@@ -228,7 +231,7 @@ bool JetsonSpi_PrepareSensorFrame(JetsonSpi_Handle_t *handle,
 
     if (handle->transfer_count == 0U)
     {
-        delta_time_10us = JETSON_SPI_FIRST_DELTA_10US;
+        delta_time_100us = JETSON_SPI_FIRST_DELTA_100US;
     }
     else
     {
@@ -237,7 +240,7 @@ bool JetsonSpi_PrepareSensorFrame(JetsonSpi_Handle_t *handle,
         {
             elapsed_ms = JETSON_SPI_MAX_DELTA_MS;
         }
-        delta_time_10us = (uint16_t)(elapsed_ms * 100U);
+        delta_time_100us = (uint8_t)(elapsed_ms * 10U);
     }
 
     memset(handle->tx_frame, 0, sizeof(handle->tx_frame));
@@ -247,13 +250,20 @@ bool JetsonSpi_PrepareSensorFrame(JetsonSpi_Handle_t *handle,
                                      JETSON_SPI_TYPE_SENSOR);
     JetsonSpi_WriteU16Le(&handle->tx_frame[JETSON_SPI_OFFSET_SEQUENCE],
                          handle->tx_sequence);
-    JetsonSpi_WriteU16Le(&handle->tx_frame[JETSON_SPI_OFFSET_DELTA_TIME],
-                         delta_time_10us);
+    handle->tx_frame[JETSON_SPI_OFFSET_DELTA_TIME] = delta_time_100us;
 
     for (joint = 0U; joint < ROBOT_JOINT_COUNT; ++joint)
     {
         handle->tx_frame[JETSON_SPI_OFFSET_JOINTS + joint] =
             JetsonSpi_EncodeJoint(snapshot->joint_angle_rad[joint]);
+    }
+
+    for (leg = 0U; leg < ROBOT_LEG_COUNT; ++leg)
+    {
+        if (snapshot->foot_contact[leg])
+        {
+            contact_mask |= (uint8_t)(1U << leg);
+        }
     }
 
     JetsonSpi_WriteI16Le(&handle->tx_frame[JETSON_SPI_OFFSET_IMU_ROLL],
@@ -262,6 +272,9 @@ bool JetsonSpi_PrepareSensorFrame(JetsonSpi_Handle_t *handle,
                          JetsonSpi_EncodeImu(snapshot->imu.attitude_rad.pitch));
     JetsonSpi_WriteI16Le(&handle->tx_frame[JETSON_SPI_OFFSET_IMU_YAW],
                          JetsonSpi_EncodeImu(snapshot->imu.attitude_rad.yaw));
+
+    handle->tx_frame[JETSON_SPI_OFFSET_FLAGS] =
+        (uint8_t)(contact_mask & JETSON_SPI_SENSOR_FOOT_CONTACT_MASK);
 
     crc = JetsonSpi_Crc16CcittFalse(handle->tx_frame,
                                     JETSON_SPI_CRC_INPUT_SIZE);
@@ -334,7 +347,8 @@ bool JetsonSpi_Process(JetsonSpi_Handle_t *handle)
     if (parsed.type == JETSON_SPI_TYPE_COMMAND)
     {
         handle->command.sequence = parsed.sequence;
-        handle->command.delta_time_10us = parsed.delta_time_10us;
+        handle->command.delta_time_100us = parsed.delta_time_100us;
+        handle->command.flags = parsed.flags;
         memcpy(handle->command.payload,
                parsed.payload,
                JETSON_SPI_PAYLOAD_SIZE);

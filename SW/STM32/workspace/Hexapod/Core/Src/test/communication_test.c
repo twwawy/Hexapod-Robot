@@ -18,6 +18,15 @@ bool CommunicationTest_Run(void)
     uint16_t crc;                                       // 시험 패킷 CRC를 저장한다.
     char text[ROBOT_TELEMETRY_MAX_TEXT + 1U];           // 생성한 패킷을 저장한다.
 
+    if ((JETSON_SPI_FRAME_SIZE != 32U) ||
+        (JETSON_SPI_PAYLOAD_SIZE != 24U) ||
+        (JETSON_SPI_OFFSET_DELTA_TIME != 4U) ||
+        (JETSON_SPI_OFFSET_FLAGS != 5U) ||
+        (JETSON_SPI_OFFSET_CRC != 30U))
+    {
+        return false;
+    }
+
     memset(&sensor, 0, sizeof(sensor));  // 관제 센서 입력을 0으로 준비한다.
     memset(&safety, 0, sizeof(safety));  // 정상 Safety 입력을 준비한다.
     memset(&jetson, 0, sizeof(jetson));  // 비초기화 SPI Handle을 준비한다.
@@ -41,8 +50,8 @@ bool CommunicationTest_Run(void)
                                      JETSON_SPI_TYPE_COMMAND);
     spi_frame[JETSON_SPI_OFFSET_SEQUENCE] = 0x34U;
     spi_frame[JETSON_SPI_OFFSET_SEQUENCE + 1U] = 0x12U;
-    spi_frame[JETSON_SPI_OFFSET_DELTA_TIME] = 0xF4U;
-    spi_frame[JETSON_SPI_OFFSET_DELTA_TIME + 1U] = 0x01U;
+    spi_frame[JETSON_SPI_OFFSET_DELTA_TIME] = 50U;
+    spi_frame[JETSON_SPI_OFFSET_FLAGS] = 0x2DU;
     spi_frame[JETSON_SPI_OFFSET_PAYLOAD] = 0x5AU;
     crc = JetsonSpi_Crc16CcittFalse(spi_frame,
                                     JETSON_SPI_CRC_INPUT_SIZE);
@@ -52,14 +61,16 @@ bool CommunicationTest_Run(void)
     if (!JetsonSpi_ParseFrame(spi_frame, &parsed) ||
         (parsed.type != JETSON_SPI_TYPE_COMMAND) ||
         (parsed.sequence != 0x1234U) ||
-        (parsed.delta_time_10us != 500U))
+        (parsed.delta_time_100us != 50U) ||
+        (parsed.flags != 0x2DU))
     {
         return false;
     }
 
     if (!JetsonSpi_ParseCommandFrame(spi_frame, &command) ||
         (command.sequence != 0x1234U) ||
-        (command.delta_time_10us != 500U) ||
+        (command.delta_time_100us != 50U) ||
+        (command.flags != 0x2DU) ||
         (command.payload[0] != 0x5AU))
     {
         return false;
