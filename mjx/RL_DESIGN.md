@@ -194,7 +194,8 @@ episode evaluation과 렌더링을 건너뛸 수 있다. Curriculum 실행에는
 
 현재 검증된 level 4 actor에서 10 kg/DS51150 동역학으로 새 run을 시작하는 명령은
 다음과 같다. 기본값인 `--no-init-value-function`으로 critic은 새 plant에 맞춰 다시
-학습하고 actor만 초기화한다.
+학습하고 actor만 초기화한다. `mjx/runs/`는 Git에서 제외되므로 아래 checkpoint
+디렉터리는 실행 장비에 별도로 존재해야 한다.
 
 ```bash
 /home/huro/bin/hexapod-mjx-python mjx/train_competence_curriculum.py \

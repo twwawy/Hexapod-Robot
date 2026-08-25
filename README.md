@@ -26,6 +26,8 @@ damping, friction loss는 제조사가 제공한 식별값이 아니라 실기 �
 
 Level 4 checkpoint에서 새 동역학으로 이어서 학습하는 명령은 다음과 같다. 환경 생성 시
 `mjx/generated/hexapod_rl.xml`이 자동 재생성되므로 별도 변환 명령은 필요 없다.
+아래 checkpoint는 `mjx/runs/` 아래의 로컬 학습 산출물이며 Git에는 포함되지 않으므로,
+다른 장비에서 실행할 때는 해당 디렉터리를 별도로 복사하거나 경로를 바꿔야 한다.
 
 ```bash
 cd /home/huro/Hexapod-Robot
