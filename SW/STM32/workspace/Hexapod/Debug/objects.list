@@ -38,6 +38,7 @@
 "./Core/Src/measurement/measurement_stage4.o"
 "./Core/Src/measurement/measurement_stage5.o"
 "./Core/Src/measurement/measurement_stage6.o"
+"./Core/Src/measurement/measurement_stage7.o"
 "./Core/Src/measurement/sensor_raw_measurement.o"
 "./Core/Src/measurement/servo_relay_measurement.o"
 "./Core/Src/sensor/foot_pressure.o"

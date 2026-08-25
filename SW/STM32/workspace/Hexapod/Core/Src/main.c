@@ -21,7 +21,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "measurement/measurement_stage6.h"
+#include "measurement/measurement_stage7.h"
 
 /* USER CODE END Includes */
 
@@ -128,7 +128,7 @@ int main(void)
   MX_USART3_UART_Init();
   MX_USART6_UART_Init();
   /* USER CODE BEGIN 2 */
-  if (!MeasurementStage6_Init(&hspi1))
+  if (!MeasurementStage7_Init(&huart6))
   {
     Error_Handler();  // 초기화 오류를 디버거에서 확인한다.
   }
@@ -142,7 +142,7 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-    MeasurementStage6_Process();  // 6단계 압력센서 보정을 계속 진행한다.
+    MeasurementStage7_Process();  // 7단계 CRSF 채널 보정을 계속 진행한다.
   }
   /* USER CODE END 3 */
 }
@@ -918,6 +918,18 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+
+/* UART 수신 완료를 7단계 CRSF 실측에 전달한다. */
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{
+  MeasurementStage7_UartRxCallback(huart);  // USART6이면 다음 CRSF 바이트를 받는다.
+}
+
+/* UART 수신 오류를 7단계 CRSF 실측에 전달한다. */
+void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
+{
+  MeasurementStage7_UartErrorCallback(huart);  // USART6이면 CRSF 수신을 복구한다.
+}
 
 /* USER CODE END 4 */
 

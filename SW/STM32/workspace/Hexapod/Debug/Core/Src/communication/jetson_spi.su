@@ -9,7 +9,7 @@
 ../Core/Src/communication/jetson_spi.c:120:10:JetsonSpi_Crc16CcittFalse	32	static
 ../Core/Src/communication/jetson_spi.c:152:6:JetsonSpi_ParseFrame	24	static
 ../Core/Src/communication/jetson_spi.c:197:6:JetsonSpi_ParseCommandFrame	56	static
-../Core/Src/communication/jetson_spi.c:214:6:JetsonSpi_PrepareSensorFrame	48	static
-../Core/Src/communication/jetson_spi.c:277:6:JetsonSpi_Process	72	static
-../Core/Src/communication/jetson_spi.c:348:6:JetsonSpi_GetLastRxPacket	24	static
-../Core/Src/communication/jetson_spi.c:360:6:JetsonSpi_TakeCommand	24	static
+../Core/Src/communication/jetson_spi.c:215:6:JetsonSpi_PrepareSensorFrame	56	static
+../Core/Src/communication/jetson_spi.c:290:6:JetsonSpi_Process	72	static
+../Core/Src/communication/jetson_spi.c:362:6:JetsonSpi_GetLastRxPacket	24	static
+../Core/Src/communication/jetson_spi.c:374:6:JetsonSpi_TakeCommand	24	static

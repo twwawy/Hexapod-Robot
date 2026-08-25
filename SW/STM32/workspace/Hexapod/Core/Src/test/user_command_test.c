@@ -33,7 +33,7 @@ bool UserCommandTest_Run(void)
     UserCommand_UpdateTimeout(&handle, 1000U);        // 중립 시간을 시작한다.
     UserCommand_UpdateTimeout(&handle, 1200U);        // 0.2초 재허가를 완료한다.
     (void)UserCommand_Get(&handle, &command);          // 허가된 명령을 읽는다.
-    if (!command.connected || !command.motion_armed)
+    if (!command.connected || !command.motion_armed || (command.s1 != 0U))
     {
         return false;
     }
@@ -42,9 +42,11 @@ bool UserCommandTest_Run(void)
         g_robot_calibration.crsf[2].raw_max : g_robot_calibration.crsf[2].raw_min;  // CH3를 논리 최대로 둔다.
     raw[3] = (g_robot_calibration.crsf[3].direction > 0) ?
         g_robot_calibration.crsf[3].raw_min : g_robot_calibration.crsf[3].raw_max;  // CH4를 논리 최소로 둔다.
+    raw[9] = (g_robot_calibration.crsf[9].direction > 0) ?
+        g_robot_calibration.crsf[9].raw_max : g_robot_calibration.crsf[9].raw_min;  // CH10을 오른쪽으로 둔다.
     UserCommand_UpdateChannels(&handle, raw, 1205U);  // 최대값 시험 프레임을 전달한다.
     (void)UserCommand_Get(&handle, &command);          // 변환한 명령을 읽는다.
-    if ((command.throttle != 1000) || (command.yaw != -1000))
+    if ((command.throttle != 1000) || (command.yaw != -1000) || (command.s1 != 1U))
     {
         return false;
     }

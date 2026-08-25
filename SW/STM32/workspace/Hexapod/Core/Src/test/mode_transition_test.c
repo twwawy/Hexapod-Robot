@@ -5,7 +5,7 @@
 #include <math.h>
 #include <string.h>
 
-/* 짐벌 기능이 바뀌는 모드와 SA 전환에서 잔류 명령을 검사한다. */
+/* 짐벌 기능이 바뀌는 모드와 S1 전환에서 잔류 명령을 검사한다. */
 bool ModeTransitionTest_Run(void)
 {
     DroneController_Handle_t controller;       // 시험용 Drone Controller를 저장한다.
@@ -39,10 +39,10 @@ bool ModeTransitionTest_Run(void)
     }
 
     priority.active_mode = ROBOT_MODE_MANUAL;  // 수동으로 다시 전환한다.
-    priority.sa = 0U;                          // Yaw 회전 기능을 선택한다.
+    priority.s1 = 0U;                          // Yaw 회전 기능을 선택한다.
     priority.throttle = 0;                     // 전진 입력을 제거한다.
     (void)DroneController_Step(&controller, &priority, contact, 0.0f);  // 수동 첫 출력을 계산한다.
-    priority.sa = 1U;                          // 같은 짐벌을 횡이동으로 바꾼다.
-    output = DroneController_Step(&controller, &priority, contact, 0.0f);  // SA 전환 첫 출력을 계산한다.
+    priority.s1 = 1U;                          // 같은 짐벌을 횡이동으로 바꾼다.
+    output = DroneController_Step(&controller, &priority, contact, 0.0f);  // S1 전환 첫 출력을 계산한다.
     return fabsf(output.vy_user_mps) < 0.06f;  // 이전 회전값이 최대 횡이동으로 튀지 않는지 확인한다.
 }

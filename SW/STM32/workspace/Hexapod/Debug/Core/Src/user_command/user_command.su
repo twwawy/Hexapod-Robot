@@ -1,9 +1,10 @@
 ../Core/Src/user_command/user_command.c:11:16:UserCommand_ClampI32	24	static
 ../Core/Src/user_command/user_command.c:25:16:UserCommand_Normalize	24	static
 ../Core/Src/user_command/user_command.c:54:16:UserCommand_MapSwitch	24	static
-../Core/Src/user_command/user_command.c:85:13:UserCommand_IsNeutral	16	static
-../Core/Src/user_command/user_command.c:99:6:UserCommand_Init	24	static
-../Core/Src/user_command/user_command.c:124:6:UserCommand_SetCalibration	24	static
-../Core/Src/user_command/user_command.c:141:6:UserCommand_UpdateChannels	24	static
-../Core/Src/user_command/user_command.c:164:6:UserCommand_UpdateTimeout	16	static
-../Core/Src/user_command/user_command.c:204:6:UserCommand_Get	24	static
+../Core/Src/user_command/user_command.c:85:16:UserCommand_MapS1Mode	24	static
+../Core/Src/user_command/user_command.c:110:13:UserCommand_IsNeutral	16	static
+../Core/Src/user_command/user_command.c:124:6:UserCommand_Init	24	static
+../Core/Src/user_command/user_command.c:149:6:UserCommand_SetCalibration	24	static
+../Core/Src/user_command/user_command.c:166:6:UserCommand_UpdateChannels	24	static
+../Core/Src/user_command/user_command.c:190:6:UserCommand_UpdateTimeout	16	static
+../Core/Src/user_command/user_command.c:230:6:UserCommand_Get	24	static

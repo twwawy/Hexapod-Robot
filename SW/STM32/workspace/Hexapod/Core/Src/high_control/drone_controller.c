@@ -61,9 +61,9 @@ RobotDroneOutput_t DroneController_Step(DroneController_Handle_t *handle,
     bool all_contact = true;      // 전체 접촉 상태를 저장한다.
     bool contact_135 = true;      // 1·3·5 접촉 상태를 저장한다.
     bool contact_246 = true;      // 2·4·6 접촉 상태를 저장한다.
-    bool lateral_mode;            // SA 횡이동 모드를 저장한다.
+    bool lateral_mode;            // S1 횡이동 모드를 저장한다.
     bool mode_changed;            // 제어 모드 변경 여부를 저장한다.
-    bool sa_changed;              // SA 이동 방식 변경 여부를 저장한다.
+    bool s1_changed;              // S1 이동 방식 변경 여부를 저장한다.
     uint32_t leg;                 // 접촉을 확인할 다리 번호를 저장한다.
 
     memset(&output, 0, sizeof(output));  // 기본 출력을 0으로 준비한다.
@@ -88,10 +88,10 @@ RobotDroneOutput_t DroneController_Step(DroneController_Handle_t *handle,
         }
     }
 
-    lateral_mode = (priority->sa != 0U);                                      // SA 이동 방식을 해석한다.
+    lateral_mode = (priority->s1 != 0U);                                      // S1 이동 방식을 해석한다.
     mode_changed = (priority->active_mode != handle->previous_mode);           // 모드 전환을 검출한다.
-    sa_changed = (priority->active_mode == ROBOT_MODE_MANUAL) &&
-                 (lateral_mode != handle->previous_sa);                        // 수동 SA 전환을 검출한다.
+    s1_changed = (priority->active_mode == ROBOT_MODE_MANUAL) &&
+                 (lateral_mode != handle->previous_s1);                        // 수동 S1 전환을 검출한다.
     output.reset_command = priority->reset_command;                             // Reset 요청을 전달한다.
 
     if (mode_changed)
@@ -101,7 +101,7 @@ RobotDroneOutput_t DroneController_Step(DroneController_Handle_t *handle,
         handle->roll_filter = 0.0f;      // 새 모드 계산 전에 Roll을 초기화한다.
         handle->pitch_filter = 0.0f;     // 새 모드 계산 전에 Pitch를 초기화한다.
     }
-    else if (sa_changed)
+    else if (s1_changed)
     {
         handle->yaw_filter = 0.0f;       // Yaw 회전과 횡이동 사이의 잔류값을 제거한다.
     }
@@ -326,7 +326,7 @@ RobotDroneOutput_t DroneController_Step(DroneController_Handle_t *handle,
     }
     else if (priority->active_mode == ROBOT_MODE_MANUAL)
     {
-        if ((handle->previous_mode != ROBOT_MODE_MANUAL) || sa_changed)
+        if ((handle->previous_mode != ROBOT_MODE_MANUAL) || s1_changed)
         {
             handle->yaw_reference_memory = DroneController_WrapPi(yaw_measured_rad);  // 모드 전환 Heading을 저장한다.
         }
@@ -341,6 +341,6 @@ RobotDroneOutput_t DroneController_Step(DroneController_Handle_t *handle,
 
     output.posture_progress = handle->posture_memory;  // 현재 자세 진행률을 반환한다.
     handle->previous_mode = priority->active_mode;     // 다음 주기 모드 전환을 위해 저장한다.
-    handle->previous_sa = lateral_mode;                // 다음 주기 SA 전환을 위해 저장한다.
+    handle->previous_s1 = lateral_mode;                // 다음 주기 S1 전환을 위해 저장한다.
     return output;
 }

@@ -86,7 +86,7 @@ READY 안에서 현재 구현된 사용자 동작은 조종 모드와 보정 모
 
 READY에 들어간 뒤 Throttle·Yaw·Roll·Pitch가 0.2 s 동안 중립이어야 동작을 허가한다. 서기·착지 중에는 짐벌 명령을 전달하지 않는다.
 
-모드가 바뀌면 새 모드의 출력을 계산하기 전에 네 짐벌 필터 상태를 0으로 초기화한다. 조종 모드에서 SA가 바뀌면 Yaw 회전 명령과 y축 이동 명령이 서로 이어지지 않도록 Yaw 필터만 초기화한다.
+모드가 바뀌면 새 모드의 출력을 계산하기 전에 네 짐벌 필터 상태를 0으로 초기화한다. 조종 모드에서 S1이 중앙의 반대편으로 넘어가면 Yaw 회전 명령과 y축 이동 명령이 서로 이어지지 않도록 Yaw 필터만 초기화한다.
 
 ## 4. 사용자 명령
 
@@ -95,8 +95,8 @@ READY에 들어간 뒤 Throttle·Yaw·Roll·Pitch가 0.2 s 동안 중립이어�
 | 입력 | 명령 |
 |---|---|
 | Throttle | x축 전진·후진 속도 |
-| Yaw, SA OFF | Yaw 회전 속도 |
-| Yaw, SA ON | Heading을 유지한 y축 좌·우 속도 |
+| Yaw, S1 왼쪽 | Yaw 회전 속도 |
+| Yaw, S1 오른쪽 | Heading을 유지한 y축 좌·우 속도 |
 | Roll | Roll 목표각 |
 | Pitch | Pitch 목표각 |
 
@@ -124,9 +124,9 @@ Position PI는 조종 모드에서만 사용한다. z 위치는 추정하지만 
 
 ### 6.2 Heading PI
 
-SA OFF에서는 사용자 Yaw 각속도를 적분해 목표 Heading을 만들고, IMU Yaw와의 오차를 Heading PI로 보정한다. SA ON에서는 사용자 Yaw 각속도를 0으로 두고 전환 시점의 Heading을 유지한다.
+S1 왼쪽에서는 사용자 Yaw 각속도를 적분해 목표 Heading을 만들고, IMU Yaw와의 오차를 Heading PI로 보정한다. S1 오른쪽에서는 사용자 Yaw 각속도를 0으로 두고 전환 시점의 Heading을 유지한다.
 
-SA 상태가 어느 방향으로 바뀌든 현재 IMU Yaw를 새 목표 Heading으로 사용하여 전환 순간의 회전 Jump를 막는다.
+S1 위치가 어느 방향으로 바뀌든 현재 IMU Yaw를 새 목표 Heading으로 사용하여 전환 순간의 회전 Jump를 막는다.
 
 ### 6.3 몸체 자세 PI
 

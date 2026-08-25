@@ -14,4 +14,6 @@
 ../Core/Src/main.c:805:13:MX_USART3_UART_Init	8	static
 ../Core/Src/main.c:838:13:MX_USART6_UART_Init	8	static
 ../Core/Src/main.c:871:13:MX_GPIO_Init	48	static
-../Core/Src/main.c:928:6:Error_Handler	4	static,ignoring_inline_asm
+../Core/Src/main.c:923:6:HAL_UART_RxCpltCallback	16	static
+../Core/Src/main.c:929:6:HAL_UART_ErrorCallback	16	static
+../Core/Src/main.c:940:6:Error_Handler	4	static,ignoring_inline_asm

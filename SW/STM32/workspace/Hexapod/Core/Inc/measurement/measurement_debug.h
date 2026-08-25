@@ -103,6 +103,25 @@ typedef struct
     uint16_t crsf_center[USER_COMMAND_USED_CHANNELS];                  // CRSF 채널별 중립 raw를 저장한다.
     uint16_t crsf_maximum[USER_COMMAND_USED_CHANNELS];                 // CRSF 채널별 최대 raw를 저장한다.
     bool crsf_center_captured;                                         // CRSF 중립 기록 여부를 저장한다.
+    uint16_t crsf_current_raw[ROBOT_CRSF_CHANNEL_COUNT];               // 최근 CRSF 16채널 raw를 저장한다.
+    uint16_t crsf_position_raw[USER_COMMAND_USED_CHANNELS][3];         // 지시한 입력 위치별 평균 raw를 저장한다.
+    int8_t crsf_calibration_direction[USER_COMMAND_USED_CHANNELS];     // 채널별 양의 입력 방향을 저장한다.
+    uint32_t crsf_frame_count;                                         // 정상 RC 프레임 수를 저장한다.
+    uint32_t crsf_crc_error_count;                                     // CRSF CRC 오류 수를 저장한다.
+    uint32_t crsf_length_error_count;                                  // CRSF 길이 오류 수를 저장한다.
+    uint32_t crsf_rx_overflow_count;                                   // CRSF 수신 버퍼 초과 수를 저장한다.
+    uint32_t crsf_uart_error_count;                                    // USART6 수신 오류 수를 저장한다.
+    uint32_t crsf_last_frame_ms;                                       // 마지막 정상 RC 프레임 시각을 저장한다.
+    uint16_t crsf_target_sample_count;                                 // 현재 위치의 평균 표본 수를 저장한다.
+    uint16_t crsf_target_average_raw;                                  // 현재 위치의 평균 raw를 저장한다.
+    uint8_t crsf_measurement_phase;                                    // 현재 CRSF 실측 단계를 저장한다.
+    uint8_t crsf_phase_elapsed_seconds;                                // 현재 단계 경과 시간을 저장한다.
+    uint8_t crsf_target_channel;                                       // 조작할 CRSF 채널 번호 1~10을 저장한다.
+    int8_t crsf_target_position;                                       // 짐벌 -1/+1 또는 스위치 0/1/2를 저장한다.
+    uint8_t crsf_measurement_error_channel;                            // 보정 실패 채널 번호를 저장한다.
+    bool crsf_connected;                                               // 정상 CRSF 수신 상태를 저장한다.
+    bool crsf_measurement_complete;                                    // CH1~CH10 보정 완료를 저장한다.
+    bool crsf_measurement_failed;                                      // CRSF 보정 실패를 저장한다.
 
     uint8_t active_servo_joint;                                        // 전체 활성일 때 UINT8_MAX를 저장한다.
     uint16_t active_servo_pulse_us;                                    // 공통 Pulse가 없을 때 0을 저장한다.

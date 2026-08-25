@@ -97,6 +97,7 @@ typedef struct
     uint8_t sc;              // SC 상태를 저장한다.
     uint8_t sd;              // SD 상태를 저장한다.
     uint8_t se;              // SE 상태를 저장한다.
+    uint8_t s1;              // S1 이동 방식을 저장한다.
     uint32_t timestamp_ms;   // 최근 정상 프레임 시각을 저장한다.
     bool connected;          // CRSF 연결 상태를 저장한다.
     bool motion_armed;       // 입력 동작 허가 상태를 저장한다.
@@ -110,6 +111,7 @@ typedef struct
     int16_t roll;                    // 전달할 Roll을 저장한다.
     int16_t pitch;                   // 전달할 Pitch를 저장한다.
     uint8_t sa;                      // 전달할 SA 상태를 저장한다.
+    uint8_t s1;                      // 전달할 S1 이동 방식을 저장한다.
     bool reset_command;              // 기준값 초기화 요청을 저장한다.
 } RobotPriorityOutput_t;
 

@@ -101,7 +101,7 @@ u_f[k]=\alpha u_f[k-1]+(1-\alpha)u_d[k]
 f_c=5\ \mathrm{Hz}
 \]
 
-모드가 바뀌면 새 모드 출력 계산 전에 네 필터 상태를 모두 0으로 초기화한다. 조종 모드에서 SA가 바뀌면 Yaw 필터만 0으로 초기화한다.
+모드가 바뀌면 새 모드 출력 계산 전에 네 필터 상태를 모두 0으로 초기화한다. 조종 모드에서 S1이 중앙의 반대편으로 넘어가면 Yaw 필터만 0으로 초기화한다.
 
 ### 2.3 연속 명령
 
@@ -169,7 +169,7 @@ v_{x,user}=0.28u_{T,f}
 \theta_{ref}=45^\circ u_{P,f}
 \]
 
-SA OFF에서는 다음을 사용한다.
+S1 왼쪽에서는 다음을 사용한다.
 
 \[
 v_{y,user}=0,
@@ -177,7 +177,7 @@ v_{y,user}=0,
 \omega_{z,user}=45^\circ/\mathrm{s}\;u_{Y,f}
 \]
 
-SA ON에서는 다음을 사용한다.
+S1 오른쪽에서는 다음을 사용한다.
 
 \[
 v_{y,user}=0.28u_{Y,f},
@@ -189,7 +189,7 @@ v_{y,user}=0.28u_{Y,f},
 
 ### 4.2 Heading Reference
 
-SA OFF에서 목표 Heading은 사용자 Yaw 각속도를 적분한다.
+S1 왼쪽에서 목표 Heading은 사용자 Yaw 각속도를 적분한다.
 
 \[
 \psi_{ref}[k+1]
@@ -200,13 +200,13 @@ SA OFF에서 목표 Heading은 사용자 Yaw 각속도를 적분한다.
 \right)
 \]
 
-Yaw 입력이 중립이면 마지막 Heading을 유지한다. MANUAL 진입 또는 SA 전환 시에는 현재 IMU Yaw를 새 목표로 사용한다.
+Yaw 입력이 중립이면 마지막 Heading을 유지한다. MANUAL 진입 또는 S1 전환 시에는 현재 IMU Yaw를 새 목표로 사용한다.
 
 \[
 \psi_{ref}\leftarrow\psi_{IMU}
 \]
 
-SA ON에서는 사용자 Yaw 각속도를 0으로 두고 Heading PI의 보정만 허용한다.
+S1 오른쪽에서는 사용자 Yaw 각속도를 0으로 두고 Heading PI의 보정만 허용한다.
 
 ### 4.3 보정 모드
 
@@ -916,7 +916,7 @@ v_{request}[k]T_s
 
 - 모드 변경 전에 새 입력 필터 상태를 초기화한다.
 - MANUAL 진입 시 Position Reference를 현재 추정 위치에 맞춘다.
-- MANUAL 진입과 SA 전환 시 Heading Reference를 현재 IMU Yaw에 맞춘다.
+- MANUAL 진입과 S1 전환 시 Heading Reference를 현재 IMU Yaw에 맞춘다.
 - 새 PI 모드 진입 시 적분항을 0으로 초기화한다.
 - 자세·보정 후보가 불가능하면 직전 유효 명령을 유지한다.
 - 보행 정지는 Swing 착지를 끝낸 뒤 마지막 STANCE 목표를 유지한다.

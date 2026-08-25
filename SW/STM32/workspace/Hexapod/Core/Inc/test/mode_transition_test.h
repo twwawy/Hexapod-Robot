@@ -3,6 +3,6 @@
 
 #include <stdbool.h>
 
-bool ModeTransitionTest_Run(void);  // MANUAL·CORRECTION·SA 전환의 필터 초기화를 검사한다.
+bool ModeTransitionTest_Run(void);  // MANUAL·CORRECTION·S1 전환의 필터 초기화를 검사한다.
 
 #endif

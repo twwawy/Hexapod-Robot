@@ -81,6 +81,31 @@ static uint8_t UserCommand_MapSwitch(const UserCommand_ChannelCalibration_t *cal
     return calibration->switch_map[physical_position];  // 실측 논리값으로 변환한다.
 }
 
+/* S1 위치를 중앙 기준의 두 이동 방식으로 변환한다. */
+static uint8_t UserCommand_MapS1Mode(const UserCommand_ChannelCalibration_t *calibration,
+                                     uint16_t raw)
+{
+    bool right_side;  // 보정 방향을 적용한 오른쪽 위치를 저장한다.
+
+    if (calibration == NULL)
+    {
+        return 0U;
+    }
+
+    if (raw == calibration->raw_center)
+    {
+        return 0U;  // 정확한 중앙값은 기본 회전 방식으로 둔다.
+    }
+
+    right_side = (raw > calibration->raw_center);  // 중앙보다 큰 쪽을 오른쪽으로 해석한다.
+    if (calibration->direction < 0)
+    {
+        right_side = !right_side;  // 반전 채널이면 물리 방향을 바로잡는다.
+    }
+
+    return right_side ? 1U : 0U;
+}
+
 /* 현재 네 짐벌이 중립 범위인지 확인한다. */
 static bool UserCommand_IsNeutral(const RobotUserCommand_t *command)
 {
@@ -156,6 +181,7 @@ void UserCommand_UpdateChannels(UserCommand_Handle_t *handle,
     handle->command.sc = UserCommand_MapSwitch(&handle->channel[6], raw[6], true);      // CH7 SC를 변환한다.
     handle->command.sd = UserCommand_MapSwitch(&handle->channel[7], raw[7], false);     // CH8 SD를 변환한다.
     handle->command.se = UserCommand_MapSwitch(&handle->channel[8], raw[8], false);     // CH9 SE를 변환한다.
+    handle->command.s1 = UserCommand_MapS1Mode(&handle->channel[9], raw[9]);             // CH10 S1 이동 방식을 변환한다.
     handle->command.timestamp_ms = now_ms;                                              // 정상 프레임 시각을 기록한다.
     handle->command.connected = true;                                                   // CRSF 연결을 표시한다.
 }

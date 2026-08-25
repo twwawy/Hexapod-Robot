@@ -92,6 +92,7 @@ RobotUserCommand_t RcCommandGenerator_Step(RcCommandGenerator_t *generator)
     generator->output.sc = generator->target.sc;  // SC 시험 상태를 적용한다.
     generator->output.sd = generator->target.sd;  // SD 시험 상태를 적용한다.
     generator->output.se = generator->target.se;  // SE 시험 상태를 적용한다.
+    generator->output.s1 = generator->target.s1;  // S1 시험 상태를 적용한다.
     generator->output.connected = true;           // 임시 연결을 유지한다.
     generator->output.motion_armed = true;        // 시험 동작 허가를 유지한다.
     return generator->output;

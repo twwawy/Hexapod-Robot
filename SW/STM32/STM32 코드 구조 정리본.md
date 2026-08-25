@@ -287,7 +287,7 @@ CRSF 프레임 길이, CRC와 16개 채널 unpack을 처리한다. UART와 핀�
 
 ### `user_command/user_command.h`
 
-CRSF 채널을 프로젝트 명령으로 변환한다. 네 짐벌 축은 보정 테이블을 거쳐 중립 0, `-1000~1000`으로 정규화하고 SA~SE를 스위치 상태로 변환한다.
+CRSF 채널을 프로젝트 명령으로 변환한다. 네 짐벌 축은 보정 테이블을 거쳐 중립 0, `-1000~1000`으로 정규화하고 SA~SE를 스위치 상태로 변환한다. CH10 S1은 중앙값 기준의 왼쪽 `0`과 오른쪽 `1` 이동 방식으로 변환한다.
 
 마지막 정상 CRSF 프레임 이후 100 ms가 지나면 이동 명령을 0으로 만들고 보행을 정지한다. 재연결 후에는 네 축이 0.2 s 동안 중립일 때 다시 동작을 허가한다. 상세 채널과 시험 입력은 [드론 조종기 입력](../Controller/드론%20조종기%20입력/README.md)을 따른다.
 
@@ -430,7 +430,7 @@ GPS, WT931과 MCP3008 24채널 raw 값, 수신 주기와 오류 횟수를 확인
 
 ### `test/user_command_test.h`
 
-정규화, Dead Zone, SA OFF 회전, SA ON 횡이동, 모드 전환 필터 초기화, 100 ms 연결 끊김과 0.2 s 재활성 조건을 검사한다.
+정규화, Dead Zone, S1 왼쪽 회전, S1 오른쪽 횡이동, 모드 전환 필터 초기화, 100 ms 연결 끊김과 0.2 s 재활성 조건을 검사한다.
 
 ### `test/leg6_test.h`
 
@@ -450,7 +450,7 @@ Tripod 위상, STANCE/SWING, 궤적 연속성, Swing Height, Early Landing과 La
 
 ### `test/mode_transition_test.h`
 
-READY↔MANUAL, MANUAL↔CORRECTION, SA 전환, 정지와 재시작에서 필터 상태와 발끝·관절 명령의 연속성을 검사한다. `Tripod_Enable`이 한 주기 변할 때 위상이 초기화되지 않는지도 확인한다.
+READY↔MANUAL, MANUAL↔CORRECTION, S1 전환, 정지와 재시작에서 필터 상태와 발끝·관절 명령의 연속성을 검사한다. `Tripod_Enable`이 한 주기 변할 때 위상이 초기화되지 않는지도 확인한다.
 
 ### `test/controller_test.h`
 

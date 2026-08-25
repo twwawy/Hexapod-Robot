@@ -1,0 +1,12 @@
+../Core/Src/measurement/measurement_stage7.c:63:13:MeasurementStage7_SetPhase	1
+../Core/Src/measurement/measurement_stage7.c:73:13:MeasurementStage7_UpdateTarget	1
+../Core/Src/measurement/measurement_stage7.c:86:13:MeasurementStage7_BuildSwitchMap	10
+../Core/Src/measurement/measurement_stage7.c:142:13:MeasurementStage7_BuildTable	15
+../Core/Src/measurement/measurement_stage7.c:221:13:MeasurementStage7_UpdateReceiverDebug	2
+../Core/Src/measurement/measurement_stage7.c:242:13:MeasurementStage7_AddSample	6
+../Core/Src/measurement/measurement_stage7.c:275:13:MeasurementStage7_CaptureCenter	3
+../Core/Src/measurement/measurement_stage7.c:296:13:MeasurementStage7_CaptureTarget	6
+../Core/Src/measurement/measurement_stage7.c:323:6:MeasurementStage7_Init	5
+../Core/Src/measurement/measurement_stage7.c:386:6:MeasurementStage7_Process	19
+../Core/Src/measurement/measurement_stage7.c:512:6:MeasurementStage7_UartRxCallback	1
+../Core/Src/measurement/measurement_stage7.c:518:6:MeasurementStage7_UartErrorCallback	1
