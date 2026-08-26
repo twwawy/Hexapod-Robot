@@ -112,6 +112,11 @@ class TrainingArtifactTest(unittest.TestCase):
             payload = json.loads(monitor.best_path.read_text(encoding="utf-8"))
             self.assertEqual(payload["step"], 200)
             self.assertTrue(payload["best_safe"])
+            level_payload = json.loads(
+                monitor.level_best_path.read_text(encoding="utf-8")
+            )
+            self.assertEqual(level_payload["step"], 100)
+            self.assertFalse(level_payload["best_safe"])
 
     def test_curriculum_order_and_final_ten_by_twenty_centimeter_stairs(self) -> None:
         self.assertEqual(MAX_TERRAIN_LEVEL, 12)

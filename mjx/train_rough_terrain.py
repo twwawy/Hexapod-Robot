@@ -79,9 +79,12 @@ class ScoreMonitor:
         self.score_key = score_key
         self.directory.mkdir(parents=True, exist_ok=True)
         self.best_path = directory / "best_score.json"
+        self.level_best_path = directory / "level_best_score.json"
         self.latest_path = directory / "latest_metrics.json"
         self.history_path = directory / "metrics_history.jsonl"
         self.best_score = -math.inf
+        self.level_best_score = -math.inf
+        self.last_level_best = False
         self.max_policy_rejection_rate = max_policy_rejection_rate
         self.max_foot_limited_rate = max_foot_limited_rate
         self.max_failure_rate = max_failure_rate
@@ -158,6 +161,13 @@ class ScoreMonitor:
         # Step 0 is the untrained policy and already has a dedicated 0%
         # progress video.  Best artifacts begin after at least one PPO update,
         # where Brax has also written the matching regular checkpoint.
+        is_level_best = (
+            step > 0 and math.isfinite(score) and score > self.level_best_score
+        )
+        self.last_level_best = is_level_best
+        if is_level_best:
+            self.level_best_score = score
+            self.write_json(self.level_best_path, payload)
         is_best = (
             step > 0
             and safe
@@ -530,7 +540,7 @@ def _prepare_run(args: argparse.Namespace) -> None:
     args.best_video_path = (
         args.best_video_path.expanduser().resolve()
         if args.best_video_path is not None
-        else videos / f"best_{stage_token}.gif"
+        else videos / f"best_level{args.terrain_level}.gif"
     )
     args.stage_video_path = videos / f"stage_final_{stage_token}.gif"
     args.teacher_video_path = videos / f"teacher_reference_{stage_token}.gif"
@@ -571,6 +581,9 @@ def _write_metadata(args: argparse.Namespace, env: HexapodRoughTerrainEnv) -> No
             "terrain_total_rise_m": env.terrain_total_rise,
             "checkpoint_dir": str(args.output),
             "best_checkpoint_pointer": str(args.monitor_dir / "best_checkpoint.json"),
+            "level_best_checkpoint_pointer": str(
+                args.monitor_dir / "level_best_checkpoint.json"
+            ),
             "init_checkpoint": str(args.init_checkpoint) if args.init_checkpoint else None,
             "teacher_distillation": {
                 "v3_checkpoint": (
@@ -904,6 +917,7 @@ def main() -> None:
 
     latest_policy: dict[str, Any] = {}
     pending_best: tuple[int, float] | None = None
+    pending_level_best: tuple[int, float] | None = None
     pending_progress: list[tuple[int, int, float]] = []
     progress_targets = progress_video_targets(args.progress_video_count)
     next_progress_target = 0
@@ -948,13 +962,56 @@ def main() -> None:
                 wandb_run.summary["best/checkpoint"] = str(checkpoint_path)
         return True
 
-    def save_stage_best_video() -> None:
-        """Render and upload exactly one video from this stage's best checkpoint."""
+    def save_level_best_checkpoint(step: int, score: float) -> bool:
+        """Point video rendering at the highest score seen on this terrain level."""
+        if latest_policy.get("step") != step:
+            return False
+        errors: dict[str, str] = {}
+        checkpoint_path = args.output / f"{step:012d}"
+        pointer_path = args.monitor_dir / "level_best_checkpoint.json"
+        if checkpoint_path.exists():
+            ScoreMonitor.write_json(
+                pointer_path,
+                {
+                    "terrain_level": args.terrain_level,
+                    "step": step,
+                    "score": score,
+                    "path": str(checkpoint_path),
+                },
+            )
+            print(
+                f"level_best_checkpoint level={args.terrain_level} "
+                f"step={step:,}: {checkpoint_path}"
+            )
+        else:
+            errors["checkpoint"] = (
+                f"matching Brax checkpoint not found: {checkpoint_path}"
+            )
+            print(f"level_best_checkpoint_error step={step:,}: {errors['checkpoint']}")
+        append_artifact(
+            {
+                "kind": "level_best_checkpoint",
+                "terrain_level": args.terrain_level,
+                "step": step,
+                "score": score,
+                "checkpoint": str(checkpoint_path) if checkpoint_path.exists() else None,
+                "errors": errors,
+            }
+        )
+        if wandb_run is not None:
+            wandb_run.summary["level/best_score"] = score
+            wandb_run.summary["level/best_step"] = step
+            if checkpoint_path.exists():
+                wandb_run.summary["level/best_checkpoint"] = str(checkpoint_path)
+        return True
+
+    def save_level_best_video() -> None:
+        """Render one video from this terrain level's highest-scoring checkpoint."""
         if not args.best_video:
             return
-        pointer_path = args.monitor_dir / "best_checkpoint.json"
+        pointer_path = args.monitor_dir / "level_best_checkpoint.json"
         if not pointer_path.exists():
-            print("best_video_skip: no safe trained best checkpoint was selected")
+            print("best_video_skip: no trained level-best checkpoint was selected")
             return
         try:
             pointer = json.loads(pointer_path.read_text(encoding="utf-8"))
@@ -979,7 +1036,7 @@ def main() -> None:
         except Exception as exc:
             error = f"{type(exc).__name__}: {exc}"
             print(f"best_video_error stage_end: {error}")
-            append_artifact({"kind": "stage_best", "error": error})
+            append_artifact({"kind": "level_best", "error": error})
             return
         print(
             f"best_video stage_end step={best_step:,} score={best_score:.3f}: "
@@ -987,7 +1044,7 @@ def main() -> None:
         )
         append_artifact(
             {
-                "kind": "stage_best",
+                "kind": "level_best",
                 "step": best_step,
                 "score": best_score,
                 "checkpoint": str(checkpoint_path),
@@ -996,22 +1053,24 @@ def main() -> None:
             }
         )
         if wandb_run is not None:
-            wandb_run.summary["stage/best_score"] = best_score
-            wandb_run.summary["stage/best_step"] = best_step
-            wandb_run.summary["stage/best_checkpoint"] = str(checkpoint_path)
-            wandb_run.summary["stage/best_video"] = str(args.best_video_path)
+            wandb_run.summary["level/best_score"] = best_score
+            wandb_run.summary["level/best_step"] = best_step
+            wandb_run.summary["level/best_checkpoint"] = str(checkpoint_path)
+            wandb_run.summary["level/best_video"] = str(args.best_video_path)
             payload: dict[str, Any] = {
                 "train/global_step": best_step,
-                "stage/best_score": best_score,
-                "stage/best_step": best_step,
+                "level/best_score": best_score,
+                "level/best_step": best_step,
             }
             if wandb_module is not None:
-                payload["stage/best_video"] = wandb_module.Video(
+                video_key = f"level/best_video_level{args.terrain_level}"
+                payload[video_key] = wandb_module.Video(
                     str(args.best_video_path),
                     format="gif",
                     caption=(
-                        f"stage best | {args.stage_token} | "
-                        f"step={best_step:,} | score={best_score:.3f}"
+                        f"level best | level={args.terrain_level} | "
+                        f"{args.stage_token} | step={best_step:,} | "
+                        f"score={best_score:.3f}"
                     ),
                 )
             wandb_run.log(payload)
@@ -1090,13 +1149,16 @@ def main() -> None:
             next_progress_target += 1
 
     def policy_params(step: int, make_policy: Any, params: Any) -> None:
-        nonlocal pending_best, pending_progress
+        nonlocal pending_best, pending_level_best, pending_progress
         latest_policy.update(
             {"step": int(step), "make_policy": make_policy, "params": params}
         )
         if pending_best is not None and pending_best[0] <= step:
             save_best_checkpoint(step, pending_best[1])
             pending_best = None
+        if pending_level_best is not None and pending_level_best[0] <= step:
+            save_level_best_checkpoint(step, pending_level_best[1])
+            pending_level_best = None
         remaining: list[tuple[int, int, float]] = []
         for requested_step, slot, fraction in pending_progress:
             if requested_step <= step:
@@ -1106,7 +1168,7 @@ def main() -> None:
         pending_progress = remaining
 
     def progress(step: int, metrics: Any) -> None:
-        nonlocal pending_best
+        nonlocal pending_best, pending_level_best
         numeric = ScoreMonitor.numeric_metrics(metrics)
         score, is_best = monitor.record(step, numeric)
         success = numeric.get("eval/episode_terrain_success", 0.0)
@@ -1122,7 +1184,15 @@ def main() -> None:
                 "nonfinite",
             )
         )
-        marker = " NEW_BEST" if is_best else (" UNSAFE" if not monitor.last_safe else "")
+        marker = (
+            " NEW_SAFE_BEST"
+            if is_best
+            else (
+                " NEW_LEVEL_BEST"
+                if monitor.last_level_best
+                else (" UNSAFE" if not monitor.last_safe else "")
+            )
+        )
         print(
             f"step={step:,} {args.score_key}={score:.3f}{marker} | "
             f"success={success:.3f} failure={failure:.3f} | best={monitor.best_score:.3f}"
@@ -1136,6 +1206,8 @@ def main() -> None:
             )
         if is_best and not save_best_checkpoint(step, score):
             pending_best = (step, score)
+        if monitor.last_level_best and not save_level_best_checkpoint(step, score):
+            pending_level_best = (step, score)
         schedule_progress(step)
 
     def save_stage_final(step: int) -> None:
@@ -1302,7 +1374,7 @@ def main() -> None:
                     progress_targets[next_progress_target],
                 )
                 next_progress_target += 1
-        save_stage_best_video()
+        save_level_best_video()
         save_stage_final(final_step)
         save_teacher_reference(final_step)
     finally:
