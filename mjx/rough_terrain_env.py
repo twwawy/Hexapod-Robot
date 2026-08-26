@@ -39,9 +39,9 @@ from servo_model import (
 
 
 ACTION_SIZE = 18
-OBSERVATION_SIZE = 143
+OBSERVATION_SIZE = 146
 ACTION_CONTRACT_VERSION = "stm32_firmware_adaptive_swing_residual_v3"
-OBSERVATION_CONTRACT_VERSION = "firmware_state_collision_terrain_pitch_v3"
+OBSERVATION_CONTRACT_VERSION = "firmware_state_collision_terrain_command5_pitch_v3"
 LEGACY_OBSERVATION_CONTRACT_VERSION = "firmware_state_collision_contact_stairs_v1"
 MODEL_FORWARD = jp.array((0.0, -1.0, 0.0))
 MODEL_LATERAL = jp.array((1.0, 0.0, 0.0))
@@ -49,6 +49,7 @@ PITCH_FF_LOOKAHEAD_M = 0.65
 PITCH_FF_DEADBAND_M = 0.005
 PITCH_FF_MAX_RAD = 0.48869
 PITCH_FF_FILTER_TAU_S = 0.15
+EFFECTIVE_PITCH_MAX_RAD = 0.5585
 SWING_BOOST_RISE_M = 0.20
 SWING_BOOST_MAX_M = 0.06
 SUCCESS_POSTURE_TOLERANCE_RAD = jp.deg2rad(12.0)
@@ -120,21 +121,68 @@ def _swing_boost(
     )
 
 
-def _target_relative_attitude(
-    attitude: jax.Array,
-    pitch_target: jax.Array,
-) -> jax.Array:
-    return attitude[:2] - jp.stack((jp.asarray(0.0), pitch_target))
+def _effective_posture_target(command: jax.Array, pitch_ff: jax.Array) -> jax.Array:
+    """Return [roll, pitch] targets for the 5-D command contract."""
+    if command.shape != (5,):
+        raise ValueError("posture target requires a 5-D command")
+    return jp.stack(
+        (
+            command[4],
+            jp.clip(
+                command[3] + pitch_ff,
+                -EFFECTIVE_PITCH_MAX_RAD,
+                EFFECTIVE_PITCH_MAX_RAD,
+            ),
+        )
+    )
 
 
-def _upright_reward(attitude: jax.Array, pitch_target: jax.Array) -> jax.Array:
-    error = _target_relative_attitude(attitude, pitch_target)
+def _upright_reward(attitude: jax.Array, posture_target: jax.Array) -> jax.Array:
+    error = attitude[:2] - posture_target
     return jp.exp(-jp.sum(jp.square(error)) / 0.12)
 
 
-def _posture_success(attitude: jax.Array, pitch_target: jax.Array) -> jax.Array:
-    error = _target_relative_attitude(attitude, pitch_target)
+def _posture_success(attitude: jax.Array, posture_target: jax.Array) -> jax.Array:
+    error = attitude[:2] - posture_target
     return jp.max(jp.abs(error)) < SUCCESS_POSTURE_TOLERANCE_RAD
+
+
+def _terrain_posture_command(
+    *,
+    height_key: jax.Array,
+    pitch_key: jax.Array,
+    terrain_kind: str,
+    slope_degrees: float,
+    command_config: config_dict.ConfigDict,
+) -> jax.Array:
+    """Sample [h_cmd, pitch_cmd, roll_cmd] from the fixed terrain curriculum."""
+    if terrain_kind in {"flat", "rough"}:
+        return jp.zeros(3)
+    height = jax.random.uniform(
+        height_key,
+        (),
+        minval=command_config.height_min,
+        maxval=0.0,
+    )
+    if terrain_kind == "ramp":
+        pitch = jp.deg2rad(
+            jp.clip(
+                -slope_degrees,
+                command_config.pitch_min_deg,
+                0.0,
+            )
+        )
+    else:
+        stair_pitch_max = min(-5.0, float(command_config.pitch_max_deg))
+        pitch = jp.deg2rad(
+            jax.random.uniform(
+                pitch_key,
+                (),
+                minval=command_config.pitch_min_deg,
+                maxval=stair_pitch_max,
+            )
+        )
+    return jp.stack((height, pitch, jp.asarray(0.0)))
 
 
 def _absolute_tilt_failure(attitude: jax.Array, max_tilt: float) -> jax.Array:
@@ -176,7 +224,8 @@ def _base_reward_terms(
     command: jax.Array,
     yaw_velocity: jax.Array,
     attitude: jax.Array,
-    pitch_target: jax.Array,
+    posture_target: jax.Array,
+    height_command: jax.Array,
     clearance: jax.Array,
     target_clearance: jax.Array,
     root_angular_speed: jax.Array,
@@ -204,8 +253,10 @@ def _base_reward_terms(
             -jp.square(forward_velocity - command[0]) / 0.01
         ),
         "yaw": jp.exp(-jp.square(yaw_velocity - command[1]) / 0.09),
-        "upright": _upright_reward(attitude, pitch_target),
-        "height": jp.exp(-jp.square(clearance - target_clearance) / 0.01),
+        "upright": _upright_reward(attitude, posture_target),
+        "height": jp.exp(
+            -jp.square(clearance - (target_clearance + height_command)) / 0.01
+        ),
         "progress": jp.clip(forward_velocity, -0.20, 0.25),
         "stability": jp.exp(-jp.square(root_angular_speed / 2.0)),
         "joint_margin": 1.0 - jp.mean(joint_proximity),
@@ -247,6 +298,13 @@ def default_config() -> config_dict.ConfigDict:
         command_max_speed=0.12,
         command_max_yaw_rate=0.0,
         command_delay=1.0,
+        command=config_dict.create(
+            height_min=-0.05,
+            height_max=0.10,
+            pitch_min_deg=-25.0,
+            pitch_max_deg=25.0,
+            roll_max_deg=15.0,
+        ),
         dr_enabled=False,
         target_clearance=0.316,
         safety=config_dict.create(
@@ -882,6 +940,14 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
             minval=-self._config.command_max_yaw_rate,
             maxval=self._config.command_max_yaw_rate,
         )
+        rng, height_key, pitch_key = jax.random.split(rng, 3)
+        posture_command = _terrain_posture_command(
+            height_key=height_key,
+            pitch_key=pitch_key,
+            terrain_kind=self._terrain_spec.kind,
+            slope_degrees=self._terrain_spec.slope_degrees,
+            command_config=self._config.command,
+        )
         data = mjx.make_data(
             self.mj_model,
             impl=self.mjx_model.impl.value,
@@ -895,7 +961,7 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
         controller_output = firmware.initial_output()
         info = {
             "rng": rng,
-            "command": jp.array((speed, yaw_rate)),
+            "command": jp.concatenate((jp.array((speed, yaw_rate)), posture_command)),
             "steps": jp.zeros((), dtype=jp.int32),
             "last_action": jp.zeros(ACTION_SIZE),
             # The policy tick is 20 ms, so delays {0,1,2} mean {0,20,40} ms.
@@ -989,17 +1055,25 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
             state.info["support_height"],
         )
         command_active = state.info["steps"] * self.dt >= self._config.command_delay
-        firmware_command = jp.where(command_active, state.info["command"], jp.zeros(2))
+        firmware_command = jp.where(
+            command_active, state.info["command"], jp.zeros(5)
+        )
+        posture_target = _effective_posture_target(
+            state.info["command"], pitch_ff
+        )
 
         def controller_tick(controller_state, _):
             return firmware.step(
                 controller_state,
-                target_velocity=firmware_command,
+                target_velocity=firmware_command[:2],
                 body_position_world=state.data.qpos[:3],
                 attitude_rpy=attitude_before,
                 contacts=contacts_before,
                 policy_action=action,
                 pitch_ff=pitch_ff,
+                roll_cmd=firmware_command[4],
+                pitch_cmd=firmware_command[3],
+                height_offset=firmware_command[2],
                 swing_boost=swing_boost,
             )
 
@@ -1064,7 +1138,7 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
         success = (
             (data.qpos[0] >= self._terrain_goal_x)
             & final_height_ready
-            & _posture_success(attitude, pitch_ff)
+            & _posture_success(attitude, posture_target)
             & (~failure)
         )
         terminated = failure | success
@@ -1143,7 +1217,8 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
             command=state.info["command"],
             yaw_velocity=data.qvel[5],
             attitude=attitude,
-            pitch_target=pitch_ff,
+            posture_target=posture_target,
+            height_command=state.info["command"][2],
             clearance=clearance,
             target_clearance=self._config.target_clearance,
             root_angular_speed=root_angular_speed,

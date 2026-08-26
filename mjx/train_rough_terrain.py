@@ -132,6 +132,14 @@ def _apply_reward_weights(
         config.reward[reward_name] = reward_weight
 
 
+def _apply_command_config(config: Any, args: argparse.Namespace) -> None:
+    config.command.height_min = args.height_cmd_min
+    config.command.height_max = args.height_cmd_max
+    config.command.pitch_min_deg = args.pitch_cmd_deg_min
+    config.command.pitch_max_deg = args.pitch_cmd_deg_max
+    config.command.roll_max_deg = args.roll_cmd_deg_max
+
+
 def _arguments(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--timesteps", type=int, default=50_000_000)
@@ -168,6 +176,11 @@ def _arguments(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--command-min-speed", type=float, default=0.06)
     parser.add_argument("--command-max-speed", type=float, default=0.12)
     parser.add_argument("--command-delay", type=float, default=1.0)
+    parser.add_argument("--height-cmd-min", type=float, default=-0.05)
+    parser.add_argument("--height-cmd-max", type=float, default=0.10)
+    parser.add_argument("--pitch-cmd-deg-min", type=float, default=-25.0)
+    parser.add_argument("--pitch-cmd-deg-max", type=float, default=25.0)
+    parser.add_argument("--roll-cmd-deg-max", type=float, default=15.0)
     parser.add_argument(
         "--dr-bank-size",
         type=int,
@@ -541,6 +554,12 @@ def main() -> None:
         raise SystemExit("timesteps, num-envs and episode-length must be positive")
     if args.command_min_speed < 0 or args.command_max_speed < args.command_min_speed:
         raise SystemExit("command speeds must satisfy 0 <= min <= max")
+    if args.height_cmd_min > args.height_cmd_max:
+        raise SystemExit("height commands must satisfy min <= max")
+    if args.pitch_cmd_deg_min > args.pitch_cmd_deg_max:
+        raise SystemExit("pitch commands must satisfy min <= max")
+    if args.roll_cmd_deg_max < 0:
+        raise SystemExit("roll command maximum must be non-negative")
     if args.num_evals < 1 or args.num_eval_envs < 1:
         raise SystemExit("num-evals and num-eval-envs must be positive")
     rollout_envs = args.batch_size * args.num_minibatches
@@ -569,6 +588,7 @@ def main() -> None:
     config.command_min_speed = args.command_min_speed
     config.command_max_speed = args.command_max_speed
     config.command_delay = args.command_delay
+    _apply_command_config(config, args)
     config.collision_mode = args.collision_mode
     config.dr_enabled = args.dr_bank_size == 16
     _apply_reward_weights(config, args.reward_weights)
