@@ -217,6 +217,40 @@ adaptive swing v3는 Z action 의미가 바뀌므로 기존 level 4 actor를 직
   -- --num-envs 1024 --num-evals 4 --num-eval-envs 32
 ```
 
+### Teacher-student 보행 보존 학습
+
+Command5/posture 조건을 유지하면서 기존 142-D 보행을 보존할 때는 frozen teacher
+manifest를 launcher에 전달한다. Adaptive-swing v3 teacher는 18-D 전체 action을,
+Cartesian v2 teacher는 의미가 호환되는 다리별 X/Y 12개 action만 지도한다. 현재
+146-D observation은 `[0:2] + [5:145]`로 legacy 142-D teacher observation에
+투영하며, teacher checkpoint를 일반 `--init-checkpoint` gate로 복원하지 않는다.
+
+```bash
+/home/huro/bin/hexapod-mjx-python mjx/train_competence_curriculum.py \
+  --run-name firmware-terrain-command5-teacher-student-v1 \
+  --run-root /home/huro/Hexapod-Robot/mjx/runs \
+  --seed 8 \
+  --flat-baseline-timesteps 262144 \
+  --start-level 1 --max-level 12 \
+  --stages 44 --stage-timesteps 5000000 \
+  --level-progression competence --promote-threshold 0.80 \
+  --checkpoint-selection best \
+  --teacher-manifest mjx/teacher_manifests/walking-teachers-v1.json \
+  --teacher-huber-delta 0.10 \
+  --wandb --wandb-project hexapod-firmware-terrain \
+  -- --num-envs 2048 --num-evals 4 --num-eval-envs 32 \
+     --dr-bank-size 16 --collision-mode lower_leg \
+     --best-video --stage-video --progress-video
+```
+
+Fresh curriculum의 actor/normalizer는 level-0 v3 teacher의 142-D 입력 layer를
+146-D로 확장해 시작한다. 새 height/pitch/roll/pitch-FF 입력 weight는 0이고 critic은
+현재 reward에 맞춰 새로 시작한다. 이후 stage는 current student checkpoint를 정상
+승계하면서 level별 teacher loss만 바뀐다. `best` pointer는 manifest 사용 시 기본
+best-safe 제한(policy rejection 1%, foot-limited 1%, failure 5%)을 통과한 평가만
+가리킨다. 모든 teacher 경로와 weight는 각 run의 `run_metadata.json` 및 curriculum
+history에 기록된다.
+
 ## W&B, checkpoint, 영상 산출물
 
 최초 한 번만 다음을 실행한다. `wandb`는 `requirements-train.txt`에 포함되어 있다.

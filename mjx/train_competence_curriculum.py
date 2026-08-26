@@ -94,6 +94,28 @@ def _arguments() -> tuple[argparse.Namespace, list[str]]:
         default=False,
         help="Restore the initial critic too; later stages always restore it.",
     )
+    parser.add_argument(
+        "--teacher-manifest",
+        type=Path,
+        default=None,
+        help="Level-indexed frozen-teacher paths and distillation weights.",
+    )
+    parser.add_argument("--teacher-huber-delta", type=float, default=0.10)
+    parser.add_argument("--teacher-max-policy-rejection-rate", type=float, default=0.01)
+    parser.add_argument("--teacher-max-foot-limited-rate", type=float, default=0.01)
+    parser.add_argument("--teacher-max-failure-rate", type=float, default=0.05)
+    parser.add_argument(
+        "--init-student-from-teacher",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Initialize a fresh curriculum actor from its level-0 v3 teacher.",
+    )
+    parser.add_argument(
+        "--teacher-stop-on-attempt-limit",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Stop instead of force-promoting a teacher student that missed competence.",
+    )
     parser.add_argument("--wandb", action="store_true")
     parser.add_argument("--wandb-project", default="hexapod-firmware-terrain")
     parser.add_argument("--wandb-entity", default=None)
@@ -137,6 +159,18 @@ def _arguments() -> tuple[argparse.Namespace, list[str]]:
         "--wandb-project",
         "--wandb-entity",
         "--wandb-mode",
+        "--teacher-v3-checkpoint",
+        "--teacher-v2-checkpoint",
+        "--distill-v3-weight",
+        "--distill-v2-xy-weight",
+        "--distill-huber-delta",
+        "--init-student-from-teacher",
+        "--no-init-student-from-teacher",
+        "--best-safe-max-policy-rejection-rate",
+        "--best-safe-max-foot-limited-rate",
+        "--best-safe-max-failure-rate",
+        "--teacher-video",
+        "--no-teacher-video",
     }
     conflicts = [
         token
@@ -145,6 +179,14 @@ def _arguments() -> tuple[argparse.Namespace, list[str]]:
     ]
     if conflicts:
         parser.error(f"launcher-managed trainer arguments cannot follow '--': {conflicts}")
+    if args.teacher_huber_delta <= 0:
+        parser.error("--teacher-huber-delta must be positive")
+    if min(
+        args.teacher_max_policy_rejection_rate,
+        args.teacher_max_foot_limited_rate,
+        args.teacher_max_failure_rate,
+    ) < 0:
+        parser.error("teacher best-safe rate limits cannot be negative")
     return args, extras
 
 
@@ -218,6 +260,25 @@ def _new_run(terrain_root: Path, before: set[Path], prefix: str) -> Path:
     return matching[0]
 
 
+def _guard_teacher_attempt_limit(
+    args: argparse.Namespace,
+    *,
+    level: int,
+    success: float,
+    next_level: int,
+    completed: bool,
+    reason: str,
+) -> tuple[int, bool, str]:
+    if (
+        args.teacher_manifest is not None
+        and args.teacher_stop_on_attempt_limit
+        and reason == "attempt_limit"
+        and success < args.promote_threshold
+    ):
+        return level, False, "attempt_limit_stop"
+    return next_level, completed, reason
+
+
 def _write_history(path: Path, payload: list[dict[str, Any]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(path.suffix + ".tmp")
@@ -232,7 +293,94 @@ def _video_paths(run_dir: Path) -> dict[str, Any]:
         "stage_video": metadata["stage_video_path"],
         "progress_videos": metadata["progress_video_dir"],
         "progress_targets": metadata["progress_video_targets"],
+        "teacher_distillation": metadata.get("teacher_distillation"),
     }
+
+
+def _load_teacher_manifest(args: argparse.Namespace) -> None:
+    args.teacher_levels = {}
+    if args.teacher_manifest is None:
+        return
+    manifest_path = args.teacher_manifest.expanduser().resolve()
+    try:
+        payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise SystemExit(f"invalid teacher manifest {manifest_path}: {exc}") from exc
+    levels = payload.get("levels")
+    if not isinstance(levels, dict):
+        raise SystemExit(f"teacher manifest must contain an object named 'levels': {manifest_path}")
+    parsed: dict[int, dict[str, Any]] = {}
+    for raw_level, entry in levels.items():
+        try:
+            level = int(raw_level)
+        except (TypeError, ValueError) as exc:
+            raise SystemExit(f"invalid teacher level {raw_level!r}") from exc
+        if level not in range(MAX_TERRAIN_LEVEL + 1) or not isinstance(entry, dict):
+            raise SystemExit(f"invalid teacher entry for level {raw_level!r}")
+        parsed[level] = dict(entry)
+    args.teacher_manifest = manifest_path
+    args.teacher_levels = parsed
+
+
+def _teacher_path(args: argparse.Namespace, raw_path: str) -> Path:
+    path = Path(raw_path).expanduser()
+    if path.is_absolute():
+        return path.resolve()
+    run_relative = (args.run_root / path).resolve()
+    if run_relative.exists():
+        return run_relative
+    assert args.teacher_manifest is not None
+    return (args.teacher_manifest.parent / path).resolve()
+
+
+def _teacher_trainer_args(
+    args: argparse.Namespace,
+    *,
+    level: int,
+    initialize_student: bool,
+) -> list[str]:
+    entry = args.teacher_levels.get(level)
+    if entry is None:
+        return []
+    command: list[str] = []
+    v3_path = entry.get("v3_checkpoint")
+    v2_path = entry.get("v2_xy_checkpoint")
+    v3_weight = float(entry.get("v3_weight", 0.0))
+    v2_weight = float(entry.get("v2_xy_weight", 0.0))
+    if min(v3_weight, v2_weight) < 0:
+        raise SystemExit(f"teacher weights cannot be negative at level {level}")
+    if v3_path is not None:
+        command.extend(("--teacher-v3-checkpoint", str(_teacher_path(args, v3_path))))
+        command.append("--teacher-video")
+    elif v3_weight > 0:
+        raise SystemExit(f"level {level} v3_weight requires v3_checkpoint")
+    if v2_path is not None:
+        command.extend(("--teacher-v2-checkpoint", str(_teacher_path(args, v2_path))))
+    elif v2_weight > 0:
+        raise SystemExit(f"level {level} v2_xy_weight requires v2_xy_checkpoint")
+    command.extend(
+        (
+            "--distill-v3-weight",
+            str(v3_weight),
+            "--distill-v2-xy-weight",
+            str(v2_weight),
+            "--distill-huber-delta",
+            str(args.teacher_huber_delta),
+            "--best-safe-max-policy-rejection-rate",
+            str(args.teacher_max_policy_rejection_rate),
+            "--best-safe-max-foot-limited-rate",
+            str(args.teacher_max_foot_limited_rate),
+            "--best-safe-max-failure-rate",
+            str(args.teacher_max_failure_rate),
+        )
+    )
+    if initialize_student and args.init_student_from_teacher:
+        if v3_path is None:
+            raise SystemExit(
+                f"fresh student initialization requires a v3 teacher at level {level}"
+            )
+        command.append("--init-student-from-teacher")
+    return command
 
 
 def _trainer_int_arg(extras: list[str], option: str, default: int) -> int:
@@ -275,6 +423,7 @@ def _run_trainer(
     init_checkpoint: Path | None,
     restore_value: bool,
     terrain_root: Path,
+    teacher_args: list[str],
 ) -> Path:
     before = set(terrain_root.iterdir())
     command = [
@@ -307,6 +456,7 @@ def _run_trainer(
         command.extend(("--init-checkpoint", str(init_checkpoint)))
         if restore_value:
             command.append("--init-value-function")
+    command.extend(teacher_args)
     command.extend(extras)
     print(
         f"launch stage={stage} level={level} timesteps={timesteps:,} "
@@ -319,6 +469,7 @@ def _run_trainer(
 def main() -> None:
     args, extras = _arguments()
     args.run_root = args.run_root.expanduser().resolve()
+    _load_teacher_manifest(args)
     trainer = Path(__file__).resolve().parent / "train_rough_terrain.py"
     terrain_root = args.run_root / "terrain"
     terrain_root.mkdir(parents=True, exist_ok=True)
@@ -364,6 +515,9 @@ def main() -> None:
             init_checkpoint=None,
             restore_value=False,
             terrain_root=terrain_root,
+            teacher_args=_teacher_trainer_args(
+                args, level=0, initialize_student=True
+            ),
         )
         init_checkpoint = _selected_checkpoint(run_dir, args.checkpoint_selection)
         latest = json.loads(
@@ -384,6 +538,14 @@ def main() -> None:
             threshold=args.promote_threshold,
             level_attempt=level_attempt,
             max_stages_per_level=stage_limit,
+        )
+        next_level, completed, promotion_reason = _guard_teacher_attempt_limit(
+            args,
+            level=0,
+            success=success,
+            next_level=next_level,
+            completed=completed,
+            reason=promotion_reason,
         )
         if next_level != 0:
             next_level = max(next_level, args.start_level)
@@ -415,6 +577,13 @@ def main() -> None:
             print(f"CURRICULUM_COMPLETE level=0 success={success:.3f}")
             print(f"CURRICULUM_HISTORY={state_path}")
             return
+        if promotion_reason == "attempt_limit_stop":
+            print(
+                f"CURRICULUM_STOPPED level=0 success={success:.3f} "
+                "reason=teacher_attempt_limit"
+            )
+            print(f"CURRICULUM_HISTORY={state_path}")
+            return
         if next_level != 0:
             level_attempt = 0
         level = next_level
@@ -427,6 +596,7 @@ def main() -> None:
             else args.stage_timesteps
         )
         prefix = f"{args.run_name}-stage{stage:02d}-level{level}"
+        initialize_student = init_checkpoint is None
         run_dir = _run_trainer(
             trainer=trainer,
             args=args,
@@ -443,6 +613,11 @@ def main() -> None:
                 or args.init_value_function
             ),
             terrain_root=terrain_root,
+            teacher_args=_teacher_trainer_args(
+                args,
+                level=level,
+                initialize_student=initialize_student,
+            ),
         )
         latest = json.loads(
             (run_dir / "monitor" / "latest_metrics.json").read_text(encoding="utf-8")
@@ -459,6 +634,14 @@ def main() -> None:
             threshold=args.promote_threshold,
             level_attempt=level_attempt,
             max_stages_per_level=stage_limit,
+        )
+        next_level, completed, promotion_reason = _guard_teacher_attempt_limit(
+            args,
+            level=level,
+            success=success,
+            next_level=next_level,
+            completed=completed,
+            reason=promotion_reason,
         )
         if level == 0 and next_level != 0:
             next_level = max(next_level, args.start_level)
@@ -496,6 +679,12 @@ def main() -> None:
         level = next_level
         if completed:
             print(f"CURRICULUM_COMPLETE level={level} success={success:.3f}")
+            break
+        if promotion_reason == "attempt_limit_stop":
+            print(
+                f"CURRICULUM_STOPPED level={level} success={success:.3f} "
+                "reason=teacher_attempt_limit"
+            )
             break
 
     print(f"CURRICULUM_HISTORY={state_path}")

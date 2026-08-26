@@ -25,6 +25,7 @@ from terrain_curriculum import (  # noqa: E402
     rough_heightfield_grid,
 )
 from train_competence_curriculum import (  # noqa: E402
+    _guard_teacher_attempt_limit,
     _level_transition,
     _max_stages_for_level,
     _replace_trainer_arg,
@@ -63,6 +64,37 @@ class TrainingArtifactTest(unittest.TestCase):
             self.assertTrue(trained_best)
             payload = json.loads(monitor.best_path.read_text(encoding="utf-8"))
             self.assertEqual(payload["step"], 100)
+
+    def test_best_safe_gate_rejects_high_policy_rejection_rate(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            monitor = ScoreMonitor(
+                Path(directory),
+                "eval/episode_reward",
+                max_policy_rejection_rate=0.01,
+                max_foot_limited_rate=0.01,
+                max_failure_rate=0.05,
+            )
+            _, unsafe = monitor.record(
+                100,
+                {
+                    "eval/episode_reward": 100.0,
+                    "eval/avg_episode_length": 1000.0,
+                    "eval/episode_policy_rejection_fraction": 20.0,
+                },
+            )
+            _, safe = monitor.record(
+                200,
+                {
+                    "eval/episode_reward": 90.0,
+                    "eval/avg_episode_length": 1000.0,
+                    "eval/episode_policy_rejection_fraction": 1.0,
+                },
+            )
+            self.assertFalse(unsafe)
+            self.assertTrue(safe)
+            payload = json.loads(monitor.best_path.read_text(encoding="utf-8"))
+            self.assertEqual(payload["step"], 200)
+            self.assertTrue(payload["best_safe"])
 
     def test_curriculum_order_and_final_ten_by_twenty_centimeter_stairs(self) -> None:
         self.assertEqual(MAX_TERRAIN_LEVEL, 12)
@@ -150,6 +182,22 @@ class TrainingArtifactTest(unittest.TestCase):
             max_stages_per_level=3,
         )
         self.assertEqual(transition, (12, True, "attempt_limit"))
+
+    def test_teacher_curriculum_stops_instead_of_force_promoting(self) -> None:
+        args = SimpleNamespace(
+            teacher_manifest=Path("teachers.json"),
+            teacher_stop_on_attempt_limit=True,
+            promote_threshold=0.80,
+        )
+        guarded = _guard_teacher_attempt_limit(
+            args,
+            level=4,
+            success=0.50,
+            next_level=5,
+            completed=False,
+            reason="attempt_limit",
+        )
+        self.assertEqual(guarded, (4, False, "attempt_limit_stop"))
 
     def test_best_checkpoint_selection_uses_monitor_pointer(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

@@ -40,7 +40,15 @@ from servo_model import metadata as servo_model_metadata
 class ScoreMonitor:
     """Persist evaluation history and the best score independently of W&B."""
 
-    def __init__(self, directory: Path, score_key: str) -> None:
+    def __init__(
+        self,
+        directory: Path,
+        score_key: str,
+        *,
+        max_policy_rejection_rate: float | None = None,
+        max_foot_limited_rate: float | None = None,
+        max_failure_rate: float | None = None,
+    ) -> None:
         self.directory = directory
         self.score_key = score_key
         self.directory.mkdir(parents=True, exist_ok=True)
@@ -48,6 +56,10 @@ class ScoreMonitor:
         self.latest_path = directory / "latest_metrics.json"
         self.history_path = directory / "metrics_history.jsonl"
         self.best_score = -math.inf
+        self.max_policy_rejection_rate = max_policy_rejection_rate
+        self.max_foot_limited_rate = max_foot_limited_rate
+        self.max_failure_rate = max_failure_rate
+        self.last_safe = True
 
     @staticmethod
     def write_json(path: Path, payload: dict[str, Any]) -> None:
@@ -70,6 +82,38 @@ class ScoreMonitor:
 
     def record(self, step: int, metrics: Any) -> tuple[float, bool]:
         numeric = self.numeric_metrics(metrics)
+        episode_length = max(numeric.get("eval/avg_episode_length", 0.0), 1.0)
+        numeric["eval/gait_policy_rejection_rate"] = (
+            numeric.get("eval/episode_policy_rejection_fraction", 0.0)
+            / episode_length
+        )
+        numeric["eval/gait_foot_limited_rate"] = (
+            numeric.get("eval/episode_foot_limited_fraction", 0.0)
+            / episode_length
+        )
+        failure_rate = sum(
+            numeric.get(f"eval/episode_termination/{name}", 0.0)
+            for name in (
+                "controller_invalid",
+                "joint_limit",
+                "dynamics",
+                "tilt",
+                "clearance",
+                "body_contact",
+                "nonfinite",
+            )
+        )
+        numeric["eval/gait_failure_rate"] = failure_rate
+        safe_reasons: list[str] = []
+        for key, limit in (
+            ("eval/gait_policy_rejection_rate", self.max_policy_rejection_rate),
+            ("eval/gait_foot_limited_rate", self.max_foot_limited_rate),
+            ("eval/gait_failure_rate", self.max_failure_rate),
+        ):
+            if limit is not None and numeric[key] > limit:
+                safe_reasons.append(f"{key}={numeric[key]:.6f}>{limit:.6f}")
+        safe = not safe_reasons
+        self.last_safe = safe
         score = numeric.get(self.score_key, float("nan"))
         payload = {
             "score_key": self.score_key,
@@ -77,6 +121,8 @@ class ScoreMonitor:
             "step": int(step),
             "updated_at_utc": datetime.now(timezone.utc).isoformat(),
             "metrics": numeric,
+            "best_safe": safe,
+            "best_safe_reasons": safe_reasons,
         }
         self.write_json(self.latest_path, payload)
         with self.history_path.open("a", encoding="utf-8") as history:
@@ -84,7 +130,12 @@ class ScoreMonitor:
         # Step 0 is the untrained policy and already has a dedicated 0%
         # progress video.  Best artifacts begin after at least one PPO update,
         # where Brax has also written the matching regular checkpoint.
-        is_best = step > 0 and math.isfinite(score) and score > self.best_score
+        is_best = (
+            step > 0
+            and safe
+            and math.isfinite(score)
+            and score > self.best_score
+        )
         if is_best:
             self.best_score = score
             self.write_json(self.best_path, payload)
@@ -228,7 +279,40 @@ def _arguments(argv: list[str] | None = None) -> argparse.Namespace:
         action=argparse.BooleanOptionalAction,
         default=False,
     )
+    parser.add_argument(
+        "--teacher-v3-checkpoint",
+        type=Path,
+        default=None,
+        help="Frozen adaptive-swing v3 teacher (legacy 142-D observation).",
+    )
+    parser.add_argument(
+        "--teacher-v2-checkpoint",
+        type=Path,
+        default=None,
+        help="Frozen Cartesian-residual v2 gait teacher; only XY actions are used.",
+    )
+    parser.add_argument("--distill-v3-weight", type=float, default=0.0)
+    parser.add_argument("--distill-v2-xy-weight", type=float, default=0.0)
+    parser.add_argument("--distill-huber-delta", type=float, default=0.10)
+    parser.add_argument(
+        "--init-student-from-teacher",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help=(
+            "Expand the v3 teacher actor/normalizer from 142-D to 146-D; "
+            "the current critic remains freshly initialized."
+        ),
+    )
+    parser.add_argument(
+        "--teacher-video",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Render the frozen v3 teacher in the current environment for comparison.",
+    )
     parser.add_argument("--score-key", default="eval/episode_reward")
+    parser.add_argument("--best-safe-max-policy-rejection-rate", type=float, default=None)
+    parser.add_argument("--best-safe-max-foot-limited-rate", type=float, default=None)
+    parser.add_argument("--best-safe-max-failure-rate", type=float, default=None)
     parser.add_argument(
         "--best-video", action=argparse.BooleanOptionalAction, default=False
     )
@@ -421,6 +505,7 @@ def _prepare_run(args: argparse.Namespace) -> None:
         else videos / f"best_{stage_token}.gif"
     )
     args.stage_video_path = videos / f"stage_final_{stage_token}.gif"
+    args.teacher_video_path = videos / f"teacher_reference_{stage_token}.gif"
     args.progress_video_dir = videos / "progress"
     if args.best_video_path.suffix.lower() != ".gif":
         raise SystemExit("--best-video-path must end with .gif")
@@ -459,6 +544,32 @@ def _write_metadata(args: argparse.Namespace, env: HexapodRoughTerrainEnv) -> No
             "checkpoint_dir": str(args.output),
             "best_checkpoint_pointer": str(args.monitor_dir / "best_checkpoint.json"),
             "init_checkpoint": str(args.init_checkpoint) if args.init_checkpoint else None,
+            "teacher_distillation": {
+                "v3_checkpoint": (
+                    str(args.teacher_v3_checkpoint)
+                    if args.teacher_v3_checkpoint is not None
+                    else None
+                ),
+                "v2_xy_checkpoint": (
+                    str(args.teacher_v2_checkpoint)
+                    if args.teacher_v2_checkpoint is not None
+                    else None
+                ),
+                "v3_weight": args.distill_v3_weight,
+                "v2_xy_weight": args.distill_v2_xy_weight,
+                "huber_delta": args.distill_huber_delta,
+                "student_initialized_from_v3": args.init_student_from_teacher,
+                "teacher_observation_size": 142,
+                "student_observation_size": OBSERVATION_SIZE,
+                "teacher_video_path": str(args.teacher_video_path),
+            },
+            "best_safe_gate": {
+                "max_policy_rejection_rate": (
+                    args.best_safe_max_policy_rejection_rate
+                ),
+                "max_foot_limited_rate": args.best_safe_max_foot_limited_rate,
+                "max_failure_rate": args.best_safe_max_failure_rate,
+            },
             "best_video_path": str(args.best_video_path),
             "stage_video_path": str(args.stage_video_path),
             "progress_video_dir": str(args.progress_video_dir),
@@ -579,6 +690,35 @@ def main() -> None:
         args.video_height,
     ) <= 0:
         raise SystemExit("video duration, fps and dimensions must be positive")
+    if min(
+        args.distill_v3_weight,
+        args.distill_v2_xy_weight,
+        args.distill_huber_delta,
+    ) < 0:
+        raise SystemExit("teacher weights and Huber delta cannot be negative")
+    if args.distill_huber_delta == 0:
+        raise SystemExit("--distill-huber-delta must be positive")
+    safe_limits = (
+        args.best_safe_max_policy_rejection_rate,
+        args.best_safe_max_foot_limited_rate,
+        args.best_safe_max_failure_rate,
+    )
+    if any(limit is not None and limit < 0 for limit in safe_limits):
+        raise SystemExit("best-safe rate limits cannot be negative")
+    if args.distill_v3_weight > 0 and args.teacher_v3_checkpoint is None:
+        raise SystemExit("--distill-v3-weight requires --teacher-v3-checkpoint")
+    if args.distill_v2_xy_weight > 0 and args.teacher_v2_checkpoint is None:
+        raise SystemExit("--distill-v2-xy-weight requires --teacher-v2-checkpoint")
+    if args.init_student_from_teacher and args.teacher_v3_checkpoint is None:
+        raise SystemExit(
+            "--init-student-from-teacher requires --teacher-v3-checkpoint"
+        )
+    if args.teacher_video and args.teacher_v3_checkpoint is None:
+        raise SystemExit("--teacher-video requires --teacher-v3-checkpoint")
+    if args.init_student_from_teacher and args.init_checkpoint is not None:
+        raise SystemExit(
+            "--init-student-from-teacher cannot be combined with --init-checkpoint"
+        )
 
     network_layers = tuple(args.network_layers)
     if args.init_checkpoint is not None:
@@ -619,6 +759,57 @@ def main() -> None:
             "print(jax.devices())'`; use --allow-cpu only for tiny debug runs."
         )
 
+    from teacher_distillation import (
+        V2_ACTION_CONTRACT,
+        V3_ACTION_CONTRACT,
+        expand_v3_teacher_for_student,
+        install_distillation_loss,
+        legacy_teacher_observation,
+        load_frozen_teacher,
+    )
+
+    v3_teacher = (
+        load_frozen_teacher(
+            args.teacher_v3_checkpoint,
+            name="adaptive_v3",
+            expected_action_contract=V3_ACTION_CONTRACT,
+        )
+        if args.teacher_v3_checkpoint is not None
+        else None
+    )
+    v2_teacher = (
+        load_frozen_teacher(
+            args.teacher_v2_checkpoint,
+            name="ik_safe_v2_xy",
+            expected_action_contract=V2_ACTION_CONTRACT,
+        )
+        if args.teacher_v2_checkpoint is not None
+        else None
+    )
+    if v3_teacher is not None:
+        args.teacher_v3_checkpoint = v3_teacher.checkpoint
+    if v2_teacher is not None:
+        args.teacher_v2_checkpoint = v2_teacher.checkpoint
+    restore_teacher_params = None
+    if args.init_student_from_teacher:
+        assert v3_teacher is not None
+        if v3_teacher.network_layers != network_layers:
+            raise SystemExit(
+                "student network layers must match the initialization teacher: "
+                f"teacher={list(v3_teacher.network_layers)} "
+                f"student={list(network_layers)}"
+            )
+        restore_teacher_params = expand_v3_teacher_for_student(v3_teacher)
+    if v3_teacher is not None or v2_teacher is not None:
+        print(
+            "teachers "
+            f"v3={v3_teacher.checkpoint if v3_teacher else None} "
+            f"weight={args.distill_v3_weight:g} | "
+            f"v2_xy={v2_teacher.checkpoint if v2_teacher else None} "
+            f"weight={args.distill_v2_xy_weight:g} "
+            f"init_student={args.init_student_from_teacher}"
+        )
+
     _prepare_run(args)
     _write_metadata(args, env)
     print(f"RUN_DIR={args.run_dir}")
@@ -633,7 +824,13 @@ def main() -> None:
         policy_hidden_layer_sizes=network_layers,
         value_hidden_layer_sizes=network_layers,
     )
-    monitor = ScoreMonitor(args.monitor_dir, args.score_key)
+    monitor = ScoreMonitor(
+        args.monitor_dir,
+        args.score_key,
+        max_policy_rejection_rate=args.best_safe_max_policy_rejection_rate,
+        max_foot_limited_rate=args.best_safe_max_foot_limited_rate,
+        max_failure_rate=args.best_safe_max_failure_rate,
+    )
     randomization_fn = (
         None
         if args.dr_bank_size == 1
@@ -666,7 +863,13 @@ def main() -> None:
             config=_wandb_config(args, env),
         )
         wandb_run.define_metric("train/global_step")
-        for namespace in ("eval/*", "best/*", "stage/*", "progress/*"):
+        for namespace in (
+            "eval/*",
+            "training/*",
+            "best/*",
+            "stage/*",
+            "progress/*",
+        ):
             wandb_run.define_metric(namespace, step_metric="train/global_step")
         wandb_run.summary["curriculum/stage"] = args.curriculum_stage
         wandb_run.summary["curriculum/terrain_level"] = args.terrain_level
@@ -863,7 +1066,7 @@ def main() -> None:
                 "nonfinite",
             )
         )
-        marker = " NEW_BEST" if is_best else ""
+        marker = " NEW_BEST" if is_best else (" UNSAFE" if not monitor.last_safe else "")
         print(
             f"step={step:,} {args.score_key}={score:.3f}{marker} | "
             f"success={success:.3f} failure={failure:.3f} | best={monitor.best_score:.3f}"
@@ -926,6 +1129,61 @@ def main() -> None:
             wandb_run.summary["stage/final_video"] = str(args.stage_video_path)
             wandb_run.summary["stage/final_step"] = step
 
+    def save_teacher_reference(step: int) -> None:
+        if not args.teacher_video or v3_teacher is None:
+            return
+
+        def make_teacher_policy(_params: Any, deterministic: bool = True) -> Any:
+            del deterministic
+
+            def policy(observation: jax.Array, key: jax.Array) -> Any:
+                return v3_teacher.policy(
+                    legacy_teacher_observation(observation), key
+                )
+
+            return policy
+
+        try:
+            render_policy_video(
+                env=env,
+                make_policy=make_teacher_policy,
+                params=None,
+                output=args.teacher_video_path,
+                seed=args.seed + 40_000,
+                duration=args.stage_video_duration,
+                fps=args.video_fps,
+                width=args.video_width,
+                height=args.video_height,
+            )
+        except Exception as exc:
+            error = f"{type(exc).__name__}: {exc}"
+            print(f"teacher_video_error step={step:,}: {error}")
+            append_artifact(
+                {"kind": "teacher_reference", "step": step, "error": error}
+            )
+            return
+        print(f"teacher_video step={step:,}: {args.teacher_video_path}")
+        append_artifact(
+            {
+                "kind": "teacher_reference",
+                "step": step,
+                "video": str(args.teacher_video_path),
+                "teacher_checkpoint": str(v3_teacher.checkpoint),
+            }
+        )
+        if wandb_run is not None and wandb_module is not None:
+            caption = f"frozen teacher | {args.stage_token} | step={step:,}"
+            wandb_run.log(
+                {
+                    "stage/teacher_video": wandb_module.Video(
+                        str(args.teacher_video_path),
+                        format="gif",
+                        caption=caption,
+                    ),
+                    "train/global_step": step,
+                }
+            )
+
     train = functools.partial(
         ppo.train,
         num_timesteps=args.timesteps,
@@ -955,6 +1213,7 @@ def main() -> None:
         restore_checkpoint_path=(
             str(args.init_checkpoint) if args.init_checkpoint is not None else None
         ),
+        restore_params=restore_teacher_params,
         restore_value_fn=args.init_value_function,
         seed=args.seed,
         progress_fn=progress,
@@ -962,7 +1221,14 @@ def main() -> None:
         use_pmap_on_reset=False,
     )
     try:
-        train(environment=env)
+        with install_distillation_loss(
+            v3_teacher=v3_teacher,
+            v2_teacher=v2_teacher,
+            v3_weight=args.distill_v3_weight,
+            v2_xy_weight=args.distill_v2_xy_weight,
+            huber_delta=args.distill_huber_delta,
+        ):
+            train(environment=env)
         final_step = int(latest_policy.get("step", 0))
         if args.progress_video and latest_policy:
             for _, slot, fraction in list(pending_progress):
@@ -976,6 +1242,7 @@ def main() -> None:
                 )
                 next_progress_target += 1
         save_stage_final(final_step)
+        save_teacher_reference(final_step)
     finally:
         if wandb_run is not None:
             wandb_run.finish()
