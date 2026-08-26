@@ -1,6 +1,7 @@
 #ifndef HEXAPOD_APP_H
 #define HEXAPOD_APP_H
 
+#include "app/pressure_load_calibration.h"
 #include "app/robot_bringup.h"
 #include "communication/jetson_spi.h"
 #include "communication/lora.h"
@@ -75,6 +76,7 @@ typedef struct
     RobotJointCommand_t joints;                        // 최근 관절 명령을 저장한다.
     RobotSafetyOutput_t safety;                        // 최근 Fault 상태를 저장한다.
     RobotBringupStatus_t bringup;                      // 단계별 출력 허가 상태를 저장한다.
+    PressureLoadCalibration_Handle_t pressure_calibration; // 기립 중 압력 자동 보정 상태를 저장한다.
     volatile bool control_due;                         // 5 ms 제어 실행 요청을 저장한다.
     uint32_t control_count;                            // 완료한 제어 주기 수를 저장한다.
     uint32_t missed_control_count;                     // 중복 Timer 요청 수를 저장한다.

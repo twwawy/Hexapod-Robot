@@ -5,13 +5,16 @@
 
 # Add inputs and outputs from these tool invocations to the build variables 
 C_SRCS += \
-../Core/Src/app/hexapod_app.c 
+../Core/Src/app/hexapod_app.c \
+../Core/Src/app/pressure_load_calibration.c 
 
 OBJS += \
-./Core/Src/app/hexapod_app.o 
+./Core/Src/app/hexapod_app.o \
+./Core/Src/app/pressure_load_calibration.o 
 
 C_DEPS += \
-./Core/Src/app/hexapod_app.d 
+./Core/Src/app/hexapod_app.d \
+./Core/Src/app/pressure_load_calibration.d 
 
 
 # Each subdirectory must supply rules for building sources it contributes
@@ -21,7 +24,7 @@ Core/Src/app/%.o Core/Src/app/%.su Core/Src/app/%.cyclo: ../Core/Src/app/%.c Cor
 clean: clean-Core-2f-Src-2f-app
 
 clean-Core-2f-Src-2f-app:
-	-$(RM) ./Core/Src/app/hexapod_app.cyclo ./Core/Src/app/hexapod_app.d ./Core/Src/app/hexapod_app.o ./Core/Src/app/hexapod_app.su
+	-$(RM) ./Core/Src/app/hexapod_app.cyclo ./Core/Src/app/hexapod_app.d ./Core/Src/app/hexapod_app.o ./Core/Src/app/hexapod_app.su ./Core/Src/app/pressure_load_calibration.cyclo ./Core/Src/app/pressure_load_calibration.d ./Core/Src/app/pressure_load_calibration.o ./Core/Src/app/pressure_load_calibration.su
 
 .PHONY: clean-Core-2f-Src-2f-app
 

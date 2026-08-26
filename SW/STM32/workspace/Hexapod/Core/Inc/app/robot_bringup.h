@@ -13,7 +13,8 @@
 #define ROBOT_BRINGUP_LOW_YAW_RATE_RADPS (15.0f * ROBOT_DEG_TO_RAD_F)        // 저속 회전 시험 한계를 정의한다.
 #define ROBOT_BRINGUP_FAKE_RC_DELAY_MS   1000U                              // 임시 조종기 전원 허가 대기시간을 정의한다.
 #define ROBOT_BRINGUP_STAGE3_STAND_MS    2000U                              // 자동 서기 시작 시각을 정의한다.
-#define ROBOT_BRINGUP_STAGE3_LANDING_MS  10000U                             // 자동 착지 시작 시각을 정의한다.
+#define ROBOT_BRINGUP_STAGE3_LANDING_MS  10000U                             // 일반 U3 자동 착지 시각을 정의한다.
+#define ROBOT_BRINGUP_PRESSURE_CALIBRATION 0U                               // U3 압력 자동 보정 사용 여부를 정의한다.
 
 #if (ROBOT_BRINGUP_STAGE < ROBOT_BRINGUP_STAGE_MIN) || \
     (ROBOT_BRINGUP_STAGE > ROBOT_BRINGUP_STAGE_MAX)

@@ -1,7 +1,9 @@
 Core/Src/app/hexapod_app.o: ../Core/Src/app/hexapod_app.c \
- ../Core/Inc/app/hexapod_app.h ../Core/Inc/app/robot_bringup.h \
- ../Core/Inc/common/robot_config.h ../Core/Inc/communication/jetson_spi.h \
- ../Core/Inc/common/robot_types.h \
+ ../Core/Inc/app/hexapod_app.h \
+ ../Core/Inc/app/pressure_load_calibration.h \
+ ../Core/Inc/sensor/foot_pressure.h ../Core/Inc/common/robot_types.h \
+ ../Core/Inc/common/robot_config.h ../Core/Inc/app/robot_bringup.h \
+ ../Core/Inc/communication/jetson_spi.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal.h \
  ../Core/Inc/stm32f4xx_hal_conf.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_rcc.h \
@@ -45,8 +47,7 @@ Core/Src/app/hexapod_app.o: ../Core/Src/app/hexapod_app.c \
  ../Core/Inc/high_control/workspace_limiter.h \
  ../Core/Inc/low_control/servo_pwm.h ../Core/Inc/sensor/gps.h \
  ../Core/Inc/sensor/imu.h ../Core/Inc/sensor/mcp3008.h \
- ../Core/Inc/sensor/sensor_manager.h ../Core/Inc/sensor/foot_pressure.h \
- ../Core/Inc/sensor/joint_feedback.h \
+ ../Core/Inc/sensor/sensor_manager.h ../Core/Inc/sensor/joint_feedback.h \
  ../Core/Inc/user_command/crsf_protocol.h \
  ../Core/Inc/user_command/crsf_receiver.h \
  ../Core/Inc/user_command/user_command.h \
@@ -54,10 +55,12 @@ Core/Src/app/hexapod_app.o: ../Core/Src/app/hexapod_app.c \
  ../Core/Inc/high_control/stand_landing.h \
  ../Core/Inc/test/rc_command_generator.h
 ../Core/Inc/app/hexapod_app.h:
-../Core/Inc/app/robot_bringup.h:
-../Core/Inc/common/robot_config.h:
-../Core/Inc/communication/jetson_spi.h:
+../Core/Inc/app/pressure_load_calibration.h:
+../Core/Inc/sensor/foot_pressure.h:
 ../Core/Inc/common/robot_types.h:
+../Core/Inc/common/robot_config.h:
+../Core/Inc/app/robot_bringup.h:
+../Core/Inc/communication/jetson_spi.h:
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal.h:
 ../Core/Inc/stm32f4xx_hal_conf.h:
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_rcc.h:
@@ -104,7 +107,6 @@ Core/Src/app/hexapod_app.o: ../Core/Src/app/hexapod_app.c \
 ../Core/Inc/sensor/imu.h:
 ../Core/Inc/sensor/mcp3008.h:
 ../Core/Inc/sensor/sensor_manager.h:
-../Core/Inc/sensor/foot_pressure.h:
 ../Core/Inc/sensor/joint_feedback.h:
 ../Core/Inc/user_command/crsf_protocol.h:
 ../Core/Inc/user_command/crsf_receiver.h:

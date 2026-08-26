@@ -1,4 +1,5 @@
 "./Core/Src/app/hexapod_app.o"
+"./Core/Src/app/pressure_load_calibration.o"
 "./Core/Src/common/robot_calibration.o"
 "./Core/Src/communication/jetson_spi.o"
 "./Core/Src/communication/lora.o"

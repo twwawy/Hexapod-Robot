@@ -63,6 +63,12 @@ static void HexapodApp_InitializeBringup(HexapodApp_Handle_t *handle)
     {
         RcCommandGenerator_Init(&simulated_rc);                                        // 연결된 중립 조종기를 만든다.
         simulated_rc_start_ms = HAL_GetTick();                                         // 1초 대기 시작 시각을 저장한다.
+        if ((ROBOT_BRINGUP_STAGE == 3U) &&
+            (ROBOT_BRINGUP_PRESSURE_CALIBRATION != 0U))
+        {
+            PressureLoadCalibration_Init(&handle->pressure_calibration,
+                                         simulated_rc_start_ms);                       // 3단계 압력 자동 보정을 준비한다.
+        }
     }
 }
 
@@ -95,17 +101,28 @@ static void HexapodApp_UpdateSimulatedRc(HexapodApp_Handle_t *handle, uint32_t n
     {
         handle->user.sb = 0U;                                            // 시작 자세에서 서기 요청을 해제한다.
         handle->bringup.simulated_rc_phase = 0U;                          // 초기 착지 대기를 표시한다.
+        return;
     }
-    else if (elapsed_ms < ROBOT_BRINGUP_STAGE3_LANDING_MS)
+
+    if (handle->bringup.simulated_rc_phase == 0U)
     {
-        handle->user.sb = 1U;                                            // SB 중앙값으로 서기를 요청한다.
         handle->bringup.simulated_rc_phase = 1U;                          // 자동 서기 구간을 표시한다.
     }
-    else
+    if ((handle->bringup.simulated_rc_phase == 1U) &&
+        (((ROBOT_BRINGUP_PRESSURE_CALIBRATION != 0U) &&
+          PressureLoadCalibration_IsFinished()) ||
+         ((ROBOT_BRINGUP_PRESSURE_CALIBRATION == 0U) &&
+          (elapsed_ms >= ROBOT_BRINGUP_STAGE3_LANDING_MS))))
     {
-        handle->user.sb = 0U;                                            // SB를 해제해 착지를 요청한다.
-        handle->bringup.simulated_rc_phase =
-            handle->drone.landing_done ? 3U : 2U;                        // 착지 진행 또는 완료를 표시한다.
+        handle->bringup.simulated_rc_phase = 2U;                          // 보정 후 자동 착지를 시작한다.
+    }
+
+    handle->user.sb = (handle->bringup.simulated_rc_phase == 1U) ?
+                      1U : 0U;                                          // 보정 완료 전까지만 서기를 유지한다.
+    if ((handle->bringup.simulated_rc_phase == 2U) &&
+        handle->drone.landing_done)
+    {
+        handle->bringup.simulated_rc_phase = 3U;                          // 자동 착지 완료를 표시한다.
     }
 }
 
@@ -373,6 +390,7 @@ static void HexapodApp_ControlStep(HexapodApp_Handle_t *handle)
     bool gait_accepted;                       // 보행 명령 채택 여부를 저장한다.
     bool relay_enable;                        // 모터 전원 허가를 저장한다.
     uint32_t leg;                             // 다리 계산 번호를 저장한다.
+    uint32_t now_ms;                          // 압력 보정 시각을 저장한다.
     RobotUserCommand_t limited_user;          // 시험 단계가 허용한 명령을 저장한다.
 
     (void)SensorManager_Update(&handle->sensors);                  // 실제 센서 스냅샷을 갱신한다.
@@ -391,6 +409,18 @@ static void HexapodApp_ControlStep(HexapodApp_Handle_t *handle)
                                          &handle->priority,
                                          handle->sensor_snapshot.foot_contact,
                                          handle->sensor_snapshot.imu.attitude_rad.yaw);  // 조종 입력을 제어 명령으로 바꾼다.
+    if ((ROBOT_BRINGUP_STAGE == 3U) &&
+        (ROBOT_BRINGUP_PRESSURE_CALIBRATION != 0U))
+    {
+        now_ms = HAL_GetTick();  // 현재 제어 시각을 읽는다.
+        PressureLoadCalibration_Update(
+            &handle->pressure_calibration,
+            handle->sensor_snapshot.pressure_raw,
+            (handle->priority.active_mode == ROBOT_MODE_READY) &&
+            handle->drone.stand_done,
+            now_ms,
+            &handle->sensors.pressure);  // 시작 자세와 완전 기립 자세로 압력 임계값을 만든다.
+    }
     HexapodApp_LimitDroneCommand(handle, &handle->drone);                          // 현재 단계의 최대 속도를 적용한다.
     position = BodyPositionEstimator_Step(
         &handle->position_estimator,
