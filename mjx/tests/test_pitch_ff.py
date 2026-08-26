@@ -6,49 +6,54 @@ import sys
 import unittest
 
 import jax.numpy as jp
-import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import firmware_mjx_controller as firmware
-from rough_terrain_env import PITCH_TARGET_MAX_RAD, _pitch_target
+from rough_terrain_env import PITCH_FF_MAX_RAD, _pitch_ff
 
 
-class PitchTargetTest(unittest.TestCase):
+class PitchFeedforwardTest(unittest.TestCase):
     def _converged(self, height: float, support: float = 0.0) -> float:
-        target = jp.zeros(())
+        feedforward = jp.zeros(())
         heights = jp.full((9,), height)
         for _ in range(500):
-            target = _pitch_target(heights, jp.asarray(support), target, 0.02)
-        return float(target)
+            feedforward = _pitch_ff(
+                heights, jp.asarray(support), feedforward, 0.02
+            )
+        return float(feedforward)
 
-    def test_specification_vectors_use_relative_rise(self) -> None:
+    def test_approved_vectors_use_relative_rise_and_uphill_negative_sign(self) -> None:
         self.assertAlmostEqual(self._converged(0.0), 0.0, places=6)
-        self.assertAlmostEqual(self._converged(0.10), 0.15264, delta=2.0e-4)
-        self.assertAlmostEqual(self._converged(0.30), 0.43256, delta=2.0e-4)
-        self.assertAlmostEqual(self._converged(0.50), PITCH_TARGET_MAX_RAD, places=5)
+        self.assertAlmostEqual(self._converged(0.10), -0.15264, delta=2.0e-4)
+        self.assertAlmostEqual(self._converged(0.30), -0.43256, delta=2.0e-4)
+        self.assertAlmostEqual(self._converged(0.50), -PITCH_FF_MAX_RAD, places=5)
         self.assertAlmostEqual(
-            self._converged(1.10, support=1.0), 0.15264, delta=2.0e-4
+            self._converged(1.10, support=1.0), -0.15264, delta=2.0e-4
         )
 
     def test_nan_is_finite_and_deadband_is_zero(self) -> None:
-        nan_target = _pitch_target(jp.full((9,), jp.nan), 0.0, jp.nan, 0.02)
-        self.assertTrue(math.isfinite(float(nan_target)))
-        self.assertEqual(float(nan_target), 0.0)
+        nan_ff = _pitch_ff(jp.full((9,), jp.nan), 0.0, jp.nan, 0.02)
+        self.assertTrue(math.isfinite(float(nan_ff)))
+        self.assertEqual(float(nan_ff), 0.0)
         self.assertEqual(self._converged(0.0049), 0.0)
 
     def test_filter_converges_monotonically(self) -> None:
-        target = jp.zeros(())
+        feedforward = jp.zeros(())
         values = []
         for _ in range(20):
-            target = _pitch_target(jp.full((9,), 0.30), 0.0, target, 0.02)
-            values.append(float(target))
-        self.assertTrue(all(left < right for left, right in zip(values, values[1:])))
-        self.assertLess(values[-1], 0.43256)
+            feedforward = _pitch_ff(
+                jp.full((9,), 0.30), 0.0, feedforward, 0.02
+            )
+            values.append(float(feedforward))
+        self.assertTrue(
+            all(left > right for left, right in zip(values, values[1:]))
+        )
+        self.assertGreater(values[-1], -0.43256)
 
     def test_requires_nine_forward_samples(self) -> None:
         with self.assertRaisesRegex(ValueError, "exactly nine"):
-            _pitch_target(jp.zeros(8), 0.0, 0.0, 0.02)
+            _pitch_ff(jp.zeros(8), 0.0, 0.0, 0.02)
 
     def test_controller_pitch_error_has_required_sign(self) -> None:
         state = firmware.initial_state()._replace(first_step=jp.asarray(False))
@@ -59,7 +64,7 @@ class PitchTargetTest(unittest.TestCase):
             attitude_rpy=jp.deg2rad(jp.asarray((0.0, 10.0, 0.0))),
             contacts=jp.ones(6, dtype=jp.bool_),
             policy_action=jp.zeros(18),
-            pitch_target=jp.deg2rad(-20.0),
+            pitch_ff=jp.deg2rad(-20.0),
         )
         expected_step = -jp.deg2rad(15.0) * firmware.FIRMWARE_CONTROL_DT
         self.assertAlmostEqual(

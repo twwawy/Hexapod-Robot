@@ -45,10 +45,10 @@ OBSERVATION_CONTRACT_VERSION = "firmware_state_collision_terrain_pitch_v3"
 LEGACY_OBSERVATION_CONTRACT_VERSION = "firmware_state_collision_contact_stairs_v1"
 MODEL_FORWARD = jp.array((0.0, -1.0, 0.0))
 MODEL_LATERAL = jp.array((1.0, 0.0, 0.0))
-PITCH_TARGET_LOOKAHEAD_M = 0.65
-PITCH_TARGET_DEADBAND_M = 0.005
-PITCH_TARGET_MAX_RAD = 0.48869
-PITCH_TARGET_FILTER_TAU_S = 0.15
+PITCH_FF_LOOKAHEAD_M = 0.65
+PITCH_FF_DEADBAND_M = 0.005
+PITCH_FF_MAX_RAD = 0.48869
+PITCH_FF_FILTER_TAU_S = 0.15
 SWING_BOOST_RISE_M = 0.20
 SWING_BOOST_MAX_M = 0.06
 SUCCESS_POSTURE_TOLERANCE_RAD = jp.deg2rad(12.0)
@@ -78,26 +78,31 @@ FOOT_CLEARANCE_OFFSETS = jp.asarray(
 )
 
 
-def _pitch_target(
+def _pitch_ff(
     forward_heights: jax.Array,
     support_height: jax.Array,
-    previous_target: jax.Array,
+    previous_ff: jax.Array,
     dt: float,
 ) -> jax.Array:
-    """Estimate and filter pitch from nine absolute forward terrain heights."""
+    """Estimate a forward-lean feedforward angle from relative terrain rise.
+
+    MJX reports uphill body pitch as negative, so positive terrain rise maps to
+    a negative feedforward angle.  The relative-rise form keeps the command
+    invariant after the robot reaches an elevated landing.
+    """
     if forward_heights.shape != (9,):
-        raise ValueError("pitch target requires exactly nine forward heights")
+        raise ValueError("pitch feedforward requires exactly nine forward heights")
     mean_ahead = jp.nan_to_num(jp.mean(forward_heights), nan=0.0)
     relative_rise = mean_ahead - jp.nan_to_num(support_height, nan=0.0)
-    raw_target = jp.arctan2(relative_rise, PITCH_TARGET_LOOKAHEAD_M)
+    raw_ff = -jp.arctan2(relative_rise, PITCH_FF_LOOKAHEAD_M)
     deadbanded = jp.where(
-        jp.abs(relative_rise) < PITCH_TARGET_DEADBAND_M,
+        jp.abs(relative_rise) < PITCH_FF_DEADBAND_M,
         0.0,
-        raw_target,
+        raw_ff,
     )
-    bounded = jp.clip(deadbanded, -PITCH_TARGET_MAX_RAD, PITCH_TARGET_MAX_RAD)
-    alpha = jp.exp(-dt / PITCH_TARGET_FILTER_TAU_S)
-    return alpha * jp.nan_to_num(previous_target, nan=0.0) + (1.0 - alpha) * bounded
+    bounded = jp.clip(deadbanded, -PITCH_FF_MAX_RAD, PITCH_FF_MAX_RAD)
+    alpha = jp.exp(-dt / PITCH_FF_FILTER_TAU_S)
+    return alpha * jp.nan_to_num(previous_ff, nan=0.0) + (1.0 - alpha) * bounded
 
 
 def _swing_boost(
@@ -748,11 +753,11 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
         sample_world = data.qpos[None, :2] + self._height_samples @ rotation.T
         return self._terrain_height(sample_world) - support_height
 
-    def _terrain_pitch_target(
+    def _terrain_pitch_ff(
         self,
         data: mjx.Data,
         support_height: jax.Array,
-        previous_target: jax.Array,
+        previous_ff: jax.Array,
     ) -> jax.Array:
         attitude = self._relative_attitude(data)
         cosine, sine = jp.cos(attitude[2]), jp.sin(attitude[2])
@@ -760,10 +765,10 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
         sample_world = (
             data.qpos[None, :2] + self._forward_height_samples @ rotation.T
         )
-        return _pitch_target(
+        return _pitch_ff(
             self._terrain_height(sample_world),
             support_height,
-            previous_target,
+            previous_ff,
             self.dt,
         )
 
@@ -811,7 +816,7 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
                     )
                 ),
                 info["last_action"],
-                jp.atleast_1d(info["pitch_target"]),
+                jp.atleast_1d(info["pitch_ff"]),
             )
         )
         return observation
@@ -903,7 +908,7 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
             "controller_output": controller_output,
             "contact_state": contacts,
             "support_height": support_height,
-            "pitch_target": jp.zeros(()),
+            "pitch_ff": jp.zeros(()),
             "swing_boost": jp.zeros(()),
             "max_terrain_height": support_height,
             "previous_root_x": data.qpos[0],
@@ -974,10 +979,10 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
         contacts_before = self._foot_contacts(state.data)
         pre_contact_foot_vz = self._foot_vertical_velocity(state.data)
         attitude_before = self._relative_attitude(state.data)
-        pitch_target = self._terrain_pitch_target(
+        pitch_ff = self._terrain_pitch_ff(
             state.data,
             state.info["support_height"],
-            state.info["pitch_target"],
+            state.info["pitch_ff"],
         )
         swing_boost = self._terrain_swing_boost(
             state.data,
@@ -994,7 +999,7 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
                 attitude_rpy=attitude_before,
                 contacts=contacts_before,
                 policy_action=action,
-                pitch_target=pitch_target,
+                pitch_ff=pitch_ff,
                 swing_boost=swing_boost,
             )
 
@@ -1059,7 +1064,7 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
         success = (
             (data.qpos[0] >= self._terrain_goal_x)
             & final_height_ready
-            & _posture_success(attitude, pitch_target)
+            & _posture_success(attitude, pitch_ff)
             & (~failure)
         )
         terminated = failure | success
@@ -1138,7 +1143,7 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
             command=state.info["command"],
             yaw_velocity=data.qvel[5],
             attitude=attitude,
-            pitch_target=pitch_target,
+            pitch_target=pitch_ff,
             clearance=clearance,
             target_clearance=self._config.target_clearance,
             root_angular_speed=root_angular_speed,
@@ -1207,7 +1212,7 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
         state.info["controller_output"] = controller
         state.info["contact_state"] = contacts
         state.info["support_height"] = support_height
-        state.info["pitch_target"] = pitch_target
+        state.info["pitch_ff"] = pitch_ff
         state.info["swing_boost"] = swing_boost
         state.info["max_terrain_height"] = max_terrain_height
         state.info["previous_root_x"] = data.qpos[0]
