@@ -239,7 +239,7 @@ def _huber_action_loss(
     mask: jax.Array,
     delta: float,
 ) -> jax.Array:
-    error = jp.abs(student_action - jp.stop_gradient(teacher_action))
+    error = jp.abs(student_action - jax.lax.stop_gradient(teacher_action))
     loss = jp.where(error <= delta, 0.5 * jp.square(error), delta * (error - 0.5 * delta))
     return jp.mean(jp.sum(loss * mask, axis=-1) / jp.maximum(jp.sum(mask), 1.0))
 
