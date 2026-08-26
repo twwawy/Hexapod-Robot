@@ -30,10 +30,12 @@
 
 typedef struct
 {
-  AlgorithmTestStep_t step;  // 실행한 알고리즘 단계를 저장한다.
-  bool finished;             // 시험 실행 완료 여부를 저장한다.
-  bool passed;               // 선택 단계 통과 여부를 저장한다.
-  bool stopped;              // 실패 후 러너 정지 여부를 저장한다.
+  AlgorithmTestStep_t step;         // 마지막으로 실행한 단계를 저장한다.
+  AlgorithmTestStep_t failed_step;  // 실패한 단계 또는 COUNT를 저장한다.
+  uint32_t completed_count;         // 통과한 단계 수를 저장한다.
+  bool finished;                    // 전체 시험 완료 여부를 저장한다.
+  bool passed;                      // 열 단계 전체 통과 여부를 저장한다.
+  bool stopped;                     // 실패 후 러너 정지 여부를 저장한다.
 } AlgorithmTestDebug_t;
 
 /* USER CODE END PTD */
@@ -139,13 +141,26 @@ int main(void)
   MX_USART3_UART_Init();
   MX_USART6_UART_Init();
   /* USER CODE BEGIN 2 */
-  TestRunner_Init(&g_algorithm_test_runner);                                  // 알고리즘 러너를 첫 단계로 초기화한다.
-  g_algorithm_test_debug.step = ALGORITHM_TEST_CALIBRATION_TABLE;             // 1단계 테이블 검사를 선택한다.
-  g_algorithm_test_debug.passed = TestRunner_RunStep(
-      &g_algorithm_test_runner,
-      ALGORITHM_TEST_CALIBRATION_TABLE);                                      // 중앙 보정 테이블을 한 번 검사한다.
-  g_algorithm_test_debug.stopped = g_algorithm_test_runner.stopped;           // 실패 정지 상태를 복사한다.
-  g_algorithm_test_debug.finished = true;                                     // Live Expressions에 완료를 표시한다.
+  TestRunner_Init(&g_algorithm_test_runner);                         // 알고리즘 러너를 첫 단계로 초기화한다.
+  g_algorithm_test_debug.failed_step = ALGORITHM_TEST_COUNT;         // 시작 시 실패 단계가 없음을 표시한다.
+
+  while (!TestRunner_IsComplete(&g_algorithm_test_runner) &&
+         !g_algorithm_test_runner.stopped)
+  {
+    g_algorithm_test_debug.step = g_algorithm_test_runner.next_step; // 이번에 실행할 단계를 표시한다.
+    if (!TestRunner_RunNext(&g_algorithm_test_runner))
+    {
+      g_algorithm_test_debug.failed_step =
+          g_algorithm_test_runner.last_step;                         // 첫 실패 단계를 기록한다.
+      break;
+    }
+    g_algorithm_test_debug.completed_count++;                        // 통과한 단계 수를 누적한다.
+  }
+
+  g_algorithm_test_debug.passed =
+      TestRunner_IsComplete(&g_algorithm_test_runner);                // 열 단계 전체 통과를 판단한다.
+  g_algorithm_test_debug.stopped = g_algorithm_test_runner.stopped;   // 실패 정지 상태를 복사한다.
+  g_algorithm_test_debug.finished = true;                             // Live Expressions에 완료를 표시한다.
 
   /* USER CODE END 2 */
 

@@ -31,6 +31,7 @@ bool UserCommandTest_Run(void)
 
     UserCommand_UpdateChannels(&handle, raw, 1000U);  // 중립 프레임을 전달한다.
     UserCommand_UpdateTimeout(&handle, 1000U);        // 중립 시간을 시작한다.
+    UserCommand_UpdateChannels(&handle, raw, 1200U);  // 연결을 유지한 중립 프레임을 전달한다.
     UserCommand_UpdateTimeout(&handle, 1200U);        // 0.2초 재허가를 완료한다.
     (void)UserCommand_Get(&handle, &command);          // 허가된 명령을 읽는다.
     if (!command.connected || !command.motion_armed || (command.s1 != 0U))
