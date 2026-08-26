@@ -174,7 +174,7 @@ class DomainRandomizationTest(unittest.TestCase):
         self.assertTrue(np.all(np.asarray(states.info["next_push_step"]) >= 200))
         self.assertTrue(np.all(np.asarray(states.info["next_push_step"]) <= 400))
 
-    def test_k16_jit_rollout_eight_envs_thirty_two_steps_is_finite(self) -> None:
+    def test_k16_training_wrapper_rollout_preserves_info_dtypes(self) -> None:
         from mujoco_playground import wrapper
 
         config = default_config()
@@ -184,7 +184,12 @@ class DomainRandomizationTest(unittest.TestCase):
         randomizer = functools.partial(
             randomize_batch, rng=rng, bank_size=16, seed=5
         )
-        wrapped = wrapper.BraxDomainRandomizationVmapWrapper(env, randomizer)
+        wrapped = wrapper.wrap_for_brax_training(
+            env,
+            episode_length=config.episode_length,
+            randomization_fn=randomizer,
+            full_reset=True,
+        )
         reset = jax.jit(wrapped.reset)
         step = jax.jit(wrapped.step)
         state = reset(rng)
@@ -192,6 +197,8 @@ class DomainRandomizationTest(unittest.TestCase):
         for _ in range(32):
             state = step(state, action)
         state.reward.block_until_ready()
+        self.assertEqual(state.info["policy_steps"].dtype, jp.int32)
+        self.assertEqual(state.info["next_push_step"].dtype, jp.int32)
         self.assertTrue(bool(jp.all(jp.isfinite(state.obs))))
         self.assertTrue(bool(jp.all(jp.isfinite(state.reward))))
 

@@ -962,7 +962,10 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
         info = {
             "rng": rng,
             "command": jp.concatenate((jp.array((speed, yaw_rate)), posture_command)),
-            "steps": jp.zeros((), dtype=jp.int32),
+            # Brax EpisodeWrapper owns info["steps"] and initializes it as a
+            # floating-point batch array.  Keep the controller/environment
+            # clock separate so its integer dtype is stable under wrappers.
+            "policy_steps": jp.zeros((), dtype=jp.int32),
             "last_action": jp.zeros(ACTION_SIZE),
             # The policy tick is 20 ms, so delays {0,1,2} mean {0,20,40} ms.
             "action_delay_buffer": jp.zeros(
@@ -1025,7 +1028,7 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
             info_rng, push_velocity_key, push_interval_key = jax.random.split(
                 info_rng, 3
             )
-            push_due = state.info["steps"] >= next_push_step
+            push_due = state.info["policy_steps"] >= next_push_step
             push_velocity = jax.random.uniform(
                 push_velocity_key,
                 (2,),
@@ -1038,7 +1041,7 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
             state = state.replace(data=state.data.replace(qvel=qvel))
             next_push_step = jp.where(
                 push_due,
-                state.info["steps"]
+                state.info["policy_steps"]
                 + _push_interval_steps(push_interval_key, self.dt),
                 next_push_step,
             )
@@ -1054,7 +1057,9 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
             state.data,
             state.info["support_height"],
         )
-        command_active = state.info["steps"] * self.dt >= self._config.command_delay
+        command_active = (
+            state.info["policy_steps"] * self.dt >= self._config.command_delay
+        )
         firmware_command = jp.where(
             command_active, state.info["command"], jp.zeros(5)
         )
@@ -1278,7 +1283,7 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
             50.0,
         )
 
-        state.info["steps"] += 1
+        state.info["policy_steps"] += 1
         state.info["rng"] = info_rng
         state.info["last_action"] = action
         state.info["action_delay_buffer"] = action_delay_buffer
