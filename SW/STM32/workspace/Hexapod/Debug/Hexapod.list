@@ -39,13 +39,13 @@ Idx Name          Size      VMA       LMA       File off  Algn
                   CONTENTS, READONLY, DEBUGGING, OCTETS
  17 .debug_line   00028a15  00000000  00000000  0006c63f  2**0
                   CONTENTS, READONLY, DEBUGGING, OCTETS
- 18 .debug_str    000daed4  00000000  00000000  00095054  2**0
+ 18 .debug_str    000daef7  00000000  00000000  00095054  2**0
                   CONTENTS, READONLY, DEBUGGING, OCTETS
- 19 .comment      00000043  00000000  00000000  0016ff28  2**0
+ 19 .comment      00000043  00000000  00000000  0016ff4b  2**0
                   CONTENTS, READONLY
- 20 .debug_frame  00007ab4  00000000  00000000  0016ff6c  2**2
+ 20 .debug_frame  00007ab4  00000000  00000000  0016ff90  2**2
                   CONTENTS, READONLY, DEBUGGING, OCTETS
- 21 .debug_line_str 0000006d  00000000  00000000  00177a20  2**0
+ 21 .debug_line_str 0000006d  00000000  00000000  00177a44  2**0
                   CONTENTS, READONLY, DEBUGGING, OCTETS
 
 Disassembly of section .text:
@@ -1381,7 +1381,7 @@ static void HexapodApp_InitializeBringup(HexapodApp_Handle_t *handle)
     handle->bringup.stage = ROBOT_BRINGUP_STAGE;                                      // 컴파일된 시험 단계를 저장한다.
  8001090:	687b      	ldr	r3, [r7, #4]
  8001092:	f503 5380 	add.w	r3, r3, #4096	@ 0x1000
- 8001096:	2204      	movs	r2, #4
+ 8001096:	2206      	movs	r2, #6
  8001098:	f883 279c 	strb.w	r2, [r3, #1948]	@ 0x79c
     handle->bringup.neutral_output_active = (ROBOT_BRINGUP_STAGE == 2U);               // 2단계에서 0도를 고정한다.
  800109c:	687b      	ldr	r3, [r7, #4]
@@ -1401,7 +1401,7 @@ static void HexapodApp_InitializeBringup(HexapodApp_Handle_t *handle)
     handle->bringup.walking_allowed = (ROBOT_BRINGUP_STAGE >= 5U);                     // 5단계부터 보행을 허가한다.
  80010c0:	687b      	ldr	r3, [r7, #4]
  80010c2:	f503 5380 	add.w	r3, r3, #4096	@ 0x1000
- 80010c6:	2200      	movs	r2, #0
+ 80010c6:	2201      	movs	r2, #1
  80010c8:	f883 27ab 	strb.w	r2, [r3, #1963]	@ 0x7ab
     handle->bringup.simulated_rc_active = (ROBOT_BRINGUP_STAGE == 2U) ||
  80010cc:	687b      	ldr	r3, [r7, #4]
