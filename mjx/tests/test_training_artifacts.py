@@ -35,11 +35,28 @@ from train_competence_curriculum import (  # noqa: E402
 from train_rough_terrain import (  # noqa: E402
     ScoreMonitor,
     _training_schedule,
+    essential_wandb_metrics,
     progress_video_targets,
 )
 
 
 class TrainingArtifactTest(unittest.TestCase):
+    def test_wandb_keeps_only_essential_metrics(self) -> None:
+        metrics = {
+            "eval/episode_reward": 12.0,
+            "eval/gait_failure_rate": 0.01,
+            "training/distill_v3_action_rmse": 0.2,
+            "eval/episode_root_angular_speed_std": 99.0,
+        }
+        self.assertEqual(
+            essential_wandb_metrics(metrics),
+            {
+                "eval/episode_reward": 12.0,
+                "eval/gait_failure_rate": 0.01,
+                "training/distill_v3_action_rmse": 0.2,
+            },
+        )
+
     def test_stage_caps_switch_from_two_to_four_at_steep_ramp(self) -> None:
         self.assertEqual(
             tuple(_max_stages_for_level(level) for level in range(4)),

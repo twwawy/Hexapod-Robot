@@ -351,7 +351,6 @@ def _teacher_trainer_args(
         raise SystemExit(f"teacher weights cannot be negative at level {level}")
     if v3_path is not None:
         command.extend(("--teacher-v3-checkpoint", str(_teacher_path(args, v3_path))))
-        command.append("--teacher-video")
     elif v3_weight > 0:
         raise SystemExit(f"level {level} v3_weight requires v3_checkpoint")
     if v2_path is not None:

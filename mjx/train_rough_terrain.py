@@ -37,6 +37,32 @@ from terrain_curriculum import MAX_TERRAIN_LEVEL, terrain_level as terrain_level
 from servo_model import metadata as servo_model_metadata
 
 
+# Keep the full evaluation payload in monitor/*.json, but send only the small
+# set that is useful for deciding whether a stage is learning, walking, and
+# preserving its teachers.  This prevents W&B from auto-creating hundreds of
+# low-value charts for every environment metric.
+WANDB_ESSENTIAL_METRICS = (
+    "eval/episode_reward",
+    "eval/episode_terrain_success",
+    "eval/gait_failure_rate",
+    "eval/gait_policy_rejection_rate",
+    "eval/gait_foot_limited_rate",
+    "eval/episode_reward/progress",
+    "eval/episode_reward/velocity",
+    "eval/episode_reward/stability",
+    "eval/episode_reward/upright",
+    "eval/episode_reward/height",
+    "training/total_loss",
+    "training/distill_v3_action_rmse",
+    "training/distill_v2_xy_rmse",
+)
+
+
+def essential_wandb_metrics(metrics: dict[str, float]) -> dict[str, float]:
+    """Select the stable, decision-relevant W&B chart set."""
+    return {key: metrics[key] for key in WANDB_ESSENTIAL_METRICS if key in metrics}
+
+
 class ScoreMonitor:
     """Persist evaluation history and the best score independently of W&B."""
 
@@ -60,6 +86,7 @@ class ScoreMonitor:
         self.max_foot_limited_rate = max_foot_limited_rate
         self.max_failure_rate = max_failure_rate
         self.last_safe = True
+        self.last_metrics: dict[str, float] = {}
 
     @staticmethod
     def write_json(path: Path, payload: dict[str, Any]) -> None:
@@ -104,6 +131,7 @@ class ScoreMonitor:
             )
         )
         numeric["eval/gait_failure_rate"] = failure_rate
+        self.last_metrics = numeric
         safe_reasons: list[str] = []
         for key, limit in (
             ("eval/gait_policy_rejection_rate", self.max_policy_rejection_rate),
@@ -314,12 +342,12 @@ def _arguments(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--best-safe-max-foot-limited-rate", type=float, default=None)
     parser.add_argument("--best-safe-max-failure-rate", type=float, default=None)
     parser.add_argument(
-        "--best-video", action=argparse.BooleanOptionalAction, default=False
+        "--best-video", action=argparse.BooleanOptionalAction, default=True
     )
     parser.add_argument("--best-video-path", type=Path, default=None)
     parser.add_argument("--best-video-duration", type=float, default=20.0)
     parser.add_argument(
-        "--stage-video", action=argparse.BooleanOptionalAction, default=True
+        "--stage-video", action=argparse.BooleanOptionalAction, default=False
     )
     parser.add_argument("--stage-video-duration", type=float, default=20.0)
     parser.add_argument(
@@ -814,6 +842,7 @@ def main() -> None:
     _write_metadata(args, env)
     print(f"RUN_DIR={args.run_dir}")
 
+    from brax.training.agents.ppo import checkpoint as ppo_checkpoint
     from brax.training.agents.ppo import networks as ppo_networks
     from brax.training.agents.ppo import train as ppo
     from mujoco_playground import wrapper
@@ -863,14 +892,9 @@ def main() -> None:
             config=_wandb_config(args, env),
         )
         wandb_run.define_metric("train/global_step")
-        for namespace in (
-            "eval/*",
-            "training/*",
-            "best/*",
-            "stage/*",
-            "progress/*",
-        ):
-            wandb_run.define_metric(namespace, step_metric="train/global_step")
+        for metric_name in WANDB_ESSENTIAL_METRICS:
+            wandb_run.define_metric(metric_name, step_metric="train/global_step")
+        wandb_run.define_metric("stage/*", step_metric="train/global_step")
         wandb_run.summary["curriculum/stage"] = args.curriculum_stage
         wandb_run.summary["curriculum/terrain_level"] = args.terrain_level
         wandb_run.summary["curriculum/terrain_name"] = env.terrain_name
@@ -893,7 +917,7 @@ def main() -> None:
         with artifact_history.open("a", encoding="utf-8") as history:
             history.write(json.dumps(record, sort_keys=True) + "\n")
 
-    def save_best_artifacts(step: int, score: float) -> bool:
+    def save_best_checkpoint(step: int, score: float) -> bool:
         if latest_policy.get("step") != step:
             return False
         errors: dict[str, str] = {}
@@ -908,57 +932,89 @@ def main() -> None:
             errors["checkpoint"] = f"matching Brax checkpoint not found: {checkpoint_path}"
             print(f"best_checkpoint_error step={step:,}: {errors['checkpoint']}")
 
-        rendered = False
-        if args.best_video:
-            try:
-                render_policy_video(
-                    env=env,
-                    make_policy=latest_policy["make_policy"],
-                    params=latest_policy["params"],
-                    output=args.best_video_path,
-                    seed=args.seed + 20_000,
-                    duration=args.best_video_duration,
-                    fps=args.video_fps,
-                    width=args.video_width,
-                    height=args.video_height,
-                )
-                rendered = True
-                print(f"best_video step={step:,}: {args.best_video_path}")
-            except Exception as exc:
-                errors["video"] = f"{type(exc).__name__}: {exc}"
-                print(f"best_video_error step={step:,}: {errors['video']}")
         append_artifact(
             {
-                "kind": "best",
+                "kind": "best_checkpoint",
                 "step": step,
                 "score": score,
                 "checkpoint": str(checkpoint_path) if checkpoint_path.exists() else None,
-                "video": str(args.best_video_path) if rendered else None,
                 "errors": errors,
             }
         )
         if wandb_run is not None:
-            payload: dict[str, Any] = {
-                "train/global_step": step,
-                "best/score": score,
-                "best/checkpoint_step": step,
-            }
-            if rendered and wandb_module is not None:
-                caption = f"best | step={step:,} | score={score:.3f}"
-                payload["best/video"] = wandb_module.Video(
-                    str(args.best_video_path),
-                    format="gif",
-                    caption=caption,
-                )
-                payload[f"best/video_{args.stage_token}"] = wandb_module.Video(
-                    str(args.best_video_path), format="gif", caption=caption
-                )
-            wandb_run.log(payload)
             wandb_run.summary["best/score"] = score
             wandb_run.summary["best/step"] = step
             if checkpoint_path.exists():
                 wandb_run.summary["best/checkpoint"] = str(checkpoint_path)
         return True
+
+    def save_stage_best_video() -> None:
+        """Render and upload exactly one video from this stage's best checkpoint."""
+        if not args.best_video:
+            return
+        pointer_path = args.monitor_dir / "best_checkpoint.json"
+        if not pointer_path.exists():
+            print("best_video_skip: no safe trained best checkpoint was selected")
+            return
+        try:
+            pointer = json.loads(pointer_path.read_text(encoding="utf-8"))
+            best_step = int(pointer["step"])
+            best_score = float(pointer["score"])
+            checkpoint_path = Path(pointer["path"])
+            if not checkpoint_path.exists():
+                raise FileNotFoundError(f"best checkpoint not found: {checkpoint_path}")
+            best_params = ppo_checkpoint.load(checkpoint_path)
+            args.best_video_path.parent.mkdir(parents=True, exist_ok=True)
+            render_policy_video(
+                env=env,
+                make_policy=latest_policy["make_policy"],
+                params=best_params,
+                output=args.best_video_path,
+                seed=args.seed + 20_000,
+                duration=args.best_video_duration,
+                fps=args.video_fps,
+                width=args.video_width,
+                height=args.video_height,
+            )
+        except Exception as exc:
+            error = f"{type(exc).__name__}: {exc}"
+            print(f"best_video_error stage_end: {error}")
+            append_artifact({"kind": "stage_best", "error": error})
+            return
+        print(
+            f"best_video stage_end step={best_step:,} score={best_score:.3f}: "
+            f"{args.best_video_path}"
+        )
+        append_artifact(
+            {
+                "kind": "stage_best",
+                "step": best_step,
+                "score": best_score,
+                "checkpoint": str(checkpoint_path),
+                "video": str(args.best_video_path),
+                "errors": {},
+            }
+        )
+        if wandb_run is not None:
+            wandb_run.summary["stage/best_score"] = best_score
+            wandb_run.summary["stage/best_step"] = best_step
+            wandb_run.summary["stage/best_checkpoint"] = str(checkpoint_path)
+            wandb_run.summary["stage/best_video"] = str(args.best_video_path)
+            payload: dict[str, Any] = {
+                "train/global_step": best_step,
+                "stage/best_score": best_score,
+                "stage/best_step": best_step,
+            }
+            if wandb_module is not None:
+                payload["stage/best_video"] = wandb_module.Video(
+                    str(args.best_video_path),
+                    format="gif",
+                    caption=(
+                        f"stage best | {args.stage_token} | "
+                        f"step={best_step:,} | score={best_score:.3f}"
+                    ),
+                )
+            wandb_run.log(payload)
 
     def save_progress_video(step: int, slot: int, fraction: float) -> bool:
         if not args.progress_video or slot in rendered_progress:
@@ -1039,7 +1095,7 @@ def main() -> None:
             {"step": int(step), "make_policy": make_policy, "params": params}
         )
         if pending_best is not None and pending_best[0] <= step:
-            save_best_artifacts(step, pending_best[1])
+            save_best_checkpoint(step, pending_best[1])
             pending_best = None
         remaining: list[tuple[int, int, float]] = []
         for requested_step, slot, fraction in pending_progress:
@@ -1072,8 +1128,13 @@ def main() -> None:
             f"success={success:.3f} failure={failure:.3f} | best={monitor.best_score:.3f}"
         )
         if wandb_run is not None:
-            wandb_run.log({**numeric, "train/global_step": step})
-        if is_best and not save_best_artifacts(step, score):
+            wandb_run.log(
+                {
+                    **essential_wandb_metrics(monitor.last_metrics),
+                    "train/global_step": step,
+                }
+            )
+        if is_best and not save_best_checkpoint(step, score):
             pending_best = (step, score)
         schedule_progress(step)
 
@@ -1241,6 +1302,7 @@ def main() -> None:
                     progress_targets[next_progress_target],
                 )
                 next_progress_target += 1
+        save_stage_best_video()
         save_stage_final(final_step)
         save_teacher_reference(final_step)
     finally:
