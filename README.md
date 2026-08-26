@@ -8,6 +8,12 @@
 > 평지→울퉁불퉁→경사면→10×20cm 최종 계단, best/stage/progress 영상과 checkpoint 규칙은
 > [mjx/RL_DESIGN.md](mjx/RL_DESIGN.md)를 따른다.
 
+Isaac 이식 이후의 최종 배포 목표는 MID-360 + Depth + IMU 기반 perceptive residual
+locomotion이다. GT 지형 누설 제거, gravity-aligned elevation map, asymmetric
+actor-critic, Jetson/STM32 역할과 단계별 gate는
+[docs/HEXAPOD_PERCEPTIVE_RESIDUAL_ISAACLAB_PLAN.md](docs/HEXAPOD_PERCEPTIVE_RESIDUAL_ISAACLAB_PLAN.md)를
+기준으로 한다.
+
 ## 현재 MJX 기준
 
 현재 학습 경로는 루트 `mjx/`이며 다음 물리 계약을 사용한다.

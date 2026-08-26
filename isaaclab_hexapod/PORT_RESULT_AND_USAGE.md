@@ -166,6 +166,11 @@ last action slice만 채우고 나머지는 0이다. 이는 interface와 timing�
 
 ## 8. 다음 작업과 최종 검토 항목
 
+최종 목표와 이후 구현 순서는
+[`docs/HEXAPOD_PERCEPTIVE_RESIDUAL_ISAACLAB_PLAN.md`](../docs/HEXAPOD_PERCEPTIVE_RESIDUAL_ISAACLAB_PLAN.md)를
+기준으로 한다. 기존 146-D/15-point 지형 입력은 parity와 privileged teacher를 위한
+중간 계약이며, 배포 actor에서는 LiDAR + Depth + IMU 기반 elevation map으로 교체한다.
+
 1. `build_asset.sh`를 다시 실행해 USD articulation root가 하나인지 확인한다.
 2. `zero_action.sh`의 `HEXAPOD_SMOKE_OK`까지 확인한다.
 3. USD joint axis/sign, mass/COM/inertia, primitive collision을 manifest와 비교한다.

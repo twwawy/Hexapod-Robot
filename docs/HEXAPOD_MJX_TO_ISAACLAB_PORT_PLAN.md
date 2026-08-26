@@ -9,6 +9,14 @@
 
 > 최종 목표: MJX의 firmware-residual 환경을 Isaac Lab `DirectRLEnv`로 옮기되, RL을 붙이기 전에 asset, controller, observation, reward, termination의 계약을 각각 검증한다. “비슷하게 걷는다”는 합격 기준이 아니다.
 
+> **2026-08-27 계획 갱신:** 이 문서는 기존 146-D MJX 환경을 Isaac으로 옮기는
+> parity 기반 문서로 유지한다. 최종 배포 목표는 LiDAR + Depth + IMU 기반
+> perceptive residual locomotion으로 확장되었으며, 센서 frame, GT 지형 누설 제거,
+> elevation map, asymmetric actor-critic, sensor curriculum의 새 구현 순서는
+> [HEXAPOD_PERCEPTIVE_RESIDUAL_ISAACLAB_PLAN.md](HEXAPOD_PERCEPTIVE_RESIDUAL_ISAACLAB_PLAN.md)를
+> 따른다. 이 문서의 15-point terrain ray와 146-D observation은 legacy teacher/parity
+> 계약이지 최종 actor 입력 계약이 아니다.
+
 ---
 
 ## 1. 절대 원칙
