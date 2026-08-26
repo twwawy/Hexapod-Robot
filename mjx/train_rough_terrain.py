@@ -23,6 +23,7 @@ if not os.environ.get("DISPLAY") and not os.environ.get("MUJOCO_GL"):
 import jax
 import jax.numpy as jp
 
+from domain_randomization import randomize_batch
 from policy_video import render_policy_video
 from rough_terrain_env import (
     ACTION_CONTRACT_VERSION,
@@ -136,6 +137,13 @@ def _arguments() -> argparse.Namespace:
     parser.add_argument("--command-min-speed", type=float, default=0.06)
     parser.add_argument("--command-max-speed", type=float, default=0.12)
     parser.add_argument("--command-delay", type=float, default=1.0)
+    parser.add_argument(
+        "--dr-bank-size",
+        type=int,
+        choices=(1, 16),
+        default=16,
+        help="Plant bank size: 1 disables DR; 16 enables model/state DR.",
+    )
     parser.add_argument(
         "--collision-mode",
         choices=("lower_leg", "terrain", "feet", "full"),
@@ -384,6 +392,7 @@ def _write_metadata(args: argparse.Namespace, env: HexapodRoughTerrainEnv) -> No
             "mjx_contact_slots": env.contact_slots,
             "mjx_constraint_rows": env.constraint_rows,
             "collision_mode": env.collision_mode,
+            "dr_bank_size": args.dr_bank_size,
             "servo_model": servo_model_metadata(),
             "terrain_step_height_m": env.terrain_step_height,
             "terrain_total_rise_m": env.terrain_total_rise,
@@ -514,6 +523,7 @@ def main() -> None:
     config.command_max_speed = args.command_max_speed
     config.command_delay = args.command_delay
     config.collision_mode = args.collision_mode
+    config.dr_enabled = args.dr_bank_size == 16
     env = HexapodRoughTerrainEnv(config=config, terrain_level=args.terrain_level)
     print("JAX devices:", jax.devices())
     print(
@@ -556,6 +566,15 @@ def main() -> None:
         value_hidden_layer_sizes=network_layers,
     )
     monitor = ScoreMonitor(args.monitor_dir, args.score_key)
+    randomization_fn = (
+        None
+        if args.dr_bank_size == 1
+        else functools.partial(
+            randomize_batch,
+            bank_size=args.dr_bank_size,
+            seed=args.seed,
+        )
+    )
 
     wandb_run = None
     wandb_module = None
@@ -863,6 +882,7 @@ def main() -> None:
         run_evals=args.eval,
         network_factory=network_factory,
         wrap_env_fn=functools.partial(wrapper.wrap_for_brax_training, full_reset=True),
+        randomization_fn=randomization_fn,
         save_checkpoint_path=str(args.output),
         restore_checkpoint_path=(
             str(args.init_checkpoint) if args.init_checkpoint is not None else None

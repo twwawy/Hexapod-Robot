@@ -55,6 +55,13 @@ SUCCESS_POSTURE_TOLERANCE_RAD = jp.deg2rad(12.0)
 FOOT_CLEARANCE_RADIUS_M = 0.05
 FOOT_CLEARANCE_MIN_M = 0.02
 STAIR_EDGE_MARGIN_M = 0.03
+DR_ROOT_POSITION_JITTER_M = 0.01
+DR_ROOT_ROTATION_JITTER_RAD = jp.deg2rad(3.0)
+DR_JOINT_POSITION_JITTER_RAD = 0.05
+DR_PUSH_VELOCITY_MPS = 0.5
+DR_PUSH_INTERVAL_MIN_S = 4.0
+DR_PUSH_INTERVAL_MAX_S = 8.0
+DR_MAX_ACTION_DELAY_TICKS = 2
 _DIAGONAL_CLEARANCE_OFFSET = FOOT_CLEARANCE_RADIUS_M / np.sqrt(2.0)
 FOOT_CLEARANCE_OFFSETS = jp.asarray(
     (
@@ -235,6 +242,7 @@ def default_config() -> config_dict.ConfigDict:
         command_max_speed=0.12,
         command_max_yaw_rate=0.0,
         command_delay=1.0,
+        dr_enabled=False,
         target_clearance=0.316,
         safety=config_dict.create(
             max_tilt=0.7853981633974483,
@@ -292,6 +300,28 @@ def _quat_multiply(left: jax.Array, right: jax.Array) -> jax.Array:
             lw * rz + lx * ry - ly * rx + lz * rw,
         )
     )
+
+
+def _euler_to_quat(rpy: jax.Array) -> jax.Array:
+    half_roll, half_pitch, half_yaw = rpy * 0.5
+    cr, sr = jp.cos(half_roll), jp.sin(half_roll)
+    cp, sp = jp.cos(half_pitch), jp.sin(half_pitch)
+    cy, sy = jp.cos(half_yaw), jp.sin(half_yaw)
+    return jp.asarray(
+        (
+            cr * cp * cy + sr * sp * sy,
+            sr * cp * cy - cr * sp * sy,
+            cr * sp * cy + sr * cp * sy,
+            cr * cp * sy - sr * sp * cy,
+        )
+    )
+
+
+def _push_interval_steps(key: jax.Array, dt: float) -> jax.Array:
+    interval_s = jax.random.uniform(
+        key, (), minval=DR_PUSH_INTERVAL_MIN_S, maxval=DR_PUSH_INTERVAL_MAX_S
+    )
+    return jp.ceil(interval_s / dt).astype(jp.int32)
 
 
 def _quat_rotate(quat: jax.Array, vector: jax.Array) -> jax.Array:
@@ -787,10 +817,51 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
         return observation
 
     def reset(self, rng: jax.Array) -> mjx_env.State:
-        rng, q_key, vel_key, cmd_key, yaw_key = jax.random.split(rng, 5)
+        if self._config.dr_enabled:
+            (
+                rng,
+                q_key,
+                vel_key,
+                cmd_key,
+                yaw_key,
+                root_key,
+                rotation_key,
+                push_key,
+                delay_key,
+            ) = jax.random.split(rng, 9)
+            joint_jitter = DR_JOINT_POSITION_JITTER_RAD
+        else:
+            rng, q_key, vel_key, cmd_key, yaw_key = jax.random.split(rng, 5)
+            joint_jitter = 0.01
         qpos = self._home_qpos.at[self._joint_qpos_ids].add(
-            jax.random.uniform(q_key, (18,), minval=-0.01, maxval=0.01)
+            jax.random.uniform(
+                q_key, (18,), minval=-joint_jitter, maxval=joint_jitter
+            )
         )
+        if self._config.dr_enabled:
+            root_position_delta = jax.random.uniform(
+                root_key,
+                (3,),
+                minval=-DR_ROOT_POSITION_JITTER_M,
+                maxval=DR_ROOT_POSITION_JITTER_M,
+            )
+            rotation_delta = jax.random.uniform(
+                rotation_key,
+                (3,),
+                minval=-DR_ROOT_ROTATION_JITTER_RAD,
+                maxval=DR_ROOT_ROTATION_JITTER_RAD,
+            )
+            qpos = qpos.at[:3].add(root_position_delta)
+            qpos = qpos.at[3:7].set(
+                _quat_multiply(_euler_to_quat(rotation_delta), qpos[3:7])
+            )
+            next_push_step = _push_interval_steps(push_key, self.dt)
+            action_delay_ticks = jax.random.randint(
+                delay_key, (), 0, DR_MAX_ACTION_DELAY_TICKS + 1
+            )
+        else:
+            next_push_step = jp.asarray(jp.iinfo(jp.int32).max, dtype=jp.int32)
+            action_delay_ticks = jp.zeros((), dtype=jp.int32)
         qvel = jp.zeros(self.mjx_model.nv).at[:6].set(
             jax.random.uniform(vel_key, (6,), minval=-0.01, maxval=0.01)
         )
@@ -822,6 +893,12 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
             "command": jp.array((speed, yaw_rate)),
             "steps": jp.zeros((), dtype=jp.int32),
             "last_action": jp.zeros(ACTION_SIZE),
+            # The policy tick is 20 ms, so delays {0,1,2} mean {0,20,40} ms.
+            "action_delay_buffer": jp.zeros(
+                (DR_MAX_ACTION_DELAY_TICKS + 1, ACTION_SIZE)
+            ),
+            "action_delay_ticks": action_delay_ticks,
+            "next_push_step": next_push_step,
             "controller_state": firmware.initial_state(),
             "controller_output": controller_output,
             "contact_state": contacts,
@@ -867,6 +944,33 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
 
     def step(self, state: mjx_env.State, action: jax.Array) -> mjx_env.State:
         action = jp.clip(action, -1.0, 1.0)
+        action_delay_buffer = jp.concatenate(
+            (action[None, :], state.info["action_delay_buffer"][:-1]), axis=0
+        )
+        action = action_delay_buffer[state.info["action_delay_ticks"]]
+        next_push_step = state.info["next_push_step"]
+        info_rng = state.info["rng"]
+        if self._config.dr_enabled:
+            info_rng, push_velocity_key, push_interval_key = jax.random.split(
+                info_rng, 3
+            )
+            push_due = state.info["steps"] >= next_push_step
+            push_velocity = jax.random.uniform(
+                push_velocity_key,
+                (2,),
+                minval=-DR_PUSH_VELOCITY_MPS,
+                maxval=DR_PUSH_VELOCITY_MPS,
+            )
+            qvel = state.data.qvel.at[:2].add(
+                jp.where(push_due, push_velocity, jp.zeros(2))
+            )
+            state = state.replace(data=state.data.replace(qvel=qvel))
+            next_push_step = jp.where(
+                push_due,
+                state.info["steps"]
+                + _push_interval_steps(push_interval_key, self.dt),
+                next_push_step,
+            )
         contacts_before = self._foot_contacts(state.data)
         pre_contact_foot_vz = self._foot_vertical_velocity(state.data)
         attitude_before = self._relative_attitude(state.data)
@@ -1095,7 +1199,10 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
         )
 
         state.info["steps"] += 1
+        state.info["rng"] = info_rng
         state.info["last_action"] = action
+        state.info["action_delay_buffer"] = action_delay_buffer
+        state.info["next_push_step"] = next_push_step
         state.info["controller_state"] = controller_state
         state.info["controller_output"] = controller
         state.info["contact_state"] = contacts
