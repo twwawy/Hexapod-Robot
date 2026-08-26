@@ -79,6 +79,8 @@ MODEL_SIGNS = jp.array(
 # Z has phase-dependent semantics: swing Z selects a 4--25 cm arc height,
 # stance Z is limited to 2 cm and late-landing Z is controller-owned.
 RESIDUAL_SCALE = jp.array((0.04, 0.02, 0.02))
+EFFECTIVE_PITCH_MAX_RAD = 0.5585
+HEIGHT_OFFSET_MAX_M = 0.10
 
 
 class FirmwareState(NamedTuple):
@@ -222,6 +224,12 @@ def _rotate_inverse(vectors: jax.Array, rpy: jax.Array) -> jax.Array:
 def _all_feet_valid(feet_body: jax.Array, posture: jax.Array) -> jax.Array:
     _, valid = _solve_ik(_rotate_inverse(feet_body, posture))
     return jp.all(valid)
+
+
+def _apply_height_offset(feet_body: jax.Array, height_offset: jax.Array) -> jax.Array:
+    """Shift nominal feet for a body-clearance offset before posture rotation."""
+    bounded = jp.clip(height_offset, -HEIGHT_OFFSET_MAX_M, HEIGHT_OFFSET_MAX_M)
+    return feet_body.at[:, 2].add(-bounded)
 
 
 def _quintic(progress: jax.Array) -> jax.Array:
@@ -549,6 +557,9 @@ def step(
     contacts: jax.Array,
     policy_action: jax.Array,
     pitch_ff: jax.Array = 0.0,
+    roll_cmd: jax.Array = 0.0,
+    pitch_cmd: jax.Array = 0.0,
+    height_offset: jax.Array = 0.0,
     swing_boost: jax.Array = 0.0,
 ) -> tuple[FirmwareState, FirmwareOutput]:
     """Advance the source-equivalent controller by one 5 ms firmware tick."""
@@ -619,7 +630,14 @@ def step(
         state, gait, gait_applied, tripod_enable
     )
 
-    posture_error = jp.stack((-attitude_rpy[0], pitch_ff - attitude_rpy[1]))
+    effective_pitch = jp.clip(
+        pitch_cmd + pitch_ff,
+        -EFFECTIVE_PITCH_MAX_RAD,
+        EFFECTIVE_PITCH_MAX_RAD,
+    )
+    posture_error = jp.stack(
+        (roll_cmd - attitude_rpy[0], effective_pitch - attitude_rpy[1])
+    )
     posture_rate = jp.clip(2.0 * posture_error, -jp.deg2rad(15.0), jp.deg2rad(15.0))
     posture_candidate = state.posture_command.at[:2].set(
         jp.clip(
@@ -633,13 +651,21 @@ def step(
         + jp.clip(-state.posture_command[2], -jp.deg2rad(15.0), jp.deg2rad(15.0))
         * FIRMWARE_CONTROL_DT
     )
-    posture_accepted = _all_feet_valid(nominal_feet, posture_candidate)
+    shifted_nominal_feet = _apply_height_offset(nominal_feet, height_offset)
+    posture_accepted = _all_feet_valid(shifted_nominal_feet, posture_candidate)
     posture_command = jp.where(
         state.first_step,
         jp.zeros(3),
         jp.where(posture_accepted, posture_candidate, state.posture_command),
     )
-    nominal_posture_feet = _rotate_inverse(nominal_feet, posture_command)
+    # Reject the combined height/posture request as one workspace-gated unit.
+    # This preserves the unshifted last-valid path when a command is unreachable.
+    accepted_nominal_feet = jp.where(
+        posture_accepted, shifted_nominal_feet, nominal_feet
+    )
+    nominal_posture_feet = _rotate_inverse(
+        accepted_nominal_feet, posture_command
+    )
 
     residual_alpha = jp.exp(-FIRMWARE_CONTROL_DT / 0.10)
     residual_filter = residual_alpha * state.residual_filter + (
@@ -651,7 +677,7 @@ def step(
         gait["progress"],
         swing_boost,
     )
-    candidate_local = _body_to_leg(nominal_feet) + residual_local
+    candidate_local = _body_to_leg(accepted_nominal_feet) + residual_local
     residual_feet = _rotate_inverse(_leg_to_body(candidate_local), posture_command)
     _, policy_valid = _solve_ik(residual_feet)
     safe_feet = jp.where(policy_valid[:, None], residual_feet, nominal_posture_feet)
