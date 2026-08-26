@@ -6,7 +6,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define ROBOT_BRINGUP_STAGE              3U                                 // 현재 실기 시험 단계를 선택한다.
+#define ROBOT_BRINGUP_STAGE              4U                                 // 현재 실기 시험 단계를 선택한다.
 #define ROBOT_BRINGUP_STAGE_MIN          1U                                 // 첫 시험 단계를 정의한다.
 #define ROBOT_BRINGUP_STAGE_MAX          6U                                 // 최종 운용 단계를 정의한다.
 #define ROBOT_BRINGUP_LOW_SPEED_MPS      0.05f                              // 저속 보행 시험 한계를 정의한다.

@@ -1381,7 +1381,7 @@ static void HexapodApp_InitializeBringup(HexapodApp_Handle_t *handle)
     handle->bringup.stage = ROBOT_BRINGUP_STAGE;                                      // 컴파일된 시험 단계를 저장한다.
  8001090:	687b      	ldr	r3, [r7, #4]
  8001092:	f503 5380 	add.w	r3, r3, #4096	@ 0x1000
- 8001096:	2203      	movs	r2, #3
+ 8001096:	2204      	movs	r2, #4
  8001098:	f883 279c 	strb.w	r2, [r3, #1948]	@ 0x79c
     handle->bringup.neutral_output_active = (ROBOT_BRINGUP_STAGE == 2U);               // 2단계에서 0도를 고정한다.
  800109c:	687b      	ldr	r3, [r7, #4]
@@ -1396,7 +1396,7 @@ static void HexapodApp_InitializeBringup(HexapodApp_Handle_t *handle)
     handle->bringup.correction_allowed = (ROBOT_BRINGUP_STAGE >= 4U);                  // 4단계부터 보정을 허가한다.
  80010b4:	687b      	ldr	r3, [r7, #4]
  80010b6:	f503 5380 	add.w	r3, r3, #4096	@ 0x1000
- 80010ba:	2200      	movs	r2, #0
+ 80010ba:	2201      	movs	r2, #1
  80010bc:	f883 27aa 	strb.w	r2, [r3, #1962]	@ 0x7aa
     handle->bringup.walking_allowed = (ROBOT_BRINGUP_STAGE >= 5U);                     // 5단계부터 보행을 허가한다.
  80010c0:	687b      	ldr	r3, [r7, #4]
@@ -1406,7 +1406,7 @@ static void HexapodApp_InitializeBringup(HexapodApp_Handle_t *handle)
     handle->bringup.simulated_rc_active = (ROBOT_BRINGUP_STAGE == 2U) ||
  80010cc:	687b      	ldr	r3, [r7, #4]
  80010ce:	f503 5380 	add.w	r3, r3, #4096	@ 0x1000
- 80010d2:	2201      	movs	r2, #1
+ 80010d2:	2200      	movs	r2, #0
  80010d4:	f883 27ac 	strb.w	r2, [r3, #1964]	@ 0x7ac
                                           (ROBOT_BRINGUP_STAGE == 3U);                  // 2·3단계에서 임시 조종기를 사용한다.
     handle->bringup.linear_limit_mps = (ROBOT_BRINGUP_STAGE == 5U) ?
