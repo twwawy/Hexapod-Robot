@@ -117,7 +117,7 @@ failure로 종료하며 **시간 간격을 곱하지 않은 -30**을 준다.
 | 2 | 강한 울퉁불퉁 | 최대 5 cm 높이 타일 |
 | 3 | 경사면 | 8° 연속 경사 |
 | 4 | 가파른 경사면 | 15° 연속 경사 |
-| 5~8 | 기존 계단 curriculum | 7단 전체 높이 5/10/15/20 cm |
+| 5~8 | 7단 계단 | 한 riser 5/10/15/20 cm |
 | 9~12 | 연속 10단 계단 | 한 riser 5/10/15/20 cm |
 
 최종 level 12는 **20 cm riser가 10번 연속**되며 최상단은 바닥에서 2 m다.
@@ -199,6 +199,8 @@ episode evaluation과 렌더링을 건너뛸 수 있다. Curriculum 실행에는
 `--level-progression sequential`을 쓴다. 기존 checkpoint에서 시작할 때는 launcher에
 `--init-checkpoint mjx/runs/terrain/<run>/checkpoints`를 지정한다. 로더는 18-D,
 142-D, network layer 및 semantic contract가 모두 맞을 때만 승계를 허용한다.
+이전 run의 stage 번호까지 이어 표시하려면 다음 stage 번호를 `--start-stage`로
+지정한다. 첫 stage는 기본적으로 actor만 복원하고 critic은 새 지형에서 다시 학습한다.
 
 adaptive swing v3는 Z action 의미가 바뀌므로 기존 level 4 actor를 직접 이어받지
 않고 level 0부터 새 run을 시작한다.

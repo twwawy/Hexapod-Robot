@@ -38,6 +38,12 @@ def _arguments() -> tuple[argparse.Namespace, list[str]]:
     )
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument(
+        "--start-stage",
+        type=int,
+        default=0,
+        help="Stage label offset used when continuing from an earlier run.",
+    )
+    parser.add_argument(
         "--stages", type=int, default=44, help="Maximum competence attempts."
     )
     parser.add_argument("--stage-timesteps", type=int, default=5_000_000)
@@ -105,6 +111,8 @@ def _arguments() -> tuple[argparse.Namespace, list[str]]:
         extras = extras[1:]
     if args.stages < 1 or args.stage_timesteps < 1:
         parser.error("--stages and --stage-timesteps must be positive")
+    if args.start_stage < 0:
+        parser.error("--start-stage cannot be negative")
     if args.flat_baseline_timesteps < 0:
         parser.error("--flat-baseline-timesteps cannot be negative")
     if args.stage_0_timesteps is not None and args.stage_0_timesteps < 1:
@@ -411,10 +419,11 @@ def main() -> None:
             level_attempt = 0
         level = next_level
 
-    for stage in range(args.stages):
+    for attempt_index in range(args.stages):
+        stage = args.start_stage + attempt_index
         timesteps = (
             args.stage_0_timesteps
-            if stage == 0 and args.stage_0_timesteps is not None
+            if attempt_index == 0 and args.stage_0_timesteps is not None
             else args.stage_timesteps
         )
         prefix = f"{args.run_name}-stage{stage:02d}-level{level}"
@@ -429,7 +438,9 @@ def main() -> None:
             stage=stage,
             init_checkpoint=init_checkpoint,
             restore_value=(
-                stage > 0 or level_attempt > 0 or args.init_value_function
+                attempt_index > 0
+                or level_attempt > 0
+                or args.init_value_function
             ),
             terrain_root=terrain_root,
         )

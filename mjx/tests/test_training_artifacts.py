@@ -76,6 +76,20 @@ class TrainingArtifactTest(unittest.TestCase):
         self.assertAlmostEqual(TERRAIN_LEVELS[3].slope_degrees, 8.0)
         self.assertAlmostEqual(TERRAIN_LEVELS[4].slope_degrees, 15.0)
         self.assertTrue(all(spec.kind == "stairs" for spec in TERRAIN_LEVELS[5:]))
+        seven_step = TERRAIN_LEVELS[5:9]
+        self.assertEqual(tuple(spec.stair_count for spec in seven_step), (7,) * 4)
+        self.assertEqual(
+            tuple(spec.stair_riser for spec in seven_step),
+            (0.05, 0.10, 0.15, 0.20),
+        )
+        for spec, expected in zip(seven_step, (0.35, 0.70, 1.05, 1.40)):
+            self.assertAlmostEqual(spec.final_height, expected)
+        ten_step = TERRAIN_LEVELS[9:13]
+        self.assertEqual(tuple(spec.stair_count for spec in ten_step), (10,) * 4)
+        self.assertEqual(
+            tuple(spec.stair_riser for spec in ten_step),
+            (0.05, 0.10, 0.15, 0.20),
+        )
         final = TERRAIN_LEVELS[-1]
         self.assertEqual(final.stair_count, 10)
         self.assertAlmostEqual(final.stair_riser, 0.20)

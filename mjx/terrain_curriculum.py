@@ -79,13 +79,13 @@ class TerrainLevel:
         )
 
 
-def _seven_step_total(level: int, total_height: float) -> TerrainLevel:
+def _stairs(level: int, stair_count: int, stair_riser: float) -> TerrainLevel:
     return TerrainLevel(
         level,
-        f"stairs_total_{int(round(100 * total_height))}cm",
+        f"stairs_{stair_count}x{int(round(100 * stair_riser))}cm",
         "stairs",
-        stair_count=7,
-        stair_riser=total_height / 7.0,
+        stair_count=stair_count,
+        stair_riser=stair_riser,
     )
 
 
@@ -95,14 +95,14 @@ TERRAIN_LEVELS = (
     TerrainLevel(2, "rough_hard", "rough", rough_amplitude=0.050),
     TerrainLevel(3, "ramp", "ramp", slope_degrees=8.0),
     TerrainLevel(4, "ramp_steep", "ramp", slope_degrees=15.0),
-    _seven_step_total(5, 0.05),
-    _seven_step_total(6, 0.10),
-    _seven_step_total(7, 0.15),
-    _seven_step_total(8, 0.20),
-    TerrainLevel(9, "stairs_riser_5cm", "stairs", stair_count=10, stair_riser=0.05),
-    TerrainLevel(10, "stairs_riser_10cm", "stairs", stair_count=10, stair_riser=0.10),
-    TerrainLevel(11, "stairs_riser_15cm", "stairs", stair_count=10, stair_riser=0.15),
-    TerrainLevel(12, "stairs_riser_20cm", "stairs", stair_count=10, stair_riser=0.20),
+    _stairs(5, 7, 0.05),
+    _stairs(6, 7, 0.10),
+    _stairs(7, 7, 0.15),
+    _stairs(8, 7, 0.20),
+    _stairs(9, 10, 0.05),
+    _stairs(10, 10, 0.10),
+    _stairs(11, 10, 0.15),
+    _stairs(12, 10, 0.20),
 )
 MAX_TERRAIN_LEVEL = len(TERRAIN_LEVELS) - 1
 
