@@ -121,20 +121,25 @@ class DomainRandomizationTest(unittest.TestCase):
         expected_qvel = jp.zeros(self.baseline.mjx_model.nv).at[:6].set(
             jax.random.uniform(vel_key, (6,), minval=-0.01, maxval=0.01)
         )
-        expected_command = jp.asarray(
+        expected_command = jp.concatenate(
             (
-                jax.random.uniform(
-                    cmd_key,
-                    (),
-                    minval=self.baseline._config.command_min_speed,
-                    maxval=self.baseline._config.command_max_speed,
+                jp.asarray(
+                    (
+                        jax.random.uniform(
+                            cmd_key,
+                            (),
+                            minval=self.baseline._config.command_min_speed,
+                            maxval=self.baseline._config.command_max_speed,
+                        ),
+                        jax.random.uniform(
+                            yaw_key,
+                            (),
+                            minval=-self.baseline._config.command_max_yaw_rate,
+                            maxval=self.baseline._config.command_max_yaw_rate,
+                        ),
+                    )
                 ),
-                jax.random.uniform(
-                    yaw_key,
-                    (),
-                    minval=-self.baseline._config.command_max_yaw_rate,
-                    maxval=self.baseline._config.command_max_yaw_rate,
-                ),
+                jp.zeros(3),
             )
         )
         np.testing.assert_allclose(np.asarray(state.data.qpos), expected_qpos, atol=1e-7)
