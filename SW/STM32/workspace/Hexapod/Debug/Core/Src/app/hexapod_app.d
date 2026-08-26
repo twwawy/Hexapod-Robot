@@ -1,8 +1,8 @@
 Core/Src/app/hexapod_app.o: ../Core/Src/app/hexapod_app.c \
- ../Core/Inc/app/hexapod_app.h \
+ ../Core/Inc/app/hexapod_app.h ../Core/Inc/app/control_timing_debug.h \
+ ../Core/Inc/common/robot_types.h ../Core/Inc/common/robot_config.h \
  ../Core/Inc/app/pressure_load_calibration.h \
- ../Core/Inc/sensor/foot_pressure.h ../Core/Inc/common/robot_types.h \
- ../Core/Inc/common/robot_config.h ../Core/Inc/app/robot_bringup.h \
+ ../Core/Inc/sensor/foot_pressure.h ../Core/Inc/app/robot_bringup.h \
  ../Core/Inc/communication/jetson_spi.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal.h \
  ../Core/Inc/stm32f4xx_hal_conf.h \
@@ -55,10 +55,11 @@ Core/Src/app/hexapod_app.o: ../Core/Src/app/hexapod_app.c \
  ../Core/Inc/high_control/stand_landing.h \
  ../Core/Inc/test/rc_command_generator.h
 ../Core/Inc/app/hexapod_app.h:
-../Core/Inc/app/pressure_load_calibration.h:
-../Core/Inc/sensor/foot_pressure.h:
+../Core/Inc/app/control_timing_debug.h:
 ../Core/Inc/common/robot_types.h:
 ../Core/Inc/common/robot_config.h:
+../Core/Inc/app/pressure_load_calibration.h:
+../Core/Inc/sensor/foot_pressure.h:
 ../Core/Inc/app/robot_bringup.h:
 ../Core/Inc/communication/jetson_spi.h:
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal.h:

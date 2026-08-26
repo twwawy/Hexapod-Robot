@@ -1,3 +1,4 @@
+"./Core/Src/app/control_timing_debug.o"
 "./Core/Src/app/hexapod_app.o"
 "./Core/Src/app/pressure_load_calibration.o"
 "./Core/Src/common/robot_calibration.o"

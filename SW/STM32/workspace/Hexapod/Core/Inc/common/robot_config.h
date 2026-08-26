@@ -19,20 +19,20 @@
 #define ROBOT_LINK_3_M                  0.230f      // 세 번째 링크 길이를 정의한다.
 #define ROBOT_BASE_FOOT_RADIUS_M        0.218728f   // 기본 발의 수평 반경을 정의한다.
 #define ROBOT_BASE_FOOT_Z_M             (-0.287006f) // 기본 발 높이를 정의한다.
-#define ROBOT_WORKSPACE_MARGIN_M        0.0001f     // IK 작업공간 여유를 정의한다.
+#define ROBOT_WORKSPACE_MARGIN_M        0.002f      // IK 작업공간 여유를 정의한다.
 
-#define ROBOT_GAIT_PHASE_TIME_S         0.5f        // 한 Tripod 위상 시간을 정의한다.
+#define ROBOT_GAIT_PHASE_TIME_S         1.0f        // 한 Tripod 위상 시간을 정의한다.
 #define ROBOT_STAND_TIME_S              5.6f        // 서기 시간을 정의한다.
 #define ROBOT_LANDING_TIME_S            5.6f        // 착지 하강 시간을 정의한다.
 #define ROBOT_SETTLING_TIME_S           0.5f        // 자세 안정 시간을 정의한다.
 #define ROBOT_RECOVERY_TIME_S           0.5f        // Tripod 복구 시간을 정의한다.
 
 #define ROBOT_MAX_LINEAR_SPEED_MPS      0.28f       // X/Y 최대 이동 속도를 정의한다.
-#define ROBOT_MAX_CORRECTION_SPEED_MPS  0.05f       // 보정 최대 이동 속도를 정의한다.
+#define ROBOT_MAX_CORRECTION_SPEED_MPS  0.10f       // 보정 최대 이동 속도를 정의한다.
 #define ROBOT_MAX_YAW_RATE_RADPS        (45.0f * ROBOT_DEG_TO_RAD_F)
 #define ROBOT_MAX_ROLL_RAD              (45.0f * ROBOT_DEG_TO_RAD_F)
 #define ROBOT_MAX_PITCH_RAD             (45.0f * ROBOT_DEG_TO_RAD_F)
-#define ROBOT_MAX_CORRECTION_YAW_RAD    (10.0f * ROBOT_DEG_TO_RAD_F)
+#define ROBOT_MAX_CORRECTION_YAW_RAD    (30.0f * ROBOT_DEG_TO_RAD_F)
 
 #define ROBOT_GAIT_LINEAR_THRESHOLD_MPS 0.005f      // 보행 시작 선속도 기준을 정의한다.
 #define ROBOT_GAIT_YAW_THRESHOLD_RADPS  (1.0f * ROBOT_DEG_TO_RAD_F)

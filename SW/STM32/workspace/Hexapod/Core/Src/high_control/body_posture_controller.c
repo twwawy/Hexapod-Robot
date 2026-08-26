@@ -8,7 +8,7 @@
 
 #define POSTURE_KP             2.0f
 #define POSTURE_KI             0.0f
-#define POSTURE_RATE_MAX       (15.0f * ROBOT_DEG_TO_RAD_F)
+#define POSTURE_RATE_MAX       (30.0f * ROBOT_DEG_TO_RAD_F)
 #define POSTURE_INTEGRAL_LIMIT 0.50f
 
 /* 실수 값을 지정한 범위로 제한한다. */

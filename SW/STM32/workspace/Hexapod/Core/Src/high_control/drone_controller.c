@@ -290,8 +290,8 @@ RobotDroneOutput_t DroneController_Step(DroneController_Handle_t *handle,
         }
         else
         {
-            output.vy_user_mps = 0.0f;                                           // 횡이동을 차단한다.
-            output.wz_user_radps = ROBOT_MAX_YAW_RATE_RADPS * handle->yaw_filter; // Yaw 회전을 계산한다.
+            output.vy_user_mps = 0.0f;                                             // 횡이동을 차단한다.
+            output.wz_user_radps = -ROBOT_MAX_YAW_RATE_RADPS * handle->yaw_filter;  // Yaw 회전 방향을 반전한다.
         }
 
         output.posture_reference_rad.roll = ROBOT_MAX_ROLL_RAD * handle->roll_filter;    // Roll 목표를 계산한다.
@@ -314,9 +314,9 @@ RobotDroneOutput_t DroneController_Step(DroneController_Handle_t *handle,
         output.body_control_enable = true;    // 몸체 제어를 활성화한다.
         output.posture_enable = true;         // 자세 제어를 활성화한다.
         output.correction_velocity_mps.x = ROBOT_MAX_CORRECTION_SPEED_MPS * handle->pitch_filter;    // Pitch로 보정 X속도를 만든다.
-        output.correction_velocity_mps.y = ROBOT_MAX_CORRECTION_SPEED_MPS * handle->roll_filter;     // Roll로 보정 Y속도를 만든다.
+        output.correction_velocity_mps.y = -ROBOT_MAX_CORRECTION_SPEED_MPS * handle->roll_filter;    // Roll 보정 방향을 반전한다.
         output.correction_velocity_mps.z = ROBOT_MAX_CORRECTION_SPEED_MPS * handle->throttle_filter; // Throttle로 보정 Z속도를 만든다.
-        output.posture_reference_rad.yaw = ROBOT_MAX_CORRECTION_YAW_RAD * handle->yaw_filter;         // Yaw 보정 목표를 만든다.
+        output.posture_reference_rad.yaw = -ROBOT_MAX_CORRECTION_YAW_RAD * handle->yaw_filter;        // Yaw 보정 방향을 반전한다.
     }
 
     if (output.reset_command)

@@ -1,6 +1,7 @@
 #ifndef HEXAPOD_APP_H
 #define HEXAPOD_APP_H
 
+#include "app/control_timing_debug.h"
 #include "app/pressure_load_calibration.h"
 #include "app/robot_bringup.h"
 #include "communication/jetson_spi.h"

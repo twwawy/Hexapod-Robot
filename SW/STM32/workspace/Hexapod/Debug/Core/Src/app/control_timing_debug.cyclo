@@ -1,0 +1,11 @@
+../Core/Src/app/control_timing_debug.c:11:17:ControlTimingDebug_CyclesToUs	2
+../Core/Src/app/control_timing_debug.c:19:13:ControlTimingDebug_Reset	1
+../Core/Src/app/control_timing_debug.c:31:13:ControlTimingDebug_SaveEvent	7
+../Core/Src/app/control_timing_debug.c:83:6:ControlTimingDebug_Init	1
+../Core/Src/app/control_timing_debug.c:97:10:ControlTimingDebug_ReadCycle	2
+../Core/Src/app/control_timing_debug.c:103:6:ControlTimingDebug_RecordProcess	5
+../Core/Src/app/control_timing_debug.c:140:6:ControlTimingDebug_BeginControl	9
+../Core/Src/app/control_timing_debug.c:185:6:ControlTimingDebug_RecordBreakdown	4
+../Core/Src/app/control_timing_debug.c:211:6:ControlTimingDebug_RecordSignals	3
+../Core/Src/app/control_timing_debug.c:228:6:ControlTimingDebug_EndControl	18
+../Core/Src/app/control_timing_debug.c:319:6:ControlTimingDebug_RecordTimerMissed	1

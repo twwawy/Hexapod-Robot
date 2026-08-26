@@ -220,6 +220,7 @@ HAL_StatusTypeDef HexapodApp_Init(HexapodApp_Handle_t *handle,
     memset(handle, 0, sizeof(*handle));  // 이전 실행 상태를 제거한다.
     handle->hardware = *hardware;        // CubeMX Handle 연결을 저장한다.
     HexapodApp_InitializeBringup(handle); // 단계별 출력 허가를 준비한다.
+    ControlTimingDebug_Init();           // 5 ms 제어 시간 측정을 준비한다.
 
     GPS_Init(&handle->gps, hardware->gps_uart);             // GPS 드라이버를 준비한다.
     IMU_Init(&handle->imu, hardware->imu_uart);             // WT931 드라이버를 준비한다.
@@ -330,12 +331,18 @@ void HexapodApp_Process(HexapodApp_Handle_t *handle)
 {
     char telemetry_text[ROBOT_TELEMETRY_MAX_TEXT + 1U];  // LoRa 관제 문자열을 저장한다.
     const uint32_t now_ms = HAL_GetTick();               // 현재 HAL 시각을 저장한다.
+    uint32_t process_start_cycle;                        // 통신 처리 시작 Cycle을 저장한다.
+    uint32_t process_end_cycle;                          // 통신 처리 종료 Cycle을 저장한다.
+    uint32_t crsf_age_ms;                                // 최신 조종기 명령 나이를 저장한다.
+    uint16_t crsf_buffer_used;                           // 현재 CRSF 버퍼 사용량을 저장한다.
     uint32_t frame_count;                                // 새 CRSF 프레임 수를 저장한다.
 
     if ((handle == NULL) || !handle->initialized)
     {
         return;
     }
+
+    process_start_cycle = ControlTimingDebug_ReadCycle();  // 통신 처리 시작 시각을 읽는다.
 
     (void)GPS_Process(&handle->gps);                 // GPS 수신 바이트를 해석한다.
     (void)IMU_Process(&handle->imu);                 // WT931 수신 바이트를 해석한다.
@@ -376,6 +383,20 @@ void HexapodApp_Process(HexapodApp_Handle_t *handle)
     {
         (void)JetsonSpi_Process(&handle->jetson);  // 준비된 센서 패킷을 Jetson과 교환한다.
     }
+
+    crsf_buffer_used = (uint16_t)((handle->crsf_receiver.head -
+                                   handle->crsf_receiver.tail) &
+                                  (CRSF_RECEIVER_BUFFER_SIZE - 1U));  // 남은 CRSF 바이트 수를 계산한다.
+    crsf_age_ms = handle->user.connected ?
+                  (HAL_GetTick() - handle->user.timestamp_ms) : 0U;   // 연결 중인 안전 명령 나이만 계산한다.
+    process_end_cycle = ControlTimingDebug_ReadCycle();               // 통신 처리 종료 시각을 읽는다.
+    ControlTimingDebug_RecordProcess(process_start_cycle,
+                                     process_end_cycle,
+                                     crsf_age_ms,
+                                     crsf_buffer_used,
+                                     handle->crsf_receiver.overflow_count,
+                                     handle->crsf_receiver.uart_error_count,
+                                     handle->crsf_protocol.crc_error_count);  // 통신 시간과 CRSF 오류를 기록한다.
 }
 
 /* 센서에서 서보와 릴레이까지 제어 체인을 한 주기 실행한다. */
@@ -391,11 +412,17 @@ static void HexapodApp_ControlStep(HexapodApp_Handle_t *handle)
     bool relay_enable;                        // 모터 전원 허가를 저장한다.
     uint32_t leg;                             // 다리 계산 번호를 저장한다.
     uint32_t now_ms;                          // 압력 보정 시각을 저장한다.
+    uint32_t sensor_start_cycle;              // 센서 구간 시작 Cycle을 저장한다.
+    uint32_t sensor_end_cycle;                // 센서 구간 종료 Cycle을 저장한다.
+    uint32_t algorithm_end_cycle;             // 알고리즘 구간 종료 Cycle을 저장한다.
+    uint32_t output_end_cycle;                // 출력 구간 종료 Cycle을 저장한다.
     RobotUserCommand_t limited_user;          // 시험 단계가 허용한 명령을 저장한다.
 
+    sensor_start_cycle = ControlTimingDebug_ReadCycle();               // 센서 구간 시작 시각을 읽는다.
     (void)SensorManager_Update(&handle->sensors);                  // 실제 센서 스냅샷을 갱신한다.
     (void)SensorManager_GetSnapshot(&handle->sensors,
                                     &handle->sensor_snapshot);     // 같은 주기의 센서값을 복사한다.
+    sensor_end_cycle = ControlTimingDebug_ReadCycle();                  // 센서 구간 종료 시각을 읽는다.
     handle->safety = Safety_Evaluate(&handle->safety_control,
                                      &handle->sensor_snapshot.imu,
                                      handle->joints.ik_valid);     // 이전 IK와 현재 자세 Fault를 먼저 평가한다.
@@ -424,10 +451,10 @@ static void HexapodApp_ControlStep(HexapodApp_Handle_t *handle)
     HexapodApp_LimitDroneCommand(handle, &handle->drone);                          // 현재 단계의 최대 속도를 적용한다.
     position = BodyPositionEstimator_Step(
         &handle->position_estimator,
-        handle->sensor_snapshot.joint_angle_rad,
+        handle->servo_pwm.previous_angle_rad,
         &handle->gait,
         handle->sensor_snapshot.foot_contact,
-        &handle->sensor_snapshot.imu.attitude_rad);                 // Stance FK로 몸체 위치를 추정한다.
+        &handle->sensor_snapshot.imu.attitude_rad);                 // 직전 서보 명령각으로 Stance FK를 계산한다.
     gait_pose = GaitPoseController_Step(
         &handle->gait_pose_control,
         handle->drone.reset_command,
@@ -440,7 +467,7 @@ static void HexapodApp_ControlStep(HexapodApp_Handle_t *handle)
                                   handle->drone.manual_enable,
                                   &handle->posture_control.command_rad,
                                   handle->drone.reset_command,
-                                  &gait_accepted);                   // 전체 위상 IK가 가능한 속도만 채택한다.
+                                  &gait_accepted);                   // 이번 주기의 보행 속도를 적용한다.
     handle->gait = GaitManager_Step(&handle->gait_manager,
                                     handle->drone.tripod_enable,
                                     handle->drone.tripod_mode,
@@ -469,6 +496,8 @@ static void HexapodApp_ControlStep(HexapodApp_Handle_t *handle)
         &handle->drone,
         &handle->sensor_snapshot.imu.attitude_rad,
         handle->drone.reset_command);  // 동적 자세 제한과 발 역회전을 적용한다.
+    algorithm_end_cycle = ControlTimingDebug_ReadCycle();  // 제어 알고리즘 종료 시각을 읽는다.
+    ControlTimingDebug_RecordSignals(&gait_pose.twist, &twist);  // PI 후보와 작업공간 채택값을 기록한다.
 
     for (leg = 0U; leg < ROBOT_LEG_COUNT; ++leg)
     {
@@ -520,18 +549,38 @@ static void HexapodApp_ControlStep(HexapodApp_Handle_t *handle)
                       handle->safety.controller_fault);                // Kill과 Fault에서 릴레이를 즉시 끈다.
     handle->bringup.relay_enabled = (Relay_GetStateMask() != 0U);       // 실제 릴레이 출력 여부를 기록한다.
     handle->control_count++;                                           // 완료 제어 주기를 기록한다.
+    output_end_cycle = ControlTimingDebug_ReadCycle();                  // IK와 출력 종료 시각을 읽는다.
+    ControlTimingDebug_RecordBreakdown(sensor_end_cycle - sensor_start_cycle,
+                                       algorithm_end_cycle - sensor_end_cycle,
+                                       output_end_cycle - algorithm_end_cycle);  // 제어 구간별 시간을 기록한다.
 }
 
 /* Timer 요청이 있을 때만 제어 체인을 한 번 실행한다. */
 bool HexapodApp_RunControlIfDue(HexapodApp_Handle_t *handle)
 {
+    uint32_t control_start_cycle;  // 전체 제어 시작 Cycle을 저장한다.
+    uint32_t control_end_cycle;    // 전체 제어 종료 Cycle을 저장한다.
+
     if ((handle == NULL) || !handle->initialized || !handle->control_due)
     {
         return false;
     }
 
-    handle->control_due = false;  // 이번 Timer 요청을 소비한다.
-    HexapodApp_ControlStep(handle);// 한 번의 5 ms 제어를 실행한다.
+    control_start_cycle = ControlTimingDebug_ReadCycle();  // 실제 제어 시작 시각을 읽는다.
+    ControlTimingDebug_BeginControl(control_start_cycle);   // 직전 제어와의 시작 간격을 기록한다.
+    handle->control_due = false;                            // 이번 Timer 요청을 소비한다.
+    HexapodApp_ControlStep(handle);                          // 한 번의 5 ms 제어를 실행한다.
+    control_end_cycle = ControlTimingDebug_ReadCycle();     // 실제 제어 종료 시각을 읽는다.
+    ControlTimingDebug_EndControl(control_start_cycle,
+                                  control_end_cycle,
+                                  HAL_GetTick(),
+                                  handle->control_count,
+                                  handle->missed_control_count,
+                                  handle->priority.active_mode,
+                                  &handle->user,
+                                  &handle->drone,
+                                  handle->gait_manager.phase_index,
+                                  handle->gait_manager.phase_time_s);  // 실행 시간과 이상 순간을 기록한다.
     return true;
 }
 
@@ -547,6 +596,7 @@ void HexapodApp_TimerCallback(HexapodApp_Handle_t *handle,
     if (handle->control_due)
     {
         handle->missed_control_count++;  // 이전 제어 미처리 상태를 기록한다.
+        ControlTimingDebug_RecordTimerMissed(handle->missed_control_count);  // 디버그 통계에 누락을 반영한다.
     }
     handle->control_due = true;           // 다음 Main Loop 제어 실행을 요청한다.
 }
