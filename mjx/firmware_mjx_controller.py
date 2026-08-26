@@ -282,6 +282,7 @@ def _phase_gated_policy_residual(
     filtered_action: jax.Array,
     gait_state: jax.Array,
     gait_progress: jax.Array,
+    swing_boost: jax.Array = 0.0,
 ) -> tuple[jax.Array, jax.Array]:
     """Return local residuals without moving swing takeoff or touchdown Z."""
     action = filtered_action.reshape(6, 3)
@@ -293,7 +294,11 @@ def _phase_gated_policy_residual(
 
     xy = action[:, :2] * RESIDUAL_SCALE[:2]
     xy = jp.where(swing[:, None], xy, 0.0)
-    swing_z = (swing_height - SWING_HEIGHT) * swing_envelope
+    bounded_boost = jp.clip(swing_boost, 0.0, 0.06)
+    swing_z = jp.minimum(
+        (swing_height - SWING_HEIGHT + bounded_boost) * swing_envelope,
+        SWING_HEIGHT_MAX - SWING_HEIGHT,
+    )
     stance_z = action[:, 2] * RESIDUAL_SCALE[2]
     z = jp.where(swing, swing_z, jp.where(stance, stance_z, 0.0))
     return jp.concatenate((xy, z[:, None]), axis=-1), swing_height
@@ -544,6 +549,7 @@ def step(
     contacts: jax.Array,
     policy_action: jax.Array,
     pitch_target: jax.Array = 0.0,
+    swing_boost: jax.Array = 0.0,
 ) -> tuple[FirmwareState, FirmwareOutput]:
     """Advance the source-equivalent controller by one 5 ms firmware tick."""
     target_velocity = jp.clip(
@@ -643,6 +649,7 @@ def step(
         residual_filter,
         gait["state"],
         gait["progress"],
+        swing_boost,
     )
     candidate_local = _body_to_leg(nominal_feet) + residual_local
     residual_feet = _rotate_inverse(_leg_to_body(candidate_local), posture_command)

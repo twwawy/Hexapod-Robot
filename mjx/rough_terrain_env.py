@@ -49,6 +49,8 @@ PITCH_TARGET_LOOKAHEAD_M = 0.65
 PITCH_TARGET_DEADBAND_M = 0.005
 PITCH_TARGET_MAX_RAD = 0.48869
 PITCH_TARGET_FILTER_TAU_S = 0.15
+SWING_BOOST_RISE_M = 0.20
+SWING_BOOST_MAX_M = 0.06
 
 
 def _pitch_target(
@@ -71,6 +73,21 @@ def _pitch_target(
     bounded = jp.clip(deadbanded, -PITCH_TARGET_MAX_RAD, PITCH_TARGET_MAX_RAD)
     alpha = jp.exp(-dt / PITCH_TARGET_FILTER_TAU_S)
     return alpha * jp.nan_to_num(previous_target, nan=0.0) + (1.0 - alpha) * bounded
+
+
+def _swing_boost(
+    forward_heights: jax.Array,
+    support_height: jax.Array,
+) -> jax.Array:
+    """Map the tallest of nine forward samples to a bounded swing lift."""
+    if forward_heights.shape != (9,):
+        raise ValueError("swing boost requires exactly nine forward heights")
+    highest_ahead = jp.nan_to_num(jp.nanmax(forward_heights), nan=0.0)
+    relative_rise = highest_ahead - jp.nan_to_num(support_height, nan=0.0)
+    return (
+        jp.clip(relative_rise / SWING_BOOST_RISE_M, 0.0, 1.0)
+        * SWING_BOOST_MAX_M
+    )
 
 
 def default_config() -> config_dict.ConfigDict:
@@ -563,6 +580,19 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
             self.dt,
         )
 
+    def _terrain_swing_boost(
+        self,
+        data: mjx.Data,
+        support_height: jax.Array,
+    ) -> jax.Array:
+        attitude = self._relative_attitude(data)
+        cosine, sine = jp.cos(attitude[2]), jp.sin(attitude[2])
+        rotation = jp.array(((cosine, -sine), (sine, cosine)))
+        sample_world = (
+            data.qpos[None, :2] + self._forward_height_samples @ rotation.T
+        )
+        return _swing_boost(self._terrain_height(sample_world), support_height)
+
     def _get_obs(self, data: mjx.Data, info: dict[str, Any]) -> jax.Array:
         quat = data.qpos[3:7]
         local_velocity = _quat_rotate_inverse(quat, data.qvel[:3])
@@ -639,6 +669,7 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
             "contact_state": contacts,
             "support_height": support_height,
             "pitch_target": jp.zeros(()),
+            "swing_boost": jp.zeros(()),
             "max_terrain_height": support_height,
             "previous_root_x": data.qpos[0],
             "controller_rejection_steps": jp.zeros((), dtype=jp.int32),
@@ -685,6 +716,10 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
             state.info["support_height"],
             state.info["pitch_target"],
         )
+        swing_boost = self._terrain_swing_boost(
+            state.data,
+            state.info["support_height"],
+        )
         command_active = state.info["steps"] * self.dt >= self._config.command_delay
         firmware_command = jp.where(command_active, state.info["command"], jp.zeros(2))
 
@@ -697,6 +732,7 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
                 contacts=contacts_before,
                 policy_action=action,
                 pitch_target=pitch_target,
+                swing_boost=swing_boost,
             )
 
         controller_state, controller_history = jax.lax.scan(
@@ -896,6 +932,7 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
         state.info["contact_state"] = contacts
         state.info["support_height"] = support_height
         state.info["pitch_target"] = pitch_target
+        state.info["swing_boost"] = swing_boost
         state.info["max_terrain_height"] = max_terrain_height
         state.info["previous_root_x"] = data.qpos[0]
         state.info["controller_rejection_steps"] = rejection_steps
