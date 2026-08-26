@@ -39,9 +39,9 @@ from servo_model import (
 
 
 ACTION_SIZE = 18
-OBSERVATION_SIZE = 142
+OBSERVATION_SIZE = 143
 ACTION_CONTRACT_VERSION = "stm32_firmware_adaptive_swing_residual_v3"
-OBSERVATION_CONTRACT_VERSION = "firmware_state_collision_terrain_curriculum_v2"
+OBSERVATION_CONTRACT_VERSION = "firmware_state_collision_terrain_pitch_v3"
 LEGACY_OBSERVATION_CONTRACT_VERSION = "firmware_state_collision_contact_stairs_v1"
 MODEL_FORWARD = jp.array((0.0, -1.0, 0.0))
 MODEL_LATERAL = jp.array((1.0, 0.0, 0.0))
@@ -51,6 +51,7 @@ PITCH_TARGET_MAX_RAD = 0.48869
 PITCH_TARGET_FILTER_TAU_S = 0.15
 SWING_BOOST_RISE_M = 0.20
 SWING_BOOST_MAX_M = 0.06
+SUCCESS_POSTURE_TOLERANCE_RAD = jp.deg2rad(12.0)
 
 
 def _pitch_target(
@@ -88,6 +89,27 @@ def _swing_boost(
         jp.clip(relative_rise / SWING_BOOST_RISE_M, 0.0, 1.0)
         * SWING_BOOST_MAX_M
     )
+
+
+def _target_relative_attitude(
+    attitude: jax.Array,
+    pitch_target: jax.Array,
+) -> jax.Array:
+    return attitude[:2] - jp.stack((jp.asarray(0.0), pitch_target))
+
+
+def _upright_reward(attitude: jax.Array, pitch_target: jax.Array) -> jax.Array:
+    error = _target_relative_attitude(attitude, pitch_target)
+    return jp.exp(-jp.sum(jp.square(error)) / 0.12)
+
+
+def _posture_success(attitude: jax.Array, pitch_target: jax.Array) -> jax.Array:
+    error = _target_relative_attitude(attitude, pitch_target)
+    return jp.max(jp.abs(error)) < SUCCESS_POSTURE_TOLERANCE_RAD
+
+
+def _absolute_tilt_failure(attitude: jax.Array, max_tilt: float) -> jax.Array:
+    return jp.any(jp.abs(attitude[:2]) > max_tilt)
 
 
 def default_config() -> config_dict.ConfigDict:
@@ -624,6 +646,7 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
                     )
                 ),
                 info["last_action"],
+                jp.atleast_1d(info["pitch_target"]),
             )
         )
         return observation
@@ -770,7 +793,9 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
             | (root_angular_speed > self._config.safety.max_root_angular_speed)
             | (joint_speed_max > self._config.safety.max_joint_speed)
         )
-        tilt_failure = jp.any(jp.abs(attitude[:2]) > self._config.safety.max_tilt)
+        tilt_failure = _absolute_tilt_failure(
+            attitude, self._config.safety.max_tilt
+        )
         clearance_failure = clearance < self._config.safety.min_clearance
         finite = (
             jp.all(jp.isfinite(data.qpos))
@@ -794,7 +819,7 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
         success = (
             (data.qpos[0] >= self._terrain_goal_x)
             & final_height_ready
-            & (jp.max(jp.abs(attitude[:2])) < jp.deg2rad(20.0))
+            & _posture_success(attitude, pitch_target)
             & (~failure)
         )
         terminated = failure | success
@@ -874,7 +899,7 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
             "yaw": jp.exp(
                 -jp.square(data.qvel[5] - state.info["command"][1]) / 0.09
             ),
-            "upright": jp.exp(-jp.sum(jp.square(attitude[:2])) / 0.12),
+            "upright": _upright_reward(attitude, pitch_target),
             "height": jp.exp(
                 -jp.square(clearance - self._config.target_clearance) / 0.01
             ),
