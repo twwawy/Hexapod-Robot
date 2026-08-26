@@ -28,7 +28,6 @@ from policy_video import render_policy_video
 from rough_terrain_env import (
     ACTION_CONTRACT_VERSION,
     ACTION_SIZE,
-    LEGACY_OBSERVATION_CONTRACT_VERSION,
     OBSERVATION_CONTRACT_VERSION,
     OBSERVATION_SIZE,
     HexapodRoughTerrainEnv,
@@ -101,7 +100,39 @@ def progress_video_targets(count: int) -> tuple[float, ...]:
     return tuple(index / (count - 1) for index in range(count))
 
 
-def _arguments() -> argparse.Namespace:
+def _parse_reward_weights(
+    values: list[str], valid_keys: tuple[str, ...]
+) -> dict[str, float]:
+    overrides: dict[str, float] = {}
+    for value in values:
+        if "=" not in value:
+            raise ValueError("reward weights must use key=value")
+        key, raw_weight = value.split("=", 1)
+        key = key.strip()
+        if key not in valid_keys:
+            raise ValueError(
+                f"unknown reward key '{key}'; valid keys: {', '.join(valid_keys)}"
+            )
+        try:
+            weight = float(raw_weight)
+        except ValueError as exc:
+            raise ValueError(
+                f"reward weight '{value}' must contain a float value"
+            ) from exc
+        if not math.isfinite(weight):
+            raise ValueError(f"reward weight '{value}' must be finite")
+        overrides[key] = weight
+    return overrides
+
+
+def _apply_reward_weights(
+    config: Any, overrides: dict[str, float]
+) -> None:
+    for reward_name, reward_weight in overrides.items():
+        config.reward[reward_name] = reward_weight
+
+
+def _arguments(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--timesteps", type=int, default=50_000_000)
     parser.add_argument("--num-envs", type=int, default=2048)
@@ -163,6 +194,13 @@ def _arguments() -> argparse.Namespace:
     )
     parser.add_argument("--learning-rate", type=float, default=3e-4)
     parser.add_argument("--entropy-cost", type=float, default=0.01)
+    parser.add_argument(
+        "--reward-weight",
+        action="append",
+        default=[],
+        metavar="KEY=VALUE",
+        help="Override a reward coefficient; repeat for multiple keys.",
+    )
     parser.add_argument("--discounting", type=float, default=0.99)
     parser.add_argument("--unroll-length", type=int, default=32)
     parser.add_argument("--batch-size", type=int, default=256)
@@ -212,7 +250,14 @@ def _arguments() -> argparse.Namespace:
         default=Path.home() / ".cache" / "hexapod-mjx" / "jax",
         help="Persistent XLA cache reused by restarts with identical shapes.",
     )
-    return parser.parse_args()
+    args = parser.parse_args(argv)
+    try:
+        args.reward_weights = _parse_reward_weights(
+            args.reward_weight, tuple(sorted(default_config().reward.keys()))
+        )
+    except ValueError as exc:
+        parser.error(str(exc))
+    return args
 
 
 def _safe_component(value: str) -> str:
@@ -256,10 +301,9 @@ def _resolve_checkpoint(path: Path, network_layers: tuple[int, ...]) -> Path:
     saved_layers = contract.get("network_factory_kwargs", {}).get(
         "policy_hidden_layer_sizes"
     )
-    if contract.get("action_size") != ACTION_SIZE or observation_shape != [OBSERVATION_SIZE]:
+    if contract.get("action_size") != ACTION_SIZE:
         raise SystemExit(
-            "checkpoint tensor contract mismatch: expected "
-            f"action={ACTION_SIZE}, observation={OBSERVATION_SIZE}"
+            f"checkpoint action tensor mismatch: expected action={ACTION_SIZE}"
         )
     if saved_layers is not None and tuple(saved_layers) != network_layers:
         raise SystemExit(
@@ -277,12 +321,15 @@ def _resolve_checkpoint(path: Path, network_layers: tuple[int, ...]) -> Path:
     if metadata.get("action_contract_version") not in compatible_action_contracts:
         raise SystemExit("checkpoint action semantics do not match this firmware policy")
     saved_observation_contract = metadata.get("observation_contract_version")
-    compatible_observation_contracts = {
-        OBSERVATION_CONTRACT_VERSION,
-        LEGACY_OBSERVATION_CONTRACT_VERSION,
-    }
-    if saved_observation_contract not in compatible_observation_contracts:
-        raise SystemExit("checkpoint observation semantics do not match this environment")
+    if (
+        saved_observation_contract != OBSERVATION_CONTRACT_VERSION
+        or observation_shape != [OBSERVATION_SIZE]
+    ):
+        raise ValueError(
+            f"checkpoint observation contract '{saved_observation_contract}' != required "
+            f"'{OBSERVATION_CONTRACT_VERSION}' (legacy 142-D checkpoints incompatible — "
+            "start fresh)"
+        )
     return resolved
 
 
@@ -524,6 +571,7 @@ def main() -> None:
     config.command_delay = args.command_delay
     config.collision_mode = args.collision_mode
     config.dr_enabled = args.dr_bank_size == 16
+    _apply_reward_weights(config, args.reward_weights)
     env = HexapodRoughTerrainEnv(config=config, terrain_level=args.terrain_level)
     print("JAX devices:", jax.devices())
     print(
