@@ -1,10 +1,10 @@
-04:12:11 **** Incremental Build of configuration Debug for project Hexapod ****
+15:26:59 **** Incremental Build of configuration Debug for project Hexapod ****
 make -j16 all 
 arm-none-eabi-size  Hexapod.elf 
    text	   data	    bss	    dec	    hex	filename
-  26260	     12	   5320	  31592	   7b68	Hexapod.elf
+  59884	     92	   5000	  64976	   fdd0	Hexapod.elf
 Finished building: default.size.stdout
  
 
-04:12:11 Build Finished. 0 errors, 0 warnings. (took 680ms)
+15:27:00 Build Finished. 0 errors, 0 warnings. (took 743ms)
 

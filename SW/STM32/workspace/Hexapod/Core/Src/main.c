@@ -21,12 +21,20 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "measurement/measurement_stage7.h"
+#include "test/test_runner.h"
 
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
+
+typedef struct
+{
+  AlgorithmTestStep_t step;  // 실행한 알고리즘 단계를 저장한다.
+  bool finished;             // 시험 실행 완료 여부를 저장한다.
+  bool passed;               // 선택 단계 통과 여부를 저장한다.
+  bool stopped;              // 실패 후 러너 정지 여부를 저장한다.
+} AlgorithmTestDebug_t;
 
 /* USER CODE END PTD */
 
@@ -58,6 +66,9 @@ UART_HandleTypeDef huart3;
 UART_HandleTypeDef huart6;
 
 /* USER CODE BEGIN PV */
+
+TestRunner_Handle_t g_algorithm_test_runner;              // 단계별 알고리즘 시험 상태를 저장한다.
+volatile AlgorithmTestDebug_t g_algorithm_test_debug;     // Live Expressions 확인값을 저장한다.
 
 /* USER CODE END PV */
 
@@ -128,10 +139,13 @@ int main(void)
   MX_USART3_UART_Init();
   MX_USART6_UART_Init();
   /* USER CODE BEGIN 2 */
-  if (!MeasurementStage7_Init(&huart6))
-  {
-    Error_Handler();  // 초기화 오류를 디버거에서 확인한다.
-  }
+  TestRunner_Init(&g_algorithm_test_runner);                                  // 알고리즘 러너를 첫 단계로 초기화한다.
+  g_algorithm_test_debug.step = ALGORITHM_TEST_CALIBRATION_TABLE;             // 1단계 테이블 검사를 선택한다.
+  g_algorithm_test_debug.passed = TestRunner_RunStep(
+      &g_algorithm_test_runner,
+      ALGORITHM_TEST_CALIBRATION_TABLE);                                      // 중앙 보정 테이블을 한 번 검사한다.
+  g_algorithm_test_debug.stopped = g_algorithm_test_runner.stopped;           // 실패 정지 상태를 복사한다.
+  g_algorithm_test_debug.finished = true;                                     // Live Expressions에 완료를 표시한다.
 
   /* USER CODE END 2 */
 
@@ -142,7 +156,6 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-    MeasurementStage7_Process();  // 7단계 CRSF 채널 보정을 계속 진행한다.
   }
   /* USER CODE END 3 */
 }
@@ -918,18 +931,6 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-
-/* UART 수신 완료를 7단계 CRSF 실측에 전달한다. */
-void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
-{
-  MeasurementStage7_UartRxCallback(huart);  // USART6이면 다음 CRSF 바이트를 받는다.
-}
-
-/* UART 수신 오류를 7단계 CRSF 실측에 전달한다. */
-void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
-{
-  MeasurementStage7_UartErrorCallback(huart);  // USART6이면 CRSF 수신을 복구한다.
-}
 
 /* USER CODE END 4 */
 
