@@ -1,2 +1,9 @@
-g_algorithm_test_debug
-g_algorithm_test_runner
+g_hexapod_app
+g_hexapod_app.initialized
+g_hexapod_app.control_count
+g_hexapod_app.missed_control_count
+g_hexapod_app.user
+g_hexapod_app.sensor_snapshot
+g_hexapod_app.joints.ik_valid
+g_hexapod_app.safety
+g_hexapod_app.bringup

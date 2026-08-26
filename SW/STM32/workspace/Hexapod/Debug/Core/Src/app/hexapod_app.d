@@ -51,7 +51,8 @@ Core/Src/app/hexapod_app.o: ../Core/Src/app/hexapod_app.c \
  ../Core/Inc/user_command/crsf_receiver.h \
  ../Core/Inc/user_command/user_command.h \
  ../Core/Inc/common/robot_calibration.h ../Core/Inc/low_control/relay.h \
- ../Core/Inc/high_control/stand_landing.h
+ ../Core/Inc/high_control/stand_landing.h \
+ ../Core/Inc/test/rc_command_generator.h
 ../Core/Inc/app/hexapod_app.h:
 ../Core/Inc/app/robot_bringup.h:
 ../Core/Inc/common/robot_config.h:
@@ -111,3 +112,4 @@ Core/Src/app/hexapod_app.o: ../Core/Src/app/hexapod_app.c \
 ../Core/Inc/common/robot_calibration.h:
 ../Core/Inc/low_control/relay.h:
 ../Core/Inc/high_control/stand_landing.h:
+../Core/Inc/test/rc_command_generator.h:

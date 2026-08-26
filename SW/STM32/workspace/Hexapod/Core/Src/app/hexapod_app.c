@@ -3,6 +3,7 @@
 #include "common/robot_calibration.h"
 #include "high_control/stand_landing.h"
 #include "low_control/relay.h"
+#include "test/rc_command_generator.h"
 
 #include <stddef.h>
 #include <string.h>
@@ -19,7 +20,11 @@ extern UART_HandleTypeDef huart2; // GPS UART Handle을 연결한다.
 extern UART_HandleTypeDef huart3; // WT931 UART Handle을 연결한다.
 extern UART_HandleTypeDef huart6; // CRSF UART Handle을 연결한다.
 
-HexapodApp_Handle_t g_hexapod_app;  // 최종 앱의 전체 실행 상태를 저장한다.
+HexapodApp_Handle_t g_hexapod_app;              // 최종 앱의 전체 실행 상태를 저장한다.
+volatile bool g_robot_bringup_emergency_stop;  // 임시 조종기 시험 긴급정지를 저장한다.
+
+static RcCommandGenerator_t simulated_rc;  // 2단계 중립 조종기 입력을 저장한다.
+static uint32_t simulated_rc_start_ms;      // 임시 조종기 시작 시각을 저장한다.
 
 /* 실수 값을 지정한 절댓값 범위로 제한한다. */
 static float HexapodApp_ClampMagnitude(float value, float limit)
@@ -43,6 +48,8 @@ static void HexapodApp_InitializeBringup(HexapodApp_Handle_t *handle)
     handle->bringup.stand_landing_allowed = (ROBOT_BRINGUP_STAGE >= 3U);               // 3단계부터 서기·착지를 허가한다.
     handle->bringup.correction_allowed = (ROBOT_BRINGUP_STAGE >= 4U);                  // 4단계부터 보정을 허가한다.
     handle->bringup.walking_allowed = (ROBOT_BRINGUP_STAGE >= 5U);                     // 5단계부터 보행을 허가한다.
+    handle->bringup.simulated_rc_active = (ROBOT_BRINGUP_STAGE == 2U) ||
+                                          (ROBOT_BRINGUP_STAGE == 3U);                  // 2·3단계에서 임시 조종기를 사용한다.
     handle->bringup.linear_limit_mps = (ROBOT_BRINGUP_STAGE == 5U) ?
                                        ROBOT_BRINGUP_LOW_SPEED_MPS :
                                        ROBOT_MAX_LINEAR_SPEED_MPS;                    // 5단계만 저속으로 제한한다.
@@ -50,6 +57,56 @@ static void HexapodApp_InitializeBringup(HexapodApp_Handle_t *handle)
                                       ROBOT_BRINGUP_LOW_YAW_RATE_RADPS :
                                       ROBOT_MAX_YAW_RATE_RADPS;                       // 5단계만 저속 회전으로 제한한다.
     handle->bringup.relay_enabled = false;                                             // 실제 릴레이 상태를 OFF로 시작한다.
+
+    g_robot_bringup_emergency_stop = false;                                            // 임시 긴급정지를 해제한다.
+    if (handle->bringup.simulated_rc_active)
+    {
+        RcCommandGenerator_Init(&simulated_rc);                                        // 연결된 중립 조종기를 만든다.
+        simulated_rc_start_ms = HAL_GetTick();                                         // 1초 대기 시작 시각을 저장한다.
+    }
+}
+
+/* 2·3단계용 연결된 임시 조종기 명령을 갱신한다. */
+static void HexapodApp_UpdateSimulatedRc(HexapodApp_Handle_t *handle, uint32_t now_ms)
+{
+    uint32_t elapsed_ms;  // 임시 조종기 경과시간을 저장한다.
+
+    if ((handle == NULL) || !handle->bringup.simulated_rc_active)
+    {
+        return;
+    }
+
+    elapsed_ms = now_ms - simulated_rc_start_ms;                         // 자동 시험 경과시간을 계산한다.
+    handle->user = RcCommandGenerator_Step(&simulated_rc);               // 모든 짐벌이 중립인 연결 명령을 만든다.
+    handle->user.timestamp_ms = now_ms;                                  // 현재 임시 프레임 시각을 기록한다.
+    handle->user.sd = g_robot_bringup_emergency_stop ? 1U : 0U;          // 디버거 긴급정지를 SD Kill로 바꾼다.
+    handle->user.motion_armed =
+        (elapsed_ms >= ROBOT_BRINGUP_FAKE_RC_DELAY_MS) &&
+        !g_robot_bringup_emergency_stop;                                 // 1초 후에만 0도 출력을 허가한다.
+    handle->bringup.simulated_rc_elapsed_ms = elapsed_ms;                 // Live Expressions에 경과시간을 표시한다.
+
+    if (ROBOT_BRINGUP_STAGE == 2U)
+    {
+        handle->bringup.simulated_rc_phase = 1U;                          // 2단계 중립 유지 상태를 표시한다.
+        return;
+    }
+
+    if (elapsed_ms < ROBOT_BRINGUP_STAGE3_STAND_MS)
+    {
+        handle->user.sb = 0U;                                            // 시작 자세에서 서기 요청을 해제한다.
+        handle->bringup.simulated_rc_phase = 0U;                          // 초기 착지 대기를 표시한다.
+    }
+    else if (elapsed_ms < ROBOT_BRINGUP_STAGE3_LANDING_MS)
+    {
+        handle->user.sb = 1U;                                            // SB 중앙값으로 서기를 요청한다.
+        handle->bringup.simulated_rc_phase = 1U;                          // 자동 서기 구간을 표시한다.
+    }
+    else
+    {
+        handle->user.sb = 0U;                                            // SB를 해제해 착지를 요청한다.
+        handle->bringup.simulated_rc_phase =
+            handle->drone.landing_done ? 3U : 2U;                        // 착지 진행 또는 완료를 표시한다.
+    }
 }
 
 /* 시험 단계에서 아직 허용하지 않은 조종 명령을 제거한다. */
@@ -278,6 +335,7 @@ void HexapodApp_Process(HexapodApp_Handle_t *handle)
     }
     UserCommand_UpdateTimeout(&handle->user_command, now_ms);  // 연결 끊김과 중립 재허가를 갱신한다.
     (void)UserCommand_Get(&handle->user_command, &handle->user);  // 안전한 현재 명령을 복사한다.
+    HexapodApp_UpdateSimulatedRc(handle, now_ms);                  // 2·3단계이면 실제 CRSF 대신 시험 명령을 넣는다.
 
     if ((handle->hardware.lora_uart != NULL) &&
         RobotTelemetry_BuildNext(&handle->telemetry,
