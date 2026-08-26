@@ -25,10 +25,11 @@ class StairPenaltyTest(unittest.TestCase):
     def _base_kwargs(self) -> dict[str, jp.ndarray]:
         return {
             "forward_velocity": jp.asarray(0.2),
-            "command": jp.asarray((0.2, 0.0)),
+            "command": jp.asarray((0.2, 0.0, 0.0, 0.0, 0.0)),
             "yaw_velocity": jp.asarray(0.0),
             "attitude": jp.zeros(3),
-            "pitch_target": jp.asarray(0.0),
+            "posture_target": jp.zeros(2),
+            "height_command": jp.asarray(0.0),
             "clearance": jp.asarray(0.316),
             "target_clearance": jp.asarray(0.316),
             "root_angular_speed": jp.asarray(0.0),
@@ -155,6 +156,23 @@ class StairPenaltyTest(unittest.TestCase):
                 "self_collision": 1.0,
             },
         )
+
+    def test_command_aware_golden_nonzero_height_pitch_and_roll(self) -> None:
+        kwargs = self._base_kwargs()
+        command = jp.asarray(
+            (0.2, 0.0, 0.05, math.radians(-15.0), math.radians(5.0))
+        )
+        target = jp.asarray((math.radians(5.0), math.radians(-15.0)))
+        kwargs.update(
+            {
+                "command": command,
+                "attitude": target,
+                "posture_target": target,
+                "height_command": command[2],
+                "clearance": jp.asarray(0.366),
+            }
+        )
+        self._assert_terms(_base_reward_terms(**kwargs), self._hover_expected())
 
     def test_new_penalty_vectors(self) -> None:
         swing = jp.ones(6, dtype=jp.bool_)
