@@ -26,6 +26,11 @@ LEGACY_OBSERVATION_CONTRACT = "firmware_state_collision_terrain_curriculum_v2"
 V2_ACTION_CONTRACT = "stm32_firmware_cartesian_foot_residual_v2"
 V3_ACTION_CONTRACT = "stm32_firmware_adaptive_swing_residual_v3"
 XY_ACTION_MASK = jp.tile(jp.asarray((1.0, 1.0, 0.0)), 6)
+_KERNEL_INITIALIZER_KEYS = (
+    "policy_network_kernel_init_fn",
+    "value_network_kernel_init_fn",
+    "mean_kernel_init_fn",
+)
 
 
 @dataclass(frozen=True)
@@ -87,6 +92,54 @@ def _run_metadata(checkpoint: Path) -> tuple[Path, dict[str, Any]]:
     raise ValueError(f"teacher checkpoint has no run_metadata.json: {checkpoint}")
 
 
+def _legacy_ppo_policy(params: Any, config: dict[str, Any]) -> Callable[..., Any]:
+    """Rebuild a PPO policy while tolerating legacy null initializer fields.
+
+    Brax serializes optional initializers such as ``mean_kernel_init_fn`` as
+    JSON null.  Some Brax releases then try to resolve that value through
+    ``KERNEL_INITIALIZER[None]`` while loading the policy.  Reconstructing the
+    network from the already validated config avoids mutating old checkpoints
+    and preserves their exact architecture.
+    """
+    from brax.training import networks as brax_networks
+    from brax.training import types as brax_types
+    from brax.training.acme import running_statistics
+    from brax.training.agents.ppo import networks as ppo_networks
+
+    kwargs = dict(config.get("network_factory_kwargs", {}))
+    activation_name = kwargs.get("activation")
+    if isinstance(activation_name, str):
+        try:
+            kwargs["activation"] = brax_networks.ACTIVATION[activation_name]
+        except KeyError as exc:
+            raise ValueError(
+                f"unsupported teacher activation {activation_name!r}"
+            ) from exc
+    for key in _KERNEL_INITIALIZER_KEYS:
+        initializer_name = kwargs.get(key)
+        if initializer_name is None:
+            continue
+        if not isinstance(initializer_name, str):
+            raise ValueError(f"invalid teacher initializer {key}={initializer_name!r}")
+        try:
+            kwargs[key] = brax_networks.KERNEL_INITIALIZER[initializer_name]
+        except KeyError as exc:
+            raise ValueError(
+                f"unsupported teacher initializer {key}={initializer_name!r}"
+            ) from exc
+
+    preprocess = brax_types.identity_observation_preprocessor
+    if bool(config.get("normalize_observations", False)):
+        preprocess = running_statistics.normalize
+    networks = ppo_networks.make_ppo_networks(
+        observation_size=LEGACY_OBSERVATION_SIZE,
+        action_size=18,
+        preprocess_observations_fn=preprocess,
+        **kwargs,
+    )
+    return ppo_networks.make_inference_fn(networks)(params, deterministic=True)
+
+
 def load_frozen_teacher(
     path: Path,
     *,
@@ -125,7 +178,7 @@ def load_frozen_teacher(
             f"{expected_action_contract!r} ({metadata_path})"
         )
     params = ppo_checkpoint.load(checkpoint)
-    policy = ppo_checkpoint.load_policy(checkpoint, deterministic=True)
+    policy = _legacy_ppo_policy(params, config)
     return FrozenTeacher(
         name, checkpoint, action_contract, network_layers, policy, params
     )
