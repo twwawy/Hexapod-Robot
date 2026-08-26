@@ -45,6 +45,32 @@ OBSERVATION_CONTRACT_VERSION = "firmware_state_collision_terrain_curriculum_v2"
 LEGACY_OBSERVATION_CONTRACT_VERSION = "firmware_state_collision_contact_stairs_v1"
 MODEL_FORWARD = jp.array((0.0, -1.0, 0.0))
 MODEL_LATERAL = jp.array((1.0, 0.0, 0.0))
+PITCH_TARGET_LOOKAHEAD_M = 0.65
+PITCH_TARGET_DEADBAND_M = 0.005
+PITCH_TARGET_MAX_RAD = 0.48869
+PITCH_TARGET_FILTER_TAU_S = 0.15
+
+
+def _pitch_target(
+    forward_heights: jax.Array,
+    support_height: jax.Array,
+    previous_target: jax.Array,
+    dt: float,
+) -> jax.Array:
+    """Estimate and filter pitch from nine absolute forward terrain heights."""
+    if forward_heights.shape != (9,):
+        raise ValueError("pitch target requires exactly nine forward heights")
+    mean_ahead = jp.nan_to_num(jp.mean(forward_heights), nan=0.0)
+    relative_rise = mean_ahead - jp.nan_to_num(support_height, nan=0.0)
+    raw_target = jp.arctan2(relative_rise, PITCH_TARGET_LOOKAHEAD_M)
+    deadbanded = jp.where(
+        jp.abs(relative_rise) < PITCH_TARGET_DEADBAND_M,
+        0.0,
+        raw_target,
+    )
+    bounded = jp.clip(deadbanded, -PITCH_TARGET_MAX_RAD, PITCH_TARGET_MAX_RAD)
+    alpha = jp.exp(-dt / PITCH_TARGET_FILTER_TAU_S)
+    return alpha * jp.nan_to_num(previous_target, nan=0.0) + (1.0 - alpha) * bounded
 
 
 def default_config() -> config_dict.ConfigDict:
@@ -271,6 +297,9 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
         self._height_samples = jp.array(
             np.stack((sample_x.ravel(), sample_y.ravel()), axis=-1)
         )
+        self._forward_height_samples = self._height_samples[
+            self._height_samples[:, 0] >= 0.40
+        ]
 
     def _set_geom_active(
         self, name: str, active: bool, rgba: tuple[float, float, float, float]
@@ -515,6 +544,25 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
         sample_world = data.qpos[None, :2] + self._height_samples @ rotation.T
         return self._terrain_height(sample_world) - support_height
 
+    def _terrain_pitch_target(
+        self,
+        data: mjx.Data,
+        support_height: jax.Array,
+        previous_target: jax.Array,
+    ) -> jax.Array:
+        attitude = self._relative_attitude(data)
+        cosine, sine = jp.cos(attitude[2]), jp.sin(attitude[2])
+        rotation = jp.array(((cosine, -sine), (sine, cosine)))
+        sample_world = (
+            data.qpos[None, :2] + self._forward_height_samples @ rotation.T
+        )
+        return _pitch_target(
+            self._terrain_height(sample_world),
+            support_height,
+            previous_target,
+            self.dt,
+        )
+
     def _get_obs(self, data: mjx.Data, info: dict[str, Any]) -> jax.Array:
         quat = data.qpos[3:7]
         local_velocity = _quat_rotate_inverse(quat, data.qvel[:3])
@@ -590,6 +638,7 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
             "controller_output": controller_output,
             "contact_state": contacts,
             "support_height": support_height,
+            "pitch_target": jp.zeros(()),
             "max_terrain_height": support_height,
             "previous_root_x": data.qpos[0],
             "controller_rejection_steps": jp.zeros((), dtype=jp.int32),
@@ -631,6 +680,11 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
         action = jp.clip(action, -1.0, 1.0)
         contacts_before = self._foot_contacts(state.data)
         attitude_before = self._relative_attitude(state.data)
+        pitch_target = self._terrain_pitch_target(
+            state.data,
+            state.info["support_height"],
+            state.info["pitch_target"],
+        )
         command_active = state.info["steps"] * self.dt >= self._config.command_delay
         firmware_command = jp.where(command_active, state.info["command"], jp.zeros(2))
 
@@ -642,6 +696,7 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
                 attitude_rpy=attitude_before,
                 contacts=contacts_before,
                 policy_action=action,
+                pitch_target=pitch_target,
             )
 
         controller_state, controller_history = jax.lax.scan(
@@ -840,6 +895,7 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
         state.info["controller_output"] = controller
         state.info["contact_state"] = contacts
         state.info["support_height"] = support_height
+        state.info["pitch_target"] = pitch_target
         state.info["max_terrain_height"] = max_terrain_height
         state.info["previous_root_x"] = data.qpos[0]
         state.info["controller_rejection_steps"] = rejection_steps

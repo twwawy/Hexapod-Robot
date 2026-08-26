@@ -543,6 +543,7 @@ def step(
     attitude_rpy: jax.Array,
     contacts: jax.Array,
     policy_action: jax.Array,
+    pitch_target: jax.Array = 0.0,
 ) -> tuple[FirmwareState, FirmwareOutput]:
     """Advance the source-equivalent controller by one 5 ms firmware tick."""
     target_velocity = jp.clip(
@@ -612,7 +613,7 @@ def step(
         state, gait, gait_applied, tripod_enable
     )
 
-    posture_error = -attitude_rpy[:2]
+    posture_error = jp.stack((-attitude_rpy[0], pitch_target - attitude_rpy[1]))
     posture_rate = jp.clip(2.0 * posture_error, -jp.deg2rad(15.0), jp.deg2rad(15.0))
     posture_candidate = state.posture_command.at[:2].set(
         jp.clip(
