@@ -50,7 +50,9 @@ class CliAndCheckpointGateTest(unittest.TestCase):
     def test_nonfloat_reward_weight_is_parser_error(self) -> None:
         self._assert_parser_error("upright=strong", "must contain a float")
 
-    def test_legacy_142d_checkpoint_has_explicit_rejection(self) -> None:
+    def _assert_legacy_checkpoint_rejected(
+        self, observation_size: int, observation_contract: str
+    ) -> None:
         with tempfile.TemporaryDirectory() as directory:
             run_dir = Path(directory) / "run"
             checkpoint = run_dir / "checkpoints" / "000000000001"
@@ -59,7 +61,7 @@ class CliAndCheckpointGateTest(unittest.TestCase):
                 json.dumps(
                     {
                         "action_size": 18,
-                        "observation_size": {"shape": [142]},
+                        "observation_size": {"shape": [observation_size]},
                         "network_factory_kwargs": {
                             "policy_hidden_layer_sizes": [256, 256, 128]
                         },
@@ -71,17 +73,25 @@ class CliAndCheckpointGateTest(unittest.TestCase):
                 json.dumps(
                     {
                         "action_contract_version": ACTION_CONTRACT_VERSION,
-                        "observation_contract_version": (
-                            "firmware_state_collision_terrain_curriculum_v2"
-                        ),
+                        "observation_contract_version": observation_contract,
                     }
                 ),
                 encoding="utf-8",
             )
             with self.assertRaisesRegex(
-                ValueError, "142-D checkpoints incompatible"
+                ValueError, "legacy checkpoints incompatible"
             ):
                 _resolve_checkpoint(checkpoint, (256, 256, 128))
+
+    def test_legacy_142d_checkpoint_has_explicit_rejection(self) -> None:
+        self._assert_legacy_checkpoint_rejected(
+            142, "firmware_state_collision_terrain_curriculum_v2"
+        )
+
+    def test_legacy_143d_checkpoint_has_explicit_rejection(self) -> None:
+        self._assert_legacy_checkpoint_rejected(
+            143, "firmware_state_collision_terrain_pitch_v3"
+        )
 
 
 if __name__ == "__main__":

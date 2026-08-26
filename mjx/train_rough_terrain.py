@@ -340,7 +340,7 @@ def _resolve_checkpoint(path: Path, network_layers: tuple[int, ...]) -> Path:
     ):
         raise ValueError(
             f"checkpoint observation contract '{saved_observation_contract}' != required "
-            f"'{OBSERVATION_CONTRACT_VERSION}' (legacy 142-D checkpoints incompatible — "
+            f"'{OBSERVATION_CONTRACT_VERSION}' (legacy checkpoints incompatible — "
             "start fresh)"
         )
     return resolved
