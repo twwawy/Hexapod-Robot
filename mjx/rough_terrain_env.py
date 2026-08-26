@@ -52,6 +52,23 @@ PITCH_TARGET_FILTER_TAU_S = 0.15
 SWING_BOOST_RISE_M = 0.20
 SWING_BOOST_MAX_M = 0.06
 SUCCESS_POSTURE_TOLERANCE_RAD = jp.deg2rad(12.0)
+FOOT_CLEARANCE_RADIUS_M = 0.05
+FOOT_CLEARANCE_MIN_M = 0.02
+STAIR_EDGE_MARGIN_M = 0.03
+_DIAGONAL_CLEARANCE_OFFSET = FOOT_CLEARANCE_RADIUS_M / np.sqrt(2.0)
+FOOT_CLEARANCE_OFFSETS = jp.asarray(
+    (
+        (0.0, 0.0),
+        (FOOT_CLEARANCE_RADIUS_M, 0.0),
+        (-FOOT_CLEARANCE_RADIUS_M, 0.0),
+        (0.0, FOOT_CLEARANCE_RADIUS_M),
+        (0.0, -FOOT_CLEARANCE_RADIUS_M),
+        (_DIAGONAL_CLEARANCE_OFFSET, _DIAGONAL_CLEARANCE_OFFSET),
+        (_DIAGONAL_CLEARANCE_OFFSET, -_DIAGONAL_CLEARANCE_OFFSET),
+        (-_DIAGONAL_CLEARANCE_OFFSET, _DIAGONAL_CLEARANCE_OFFSET),
+        (-_DIAGONAL_CLEARANCE_OFFSET, -_DIAGONAL_CLEARANCE_OFFSET),
+    )
+)
 
 
 def _pitch_target(
@@ -112,6 +129,98 @@ def _absolute_tilt_failure(attitude: jax.Array, max_tilt: float) -> jax.Array:
     return jp.any(jp.abs(attitude[:2]) > max_tilt)
 
 
+def _foot_clearance_terrain_cost(
+    foot_z: jax.Array,
+    local_terrain_height: jax.Array,
+    swing_mask: jax.Array,
+) -> jax.Array:
+    clearance = foot_z - local_terrain_height
+    cost = jp.maximum(FOOT_CLEARANCE_MIN_M - clearance, 0.0)
+    swing_count = jp.maximum(jp.sum(swing_mask.astype(jp.float32)), 1.0)
+    return jp.sum(jp.where(swing_mask, cost, 0.0)) / swing_count
+
+
+def _edge_margin_cost(foot_x: jax.Array, riser_edges: jax.Array) -> jax.Array:
+    if riser_edges.shape[0] == 0:
+        return jp.zeros(())
+    nearest = jp.min(jp.abs(foot_x[:, None] - riser_edges[None, :]), axis=1)
+    return jp.mean(jp.maximum(STAIR_EDGE_MARGIN_M - nearest, 0.0))
+
+
+def _touchdown_impact_cost(
+    previous_contacts: jax.Array,
+    contacts: jax.Array,
+    pre_contact_vertical_velocity: jax.Array,
+) -> jax.Array:
+    touchdown = (~previous_contacts) & contacts
+    return jp.mean(
+        touchdown.astype(jp.float32) * jp.square(pre_contact_vertical_velocity)
+    )
+
+
+def _base_reward_terms(
+    *,
+    forward_velocity: jax.Array,
+    command: jax.Array,
+    yaw_velocity: jax.Array,
+    attitude: jax.Array,
+    pitch_target: jax.Array,
+    clearance: jax.Array,
+    target_clearance: jax.Array,
+    root_angular_speed: jax.Array,
+    joint_proximity: jax.Array,
+    action: jax.Array,
+    last_action: jax.Array,
+    swing_height_cost: jax.Array,
+    early_swing_contact: jax.Array,
+    vertical_velocity: jax.Array,
+    lateral_velocity: jax.Array,
+    joint_velocity: jax.Array,
+    actuator_force: jax.Array,
+    torque_limit: jax.Array,
+    torque_saturation: jax.Array,
+    gait_accepted: jax.Array,
+    posture_accepted: jax.Array,
+    policy_valid: jax.Array,
+    foot_limited: jax.Array,
+    body_contact: jax.Array,
+    self_collision: jax.Array,
+) -> dict[str, jax.Array]:
+    """Compute the reward terms that predate stair-contact penalties."""
+    return {
+        "velocity": jp.exp(
+            -jp.square(forward_velocity - command[0]) / 0.01
+        ),
+        "yaw": jp.exp(-jp.square(yaw_velocity - command[1]) / 0.09),
+        "upright": _upright_reward(attitude, pitch_target),
+        "height": jp.exp(-jp.square(clearance - target_clearance) / 0.01),
+        "progress": jp.clip(forward_velocity, -0.20, 0.25),
+        "stability": jp.exp(-jp.square(root_angular_speed / 2.0)),
+        "joint_margin": 1.0 - jp.mean(joint_proximity),
+        "action_rate": jp.mean(jp.square(action - last_action)),
+        "residual": jp.mean(jp.square(action)),
+        "swing_height": swing_height_cost,
+        "early_swing_contact": early_swing_contact,
+        "vertical_velocity": jp.square(vertical_velocity),
+        "lateral_velocity": jp.square(lateral_velocity),
+        "joint_velocity": jp.mean(jp.square(joint_velocity / 10.0)),
+        "torque": jp.mean(jp.square(actuator_force / torque_limit)),
+        "torque_saturation": torque_saturation,
+        "gait_rejected": (~gait_accepted).astype(jp.float32),
+        "posture_rejected": (~posture_accepted).astype(jp.float32),
+        "policy_rejected": jp.mean((~policy_valid).astype(jp.float32)),
+        "foot_limited": jp.mean(foot_limited.astype(jp.float32)),
+        "body_contact": body_contact.astype(jp.float32),
+        "self_collision": self_collision.astype(jp.float32),
+    }
+
+
+def _scale_reward_terms(
+    terms: dict[str, jax.Array], reward_config: config_dict.ConfigDict
+) -> dict[str, jax.Array]:
+    return {name: value * reward_config[name] for name, value in terms.items()}
+
+
 def default_config() -> config_dict.ConfigDict:
     """Training defaults biased toward a stable complete staircase ascent."""
     return config_dict.create(
@@ -158,6 +267,9 @@ def default_config() -> config_dict.ConfigDict:
             foot_limited=-2.0,
             body_contact=-2.0,
             self_collision=-0.5,
+            foot_clearance_terrain=-2.0,
+            edge_margin=-0.50,
+            touchdown_impact=-0.05,
         ),
         ascent_bonus=8.0,
         success_bonus=30.0,
@@ -306,6 +418,9 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
         self._foot_site_ids = jp.array(
             [self._mj_model.site(f"{prefix}_foot_site").id for prefix in LEG_PREFIXES]
         )
+        self._foot_body_ids = jp.array(self._mj_model.site_bodyid)[
+            self._foot_site_ids
+        ]
         self._foot_geom_ids = jp.array(
             [
                 self._mj_model.geom(f"{prefix}_foot_collision").id
@@ -326,6 +441,12 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
         self._step_heights = jp.array(
             [
                 self._terrain_step_height * (index + 1)
+                for index in range(spec.stair_count)
+            ]
+        )
+        self._riser_edges = jp.asarray(
+            [
+                TERRAIN_START_X + STAIR_DEPTH * index
                 for index in range(spec.stair_count)
             ]
         )
@@ -576,6 +697,20 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
             axis=-1,
         )
 
+    def _local_terrain_max(self, foot_xy: jax.Array) -> jax.Array:
+        samples = foot_xy[:, None, :] + FOOT_CLEARANCE_OFFSETS[None, :, :]
+        heights = self._terrain_height(samples.reshape((-1, 2)))
+        return jp.max(heights.reshape((6, -1)), axis=1)
+
+    def _foot_vertical_velocity(self, data: mjx.Data) -> jax.Array:
+        def site_velocity(point: jax.Array, body_id: jax.Array) -> jax.Array:
+            jacobian_position, _ = mjx.jac(self.mjx_model, data, point, body_id)
+            return data.qvel @ jacobian_position[:, 2]
+
+        return jax.vmap(site_velocity)(
+            data.site_xpos[self._foot_site_ids], self._foot_body_ids
+        )
+
     def _terrain_features(self, data: mjx.Data, support_height: jax.Array) -> jax.Array:
         attitude = self._relative_attitude(data)
         cosine, sine = jp.cos(attitude[2]), jp.sin(attitude[2])
@@ -733,6 +868,7 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
     def step(self, state: mjx_env.State, action: jax.Array) -> mjx_env.State:
         action = jp.clip(action, -1.0, 1.0)
         contacts_before = self._foot_contacts(state.data)
+        pre_contact_foot_vz = self._foot_vertical_velocity(state.data)
         attitude_before = self._relative_attitude(state.data)
         pitch_target = self._terrain_pitch_target(
             state.data,
@@ -892,42 +1028,50 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
                 & (controller.gait_progress < firmware.EARLY_LANDING_PROGRESS)
             ).astype(jp.float32)
         )
-        reward_terms = {
-            "velocity": jp.exp(
-                -jp.square(forward_velocity - state.info["command"][0]) / 0.01
-            ),
-            "yaw": jp.exp(
-                -jp.square(data.qvel[5] - state.info["command"][1]) / 0.09
-            ),
-            "upright": _upright_reward(attitude, pitch_target),
-            "height": jp.exp(
-                -jp.square(clearance - self._config.target_clearance) / 0.01
-            ),
-            "progress": jp.clip(forward_velocity, -0.20, 0.25),
-            "stability": jp.exp(-jp.square(root_angular_speed / 2.0)),
-            "joint_margin": 1.0 - jp.mean(joint_proximity),
-            "action_rate": jp.mean(jp.square(action - state.info["last_action"])),
-            "residual": jp.mean(jp.square(action)),
-            "swing_height": swing_height_cost,
-            "early_swing_contact": early_swing_contact,
-            "vertical_velocity": jp.square(data.qvel[2]),
-            "lateral_velocity": jp.square(lateral_velocity),
-            "joint_velocity": jp.mean(
-                jp.square(data.qvel[self._joint_qvel_ids] / 10.0)
-            ),
-            "torque": jp.mean(jp.square(data.actuator_force / torque_limit)),
-            "torque_saturation": torque_saturation,
-            "gait_rejected": (~controller.gait_accepted).astype(jp.float32),
-            "posture_rejected": (~controller.posture_accepted).astype(jp.float32),
-            "policy_rejected": policy_rejected,
-            "foot_limited": foot_limited,
-            "body_contact": body_contact.astype(jp.float32),
-            "self_collision": self_collision.astype(jp.float32),
-        }
-        scaled = {
-            name: value * self._config.reward[name]
-            for name, value in reward_terms.items()
-        }
+        feet_world = data.site_xpos[self._foot_site_ids]
+        reward_terms = _base_reward_terms(
+            forward_velocity=forward_velocity,
+            command=state.info["command"],
+            yaw_velocity=data.qvel[5],
+            attitude=attitude,
+            pitch_target=pitch_target,
+            clearance=clearance,
+            target_clearance=self._config.target_clearance,
+            root_angular_speed=root_angular_speed,
+            joint_proximity=joint_proximity,
+            action=action,
+            last_action=state.info["last_action"],
+            swing_height_cost=swing_height_cost,
+            early_swing_contact=early_swing_contact,
+            vertical_velocity=data.qvel[2],
+            lateral_velocity=lateral_velocity,
+            joint_velocity=data.qvel[self._joint_qvel_ids],
+            actuator_force=data.actuator_force,
+            torque_limit=torque_limit,
+            torque_saturation=torque_saturation,
+            gait_accepted=controller.gait_accepted,
+            posture_accepted=controller.posture_accepted,
+            policy_valid=controller.policy_valid,
+            foot_limited=controller.foot_limited,
+            body_contact=body_contact,
+            self_collision=self_collision,
+        )
+        reward_terms.update(
+            {
+                "foot_clearance_terrain": _foot_clearance_terrain_cost(
+                    feet_world[:, 2],
+                    self._local_terrain_max(feet_world[:, :2]),
+                    swing_mask,
+                ),
+                "edge_margin": _edge_margin_cost(
+                    feet_world[:, 0], self._riser_edges
+                ),
+                "touchdown_impact": _touchdown_impact_cost(
+                    contacts_before, contacts, pre_contact_foot_vz
+                ),
+            }
+        )
+        scaled = _scale_reward_terms(reward_terms, self._config.reward)
         running_reward = sum(scaled.values()) * self.dt
         positive_ascent = jp.maximum(
             support_height - state.info["max_terrain_height"], 0.0
