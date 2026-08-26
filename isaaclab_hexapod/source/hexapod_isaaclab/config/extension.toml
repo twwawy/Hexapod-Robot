@@ -1,0 +1,20 @@
+[package]
+version = "0.1.0"
+category = "isaaclab"
+title = "Hexapod Isaac Lab"
+author = "Inha University Robot Research Society"
+maintainer = "Inha University Robot Research Society"
+description = "MJX firmware-residual Hexapod asset and deterministic replay scaffold"
+repository = "https://github.com/twwawy/Hexapod-Robot.git"
+keywords = ["isaaclab", "hexapod", "mjx", "robotics"]
+
+[dependencies]
+"isaaclab" = {}
+"isaaclab_assets" = {}
+"isaaclab_tasks" = {}
+
+[[python.module]]
+name = "hexapod_isaaclab"
+
+[isaac_lab_settings]
+

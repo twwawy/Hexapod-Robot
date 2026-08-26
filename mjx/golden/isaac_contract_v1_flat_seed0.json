@@ -1,0 +1,897 @@
+{
+  "action_contract": "stm32_firmware_adaptive_swing_residual_v3",
+  "action_source": "deterministic_scripted_v1_zero_first_1s",
+  "canonical_leg_order": [
+    "RB",
+    "RM",
+    "RF",
+    "LB",
+    "LM",
+    "LF"
+  ],
+  "collision_mode": "lower_leg",
+  "domain_randomization": false,
+  "duration_seconds": 10.0,
+  "firmware_ticks_per_policy_step": 4,
+  "npz": {
+    "arrays": {
+      "action_applied": {
+        "dtype": "float32",
+        "shape": [
+          500,
+          18
+        ]
+      },
+      "action_requested": {
+        "dtype": "float32",
+        "shape": [
+          500,
+          18
+        ]
+      },
+      "command": {
+        "dtype": "float32",
+        "shape": [
+          500,
+          5
+        ]
+      },
+      "debug/actuator_force": {
+        "dtype": "float32",
+        "shape": [
+          500,
+          18
+        ]
+      },
+      "debug/foot_controller_body": {
+        "dtype": "float32",
+        "shape": [
+          500,
+          6,
+          3
+        ]
+      },
+      "debug/foot_world": {
+        "dtype": "float32",
+        "shape": [
+          500,
+          6,
+          3
+        ]
+      },
+      "debug/joint_limit_margin": {
+        "dtype": "float32",
+        "shape": [
+          500
+        ]
+      },
+      "debug/pitch_ff": {
+        "dtype": "float32",
+        "shape": [
+          500
+        ]
+      },
+      "debug/posture_target": {
+        "dtype": "float32",
+        "shape": [
+          500,
+          2
+        ]
+      },
+      "debug/self_collision": {
+        "dtype": "bool",
+        "shape": [
+          500
+        ]
+      },
+      "debug/support_height": {
+        "dtype": "float32",
+        "shape": [
+          500
+        ]
+      },
+      "debug/swing_boost": {
+        "dtype": "float32",
+        "shape": [
+          500
+        ]
+      },
+      "debug/terrain_15": {
+        "dtype": "float32",
+        "shape": [
+          500,
+          15
+        ]
+      },
+      "debug/torso_contact": {
+        "dtype": "bool",
+        "shape": [
+          500
+        ]
+      },
+      "done": {
+        "dtype": "bool",
+        "shape": [
+          500
+        ]
+      },
+      "done_reason/body_contact": {
+        "dtype": "bool",
+        "shape": [
+          500
+        ]
+      },
+      "done_reason/clearance": {
+        "dtype": "bool",
+        "shape": [
+          500
+        ]
+      },
+      "done_reason/controller_invalid": {
+        "dtype": "bool",
+        "shape": [
+          500
+        ]
+      },
+      "done_reason/dynamics": {
+        "dtype": "bool",
+        "shape": [
+          500
+        ]
+      },
+      "done_reason/joint_limit": {
+        "dtype": "bool",
+        "shape": [
+          500
+        ]
+      },
+      "done_reason/nonfinite": {
+        "dtype": "bool",
+        "shape": [
+          500
+        ]
+      },
+      "done_reason/tilt": {
+        "dtype": "bool",
+        "shape": [
+          500
+        ]
+      },
+      "firmware_tick/output/applied_twist": {
+        "dtype": "float32",
+        "shape": [
+          500,
+          4,
+          4
+        ]
+      },
+      "firmware_tick/output/foot_limited": {
+        "dtype": "bool",
+        "shape": [
+          500,
+          4,
+          6
+        ]
+      },
+      "firmware_tick/output/foot_targets_body": {
+        "dtype": "float32",
+        "shape": [
+          500,
+          4,
+          6,
+          3
+        ]
+      },
+      "firmware_tick/output/gait_accepted": {
+        "dtype": "bool",
+        "shape": [
+          500,
+          4
+        ]
+      },
+      "firmware_tick/output/gait_enabled": {
+        "dtype": "bool",
+        "shape": [
+          500,
+          4
+        ]
+      },
+      "firmware_tick/output/gait_progress": {
+        "dtype": "float32",
+        "shape": [
+          500,
+          4,
+          6
+        ]
+      },
+      "firmware_tick/output/gait_state": {
+        "dtype": "int32",
+        "shape": [
+          500,
+          4,
+          6
+        ]
+      },
+      "firmware_tick/output/ik_valid": {
+        "dtype": "bool",
+        "shape": [
+          500,
+          4,
+          6
+        ]
+      },
+      "firmware_tick/output/model_joint_targets": {
+        "dtype": "float32",
+        "shape": [
+          500,
+          4,
+          6,
+          3
+        ]
+      },
+      "firmware_tick/output/policy_valid": {
+        "dtype": "bool",
+        "shape": [
+          500,
+          4,
+          6
+        ]
+      },
+      "firmware_tick/output/posture_accepted": {
+        "dtype": "bool",
+        "shape": [
+          500,
+          4
+        ]
+      },
+      "firmware_tick/output/servo_joint_targets": {
+        "dtype": "float32",
+        "shape": [
+          500,
+          4,
+          6,
+          3
+        ]
+      },
+      "firmware_tick/output/swing_height_command": {
+        "dtype": "float32",
+        "shape": [
+          500,
+          4,
+          6
+        ]
+      },
+      "firmware_tick/state/adapted_stance": {
+        "dtype": "bool",
+        "shape": [
+          500,
+          4,
+          6
+        ]
+      },
+      "firmware_tick/state/airborne_seen": {
+        "dtype": "bool",
+        "shape": [
+          500,
+          4,
+          6
+        ]
+      },
+      "firmware_tick/state/custom_swing": {
+        "dtype": "bool",
+        "shape": [
+          500,
+          4,
+          6
+        ]
+      },
+      "firmware_tick/state/first_step": {
+        "dtype": "bool",
+        "shape": [
+          500,
+          4
+        ]
+      },
+      "firmware_tick/state/foot_memory": {
+        "dtype": "float32",
+        "shape": [
+          500,
+          4,
+          6,
+          3
+        ]
+      },
+      "firmware_tick/state/gait_applied": {
+        "dtype": "float32",
+        "shape": [
+          500,
+          4,
+          4
+        ]
+      },
+      "firmware_tick/state/gait_initialized": {
+        "dtype": "bool",
+        "shape": [
+          500,
+          4
+        ]
+      },
+      "firmware_tick/state/gait_running": {
+        "dtype": "bool",
+        "shape": [
+          500,
+          4
+        ]
+      },
+      "firmware_tick/state/landed": {
+        "dtype": "bool",
+        "shape": [
+          500,
+          4,
+          6
+        ]
+      },
+      "firmware_tick/state/last_ik": {
+        "dtype": "float32",
+        "shape": [
+          500,
+          4,
+          6,
+          3
+        ]
+      },
+      "firmware_tick/state/phase_index": {
+        "dtype": "int32",
+        "shape": [
+          500,
+          4
+        ]
+      },
+      "firmware_tick/state/phase_time": {
+        "dtype": "float32",
+        "shape": [
+          500,
+          4
+        ]
+      },
+      "firmware_tick/state/position_reference": {
+        "dtype": "float32",
+        "shape": [
+          500,
+          4,
+          2
+        ]
+      },
+      "firmware_tick/state/posture_command": {
+        "dtype": "float32",
+        "shape": [
+          500,
+          4,
+          3
+        ]
+      },
+      "firmware_tick/state/previous_joint": {
+        "dtype": "float32",
+        "shape": [
+          500,
+          4,
+          6,
+          3
+        ]
+      },
+      "firmware_tick/state/previous_leg_state": {
+        "dtype": "int32",
+        "shape": [
+          500,
+          4,
+          6
+        ]
+      },
+      "firmware_tick/state/previous_twist": {
+        "dtype": "float32",
+        "shape": [
+          500,
+          4,
+          4
+        ]
+      },
+      "firmware_tick/state/residual_filter": {
+        "dtype": "float32",
+        "shape": [
+          500,
+          4,
+          18
+        ]
+      },
+      "firmware_tick/state/stop_pending": {
+        "dtype": "bool",
+        "shape": [
+          500,
+          4
+        ]
+      },
+      "firmware_tick/state/swing_start": {
+        "dtype": "float32",
+        "shape": [
+          500,
+          4,
+          6,
+          3
+        ]
+      },
+      "firmware_tick/state/throttle_filter": {
+        "dtype": "float32",
+        "shape": [
+          500,
+          4
+        ]
+      },
+      "firmware_tick/state/yaw_filter": {
+        "dtype": "float32",
+        "shape": [
+          500,
+          4
+        ]
+      },
+      "firmware_tick/state/yaw_reference": {
+        "dtype": "float32",
+        "shape": [
+          500,
+          4
+        ]
+      },
+      "observation_post": {
+        "dtype": "float32",
+        "shape": [
+          500,
+          146
+        ]
+      },
+      "observation_pre": {
+        "dtype": "float32",
+        "shape": [
+          500,
+          146
+        ]
+      },
+      "post/contact": {
+        "dtype": "bool",
+        "shape": [
+          500,
+          6
+        ]
+      },
+      "post/joint_q": {
+        "dtype": "float32",
+        "shape": [
+          500,
+          18
+        ]
+      },
+      "post/joint_qd": {
+        "dtype": "float32",
+        "shape": [
+          500,
+          18
+        ]
+      },
+      "post/root_pose": {
+        "dtype": "float32",
+        "shape": [
+          500,
+          7
+        ]
+      },
+      "post/root_velocity": {
+        "dtype": "float32",
+        "shape": [
+          500,
+          6
+        ]
+      },
+      "pre/contact": {
+        "dtype": "bool",
+        "shape": [
+          500,
+          6
+        ]
+      },
+      "pre/joint_q": {
+        "dtype": "float32",
+        "shape": [
+          500,
+          18
+        ]
+      },
+      "pre/joint_qd": {
+        "dtype": "float32",
+        "shape": [
+          500,
+          18
+        ]
+      },
+      "pre/root_pose": {
+        "dtype": "float32",
+        "shape": [
+          500,
+          7
+        ]
+      },
+      "pre/root_velocity": {
+        "dtype": "float32",
+        "shape": [
+          500,
+          6
+        ]
+      },
+      "q_des": {
+        "dtype": "float32",
+        "shape": [
+          500,
+          18
+        ]
+      },
+      "reward_ascent": {
+        "dtype": "float32",
+        "shape": [
+          500
+        ]
+      },
+      "reward_failure": {
+        "dtype": "float32",
+        "shape": [
+          500
+        ]
+      },
+      "reward_raw/action_rate": {
+        "dtype": "float32",
+        "shape": [
+          500
+        ]
+      },
+      "reward_raw/body_contact": {
+        "dtype": "float32",
+        "shape": [
+          500
+        ]
+      },
+      "reward_raw/early_swing_contact": {
+        "dtype": "float32",
+        "shape": [
+          500
+        ]
+      },
+      "reward_raw/edge_margin": {
+        "dtype": "float32",
+        "shape": [
+          500
+        ]
+      },
+      "reward_raw/foot_clearance_terrain": {
+        "dtype": "float32",
+        "shape": [
+          500
+        ]
+      },
+      "reward_raw/foot_limited": {
+        "dtype": "float32",
+        "shape": [
+          500
+        ]
+      },
+      "reward_raw/gait_rejected": {
+        "dtype": "float32",
+        "shape": [
+          500
+        ]
+      },
+      "reward_raw/height": {
+        "dtype": "float32",
+        "shape": [
+          500
+        ]
+      },
+      "reward_raw/joint_margin": {
+        "dtype": "float32",
+        "shape": [
+          500
+        ]
+      },
+      "reward_raw/joint_velocity": {
+        "dtype": "float32",
+        "shape": [
+          500
+        ]
+      },
+      "reward_raw/lateral_velocity": {
+        "dtype": "float32",
+        "shape": [
+          500
+        ]
+      },
+      "reward_raw/policy_rejected": {
+        "dtype": "float32",
+        "shape": [
+          500
+        ]
+      },
+      "reward_raw/posture_rejected": {
+        "dtype": "float32",
+        "shape": [
+          500
+        ]
+      },
+      "reward_raw/progress": {
+        "dtype": "float32",
+        "shape": [
+          500
+        ]
+      },
+      "reward_raw/residual": {
+        "dtype": "float32",
+        "shape": [
+          500
+        ]
+      },
+      "reward_raw/self_collision": {
+        "dtype": "float32",
+        "shape": [
+          500
+        ]
+      },
+      "reward_raw/stability": {
+        "dtype": "float32",
+        "shape": [
+          500
+        ]
+      },
+      "reward_raw/swing_height": {
+        "dtype": "float32",
+        "shape": [
+          500
+        ]
+      },
+      "reward_raw/torque": {
+        "dtype": "float32",
+        "shape": [
+          500
+        ]
+      },
+      "reward_raw/torque_saturation": {
+        "dtype": "float32",
+        "shape": [
+          500
+        ]
+      },
+      "reward_raw/touchdown_impact": {
+        "dtype": "float32",
+        "shape": [
+          500
+        ]
+      },
+      "reward_raw/upright": {
+        "dtype": "float32",
+        "shape": [
+          500
+        ]
+      },
+      "reward_raw/velocity": {
+        "dtype": "float32",
+        "shape": [
+          500
+        ]
+      },
+      "reward_raw/vertical_velocity": {
+        "dtype": "float32",
+        "shape": [
+          500
+        ]
+      },
+      "reward_raw/yaw": {
+        "dtype": "float32",
+        "shape": [
+          500
+        ]
+      },
+      "reward_scaled/action_rate": {
+        "dtype": "float32",
+        "shape": [
+          500
+        ]
+      },
+      "reward_scaled/body_contact": {
+        "dtype": "float32",
+        "shape": [
+          500
+        ]
+      },
+      "reward_scaled/early_swing_contact": {
+        "dtype": "float32",
+        "shape": [
+          500
+        ]
+      },
+      "reward_scaled/edge_margin": {
+        "dtype": "float32",
+        "shape": [
+          500
+        ]
+      },
+      "reward_scaled/foot_clearance_terrain": {
+        "dtype": "float32",
+        "shape": [
+          500
+        ]
+      },
+      "reward_scaled/foot_limited": {
+        "dtype": "float32",
+        "shape": [
+          500
+        ]
+      },
+      "reward_scaled/gait_rejected": {
+        "dtype": "float32",
+        "shape": [
+          500
+        ]
+      },
+      "reward_scaled/height": {
+        "dtype": "float32",
+        "shape": [
+          500
+        ]
+      },
+      "reward_scaled/joint_margin": {
+        "dtype": "float32",
+        "shape": [
+          500
+        ]
+      },
+      "reward_scaled/joint_velocity": {
+        "dtype": "float32",
+        "shape": [
+          500
+        ]
+      },
+      "reward_scaled/lateral_velocity": {
+        "dtype": "float32",
+        "shape": [
+          500
+        ]
+      },
+      "reward_scaled/policy_rejected": {
+        "dtype": "float32",
+        "shape": [
+          500
+        ]
+      },
+      "reward_scaled/posture_rejected": {
+        "dtype": "float32",
+        "shape": [
+          500
+        ]
+      },
+      "reward_scaled/progress": {
+        "dtype": "float32",
+        "shape": [
+          500
+        ]
+      },
+      "reward_scaled/residual": {
+        "dtype": "float32",
+        "shape": [
+          500
+        ]
+      },
+      "reward_scaled/self_collision": {
+        "dtype": "float32",
+        "shape": [
+          500
+        ]
+      },
+      "reward_scaled/stability": {
+        "dtype": "float32",
+        "shape": [
+          500
+        ]
+      },
+      "reward_scaled/swing_height": {
+        "dtype": "float32",
+        "shape": [
+          500
+        ]
+      },
+      "reward_scaled/torque": {
+        "dtype": "float32",
+        "shape": [
+          500
+        ]
+      },
+      "reward_scaled/torque_saturation": {
+        "dtype": "float32",
+        "shape": [
+          500
+        ]
+      },
+      "reward_scaled/touchdown_impact": {
+        "dtype": "float32",
+        "shape": [
+          500
+        ]
+      },
+      "reward_scaled/upright": {
+        "dtype": "float32",
+        "shape": [
+          500
+        ]
+      },
+      "reward_scaled/velocity": {
+        "dtype": "float32",
+        "shape": [
+          500
+        ]
+      },
+      "reward_scaled/vertical_velocity": {
+        "dtype": "float32",
+        "shape": [
+          500
+        ]
+      },
+      "reward_scaled/yaw": {
+        "dtype": "float32",
+        "shape": [
+          500
+        ]
+      },
+      "reward_success": {
+        "dtype": "float32",
+        "shape": [
+          500
+        ]
+      },
+      "reward_total": {
+        "dtype": "float32",
+        "shape": [
+          500
+        ]
+      },
+      "t": {
+        "dtype": "float32",
+        "shape": [
+          500
+        ]
+      }
+    },
+    "path": "isaac_contract_v1_flat_seed0.npz",
+    "sha256": "2f323a4b9becef80e095972a98dcaf24be480702fc98a5e525f659c5b8408a76"
+  },
+  "observation_contract": "firmware_state_collision_terrain_command5_pitch_v3",
+  "policy_steps": 500,
+  "schema": "hexapod_mjx_transition_v1",
+  "seed": 0,
+  "source": {
+    "devices": [
+      "TFRT_CPU_0"
+    ],
+    "git_commit": "74d7d9e6bd14215048cf15ae77af8dcc728a783a",
+    "git_dirty": true,
+    "git_status": [
+      "?? mjx/export_asset_manifest.py",
+      "?? mjx/export_isaac_contract.py",
+      "?? mjx/golden/"
+    ],
+    "isaaclab_commit": "cbf51abb5e98d1b3d497c8c73dc989e9f3628b89",
+    "isaaclab_status": [
+      "M source/isaaclab/isaaclab/sim/converters/urdf_converter.py",
+      "?? run_flamingo.sh"
+    ],
+    "isaaclab_version": "2.3.0",
+    "jax": "0.6.2",
+    "mujoco": "3.12.0",
+    "numpy": "2.2.6",
+    "python": "3.10.12",
+    "rl_xml_sha256": "6b793d9e6d54248d065e5db67cb21798b7a95df98d0de59d8d5b9fb8bc4490e9",
+    "urdf_sha256": "ab44548dd4caa668989967575f190bfe5997d75b6497ddd982bece67d889dc9f"
+  },
+  "terrain_level": 0
+}

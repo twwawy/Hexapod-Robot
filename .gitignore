@@ -1,8 +1,11 @@
 *.swp
 *.pyc
 __pycache__/
+*.egg-info/
 .ipynb_checkpoints/
 wandb/
+!isaaclab_hexapod/data/wandb/
+!isaaclab_hexapod/data/wandb/reference_run.json
 SW/mjx/artifacts/
 SW/mjx/**/__pycache__/
 tuto/
