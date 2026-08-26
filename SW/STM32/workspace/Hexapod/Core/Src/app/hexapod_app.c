@@ -7,6 +7,104 @@
 #include <stddef.h>
 #include <string.h>
 
+extern SPI_HandleTypeDef hspi1;   // MCP3008 SPI Handle을 연결한다.
+extern TIM_HandleTypeDef htim1;   // 1·6번 일부 서보 Timer를 연결한다.
+extern TIM_HandleTypeDef htim2;   // 2번 서보 Timer를 연결한다.
+extern TIM_HandleTypeDef htim3;   // 3·6번 일부 서보 Timer를 연결한다.
+extern TIM_HandleTypeDef htim4;   // 4·6번 일부 서보 Timer를 연결한다.
+extern TIM_HandleTypeDef htim5;   // 5번 일부 서보 Timer를 연결한다.
+extern TIM_HandleTypeDef htim6;   // 5 ms 제어 Timer를 연결한다.
+extern TIM_HandleTypeDef htim8;   // 5번 일부 서보 Timer를 연결한다.
+extern UART_HandleTypeDef huart2; // GPS UART Handle을 연결한다.
+extern UART_HandleTypeDef huart3; // WT931 UART Handle을 연결한다.
+extern UART_HandleTypeDef huart6; // CRSF UART Handle을 연결한다.
+
+HexapodApp_Handle_t g_hexapod_app;  // 최종 앱의 전체 실행 상태를 저장한다.
+
+/* 실수 값을 지정한 절댓값 범위로 제한한다. */
+static float HexapodApp_ClampMagnitude(float value, float limit)
+{
+    if (value > limit)
+    {
+        return limit;
+    }
+    if (value < -limit)
+    {
+        return -limit;
+    }
+    return value;
+}
+
+/* 선택한 실기 시험 단계의 허가 범위를 준비한다. */
+static void HexapodApp_InitializeBringup(HexapodApp_Handle_t *handle)
+{
+    handle->bringup.stage = ROBOT_BRINGUP_STAGE;                                      // 컴파일된 시험 단계를 저장한다.
+    handle->bringup.neutral_output_active = (ROBOT_BRINGUP_STAGE == 2U);               // 2단계에서 0도를 고정한다.
+    handle->bringup.stand_landing_allowed = (ROBOT_BRINGUP_STAGE >= 3U);               // 3단계부터 서기·착지를 허가한다.
+    handle->bringup.correction_allowed = (ROBOT_BRINGUP_STAGE >= 4U);                  // 4단계부터 보정을 허가한다.
+    handle->bringup.walking_allowed = (ROBOT_BRINGUP_STAGE >= 5U);                     // 5단계부터 보행을 허가한다.
+    handle->bringup.linear_limit_mps = (ROBOT_BRINGUP_STAGE == 5U) ?
+                                       ROBOT_BRINGUP_LOW_SPEED_MPS :
+                                       ROBOT_MAX_LINEAR_SPEED_MPS;                    // 5단계만 저속으로 제한한다.
+    handle->bringup.yaw_limit_radps = (ROBOT_BRINGUP_STAGE == 5U) ?
+                                      ROBOT_BRINGUP_LOW_YAW_RATE_RADPS :
+                                      ROBOT_MAX_YAW_RATE_RADPS;                       // 5단계만 저속 회전으로 제한한다.
+    handle->bringup.relay_enabled = false;                                             // 실제 릴레이 상태를 OFF로 시작한다.
+}
+
+/* 시험 단계에서 아직 허용하지 않은 조종 명령을 제거한다. */
+static RobotUserCommand_t HexapodApp_LimitUserCommand(const HexapodApp_Handle_t *handle)
+{
+    RobotUserCommand_t limited = handle->user;  // 실제 조종 명령을 복사한다.
+
+    if (!handle->bringup.stand_landing_allowed)
+    {
+        limited.throttle = 0;  // 이동 명령을 제거한다.
+        limited.yaw = 0;       // 회전 명령을 제거한다.
+        limited.roll = 0;      // Roll 명령을 제거한다.
+        limited.pitch = 0;     // Pitch 명령을 제거한다.
+        limited.sb = 0U;       // 자동 서기를 차단한다.
+        limited.sc = 1U;       // 수동·보정 모드를 차단한다.
+        limited.se = 0U;       // Reset 명령을 차단한다.
+    }
+    else if (!handle->bringup.correction_allowed)
+    {
+        limited.throttle = 0;  // 서기 시험 중 이동 명령을 제거한다.
+        limited.yaw = 0;       // 서기 시험 중 회전 명령을 제거한다.
+        limited.roll = 0;      // 서기 시험 중 Roll 명령을 제거한다.
+        limited.pitch = 0;     // 서기 시험 중 Pitch 명령을 제거한다.
+        limited.sc = 1U;       // 수동·보정 모드를 차단한다.
+        limited.se = 0U;       // Reset 명령을 차단한다.
+    }
+    else if (!handle->bringup.walking_allowed && (limited.sc != 2U))
+    {
+        limited.sc = 1U;       // 4단계에서 보정 모드만 허가한다.
+        limited.throttle = 0;  // READY의 잔류 이동 명령을 제거한다.
+        limited.yaw = 0;       // READY의 잔류 회전 명령을 제거한다.
+        limited.roll = 0;      // READY의 잔류 Roll 명령을 제거한다.
+        limited.pitch = 0;     // READY의 잔류 Pitch 명령을 제거한다.
+    }
+
+    return limited;
+}
+
+/* 저속 보행 단계의 선속도와 회전속도를 제한한다. */
+static void HexapodApp_LimitDroneCommand(const HexapodApp_Handle_t *handle,
+                                         RobotDroneOutput_t *drone)
+{
+    if ((handle == NULL) || (drone == NULL) || !handle->bringup.walking_allowed)
+    {
+        return;
+    }
+
+    drone->vx_user_mps = HexapodApp_ClampMagnitude(
+        drone->vx_user_mps, handle->bringup.linear_limit_mps);  // 전후 속도를 현재 단계로 제한한다.
+    drone->vy_user_mps = HexapodApp_ClampMagnitude(
+        drone->vy_user_mps, handle->bringup.linear_limit_mps);  // 횡이동 속도를 현재 단계로 제한한다.
+    drone->wz_user_radps = HexapodApp_ClampMagnitude(
+        drone->wz_user_radps, handle->bringup.yaw_limit_radps); // 회전속도를 현재 단계로 제한한다.
+}
+
 /* 초기 관절 명령을 기본 발 위치의 정상 IK로 만든다. */
 static bool HexapodApp_InitializeJointCommand(HexapodApp_Handle_t *handle)
 {
@@ -35,6 +133,7 @@ HAL_StatusTypeDef HexapodApp_Init(HexapodApp_Handle_t *handle,
                                   const HexapodApp_Hardware_t *hardware)
 {
     HAL_StatusTypeDef status;  // 장치 초기화 결과를 저장한다.
+    float neutral_angle_rad[ROBOT_JOINT_COUNT] = {0.0f};  // 2단계 Rate Limit 시작각을 저장한다.
 
     if ((handle == NULL) || (hardware == NULL) ||
         (hardware->gps_uart == NULL) || (hardware->imu_uart == NULL) ||
@@ -46,6 +145,7 @@ HAL_StatusTypeDef HexapodApp_Init(HexapodApp_Handle_t *handle,
 
     memset(handle, 0, sizeof(*handle));  // 이전 실행 상태를 제거한다.
     handle->hardware = *hardware;        // CubeMX Handle 연결을 저장한다.
+    HexapodApp_InitializeBringup(handle); // 단계별 출력 허가를 준비한다.
 
     GPS_Init(&handle->gps, hardware->gps_uart);             // GPS 드라이버를 준비한다.
     IMU_Init(&handle->imu, hardware->imu_uart);             // WT931 드라이버를 준비한다.
@@ -79,20 +179,24 @@ HAL_StatusTypeDef HexapodApp_Init(HexapodApp_Handle_t *handle,
     }
 
     ServoPwm_Init(&handle->servo_pwm, &hardware->servo_timers);  // 18개 서보 채널을 배치한다.
-    (void)RobotCalibration_Apply(&g_robot_calibration,
-                                 &handle->imu,
-                                 &handle->adc,
-                                 &handle->sensors.joints,
-                                 &handle->sensors.pressure,
-                                 &handle->servo_pwm,
-                                 &handle->user_command);          // 중앙 실측값을 모든 장치에 적용한다.
+    if (!RobotCalibration_Apply(&g_robot_calibration,
+                                &handle->imu,
+                                &handle->adc,
+                                &handle->sensors.joints,
+                                &handle->sensors.pressure,
+                                &handle->servo_pwm,
+                                &handle->user_command))           // 중앙 실측값을 모든 장치에 적용한다.
+    {
+        return HAL_ERROR;
+    }
     status = ServoPwm_Start(&handle->servo_pwm);                  // 보정된 중립 PWM을 시작한다.
     if (status != HAL_OK)
     {
         return status;
     }
     ServoPwm_SeedAngles(&handle->servo_pwm,
-                        handle->joints.angle_rad);                // 정상 IK를 Rate Limit 시작점으로 둔다.
+                        handle->bringup.neutral_output_active ?
+                        neutral_angle_rad : handle->joints.angle_rad);  // 현재 단계의 Rate Limit 시작점을 둔다.
     Relay_Init();                                                 // 모터 전원을 꺼진 상태로 준비한다.
 
     if (hardware->lora_uart != NULL)
@@ -211,6 +315,7 @@ static void HexapodApp_ControlStep(HexapodApp_Handle_t *handle)
     bool gait_accepted;                       // 보행 명령 채택 여부를 저장한다.
     bool relay_enable;                        // 모터 전원 허가를 저장한다.
     uint32_t leg;                             // 다리 계산 번호를 저장한다.
+    RobotUserCommand_t limited_user;          // 시험 단계가 허용한 명령을 저장한다.
 
     (void)SensorManager_Update(&handle->sensors);                  // 실제 센서 스냅샷을 갱신한다.
     (void)SensorManager_GetSnapshot(&handle->sensors,
@@ -218,8 +323,9 @@ static void HexapodApp_ControlStep(HexapodApp_Handle_t *handle)
     handle->safety = Safety_Evaluate(&handle->safety_control,
                                      &handle->sensor_snapshot.imu,
                                      handle->joints.ik_valid);     // 이전 IK와 현재 자세 Fault를 먼저 평가한다.
+    limited_user = HexapodApp_LimitUserCommand(handle);            // 시험 단계 밖의 조종 명령을 제거한다.
     handle->priority = ControlPriority_Step(&handle->priority_control,
-                                            &handle->user,
+                                            &limited_user,
                                             handle->drone.stand_done,
                                             handle->drone.landing_done,
                                             &handle->safety);       // 안전 상태를 포함해 운용 모드를 결정한다.
@@ -227,6 +333,7 @@ static void HexapodApp_ControlStep(HexapodApp_Handle_t *handle)
                                          &handle->priority,
                                          handle->sensor_snapshot.foot_contact,
                                          handle->sensor_snapshot.imu.attitude_rad.yaw);  // 조종 입력을 제어 명령으로 바꾼다.
+    HexapodApp_LimitDroneCommand(handle, &handle->drone);                          // 현재 단계의 최대 속도를 적용한다.
     position = BodyPositionEstimator_Step(
         &handle->position_estimator,
         handle->sensor_snapshot.joint_angle_rad,
@@ -296,22 +403,34 @@ static void HexapodApp_ControlStep(HexapodApp_Handle_t *handle)
     handle->safety = Safety_Evaluate(&handle->safety_control,
                                      &handle->sensor_snapshot.imu,
                                      handle->joints.ik_valid);        // 현재 IK 실패를 같은 주기에 Latch한다.
+
+    if (handle->bringup.neutral_output_active)
+    {
+        memset(handle->joints.angle_rad, 0,
+               sizeof(handle->joints.angle_rad));                    // 2단계에서 18개 관절을 0도로 고정한다.
+    }
     (void)ServoPwm_WriteAngles(&handle->servo_pwm,
                                handle->joints.angle_rad);             // 속도 제한 후 관절 PWM을 출력한다.
 
-    relay_enable = !handle->safety.rollover_fault &&
+    relay_enable = ((ROBOT_BRINGUP_STAGE == 2U) &&
+                    handle->user.connected &&
+                    handle->user.motion_armed) ||
+                   ((ROBOT_BRINGUP_STAGE >= 3U) &&
+                    ((handle->priority.active_mode == ROBOT_MODE_STAND) ||
+                     (handle->priority.active_mode == ROBOT_MODE_READY) ||
+                     (handle->priority.active_mode == ROBOT_MODE_MANUAL) ||
+                     (handle->priority.active_mode == ROBOT_MODE_CORRECTION) ||
+                     ((handle->priority.active_mode == ROBOT_MODE_LANDING) &&
+                      !handle->drone.landing_done)));                  // 연결 확인 후 현재 단계가 허용한 동작에서만 전원을 요청한다.
+    relay_enable = relay_enable &&
+                   !handle->safety.rollover_fault &&
                    !handle->safety.controller_fault &&
-                   !handle->drone.kill_enable &&
-                   ((handle->priority.active_mode == ROBOT_MODE_STAND) ||
-                    (handle->priority.active_mode == ROBOT_MODE_READY) ||
-                    (handle->priority.active_mode == ROBOT_MODE_MANUAL) ||
-                    (handle->priority.active_mode == ROBOT_MODE_CORRECTION) ||
-                    ((handle->priority.active_mode == ROBOT_MODE_LANDING) &&
-                     !handle->drone.landing_done));                    // 동작 중일 때만 모터 전원을 허가한다.
+                   !handle->drone.kill_enable;                         // Kill과 Fault에서 전원 요청을 제거한다.
     Relay_ApplySafety(relay_enable,
                       handle->drone.kill_enable ||
                       handle->safety.rollover_fault ||
                       handle->safety.controller_fault);                // Kill과 Fault에서 릴레이를 즉시 끈다.
+    handle->bringup.relay_enabled = (Relay_GetStateMask() != 0U);       // 실제 릴레이 출력 여부를 기록한다.
     handle->control_count++;                                           // 완료 제어 주기를 기록한다.
 }
 
@@ -372,4 +491,51 @@ void HexapodApp_UartErrorCallback(HexapodApp_Handle_t *handle,
     IMU_ErrorCallback(&handle->imu, uart);                     // WT931 오류를 복구한다.
     LoRa_ErrorCallback(&handle->lora, uart);                   // LoRa 오류를 복구한다.
     CRSF_Receiver_ErrorCallback(&handle->crsf_receiver, uart); // CRSF 오류를 복구한다.
+}
+
+/* 현재 CubeMX Handle을 최종 앱 장치에 연결한다. */
+HAL_StatusTypeDef HexapodApp_BoardInit(void)
+{
+    HexapodApp_Hardware_t hardware = {0};  // 현재 보드의 장치 연결을 준비한다.
+
+    hardware.gps_uart = &huart2;           // GPS를 USART2에 연결한다.
+    hardware.imu_uart = &huart3;           // WT931을 USART3에 연결한다.
+    hardware.lora_uart = NULL;             // 실기 검증 전 LoRa를 비활성화한다.
+    hardware.crsf_uart = &huart6;          // CRSF를 USART6에 연결한다.
+    hardware.adc_spi = &hspi1;             // MCP3008을 SPI1에 연결한다.
+    hardware.jetson_spi = NULL;            // 명령 형식 확정 전 Jetson을 비활성화한다.
+    hardware.control_timer = &htim6;       // 5 ms 제어 주기를 TIM6에 연결한다.
+    hardware.servo_timers.tim1 = &htim1;   // TIM1 서보 채널을 연결한다.
+    hardware.servo_timers.tim2 = &htim2;   // TIM2 서보 채널을 연결한다.
+    hardware.servo_timers.tim3 = &htim3;   // TIM3 서보 채널을 연결한다.
+    hardware.servo_timers.tim4 = &htim4;   // TIM4 서보 채널을 연결한다.
+    hardware.servo_timers.tim5 = &htim5;   // TIM5 서보 채널을 연결한다.
+    hardware.servo_timers.tim8 = &htim8;   // TIM8 서보 채널을 연결한다.
+
+    return HexapodApp_Init(&g_hexapod_app, &hardware);  // 전체 최종 앱을 시작한다.
+}
+
+/* Main Loop에서 통신과 제어 요청을 처리한다. */
+void HexapodApp_BoardProcess(void)
+{
+    HexapodApp_Process(&g_hexapod_app);                 // 대기 중인 통신을 해석한다.
+    (void)HexapodApp_RunControlIfDue(&g_hexapod_app);   // TIM6 요청이 있으면 제어를 실행한다.
+}
+
+/* 보드 Timer 완료를 최종 앱으로 전달한다. */
+void HexapodApp_BoardTimerCallback(TIM_HandleTypeDef *timer)
+{
+    HexapodApp_TimerCallback(&g_hexapod_app, timer);  // TIM6 요청을 제어 플래그로 바꾼다.
+}
+
+/* 보드 UART 수신 완료를 최종 앱으로 전달한다. */
+void HexapodApp_BoardUartRxCallback(UART_HandleTypeDef *uart)
+{
+    HexapodApp_UartRxCallback(&g_hexapod_app, uart);  // 해당 UART 드라이버의 다음 수신을 건다.
+}
+
+/* 보드 UART 오류를 최종 앱으로 전달한다. */
+void HexapodApp_BoardUartErrorCallback(UART_HandleTypeDef *uart)
+{
+    HexapodApp_UartErrorCallback(&g_hexapod_app, uart);  // 해당 UART 드라이버의 수신을 복구한다.
 }

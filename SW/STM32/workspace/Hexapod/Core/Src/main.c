@@ -21,22 +21,12 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "test/test_runner.h"
+#include "app/hexapod_app.h"
 
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
-
-typedef struct
-{
-  AlgorithmTestStep_t step;         // 마지막으로 실행한 단계를 저장한다.
-  AlgorithmTestStep_t failed_step;  // 실패한 단계 또는 COUNT를 저장한다.
-  uint32_t completed_count;         // 통과한 단계 수를 저장한다.
-  bool finished;                    // 전체 시험 완료 여부를 저장한다.
-  bool passed;                      // 열 단계 전체 통과 여부를 저장한다.
-  bool stopped;                     // 실패 후 러너 정지 여부를 저장한다.
-} AlgorithmTestDebug_t;
 
 /* USER CODE END PTD */
 
@@ -68,9 +58,6 @@ UART_HandleTypeDef huart3;
 UART_HandleTypeDef huart6;
 
 /* USER CODE BEGIN PV */
-
-TestRunner_Handle_t g_algorithm_test_runner;              // 단계별 알고리즘 시험 상태를 저장한다.
-volatile AlgorithmTestDebug_t g_algorithm_test_debug;     // Live Expressions 확인값을 저장한다.
 
 /* USER CODE END PV */
 
@@ -141,26 +128,10 @@ int main(void)
   MX_USART3_UART_Init();
   MX_USART6_UART_Init();
   /* USER CODE BEGIN 2 */
-  TestRunner_Init(&g_algorithm_test_runner);                         // 알고리즘 러너를 첫 단계로 초기화한다.
-  g_algorithm_test_debug.failed_step = ALGORITHM_TEST_COUNT;         // 시작 시 실패 단계가 없음을 표시한다.
-
-  while (!TestRunner_IsComplete(&g_algorithm_test_runner) &&
-         !g_algorithm_test_runner.stopped)
+  if (HexapodApp_BoardInit() != HAL_OK)  // 실제 장치와 최종 제어 앱을 시작한다.
   {
-    g_algorithm_test_debug.step = g_algorithm_test_runner.next_step; // 이번에 실행할 단계를 표시한다.
-    if (!TestRunner_RunNext(&g_algorithm_test_runner))
-    {
-      g_algorithm_test_debug.failed_step =
-          g_algorithm_test_runner.last_step;                         // 첫 실패 단계를 기록한다.
-      break;
-    }
-    g_algorithm_test_debug.completed_count++;                        // 통과한 단계 수를 누적한다.
+    Error_Handler();                        // 초기화 실패 시 출력을 정지한다.
   }
-
-  g_algorithm_test_debug.passed =
-      TestRunner_IsComplete(&g_algorithm_test_runner);                // 열 단계 전체 통과를 판단한다.
-  g_algorithm_test_debug.stopped = g_algorithm_test_runner.stopped;   // 실패 정지 상태를 복사한다.
-  g_algorithm_test_debug.finished = true;                             // Live Expressions에 완료를 표시한다.
 
   /* USER CODE END 2 */
 
@@ -171,6 +142,7 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+    HexapodApp_BoardProcess();  // 통신과 5 ms 제어 요청을 계속 처리한다.
   }
   /* USER CODE END 3 */
 }
@@ -946,6 +918,24 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+
+/* UART 수신 완료를 최종 앱으로 전달한다. */
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{
+  HexapodApp_BoardUartRxCallback(huart);  // 해당 UART의 다음 수신을 준비한다.
+}
+
+/* UART 오류를 최종 앱으로 전달한다. */
+void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
+{
+  HexapodApp_BoardUartErrorCallback(huart);  // 해당 UART 수신을 복구한다.
+}
+
+/* 제어 Timer 완료를 최종 앱으로 전달한다. */
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+  HexapodApp_BoardTimerCallback(htim);  // TIM6 제어 실행을 요청한다.
+}
 
 /* USER CODE END 4 */
 

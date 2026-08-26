@@ -1,6 +1,7 @@
 #ifndef HEXAPOD_APP_H
 #define HEXAPOD_APP_H
 
+#include "app/robot_bringup.h"
 #include "communication/jetson_spi.h"
 #include "communication/lora.h"
 #include "communication/robot_telemetry.h"
@@ -73,11 +74,14 @@ typedef struct
     RobotGaitPhase_t gait;                             // 최근 Tripod 상태를 저장한다.
     RobotJointCommand_t joints;                        // 최근 관절 명령을 저장한다.
     RobotSafetyOutput_t safety;                        // 최근 Fault 상태를 저장한다.
+    RobotBringupStatus_t bringup;                      // 단계별 출력 허가 상태를 저장한다.
     volatile bool control_due;                         // 5 ms 제어 실행 요청을 저장한다.
     uint32_t control_count;                            // 완료한 제어 주기 수를 저장한다.
     uint32_t missed_control_count;                     // 중복 Timer 요청 수를 저장한다.
     bool initialized;                                 // 초기화 완료 여부를 저장한다.
 } HexapodApp_Handle_t;
+
+extern HexapodApp_Handle_t g_hexapod_app;  // Live Expressions용 최종 앱 상태를 공개한다.
 
 HAL_StatusTypeDef HexapodApp_Init(HexapodApp_Handle_t *handle,
                                   const HexapodApp_Hardware_t *hardware);  // 모든 실제 장치와 제어 모듈을 준비한다.
@@ -94,5 +98,15 @@ void HexapodApp_UartRxCallback(HexapodApp_Handle_t *handle,
 
 void HexapodApp_UartErrorCallback(HexapodApp_Handle_t *handle,
                                   UART_HandleTypeDef *uart);  // UART 오류를 해당 드라이버에 전달한다.
+
+HAL_StatusTypeDef HexapodApp_BoardInit(void);  // 현재 CubeMX Handle로 최종 앱을 시작한다.
+
+void HexapodApp_BoardProcess(void);  // 통신과 5 ms 제어 요청을 처리한다.
+
+void HexapodApp_BoardTimerCallback(TIM_HandleTypeDef *timer);  // 최종 앱에 Timer 완료를 전달한다.
+
+void HexapodApp_BoardUartRxCallback(UART_HandleTypeDef *uart);  // 최종 앱에 UART 수신 완료를 전달한다.
+
+void HexapodApp_BoardUartErrorCallback(UART_HandleTypeDef *uart);  // 최종 앱에 UART 오류를 전달한다.
 
 #endif
