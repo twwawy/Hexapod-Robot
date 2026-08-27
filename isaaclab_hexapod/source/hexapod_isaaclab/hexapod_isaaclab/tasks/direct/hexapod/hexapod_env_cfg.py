@@ -22,4 +22,6 @@ class HexapodEnvCfg(DirectRLEnvCfg):
     )
     robot_cfg = HEXAPOD_CFG
     golden_replay = True
-
+    firmware_ticks_per_policy_step = 4
+    default_command = (0.0, 0.0, 0.0, 0.0, 0.0)
+    contact_force_threshold = 1.0

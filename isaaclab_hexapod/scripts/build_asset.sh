@@ -16,4 +16,6 @@ mkdir -p "$(dirname "${OUTPUT}")"
 
 test -s "${OUTPUT}"
 
+"${REPO_ROOT}/isaaclab_hexapod/scripts/inspect_asset.sh"
+
 echo "Generated ${OUTPUT}"

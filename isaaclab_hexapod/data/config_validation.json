@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "checks": {
+    "flat_action_space": true,
+    "flat_observation_space": true,
+    "timing_400hz_decimation8": true,
+    "actor_shape": true,
+    "critic_shape": true,
+    "terrain_gt_removed_from_actor": true,
+    "elevation_map_shape": true,
+    "terrain_latent_shape": true,
+    "legacy_ray_pattern_shape": true,
+    "perceptive_observation_groups": true,
+    "rsl_asymmetric_groups": true,
+    "sensor_configs_construct": true,
+    "depth_extrinsic_safety_gate": true,
+    "flat_task_registered": true,
+    "perceptive_task_registered": true
+  },
+  "dimensions": {
+    "legacy": 146,
+    "actor": 195,
+    "critic": 225,
+    "elevation_map": [
+      32,
+      24,
+      3
+    ],
+    "terrain_latent": 64
+  },
+  "passed": true
+}
