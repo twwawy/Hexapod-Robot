@@ -36,6 +36,7 @@ from train_rough_terrain import (  # noqa: E402
     ScoreMonitor,
     _training_schedule,
     essential_wandb_metrics,
+    level_best_video_keys,
     progress_video_targets,
 )
 
@@ -71,6 +72,14 @@ class TrainingArtifactTest(unittest.TestCase):
 
     def test_default_progress_targets_are_exact_quarters(self) -> None:
         self.assertEqual(progress_video_targets(5), (0.0, 0.25, 0.5, 0.75, 1.0))
+
+    def test_level_best_video_has_stable_and_level_specific_wandb_keys(self) -> None:
+        self.assertEqual(
+            level_best_video_keys(5),
+            ("level/best_video", "level/best_video_level5"),
+        )
+        with self.assertRaisesRegex(ValueError, "non-negative"):
+            level_best_video_keys(-1)
 
     def test_untrained_step_zero_is_not_selected_as_best(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

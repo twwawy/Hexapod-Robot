@@ -264,8 +264,9 @@ $PY -m pip install -r mjx/requirements-train.txt
 
 - `checkpoints/`: 매 evaluation의 일반 Brax checkpoint
 - `monitor/best_checkpoint.json`: NEW_BEST와 정확히 같은 `checkpoints/<step>` 경로
-- `monitor/best_score.json`, `latest_metrics.json`, `metrics_history.jsonl`: 로컬 점수 기록
-- `videos/best_stageXX_levelY.gif`: stage 종료 시 해당 stage의 best checkpoint 영상 1개
+- `monitor/level_best_checkpoint.json`: safety gate와 무관한 현재 terrain level 최고 checkpoint
+- `monitor/best_score.json`, `level_best_score.json`, `latest_metrics.json`, `metrics_history.jsonl`: 로컬 점수 기록
+- `videos/best_levelY.gif`: 새 level-best 평가 직후 교체되는 해당 level 최고 영상
 - `videos/stage_final_stageXX_levelY.gif`: `--stage-video`를 명시한 경우의 최종 정책 영상
 - `videos/progress/`: `--progress-video`를 명시한 경우의 중간 정책 영상
 - `run_metadata.json`: 펌웨어/action/observation/terrain/PPO/checkpoint 계약
@@ -273,12 +274,16 @@ $PY -m pip install -r mjx/requirements-train.txt
 W&B에서는 모든 stage가 launcher의 `--run-name` group 아래 별도 run으로 묶인다.
 공통 x축은 `train/global_step`이다. 차트에는 reward/success, failure·safety rate,
 진행·속도·자세 reward, teacher distillation 오차처럼 stage 판단에 필요한 핵심 metric만
-기록하며 전체 metric은 로컬 `monitor/metrics_history.jsonl`에 보존한다. stage 종료 후
-`stage/best_video` key로 best 영상 하나만 업로드한다. 네트워크가 없는
+기록하며 전체 metric은 로컬 `monitor/metrics_history.jsonl`에 보존한다. 새 level-best가
+나오면 즉시 `level/best_video`와 `level/best_video_levelY`에 올리고, 같은 파일을
+`policy-video` artifact로도 큐잉한다. `monitor/artifacts.jsonl`의
+`wandb_queued=true`와 콘솔의 `wandb_best_video_queued`로 업로드 요청 여부를 확인한다.
+네트워크가 없는
 서버에서는 `--wandb --wandb-mode offline`으로 실행한 뒤 `wandb sync`를 사용한다.
 offline 원본은 각 run directory의 `wandb/` 아래에 남는다.
 
-기본 영상 정책은 stage 종료 후 best checkpoint 영상 하나만 생성하는 것이다.
+기본 영상 정책은 각 evaluation의 새 level-best가 나올 때 동일한 level별 GIF를
+원자적으로 교체하는 것이다. stage 종료 시에는 누락된 경우 한 번 더 생성한다.
 stage-final, progress, teacher 영상은 기본적으로 꺼져 있으며 필요한 경우에만 각각
 `--stage-video`, `--progress-video`, `--teacher-video`로 켠다. 영상은 각 20초다.
 개수·길이는 `--progress-video-count`,

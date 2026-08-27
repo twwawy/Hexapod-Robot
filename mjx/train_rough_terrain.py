@@ -189,6 +189,13 @@ def progress_video_targets(count: int) -> tuple[float, ...]:
     return tuple(index / (count - 1) for index in range(count))
 
 
+def level_best_video_keys(terrain_level: int) -> tuple[str, str]:
+    """Return the stable and level-specific W&B media keys."""
+    if terrain_level < 0:
+        raise ValueError("terrain level must be non-negative")
+    return "level/best_video", f"level/best_video_level{terrain_level}"
+
+
 def _parse_reward_weights(
     values: list[str], valid_keys: tuple[str, ...]
 ) -> dict[str, float]:
@@ -907,6 +914,7 @@ def main() -> None:
         wandb_run.define_metric("train/global_step")
         for metric_name in WANDB_ESSENTIAL_METRICS:
             wandb_run.define_metric(metric_name, step_metric="train/global_step")
+        wandb_run.define_metric("level/*", step_metric="train/global_step")
         wandb_run.define_metric("stage/*", step_metric="train/global_step")
         wandb_run.summary["curriculum/stage"] = args.curriculum_stage
         wandb_run.summary["curriculum/terrain_level"] = args.terrain_level
@@ -922,6 +930,7 @@ def main() -> None:
     progress_targets = progress_video_targets(args.progress_video_count)
     next_progress_target = 0
     rendered_progress: dict[int, Path] = {}
+    rendered_level_best_step: int | None = None
     progress_history = args.monitor_dir / "progress_videos.jsonl"
     artifact_history = args.monitor_dir / "artifacts.jsonl"
 
@@ -963,7 +972,7 @@ def main() -> None:
         return True
 
     def save_level_best_checkpoint(step: int, score: float) -> bool:
-        """Point video rendering at the highest score seen on this terrain level."""
+        """Persist and immediately publish this terrain level's best policy."""
         if latest_policy.get("step") != step:
             return False
         errors: dict[str, str] = {}
@@ -1003,24 +1012,57 @@ def main() -> None:
             wandb_run.summary["level/best_step"] = step
             if checkpoint_path.exists():
                 wandb_run.summary["level/best_checkpoint"] = str(checkpoint_path)
+        if not checkpoint_path.exists():
+            # Keep the request pending. This also tolerates a Brax release that
+            # invokes callbacks before writing the matching checkpoint.
+            return False
+        save_level_best_video(
+            step=step,
+            score=score,
+            checkpoint_path=checkpoint_path,
+            params=latest_policy["params"],
+        )
         return True
 
-    def save_level_best_video() -> None:
-        """Render one video from this terrain level's highest-scoring checkpoint."""
+    def save_level_best_video(
+        *,
+        step: int | None = None,
+        score: float | None = None,
+        checkpoint_path: Path | None = None,
+        params: Any | None = None,
+    ) -> bool:
+        """Render and publish the newest level-best policy immediately.
+
+        During training, ``params`` is the exact policy that was just evaluated.
+        At stage end the pointer/checkpoint fallback guarantees a final attempt
+        even if an earlier render or upload failed.
+        """
+        nonlocal rendered_level_best_step
         if not args.best_video:
-            return
-        pointer_path = args.monitor_dir / "level_best_checkpoint.json"
-        if not pointer_path.exists():
-            print("best_video_skip: no trained level-best checkpoint was selected")
-            return
+            return False
         try:
-            pointer = json.loads(pointer_path.read_text(encoding="utf-8"))
-            best_step = int(pointer["step"])
-            best_score = float(pointer["score"])
-            checkpoint_path = Path(pointer["path"])
+            if step is None or score is None or checkpoint_path is None:
+                pointer_path = args.monitor_dir / "level_best_checkpoint.json"
+                if not pointer_path.exists():
+                    print(
+                        "best_video_skip: no trained level-best checkpoint was selected"
+                    )
+                    return False
+                pointer = json.loads(pointer_path.read_text(encoding="utf-8"))
+                step = int(pointer["step"])
+                score = float(pointer["score"])
+                checkpoint_path = Path(pointer["path"])
             if not checkpoint_path.exists():
                 raise FileNotFoundError(f"best checkpoint not found: {checkpoint_path}")
-            best_params = ppo_checkpoint.load(checkpoint_path)
+            if (
+                rendered_level_best_step == step
+                and args.best_video_path.is_file()
+                and args.best_video_path.stat().st_size > 0
+            ):
+                return True
+            best_params = (
+                params if params is not None else ppo_checkpoint.load(checkpoint_path)
+            )
             args.best_video_path.parent.mkdir(parents=True, exist_ok=True)
             render_policy_video(
                 env=env,
@@ -1035,45 +1077,81 @@ def main() -> None:
             )
         except Exception as exc:
             error = f"{type(exc).__name__}: {exc}"
-            print(f"best_video_error stage_end: {error}")
-            append_artifact({"kind": "level_best", "error": error})
-            return
+            print(f"best_video_error step={step}: {error}")
+            append_artifact(
+                {"kind": "level_best_video", "step": step, "error": error}
+            )
+            return False
+        rendered_level_best_step = step
         print(
-            f"best_video stage_end step={best_step:,} score={best_score:.3f}: "
+            f"best_video level={args.terrain_level} step={step:,} score={score:.3f}: "
             f"{args.best_video_path}"
         )
-        append_artifact(
-            {
-                "kind": "level_best",
-                "step": best_step,
-                "score": best_score,
-                "checkpoint": str(checkpoint_path),
-                "video": str(args.best_video_path),
-                "errors": {},
-            }
-        )
+        errors: dict[str, str] = {}
         if wandb_run is not None:
-            wandb_run.summary["level/best_score"] = best_score
-            wandb_run.summary["level/best_step"] = best_step
+            wandb_run.summary["level/best_score"] = score
+            wandb_run.summary["level/best_step"] = step
             wandb_run.summary["level/best_checkpoint"] = str(checkpoint_path)
             wandb_run.summary["level/best_video"] = str(args.best_video_path)
             payload: dict[str, Any] = {
-                "train/global_step": best_step,
-                "level/best_score": best_score,
-                "level/best_step": best_step,
+                "train/global_step": step,
+                "level/best_score": score,
+                "level/best_step": step,
             }
             if wandb_module is not None:
-                video_key = f"level/best_video_level{args.terrain_level}"
-                payload[video_key] = wandb_module.Video(
-                    str(args.best_video_path),
-                    format="gif",
-                    caption=(
-                        f"level best | level={args.terrain_level} | "
-                        f"{args.stage_token} | step={best_step:,} | "
-                        f"score={best_score:.3f}"
-                    ),
+                caption = (
+                    f"level best | level={args.terrain_level} | "
+                    f"{args.stage_token} | step={step:,} | score={score:.3f}"
                 )
-            wandb_run.log(payload)
+                generic_key, level_key = level_best_video_keys(args.terrain_level)
+                payload[generic_key] = wandb_module.Video(
+                    str(args.best_video_path), format="gif", caption=caption
+                )
+                payload[level_key] = wandb_module.Video(
+                    str(args.best_video_path), format="gif", caption=caption
+                )
+            try:
+                wandb_run.log(payload, commit=True)
+                if wandb_module is not None:
+                    artifact = wandb_module.Artifact(
+                        name=(
+                            f"{_safe_component(args.run_id)}-"
+                            f"level{args.terrain_level}-best-video"
+                        ),
+                        type="policy-video",
+                        metadata={
+                            "terrain_level": args.terrain_level,
+                            "step": step,
+                            "score": score,
+                            "checkpoint": str(checkpoint_path),
+                        },
+                    )
+                    artifact.add_file(
+                        str(args.best_video_path), name=args.best_video_path.name
+                    )
+                    wandb_run.log_artifact(
+                        artifact, aliases=["latest", f"step-{step}"]
+                    )
+                print(
+                    f"wandb_best_video_queued level={args.terrain_level} "
+                    f"step={step:,}"
+                )
+            except Exception as exc:
+                errors["wandb"] = f"{type(exc).__name__}: {exc}"
+                print(f"wandb_best_video_error step={step:,}: {errors['wandb']}")
+        append_artifact(
+            {
+                "kind": "level_best_video",
+                "terrain_level": args.terrain_level,
+                "step": step,
+                "score": score,
+                "checkpoint": str(checkpoint_path),
+                "video": str(args.best_video_path),
+                "wandb_queued": wandb_run is not None and "wandb" not in errors,
+                "errors": errors,
+            }
+        )
+        return True
 
     def save_progress_video(step: int, slot: int, fraction: float) -> bool:
         if not args.progress_video or slot in rendered_progress:
