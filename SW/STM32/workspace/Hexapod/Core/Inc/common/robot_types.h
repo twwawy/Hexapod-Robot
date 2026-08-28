@@ -13,6 +13,24 @@ typedef struct
     float z;   // Z축 값을 저장한다.
 } RobotVec3_t;
 
+typedef enum
+{
+    ROBOT_CONTROLLER_FAULT_NONE = 0,       // 기록된 제어기 Fault가 없음을 나타낸다.
+    ROBOT_CONTROLLER_FAULT_IK_INPUT,       // IK 입력 좌표 오류를 나타낸다.
+    ROBOT_CONTROLLER_FAULT_IK_SOLVE        // 최종 IK 해 실패를 나타낸다.
+} RobotControllerFaultReason_t;
+
+typedef struct
+{
+    RobotVec3_t target_body;                 // 최초 실패 발 목표를 저장한다.
+    RobotVec3_t limited_body;                // 최초 실패 제한 결과를 저장한다.
+    uint32_t control_count;                  // 최초 실패 제어 주기를 저장한다.
+    RobotControllerFaultReason_t reason;     // 최초 실패 원인을 저장한다.
+    uint8_t leg;                             // 최초 실패 다리 번호를 저장한다.
+    bool was_limited;                        // 최초 실패 전 위치 제한 여부를 저장한다.
+    bool valid;                              // 최초 실패 기록 존재 여부를 저장한다.
+} RobotControllerFaultRecord_t;
+
 typedef struct
 {
     float roll;    // Roll 자세를 저장한다.
@@ -140,10 +158,17 @@ typedef struct
 
 typedef struct
 {
-    RobotLegState_t state[ROBOT_LEG_COUNT];  // 다리별 상태를 저장한다.
-    float progress[ROBOT_LEG_COUNT];         // 다리별 진행률을 저장한다.
-    bool startup_phase;                      // 시작 위상 여부를 저장한다.
-    bool enabled_internal;                   // 내부 보행 상태를 저장한다.
+    RobotLegState_t state[ROBOT_LEG_COUNT];        // 다리별 상태를 저장한다.
+    float progress[ROBOT_LEG_COUNT];               // 다리별 진행률을 저장한다.
+    bool late_landing_exhausted[ROBOT_LEG_COUNT];  // 다리별 Late Landing 한계 도달을 저장한다.
+    bool startup_phase;                            // 시작 위상 여부를 저장한다.
+    bool waiting_start;                            // 첫 속도 표본 대기 여부를 저장한다.
+    bool next_phase_preview;                       // 다음 위상 검사 시작을 알린다.
+    bool next_phase_startup;                       // 검사할 위상의 최초 보행 여부를 저장한다.
+    uint8_t next_phase_swing_mask;                 // 검사할 다음 Swing 그룹을 저장한다.
+    bool late_landing_hold;                        // 탐색 한계 후 위치 고정을 저장한다.
+    bool enabled_internal;                         // 내부 보행 상태를 저장한다.
+    bool late_landing_stop;                        // Late Landing 한계 정지를 저장한다.
 } RobotGaitPhase_t;
 
 typedef struct

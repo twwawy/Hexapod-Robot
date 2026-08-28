@@ -1,3 +1,4 @@
 ../Core/Src/high_control/gait_manager.c:8:13:GaitManager_IsSwingLeg	24	static
-../Core/Src/high_control/gait_manager.c:15:6:GaitManager_Init	16	static
-../Core/Src/high_control/gait_manager.c:24:18:GaitManager_Step	80	static
+../Core/Src/high_control/gait_manager.c:15:16:GaitManager_SwingMask	24	static
+../Core/Src/high_control/gait_manager.c:32:6:GaitManager_Init	16	static
+../Core/Src/high_control/gait_manager.c:41:18:GaitManager_Step	96	static

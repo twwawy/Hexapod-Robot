@@ -52,6 +52,9 @@ bool ServoPwm_CalculatePulse(const ServoPwm_Calibration_t *calibration,
 
 HAL_StatusTypeDef ServoPwm_Start(ServoPwm_Handle_t *handle);  // 모든 PWM을 중립에서 시작한다.
 
+HAL_StatusTypeDef ServoPwm_StartAngles(ServoPwm_Handle_t *handle,
+                                       const float angle_rad[ROBOT_JOINT_COUNT]);  // 주어진 관절각에서 PWM을 시작한다.
+
 void ServoPwm_SeedAngles(ServoPwm_Handle_t *handle,
                          const float angle_rad[ROBOT_JOINT_COUNT]);  // 현재 측정각으로 Rate Limit를 초기화한다.
 

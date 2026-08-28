@@ -5,6 +5,7 @@
 ../Core/Src/low_control/servo_pwm.c:94:6:ServoPwm_SetCalibration	32	static
 ../Core/Src/low_control/servo_pwm.c:112:6:ServoPwm_CalculatePulse	32	static
 ../Core/Src/low_control/servo_pwm.c:138:19:ServoPwm_Start	24	static
-../Core/Src/low_control/servo_pwm.c:173:6:ServoPwm_SeedAngles	24	static
-../Core/Src/low_control/servo_pwm.c:193:6:ServoPwm_WriteAngles	40	static
-../Core/Src/low_control/servo_pwm.c:235:6:ServoPwm_Stop	24	static
+../Core/Src/low_control/servo_pwm.c:173:19:ServoPwm_StartAngles	64	static
+../Core/Src/low_control/servo_pwm.c:226:6:ServoPwm_SeedAngles	24	static
+../Core/Src/low_control/servo_pwm.c:246:6:ServoPwm_WriteAngles	40	static
+../Core/Src/low_control/servo_pwm.c:288:6:ServoPwm_Stop	24	static

@@ -3,6 +3,26 @@
 #include <stddef.h>
 #include <string.h>
 
+/* 압력 상태를 갱신하고 새 접촉을 Latch한다. */
+static void SensorManager_UpdateContactState(SensorManager_Handle_t *handle)
+{
+    bool previous[ROBOT_LEG_COUNT];  // 갱신 전 접촉 상태를 저장한다.
+    uint32_t leg;                    // 확인할 다리 번호를 저장한다.
+
+    memcpy(previous, handle->snapshot.foot_contact, sizeof(previous));  // 이전 접촉을 보존한다.
+    FootPressure_Update(&handle->pressure,
+                        handle->snapshot.pressure_raw,
+                        handle->snapshot.foot_contact);  // Hysteresis 접촉 상태를 갱신한다.
+
+    for (leg = 0U; leg < ROBOT_LEG_COUNT; ++leg)
+    {
+        if (!previous[leg] && handle->snapshot.foot_contact[leg])
+        {
+            handle->contact_latched_mask |= (uint8_t)(1U << leg);  // 새 접촉을 제어 전까지 유지한다.
+        }
+    }
+}
+
 /* 실제 센서 드라이버와 변환 모듈을 연결한다. */
 void SensorManager_Init(SensorManager_Handle_t *handle,
                         GPS_Handle_t *gps,
@@ -82,13 +102,57 @@ bool SensorManager_Update(SensorManager_Handle_t *handle)
         (void)JointFeedback_Convert(&handle->joints,
                                     handle->snapshot.joint_raw,
                                     handle->snapshot.joint_angle_rad);       // 관절각을 변환한다.
-        FootPressure_Update(&handle->pressure,
-                            handle->snapshot.pressure_raw,
-                            handle->snapshot.foot_contact);                  // 접촉 상태를 갱신한다.
+        SensorManager_UpdateContactState(handle);                            // 접촉과 새 접촉 Latch를 갱신한다.
         handle->snapshot.timestamp_ms = handle->adc.mcu_time_ms;             // 스냅샷 시각을 갱신한다.
     }
 
     return adc_ok;
+}
+
+/* 압력센서 여섯 채널만 읽어 접촉 상태를 1 ms로 갱신한다. */
+bool SensorManager_UpdatePressure(SensorManager_Handle_t *handle)
+{
+    uint16_t pressure_raw[ROBOT_LEG_COUNT];  // 새 압력 ADC 값을 임시 저장한다.
+    uint32_t leg;                           // 읽을 다리 번호를 저장한다.
+
+    if ((handle == NULL) || (handle->mcp3008 == NULL))
+    {
+        return false;
+    }
+
+    for (leg = 0U; leg < ROBOT_LEG_COUNT; ++leg)
+    {
+        const MCP3008_InputMapping_t *mapping =
+            &handle->mcp3008->mapping[leg][MCP3008_LEG_PRESSURE];  // 압력 ADC 매핑을 선택한다.
+
+        if (MCP3008_ReadChannel(handle->mcp3008,
+                                (MCP3008_Device_t)mapping->device,
+                                mapping->channel,
+                                &pressure_raw[leg]) != HAL_OK)
+        {
+            return false;
+        }
+    }
+
+    memcpy(handle->snapshot.pressure_raw, pressure_raw,
+           sizeof(pressure_raw));                // 완성된 여섯 압력값을 함께 반영한다.
+    SensorManager_UpdateContactState(handle);    // 접촉과 새 접촉 Latch를 갱신한다.
+    return true;
+}
+
+/* 새 접촉 비트를 반환하고 Latch를 비운다. */
+uint8_t SensorManager_TakeContactLatch(SensorManager_Handle_t *handle)
+{
+    uint8_t mask;  // 반환할 접촉 비트를 저장한다.
+
+    if (handle == NULL)
+    {
+        return 0U;
+    }
+
+    mask = handle->contact_latched_mask;  // 현재 접촉 비트를 복사한다.
+    handle->contact_latched_mask = 0U;    // 다음 접촉을 위해 Latch를 비운다.
+    return mask;
 }
 
 /* 가장 최근 센서 스냅샷을 복사한다. */

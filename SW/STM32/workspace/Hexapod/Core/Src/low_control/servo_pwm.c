@@ -169,6 +169,59 @@ HAL_StatusTypeDef ServoPwm_Start(ServoPwm_Handle_t *handle)
     return HAL_OK;
 }
 
+/* 주어진 관절각 Pulse를 먼저 기록하고 PWM을 시작한다. */
+HAL_StatusTypeDef ServoPwm_StartAngles(ServoPwm_Handle_t *handle,
+                                       const float angle_rad[ROBOT_JOINT_COUNT])
+{
+    uint16_t pulse_us[ROBOT_JOINT_COUNT];  // 관절별 시작 Pulse를 저장한다.
+    uint32_t joint;                        // 시작할 관절 번호를 저장한다.
+
+    if ((handle == NULL) || (angle_rad == NULL) || handle->started)
+    {
+        return HAL_ERROR;
+    }
+
+    for (joint = 0U; joint < ROBOT_JOINT_COUNT; ++joint)
+    {
+        const float limited = ServoPwm_Clamp(angle_rad[joint],
+                                             ROBOT_JOINT_MIN_RAD,
+                                             ROBOT_JOINT_MAX_RAD);  // 시작각을 관절 범위로 제한한다.
+
+        if ((handle->timer[joint] == NULL) ||
+            !ServoPwm_CalculatePulse(&handle->table[joint],
+                                     limited,
+                                     &pulse_us[joint]))
+        {
+            return HAL_ERROR;
+        }
+    }
+
+    for (joint = 0U; joint < ROBOT_JOINT_COUNT; ++joint)
+    {
+        __HAL_TIM_SET_COMPARE(handle->timer[joint],
+                              handle->channel[joint],
+                              pulse_us[joint]);              // PWM 시작 전에 실측각 Pulse를 기록한다.
+        handle->pulse_us[joint] = pulse_us[joint];            // 최근 Pulse를 갱신한다.
+        handle->previous_angle_rad[joint] = ServoPwm_Clamp(
+            angle_rad[joint],
+            ROBOT_JOINT_MIN_RAD,
+            ROBOT_JOINT_MAX_RAD);                             // Rate Limit 시작각을 맞춘다.
+    }
+
+    for (joint = 0U; joint < ROBOT_JOINT_COUNT; ++joint)
+    {
+        if (HAL_TIM_PWM_Start(handle->timer[joint], handle->channel[joint]) != HAL_OK)
+        {
+            ServoPwm_Stop(handle);  // 시작된 PWM을 모두 정리한다.
+            return HAL_ERROR;
+        }
+    }
+
+    handle->seeded = true;   // Rate Limit 초기화를 표시한다.
+    handle->started = true;  // 전체 PWM 시작을 표시한다.
+    return HAL_OK;
+}
+
 /* 현재 측정 관절각으로 Rate Limiter의 이전값을 초기화한다. */
 void ServoPwm_SeedAngles(ServoPwm_Handle_t *handle,
                          const float angle_rad[ROBOT_JOINT_COUNT])
@@ -245,10 +298,10 @@ void ServoPwm_Stop(ServoPwm_Handle_t *handle)
     {
         if (handle->timer[joint] != NULL)
         {
+            (void)HAL_TIM_PWM_Stop(handle->timer[joint], handle->channel[joint]);  // PWM 채널을 정지한다.
             __HAL_TIM_SET_COMPARE(handle->timer[joint],
                                   handle->channel[joint],
-                                  handle->table[joint].neutral_us);            // 정지 전에 중립 Pulse를 기록한다.
-            (void)HAL_TIM_PWM_Stop(handle->timer[joint], handle->channel[joint]);  // PWM 채널을 정지한다.
+                                  handle->table[joint].neutral_us);                // 정지 후 중립 Pulse를 준비한다.
         }
     }
 

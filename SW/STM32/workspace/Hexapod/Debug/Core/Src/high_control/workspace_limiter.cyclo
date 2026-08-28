@@ -1,4 +1,7 @@
-../Core/Src/high_control/workspace_limiter.c:10:20:WorkspaceLimiter_RotateInverse	1
-../Core/Src/high_control/workspace_limiter.c:37:6:WorkspaceLimiter_Init	2
-../Core/Src/high_control/workspace_limiter.c:46:6:WorkspaceLimiter_AllFeetValid	5
-../Core/Src/high_control/workspace_limiter.c:70:18:WorkspaceLimiter_Gait	7
+../Core/Src/high_control/workspace_limiter.c:22:20:WorkspaceLimiter_RotateInverse	1
+../Core/Src/high_control/workspace_limiter.c:49:13:WorkspaceLimiter_TwistEqual	5
+../Core/Src/high_control/workspace_limiter.c:59:13:WorkspaceLimiter_StartPreview	1
+../Core/Src/high_control/workspace_limiter.c:73:13:WorkspaceLimiter_PreviewPoint	5
+../Core/Src/high_control/workspace_limiter.c:138:6:WorkspaceLimiter_Init	2
+../Core/Src/high_control/workspace_limiter.c:147:6:WorkspaceLimiter_AllFeetValid	5
+../Core/Src/high_control/workspace_limiter.c:171:18:WorkspaceLimiter_Gait	12

@@ -37,13 +37,23 @@ typedef struct
     UART_HandleTypeDef *crsf_uart;      // CRSF UART를 연결한다.
     SPI_HandleTypeDef *adc_spi;         // MCP3008 SPI를 연결한다.
     SPI_HandleTypeDef *jetson_spi;      // Jetson SPI를 연결한다.
-    TIM_HandleTypeDef *control_timer;   // 5 ms TIM6를 연결한다.
+    TIM_HandleTypeDef *control_timer;   // 1 ms TIM6를 연결한다.
     ServoPwm_TimerBank_t servo_timers;  // 서보 PWM 타이머를 연결한다.
     uint16_t lora_local_address;        // 로봇 LoRa 주소를 저장한다.
     uint16_t lora_destination;          // 관제탑 LoRa 주소를 저장한다.
     uint8_t lora_network_id;            // LoRa Network ID를 저장한다.
     bool configure_lora;                // 저장된 LoRa 설정 갱신 여부를 저장한다.
 } HexapodApp_Hardware_t;
+
+typedef enum
+{
+    HEXAPOD_STARTUP_ZERO_WAIT = 0,  // 서기 요청을 기다린다.
+    HEXAPOD_STARTUP_ZERO_CAPTURE,   // PWM 없이 초기 관절각을 측정한다.
+    HEXAPOD_STARTUP_ZERO_MOVE,      // 측정각에서 0도로 이동한다.
+    HEXAPOD_STARTUP_ZERO_READY,     // 0도 완료 후 서기를 허가한다.
+    HEXAPOD_STARTUP_ZERO_COMPLETE,  // 기존 제어 동작을 허가한다.
+    HEXAPOD_STARTUP_ZERO_FAULT      // PWM 시작 실패를 유지한다.
+} HexapodApp_StartupZeroState_t;
 
 typedef struct
 {
@@ -76,12 +86,22 @@ typedef struct
     RobotGaitPhase_t gait;                             // 최근 Tripod 상태를 저장한다.
     RobotJointCommand_t joints;                        // 최근 관절 명령을 저장한다.
     RobotSafetyOutput_t safety;                        // 최근 Fault 상태를 저장한다.
+    RobotControllerFaultRecord_t controller_fault;    // 최초 제어기 Fault 원인을 저장한다.
     RobotBringupStatus_t bringup;                      // 단계별 출력 허가 상태를 저장한다.
-    PressureLoadCalibration_Handle_t pressure_calibration; // 기립 중 압력 자동 보정 상태를 저장한다.
-    volatile bool control_due;                         // 5 ms 제어 실행 요청을 저장한다.
-    uint32_t control_count;                            // 완료한 제어 주기 수를 저장한다.
-    uint32_t missed_control_count;                     // 중복 Timer 요청 수를 저장한다.
-    bool initialized;                                 // 초기화 완료 여부를 저장한다.
+    PressureLoadCalibration_Handle_t pressure_calibration;            // 기립 중 압력 자동 보정 상태를 저장한다.
+    HexapodApp_StartupZeroState_t startup_zero_state;                  // 서기 전 영점 정렬 상태를 저장한다.
+    float startup_initial_angle_rad[ROBOT_JOINT_COUNT];                // 영점 정렬 시작각을 저장한다.
+    float startup_command_angle_rad[ROBOT_JOINT_COUNT];                // 영점 정렬 명령각을 저장한다.
+    float startup_angle_sum_rad[ROBOT_JOINT_COUNT];                    // 초기 관절각 합계를 저장한다.
+    float startup_sensor_settle_time_s;                                // 센서 전원 안정 시간을 저장한다.
+    uint32_t startup_sensor_sample_count;                              // 초기 관절각 측정 횟수를 저장한다.
+    volatile bool pressure_due;                                        // 1 ms 압력 읽기 요청을 저장한다.
+    volatile bool control_due;                                         // 5 ms 제어 실행 요청을 저장한다.
+    uint8_t control_tick_divider;                                      // 1 ms Tick의 제어 분주를 저장한다.
+    uint8_t touchdown_control_mask;                                    // 다음 제어까지 접촉 비트를 유지한다.
+    uint32_t control_count;                                            // 완료한 제어 주기 수를 저장한다.
+    uint32_t missed_control_count;                                     // 중복 Timer 요청 수를 저장한다.
+    bool initialized;                                                  // 초기화 완료 여부를 저장한다.
 } HexapodApp_Handle_t;
 
 extern HexapodApp_Handle_t g_hexapod_app;  // Live Expressions용 최종 앱 상태를 공개한다.
@@ -91,10 +111,10 @@ HAL_StatusTypeDef HexapodApp_Init(HexapodApp_Handle_t *handle,
 
 void HexapodApp_Process(HexapodApp_Handle_t *handle);  // 통신 해석과 관제 전송을 처리한다.
 
-bool HexapodApp_RunControlIfDue(HexapodApp_Handle_t *handle);  // TIM6 요청마다 제어 1회를 실행한다.
+bool HexapodApp_RunControlIfDue(HexapodApp_Handle_t *handle);  // 5분주 요청마다 제어 1회를 실행한다.
 
 void HexapodApp_TimerCallback(HexapodApp_Handle_t *handle,
-                              TIM_HandleTypeDef *timer);  // 5 ms Timer 완료를 전달한다.
+                              TIM_HandleTypeDef *timer);  // 1 ms Timer 완료를 압력과 제어에 분배한다.
 
 void HexapodApp_UartRxCallback(HexapodApp_Handle_t *handle,
                                UART_HandleTypeDef *uart);  // UART 수신 완료를 해당 드라이버에 전달한다.
@@ -104,7 +124,7 @@ void HexapodApp_UartErrorCallback(HexapodApp_Handle_t *handle,
 
 HAL_StatusTypeDef HexapodApp_BoardInit(void);  // 현재 CubeMX Handle로 최종 앱을 시작한다.
 
-void HexapodApp_BoardProcess(void);  // 통신과 5 ms 제어 요청을 처리한다.
+void HexapodApp_BoardProcess(void);  // 압력·통신·5 ms 제어 요청을 처리한다.
 
 void HexapodApp_BoardTimerCallback(TIM_HandleTypeDef *timer);  // 최종 앱에 Timer 완료를 전달한다.
 

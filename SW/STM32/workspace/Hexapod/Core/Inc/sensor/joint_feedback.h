@@ -29,6 +29,11 @@ bool JointFeedback_SetCalibration(JointFeedback_Handle_t *handle,
                                   uint8_t joint,
                                   const JointFeedback_Calibration_t *calibration);  // 한 관절 보정값을 갱신한다.
 
+bool JointFeedback_ConvertJoint(const JointFeedback_Handle_t *handle,
+                                uint8_t joint,
+                                uint16_t raw,
+                                float *angle_rad);  // 한 관절 ADC 값을 실측각으로 변환한다.
+
 bool JointFeedback_Convert(const JointFeedback_Handle_t *handle,
                            const uint16_t raw[ROBOT_JOINT_COUNT],
                            float angle_rad[ROBOT_JOINT_COUNT]);  // 전체 ADC 값을 관절각으로 변환한다.

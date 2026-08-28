@@ -14,7 +14,7 @@ extern TIM_HandleTypeDef htim2;   // 2번 서보 Timer를 연결한다.
 extern TIM_HandleTypeDef htim3;   // 3·6번 일부 서보 Timer를 연결한다.
 extern TIM_HandleTypeDef htim4;   // 4·6번 일부 서보 Timer를 연결한다.
 extern TIM_HandleTypeDef htim5;   // 5번 일부 서보 Timer를 연결한다.
-extern TIM_HandleTypeDef htim6;   // 5 ms 제어 Timer를 연결한다.
+extern TIM_HandleTypeDef htim6;   // 1 ms 기준 Timer를 연결한다.
 extern TIM_HandleTypeDef htim8;   // 5번 일부 서보 Timer를 연결한다.
 extern UART_HandleTypeDef huart2; // GPS UART Handle을 연결한다.
 extern UART_HandleTypeDef huart3; // WT931 UART Handle을 연결한다.
@@ -138,8 +138,8 @@ static RobotUserCommand_t HexapodApp_LimitUserCommand(const HexapodApp_Handle_t 
         limited.roll = 0;      // Roll 명령을 제거한다.
         limited.pitch = 0;     // Pitch 명령을 제거한다.
         limited.sb = 0U;       // 자동 서기를 차단한다.
-        limited.sc = 1U;       // 수동·보정 모드를 차단한다.
-        limited.se = 0U;       // Reset 명령을 차단한다.
+        limited.sc = 0U;       // Reset 명령을 차단한다.
+        limited.se = 1U;       // 수동·보정 모드를 차단한다.
     }
     else if (!handle->bringup.correction_allowed)
     {
@@ -147,12 +147,12 @@ static RobotUserCommand_t HexapodApp_LimitUserCommand(const HexapodApp_Handle_t 
         limited.yaw = 0;       // 서기 시험 중 회전 명령을 제거한다.
         limited.roll = 0;      // 서기 시험 중 Roll 명령을 제거한다.
         limited.pitch = 0;     // 서기 시험 중 Pitch 명령을 제거한다.
-        limited.sc = 1U;       // 수동·보정 모드를 차단한다.
-        limited.se = 0U;       // Reset 명령을 차단한다.
+        limited.sc = 0U;       // Reset 명령을 차단한다.
+        limited.se = 1U;       // 수동·보정 모드를 차단한다.
     }
     else if (!handle->bringup.walking_allowed && (limited.sc != 2U))
     {
-        limited.sc = 1U;       // 4단계에서 보정 모드만 허가한다.
+        limited.se = 1U;       // 4단계에서 수동 모드를 READY로 바꾼다.
         limited.throttle = 0;  // READY의 잔류 이동 명령을 제거한다.
         limited.yaw = 0;       // READY의 잔류 회전 명령을 제거한다.
         limited.roll = 0;      // READY의 잔류 Roll 명령을 제거한다.
@@ -202,6 +202,213 @@ static bool HexapodApp_InitializeJointCommand(HexapodApp_Handle_t *handle)
     return all_valid;
 }
 
+/* 최초 제어기 Fault의 다리와 발 목표를 영구 기록한다. */
+static void HexapodApp_RecordControllerFault(
+    HexapodApp_Handle_t *handle,
+    RobotControllerFaultReason_t reason,
+    uint8_t leg,
+    const RobotVec3_t *target_body,
+    const RobotVec3_t *limited_body,
+    bool was_limited)
+{
+    if ((handle == NULL) || handle->controller_fault.valid)
+    {
+        return;
+    }
+
+    memset(&handle->controller_fault, 0,
+           sizeof(handle->controller_fault));                        // 최초 Fault 기록을 준비한다.
+    handle->controller_fault.reason = reason;                        // 최초 실패 원인을 저장한다.
+    handle->controller_fault.leg = leg;                              // 최초 실패 다리를 저장한다.
+    handle->controller_fault.control_count = handle->control_count;  // 최초 실패 제어 주기를 저장한다.
+    handle->controller_fault.was_limited = was_limited;              // 실패 전 제한 여부를 저장한다.
+    if (target_body != NULL)
+    {
+        handle->controller_fault.target_body = *target_body;     // 제한 전 발 목표를 저장한다.
+    }
+    if (limited_body != NULL)
+    {
+        handle->controller_fault.limited_body = *limited_body;   // 제한 후 발 목표를 저장한다.
+    }
+    handle->controller_fault.valid = true;                       // 최초 Fault 기록을 확정한다.
+}
+
+/* 현재 관절 명령을 초기 영점 정렬 속도로 0도에 접근시킨다. */
+static float HexapodApp_MoveStartupAngleToZero(float angle_rad)
+{
+    const float maximum_step = ROBOT_STARTUP_ZERO_RATE_RADPS *
+                               ROBOT_CONTROL_PERIOD_S;  // 한 주기 최대 이동각을 계산한다.
+
+    if (angle_rad > maximum_step)
+    {
+        return angle_rad - maximum_step;
+    }
+    if (angle_rad < -maximum_step)
+    {
+        return angle_rad + maximum_step;
+    }
+    return 0.0f;
+}
+
+/* PWM을 끈 채 초기 관절각을 측정하고 영점 정렬을 준비한다. */
+static void HexapodApp_PrepareStartupZero(HexapodApp_Handle_t *handle,
+                                          RobotUserCommand_t *limited_user,
+                                          bool sensor_updated)
+{
+    bool start_requested;  // 안전한 서기 요청 여부를 저장한다.
+    uint32_t joint;        // 측정할 관절 번호를 저장한다.
+
+    if ((handle == NULL) || (limited_user == NULL) ||
+        (handle->startup_zero_state == HEXAPOD_STARTUP_ZERO_COMPLETE))
+    {
+        return;
+    }
+
+    start_requested = limited_user->connected &&
+                      limited_user->motion_armed &&
+                      (limited_user->sb == 1U) &&
+                      (limited_user->sd == 0U) &&
+                      !handle->safety.rollover_fault &&
+                      !handle->safety.controller_fault;  // 연결·서기·안전 조건을 함께 검사한다.
+
+    if (handle->startup_zero_state == HEXAPOD_STARTUP_ZERO_FAULT)
+    {
+        limited_user->sb = 0U;  // 서기 요청을 차단한다.
+        limited_user->sd = 1U;  // PWM 시작 실패를 Kill로 유지한다.
+        return;
+    }
+
+    if (handle->startup_zero_state == HEXAPOD_STARTUP_ZERO_WAIT)
+    {
+        if (start_requested)
+        {
+            memset(handle->startup_angle_sum_rad,
+                   0,
+                   sizeof(handle->startup_angle_sum_rad));             // 초기각 합계를 초기화한다.
+            handle->startup_sensor_settle_time_s = 0.0f;                // 전원 안정 시간을 초기화한다.
+            handle->startup_sensor_sample_count = 0U;                   // 초기각 측정 횟수를 초기화한다.
+            handle->startup_zero_state = HEXAPOD_STARTUP_ZERO_CAPTURE; // 센서 전원과 측정을 시작한다.
+        }
+        limited_user->sb = 0U;  // 초기각 측정 전 기존 서기 진입을 막는다.
+    }
+    else if (handle->startup_zero_state == HEXAPOD_STARTUP_ZERO_CAPTURE)
+    {
+        if (!start_requested)
+        {
+            ServoPwm_Stop(&handle->servo_pwm);                       // 취소 시 PWM을 정지한다.
+            handle->startup_zero_state = HEXAPOD_STARTUP_ZERO_WAIT;  // 전원 차단 대기로 돌아간다.
+        }
+        else if (handle->startup_sensor_settle_time_s < ROBOT_STARTUP_SENSOR_SETTLE_S)
+        {
+            handle->startup_sensor_settle_time_s += ROBOT_CONTROL_PERIOD_S;  // 센서 전원 안정 시간을 누적한다.
+        }
+        else if (sensor_updated)
+        {
+            for (joint = 0U; joint < ROBOT_JOINT_COUNT; ++joint)
+            {
+                handle->startup_angle_sum_rad[joint] +=
+                    handle->sensor_snapshot.joint_angle_rad[joint];  // 실측 관절각을 누적한다.
+            }
+            handle->startup_sensor_sample_count++;  // 유효한 ADC 측정을 기록한다.
+
+            if (handle->startup_sensor_sample_count >= ROBOT_STARTUP_SENSOR_SAMPLES)
+            {
+                for (joint = 0U; joint < ROBOT_JOINT_COUNT; ++joint)
+                {
+                    handle->startup_initial_angle_rad[joint] = HexapodApp_ClampMagnitude(
+                        handle->startup_angle_sum_rad[joint] /
+                            (float)handle->startup_sensor_sample_count,
+                        ROBOT_JOINT_MAX_RAD);  // 평균 초기각을 관절 범위로 제한한다.
+                    handle->startup_command_angle_rad[joint] =
+                        handle->startup_initial_angle_rad[joint];  // 실측각을 첫 PWM 명령으로 사용한다.
+                }
+
+                if (ServoPwm_StartAngles(&handle->servo_pwm,
+                                         handle->startup_command_angle_rad) == HAL_OK)
+                {
+                    handle->startup_zero_state = HEXAPOD_STARTUP_ZERO_MOVE;  // 실측각에서 영점 정렬을 시작한다.
+                }
+                else
+                {
+                    ServoPwm_Stop(&handle->servo_pwm);                        // 부분 PWM 출력을 정리한다.
+                    handle->startup_zero_state = HEXAPOD_STARTUP_ZERO_FAULT; // 재시작 실패를 유지한다.
+                    limited_user->sd = 1U;                                  // 릴레이 차단을 요청한다.
+                }
+            }
+        }
+        limited_user->sb = 0U;  // PWM 시작과 영점 정렬 전 기존 서기 진입을 막는다.
+    }
+    else if (handle->startup_zero_state == HEXAPOD_STARTUP_ZERO_MOVE)
+    {
+        if (!start_requested)
+        {
+            ServoPwm_Stop(&handle->servo_pwm);                       // 릴레이 차단 전 PWM을 정지한다.
+            handle->startup_zero_state = HEXAPOD_STARTUP_ZERO_WAIT;  // 요청 해제 시 다시 측정한다.
+        }
+        limited_user->sb = 0U;  // 영점 이동 중 기존 서기 진입을 막는다.
+    }
+    else if ((handle->startup_zero_state == HEXAPOD_STARTUP_ZERO_READY) &&
+             !start_requested)
+    {
+        ServoPwm_Stop(&handle->servo_pwm);                       // 릴레이 차단 전 PWM을 정지한다.
+        handle->startup_zero_state = HEXAPOD_STARTUP_ZERO_WAIT;  // 서기 취소 시 초기각 대기로 돌아간다.
+        limited_user->sb = 0U;                                  // 취소된 서기 요청을 제거한다.
+    }
+}
+
+/* 초기 영점 상태에 맞는 관절 명령을 만들고 완료를 판정한다. */
+static void HexapodApp_ApplyStartupZero(HexapodApp_Handle_t *handle)
+{
+    bool all_zero = true;  // 전체 관절 영점 도달 여부를 저장한다.
+    uint32_t joint;        // 갱신할 관절 번호를 저장한다.
+
+    if ((handle == NULL) ||
+        (handle->startup_zero_state == HEXAPOD_STARTUP_ZERO_COMPLETE))
+    {
+        return;
+    }
+
+    if (handle->startup_zero_state == HEXAPOD_STARTUP_ZERO_MOVE)
+    {
+        for (joint = 0U; joint < ROBOT_JOINT_COUNT; ++joint)
+        {
+            handle->startup_command_angle_rad[joint] =
+                HexapodApp_MoveStartupAngleToZero(
+                    handle->startup_command_angle_rad[joint]);  // 관절별 명령을 0도에 접근시킨다.
+            all_zero = all_zero &&
+                       (handle->startup_command_angle_rad[joint] == 0.0f);  // 전체 영점 도달을 누적한다.
+        }
+
+        if (all_zero)
+        {
+            handle->startup_zero_state = HEXAPOD_STARTUP_ZERO_READY;  // 다음 주기에 기존 서기를 허가한다.
+        }
+    }
+
+    memcpy(handle->joints.angle_rad,
+           handle->startup_command_angle_rad,
+           sizeof(handle->joints.angle_rad));  // 대기·이동·완료 직전 명령을 최종 PWM에 적용한다.
+}
+
+/* 완전 착지 후 PWM을 끈 다음 초기각 측정을 재무장한다. */
+static void HexapodApp_RearmStartupZero(HexapodApp_Handle_t *handle)
+{
+    const bool landing_complete =
+        (handle != NULL) &&
+        (handle->priority.active_mode == ROBOT_MODE_LANDING) &&
+        handle->drone.landing_done;  // 정상 착지 완료를 검사한다.
+
+    if ((handle == NULL) || (ROBOT_BRINGUP_STAGE < 3U) ||
+        (handle->startup_zero_state != HEXAPOD_STARTUP_ZERO_COMPLETE) ||
+        !landing_complete)
+    {
+        return;
+    }
+
+    ServoPwm_Stop(&handle->servo_pwm);                       // 릴레이 차단 전 PWM을 정지한다.
+    handle->startup_zero_state = HEXAPOD_STARTUP_ZERO_WAIT;  // 다음 서기의 초기각 측정을 기다린다.
+}
+
 /* 실제 장치 드라이버와 모든 제어 상태를 초기화한다. */
 HAL_StatusTypeDef HexapodApp_Init(HexapodApp_Handle_t *handle,
                                   const HexapodApp_Hardware_t *hardware)
@@ -220,6 +427,9 @@ HAL_StatusTypeDef HexapodApp_Init(HexapodApp_Handle_t *handle,
     memset(handle, 0, sizeof(*handle));  // 이전 실행 상태를 제거한다.
     handle->hardware = *hardware;        // CubeMX Handle 연결을 저장한다.
     HexapodApp_InitializeBringup(handle); // 단계별 출력 허가를 준비한다.
+    handle->startup_zero_state = (ROBOT_BRINGUP_STAGE >= 3U) ?
+                                 HEXAPOD_STARTUP_ZERO_WAIT :
+                                 HEXAPOD_STARTUP_ZERO_COMPLETE;  // 각 서기 전 초기 영점 정렬을 요구한다.
     ControlTimingDebug_Init();           // 5 ms 제어 시간 측정을 준비한다.
 
     GPS_Init(&handle->gps, hardware->gps_uart);             // GPS 드라이버를 준비한다.
@@ -264,15 +474,19 @@ HAL_StatusTypeDef HexapodApp_Init(HexapodApp_Handle_t *handle,
     {
         return HAL_ERROR;
     }
-    status = ServoPwm_Start(&handle->servo_pwm);                  // 보정된 중립 PWM을 시작한다.
-    if (status != HAL_OK)
+    Relay_Init();  // 서보 전원을 꺼진 상태로 준비한다.
+
+    if (ROBOT_BRINGUP_STAGE < 3U)
     {
-        return status;
+        status = ServoPwm_Start(&handle->servo_pwm);  // 1·2단계는 중립 PWM을 즉시 시작한다.
+        if (status != HAL_OK)
+        {
+            return status;
+        }
+        ServoPwm_SeedAngles(&handle->servo_pwm,
+                            handle->bringup.neutral_output_active ?
+                            neutral_angle_rad : handle->joints.angle_rad);  // 시험 단계의 Rate Limit 시작점을 맞춘다.
     }
-    ServoPwm_SeedAngles(&handle->servo_pwm,
-                        handle->bringup.neutral_output_active ?
-                        neutral_angle_rad : handle->joints.angle_rad);  // 현재 단계의 Rate Limit 시작점을 둔다.
-    Relay_Init();                                                 // 모터 전원을 꺼진 상태로 준비한다.
 
     if (hardware->lora_uart != NULL)
     {
@@ -316,7 +530,7 @@ HAL_StatusTypeDef HexapodApp_Init(HexapodApp_Handle_t *handle,
     {
         return status;
     }
-    status = HAL_TIM_Base_Start_IT(hardware->control_timer);  // 5 ms 제어 Timer를 시작한다.
+    status = HAL_TIM_Base_Start_IT(hardware->control_timer);  // 1 ms 압력·제어 Timer를 시작한다.
     if (status != HAL_OK)
     {
         return status;
@@ -400,6 +614,67 @@ void HexapodApp_Process(HexapodApp_Handle_t *handle)
 }
 
 /* 센서에서 서보와 릴레이까지 제어 체인을 한 주기 실행한다. */
+/* 새 접촉 다리를 현재 PWM 명령각의 발 위치에 즉시 고정한다. */
+static void HexapodApp_ProcessTouchdownLatch(HexapodApp_Handle_t *handle,
+                                             uint32_t now_ms)
+{
+    const uint8_t contact_mask = SensorManager_TakeContactLatch(&handle->sensors);  // 새 접촉 비트를 꺼낸다.
+    uint32_t leg;                                                                    // 처리할 다리 번호를 저장한다.
+
+    handle->touchdown_control_mask |= contact_mask;  // 다음 5 ms 제어까지 접촉을 유지한다.
+    if (!handle->drone.manual_enable ||
+        (handle->drone.tripod_mode != ROBOT_TRIPOD_NORMAL))
+    {
+        return;
+    }
+
+    for (leg = 0U; leg < ROBOT_LEG_COUNT; ++leg)
+    {
+        const uint32_t first = leg * ROBOT_JOINTS_PER_LEG;  // 첫 관절 위치를 계산한다.
+        const float *command_angle =
+            &handle->servo_pwm.previous_angle_rad[first];   // 현재 PWM 명령각을 선택한다.
+        RobotVec3_t commanded_foot;                          // 현재 PWM 명령의 FK를 저장한다.
+
+        if (((contact_mask & (uint8_t)(1U << leg)) == 0U) ||
+            ((handle->gait.state[leg] != ROBOT_LEG_SWING) &&
+             (handle->gait.state[leg] != ROBOT_LEG_LATE_LANDING)))
+        {
+            continue;
+        }
+
+        if (!LegKinematics_Forward((uint8_t)leg,
+                                   command_angle,
+                                   &commanded_foot) ||
+            !FootTrajectory_LatchTouchdown(&handle->foot_trajectory,
+                                           (uint8_t)leg,
+                                           &commanded_foot,
+                                           &handle->posture_control.command_rad,
+                                           now_ms))
+        {
+            continue;
+        }
+    }
+}
+
+/* 1 ms 요청에서 압력 6채널과 접촉 Latch를 갱신한다. */
+static bool HexapodApp_RunPressureIfDue(HexapodApp_Handle_t *handle)
+{
+    if ((handle == NULL) || !handle->initialized || !handle->pressure_due)
+    {
+        return false;
+    }
+
+    handle->pressure_due = false;  // 이번 1 ms 요청을 소비한다.
+    if (!SensorManager_UpdatePressure(&handle->sensors))
+    {
+        return false;
+    }
+
+    HexapodApp_ProcessTouchdownLatch(handle, HAL_GetTick());  // 새 접촉을 즉시 처리한다.
+    return true;
+}
+
+/* 한 번의 5 ms 전체 제어를 실행한다. */
 static void HexapodApp_ControlStep(HexapodApp_Handle_t *handle)
 {
     BodyPositionEstimator_Output_t position;  // FK 몸체 위치 추정값을 저장한다.
@@ -410,6 +685,7 @@ static void HexapodApp_ControlStep(HexapodApp_Handle_t *handle)
     RobotVec3_t stand_delta[ROBOT_LEG_COUNT]; // 서기·착지 발 변화량을 저장한다.
     bool gait_accepted;                       // 보행 명령 채택 여부를 저장한다.
     bool relay_enable;                        // 모터 전원 허가를 저장한다.
+    bool sensor_updated;                      // 관절 초기각 갱신 성공 여부를 저장한다.
     uint32_t leg;                             // 다리 계산 번호를 저장한다.
     uint32_t now_ms;                          // 압력 보정 시각을 저장한다.
     uint32_t sensor_start_cycle;              // 센서 구간 시작 Cycle을 저장한다.
@@ -418,20 +694,37 @@ static void HexapodApp_ControlStep(HexapodApp_Handle_t *handle)
     uint32_t output_end_cycle;                // 출력 구간 종료 Cycle을 저장한다.
     RobotUserCommand_t limited_user;          // 시험 단계가 허용한 명령을 저장한다.
 
-    sensor_start_cycle = ControlTimingDebug_ReadCycle();               // 센서 구간 시작 시각을 읽는다.
-    (void)SensorManager_Update(&handle->sensors);                  // 실제 센서 스냅샷을 갱신한다.
+    now_ms = HAL_GetTick();                                       // 현재 제어 시각을 읽는다.
+    sensor_start_cycle = ControlTimingDebug_ReadCycle();          // 센서 구간 시작 시각을 읽는다.
+    sensor_updated = SensorManager_Update(&handle->sensors);      // 실제 센서 스냅샷을 갱신한다.
+    HexapodApp_ProcessTouchdownLatch(handle, now_ms);             // 전체 읽기에서 생긴 접촉도 처리한다.
     (void)SensorManager_GetSnapshot(&handle->sensors,
                                     &handle->sensor_snapshot);     // 같은 주기의 센서값을 복사한다.
-    sensor_end_cycle = ControlTimingDebug_ReadCycle();                  // 센서 구간 종료 시각을 읽는다.
-    handle->safety = Safety_Evaluate(&handle->safety_control,
-                                     &handle->sensor_snapshot.imu,
-                                     handle->joints.ik_valid);     // 이전 IK와 현재 자세 Fault를 먼저 평가한다.
+    for (leg = 0U; leg < ROBOT_LEG_COUNT; ++leg)
+    {
+        if ((handle->touchdown_control_mask & (uint8_t)(1U << leg)) != 0U)
+        {
+            handle->sensor_snapshot.foot_contact[leg] = true;  // 1 ms 사이 접촉을 이번 제어에 전달한다.
+        }
+    }
+    sensor_end_cycle = ControlTimingDebug_ReadCycle();            // 센서 구간 종료 시각을 읽는다.
+    handle->safety = Safety_EvaluateImu(
+        &handle->safety_control,
+        &handle->sensor_snapshot.imu);                            // 현재 자세 Fault를 먼저 평가한다.
     limited_user = HexapodApp_LimitUserCommand(handle);            // 시험 단계 밖의 조종 명령을 제거한다.
+    HexapodApp_PrepareStartupZero(handle,
+                                  &limited_user,
+                                  sensor_updated);                 // 서기 전에 실측각 기반 영점 정렬을 준비한다.
     handle->priority = ControlPriority_Step(&handle->priority_control,
                                             &limited_user,
                                             handle->drone.stand_done,
                                             handle->drone.landing_done,
                                             &handle->safety);       // 안전 상태를 포함해 운용 모드를 결정한다.
+    if ((handle->startup_zero_state == HEXAPOD_STARTUP_ZERO_READY) &&
+        (handle->priority.active_mode == ROBOT_MODE_STAND))
+    {
+        handle->startup_zero_state = HEXAPOD_STARTUP_ZERO_COMPLETE;  // 릴레이를 유지한 채 기존 서기로 넘긴다.
+    }
     handle->drone = DroneController_Step(&handle->drone_control,
                                          &handle->priority,
                                          handle->sensor_snapshot.foot_contact,
@@ -439,7 +732,6 @@ static void HexapodApp_ControlStep(HexapodApp_Handle_t *handle)
     if ((ROBOT_BRINGUP_STAGE == 3U) &&
         (ROBOT_BRINGUP_PRESSURE_CALIBRATION != 0U))
     {
-        now_ms = HAL_GetTick();  // 현재 제어 시각을 읽는다.
         PressureLoadCalibration_Update(
             &handle->pressure_calibration,
             handle->sensor_snapshot.pressure_raw,
@@ -462,17 +754,31 @@ static void HexapodApp_ControlStep(HexapodApp_Handle_t *handle)
         &position.position_world,
         position.valid_leg_count,
         handle->sensor_snapshot.imu.attitude_rad.yaw);              // 사용자와 PI 보행 명령을 결합한다.
-    twist = WorkspaceLimiter_Gait(&handle->workspace_limiter,
-                                  &gait_pose.twist,
-                                  handle->drone.manual_enable,
-                                  &handle->posture_control.command_rad,
-                                  handle->drone.reset_command,
-                                  &gait_accepted);                   // 이번 주기의 보행 속도를 적용한다.
     handle->gait = GaitManager_Step(&handle->gait_manager,
+                                    handle->drone.manual_enable,
                                     handle->drone.tripod_enable,
+                                    handle->workspace_limiter.phase_result_valid,
+                                    handle->workspace_limiter.phase_result_accepted,
                                     handle->drone.tripod_mode,
                                     handle->drone.recovery_progress,
                                     handle->sensor_snapshot.foot_contact);  // Tripod 상태와 진행률을 계산한다.
+    FootTrajectory_UpdateCommandedLanding(
+        &handle->foot_trajectory,
+        handle->servo_pwm.previous_angle_rad,
+        &handle->gait,
+        &handle->posture_control.command_rad,
+        (ROBOT_COMMON_Z_RECOVERY_ENABLE != 0U) &&
+        handle->drone.manual_enable &&
+        (handle->drone.tripod_mode == ROBOT_TRIPOD_NORMAL),
+        now_ms);  // 활성 시 접촉 20 ms 후 PWM FK의 공통 Z 오차를 수집한다.
+    handle->touchdown_control_mask = 0U;  // Gait가 소비한 접촉 Latch를 비운다.
+    twist = WorkspaceLimiter_Gait(&handle->workspace_limiter,
+                                  &gait_pose.twist,
+                                  handle->drone.manual_enable,
+                                  &handle->gait,
+                                  &handle->posture_control.command_rad,
+                                  handle->drone.reset_command,
+                                  &gait_accepted);                   // 미래 검증을 마친 보행 속도를 적용한다.
     feet = FootTrajectory_Step(&handle->foot_trajectory,
                                &twist,
                                &handle->drone,
@@ -496,40 +802,63 @@ static void HexapodApp_ControlStep(HexapodApp_Handle_t *handle)
         &handle->drone,
         &handle->sensor_snapshot.imu.attitude_rad,
         handle->drone.reset_command);  // 동적 자세 제한과 발 역회전을 적용한다.
+
     algorithm_end_cycle = ControlTimingDebug_ReadCycle();  // 제어 알고리즘 종료 시각을 읽는다.
     ControlTimingDebug_RecordSignals(&gait_pose.twist, &twist);  // PI 후보와 작업공간 채택값을 기록한다.
 
     for (leg = 0U; leg < ROBOT_LEG_COUNT; ++leg)
     {
-        RobotVec3_t limited;                                      // 최종 제한 발 위치를 저장한다.
-        bool was_limited;                                         // 발 위치 제한 여부를 저장한다.
-        const uint32_t first = leg * ROBOT_JOINTS_PER_LEG;        // 다리 첫 관절 위치를 계산한다.
+        RobotVec3_t limited = {0.0f, 0.0f, 0.0f};            // 최종 제한 발 위치를 저장한다.
+        bool was_limited = false;                            // 발 위치 제한 여부를 저장한다.
+        bool inverse_ok = false;                             // 최종 IK 계산 성공 여부를 저장한다.
+        const uint32_t first = leg * ROBOT_JOINTS_PER_LEG;  // 다리 첫 관절 위치를 계산한다.
         const bool limit_ok = LegKinematics_LimitFoot(
             (uint8_t)leg,
             &posture.targets.foot[leg],
             &limited,
-            &was_limited);                                        // IK 앞 최종 작업공간 여유를 적용한다.
+            &was_limited);                                  // 관절 여유를 포함한 최종 제한을 적용한다.
 
-        handle->joints.ik_valid[leg] = limit_ok &&
-            LegKinematics_Inverse(&handle->kinematics,
-                                  (uint8_t)leg,
-                                  &limited,
-                                  &handle->joints.angle_rad[first]);  // 제한된 위치의 IK를 계산한다.
+        if (limit_ok)
+        {
+            inverse_ok = LegKinematics_Inverse(
+                &handle->kinematics,
+                (uint8_t)leg,
+                &limited,
+                &handle->joints.angle_rad[first]);  // 제한된 위치의 IK를 계산한다.
+        }
+        handle->joints.ik_valid[leg] = limit_ok && inverse_ok;  // 최종 제한과 IK 결과를 함께 저장한다.
+
+        if (!handle->joints.ik_valid[leg])
+        {
+            HexapodApp_RecordControllerFault(
+                handle,
+                limit_ok ? ROBOT_CONTROLLER_FAULT_IK_SOLVE
+                         : ROBOT_CONTROLLER_FAULT_IK_INPUT,
+                (uint8_t)leg,
+                &posture.targets.foot[leg],
+                limit_ok ? &limited : NULL,
+                was_limited);  // 최초 실패 좌표와 단계를 보존한다.
+        }
     }
 
     handle->safety = Safety_Evaluate(&handle->safety_control,
                                      &handle->sensor_snapshot.imu,
-                                     handle->joints.ik_valid);        // 현재 IK 실패를 같은 주기에 Latch한다.
+                                     handle->joints.ik_valid);        // 현재 IK 실패의 연속 횟수를 평가한다.
 
     if (handle->bringup.neutral_output_active)
     {
         memset(handle->joints.angle_rad, 0,
                sizeof(handle->joints.angle_rad));                    // 2단계에서 18개 관절을 0도로 고정한다.
     }
+    HexapodApp_ApplyStartupZero(handle);                              // 초기각에서 0도로 저속 이동시킨다.
     (void)ServoPwm_WriteAngles(&handle->servo_pwm,
                                handle->joints.angle_rad);             // 속도 제한 후 관절 PWM을 출력한다.
+    HexapodApp_RearmStartupZero(handle);                              // 착지 완료 후 다음 서기를 준비한다.
 
-    relay_enable = ((ROBOT_BRINGUP_STAGE == 2U) &&
+    relay_enable = (handle->startup_zero_state == HEXAPOD_STARTUP_ZERO_CAPTURE) ||
+                   (handle->startup_zero_state == HEXAPOD_STARTUP_ZERO_MOVE) ||
+                   (handle->startup_zero_state == HEXAPOD_STARTUP_ZERO_READY) ||
+                   ((ROBOT_BRINGUP_STAGE == 2U) &&
                     handle->user.connected &&
                     handle->user.motion_armed) ||
                    ((ROBOT_BRINGUP_STAGE >= 3U) &&
@@ -584,7 +913,7 @@ bool HexapodApp_RunControlIfDue(HexapodApp_Handle_t *handle)
     return true;
 }
 
-/* TIM6 완료를 짧은 제어 실행 요청으로 바꾼다. */
+/* TIM6 1 ms Tick을 압력 요청과 5분주 제어 요청으로 나눈다. */
 void HexapodApp_TimerCallback(HexapodApp_Handle_t *handle,
                               TIM_HandleTypeDef *timer)
 {
@@ -593,6 +922,14 @@ void HexapodApp_TimerCallback(HexapodApp_Handle_t *handle,
         return;
     }
 
+    handle->pressure_due = true;  // 매 Tick마다 압력센서 읽기를 요청한다.
+    handle->control_tick_divider++;  // 5 ms 전체 제어 분주를 진행한다.
+    if (handle->control_tick_divider < ROBOT_CONTROL_PERIOD_MS)
+    {
+        return;
+    }
+
+    handle->control_tick_divider = 0U;  // 다음 5 ms 구간을 시작한다.
     if (handle->control_due)
     {
         handle->missed_control_count++;  // 이전 제어 미처리 상태를 기록한다.
@@ -642,7 +979,7 @@ HAL_StatusTypeDef HexapodApp_BoardInit(void)
     hardware.crsf_uart = &huart6;          // CRSF를 USART6에 연결한다.
     hardware.adc_spi = &hspi1;             // MCP3008을 SPI1에 연결한다.
     hardware.jetson_spi = NULL;            // 명령 형식 확정 전 Jetson을 비활성화한다.
-    hardware.control_timer = &htim6;       // 5 ms 제어 주기를 TIM6에 연결한다.
+    hardware.control_timer = &htim6;       // 1 ms 기준 주기를 TIM6에 연결한다.
     hardware.servo_timers.tim1 = &htim1;   // TIM1 서보 채널을 연결한다.
     hardware.servo_timers.tim2 = &htim2;   // TIM2 서보 채널을 연결한다.
     hardware.servo_timers.tim3 = &htim3;   // TIM3 서보 채널을 연결한다.
@@ -653,17 +990,18 @@ HAL_StatusTypeDef HexapodApp_BoardInit(void)
     return HexapodApp_Init(&g_hexapod_app, &hardware);  // 전체 최종 앱을 시작한다.
 }
 
-/* Main Loop에서 통신과 제어 요청을 처리한다. */
+/* Main Loop에서 압력·통신·5 ms 제어 요청을 처리한다. */
 void HexapodApp_BoardProcess(void)
 {
+    (void)HexapodApp_RunPressureIfDue(&g_hexapod_app);  // 1 ms 압력 요청을 먼저 처리한다.
     HexapodApp_Process(&g_hexapod_app);                 // 대기 중인 통신을 해석한다.
-    (void)HexapodApp_RunControlIfDue(&g_hexapod_app);   // TIM6 요청이 있으면 제어를 실행한다.
+    (void)HexapodApp_RunControlIfDue(&g_hexapod_app);   // 5분주 제어 요청이 있으면 실행한다.
 }
 
 /* 보드 Timer 완료를 최종 앱으로 전달한다. */
 void HexapodApp_BoardTimerCallback(TIM_HandleTypeDef *timer)
 {
-    HexapodApp_TimerCallback(&g_hexapod_app, timer);  // TIM6 요청을 제어 플래그로 바꾼다.
+    HexapodApp_TimerCallback(&g_hexapod_app, timer);  // TIM6 요청을 압력·제어 플래그로 바꾼다.
 }
 
 /* 보드 UART 수신 완료를 최종 앱으로 전달한다. */

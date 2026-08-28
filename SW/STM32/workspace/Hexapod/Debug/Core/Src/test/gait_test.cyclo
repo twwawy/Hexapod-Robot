@@ -1,1 +1,10 @@
-../Core/Src/test/gait_test.c:8:6:GaitTest_Run	4
+../Core/Src/test/gait_test.c:11:13:GaitTest_CheckImmediateContactHold	6
+../Core/Src/test/gait_test.c:54:13:GaitTest_CheckManualStanceHold	6
+../Core/Src/test/gait_test.c:98:13:GaitTest_CheckCommonZRecovery	10
+../Core/Src/test/gait_test.c:187:13:GaitTest_CheckLateLandingLimit	15
+../Core/Src/test/gait_test.c:269:13:GaitTest_CheckStartupDelay	15
+../Core/Src/test/gait_test.c:321:13:GaitTest_CheckPhaseTwistLatch	9
+../Core/Src/test/gait_test.c:393:25:GaitTest_StartNormal	2
+../Core/Src/test/gait_test.c:414:13:GaitTest_CheckPreviewTransition	11
+../Core/Src/test/gait_test.c:463:13:GaitTest_CheckResumeTripod	12
+../Core/Src/test/gait_test.c:517:6:GaitTest_Run	12

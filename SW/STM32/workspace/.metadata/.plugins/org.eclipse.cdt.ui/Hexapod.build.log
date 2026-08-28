@@ -1,4 +1,4 @@
-03:50:32 **** Incremental Build of configuration Debug for project Hexapod ****
+17:02:56 **** Incremental Build of configuration Debug for project Hexapod ****
 make -j16 all 
 arm-none-eabi-gcc "../Core/Src/user_command/crsf_protocol.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/user_command/crsf_protocol.d" -MT"Core/Src/user_command/crsf_protocol.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/user_command/crsf_protocol.o"
 arm-none-eabi-gcc "../Core/Src/user_command/user_command.c" -mcpu=cortex-m4 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F446xx -c -I../Core/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc -I../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32F4xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/user_command/user_command.d" -MT"Core/Src/user_command/user_command.o" --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -o "Core/Src/user_command/user_command.o"
@@ -61,11 +61,11 @@ Finished building target: Hexapod.elf
 arm-none-eabi-size  Hexapod.elf 
 arm-none-eabi-objdump -h -S Hexapod.elf  > "Hexapod.list"
    text	   data	    bss	    dec	    hex	filename
-  96216	    468	  12920	 109604	  1ac24	Hexapod.elf
+ 105752	    468	  13392	 119612	  1d33c	Hexapod.elf
 Finished building: default.size.stdout
  
 Finished building: Hexapod.list
  
 
-03:50:38 Build Finished. 0 errors, 0 warnings. (took 5s.950ms)
+17:03:02 Build Finished. 0 errors, 0 warnings. (took 6s.407ms)
 

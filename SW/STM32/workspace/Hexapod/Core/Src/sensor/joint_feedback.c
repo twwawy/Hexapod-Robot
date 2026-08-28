@@ -94,6 +94,20 @@ bool JointFeedback_SetCalibration(JointFeedback_Handle_t *handle,
     return true;
 }
 
+/* 한 관절의 ADC 값을 실측각으로 변환한다. */
+bool JointFeedback_ConvertJoint(const JointFeedback_Handle_t *handle,
+                                uint8_t joint,
+                                uint16_t raw,
+                                float *angle_rad)
+{
+    if ((handle == NULL) || (angle_rad == NULL) || (joint >= ROBOT_JOINT_COUNT))
+    {
+        return false;
+    }
+
+    return JointFeedback_ConvertOne(&handle->table[joint], raw, angle_rad);  // 선택 관절 보정을 적용한다.
+}
+
 /* 18개 관절센서 raw 값을 관절각으로 변환한다. */
 bool JointFeedback_Convert(const JointFeedback_Handle_t *handle,
                            const uint16_t raw[ROBOT_JOINT_COUNT],
@@ -109,7 +123,8 @@ bool JointFeedback_Convert(const JointFeedback_Handle_t *handle,
 
     for (joint = 0U; joint < ROBOT_JOINT_COUNT; ++joint)
     {
-        if (!JointFeedback_ConvertOne(&handle->table[joint], raw[joint], &angle_rad[joint]))
+        if (!JointFeedback_ConvertJoint(handle, (uint8_t)joint,
+                                        raw[joint], &angle_rad[joint]))
         {
             angle_rad[joint] = 0.0f;   // 잘못된 테이블은 영점으로 대체한다.
             valid = false;             // 전체 변환 실패를 기록한다.

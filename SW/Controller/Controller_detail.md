@@ -54,13 +54,13 @@ a\times b=[a]_\times b
 
 ### 1.2 제어 주기
 
-전체 제어 루프는 200 Hz로 실행한다.
+TIM6 기준 Tick은 1 kHz로 실행하고 압력센서 여섯 채널을 갱신한다. 전체 제어 루프는 다섯 번째 Tick마다 200 Hz로 실행한다.
 
 \[
 T_s=0.005\ \mathrm{s}
 \]
 
-센서 Snapshot부터 서보 명령 갱신까지 한 주기 안에서 순서대로 완료한다고 가정한다. 계산이 일찍 끝나면 다음 5 ms Tick까지 기다린다. 별도의 연산시간 초과 Fault는 현재 구현하지 않는다.
+전체 센서 Snapshot부터 서보 명령 갱신까지 5 ms 제어 주기 안에서 순서대로 완료한다고 가정한다. 별도의 연산시간 초과 Fault는 현재 구현하지 않는다.
 
 ## 2. 사용자 입력 전처리
 
@@ -708,7 +708,7 @@ h
 \operatorname{clamp}
 \left(
 0.20+\Delta z_B,
-0.15,
+0.05,
 0.25
 \right)
 \ \mathrm{m}
@@ -726,7 +726,7 @@ h
 F_{release}<F_{contact}
 \]
 
-연속 \(N_c\) Sample 동안 \(F_i>F_{contact}\)이면 CONTACT로 전환한다. 연속 \(N_r\) Sample 동안 \(F_i<F_{release}\)이면 CONTACT를 해제한다.
+1 ms 압력 표본에서 \(F_i>F_{contact}\)이면 CONTACT로 전환하고, \(F_i<F_{release}\)이면 CONTACT를 해제한다. 새 CONTACT는 다음 전체 제어가 소비할 때까지 Latch한다.
 
 임계값과 Sample 수는 실측 후 발별 설정 테이블에 기록한다.
 
@@ -739,6 +739,8 @@ F_{release}<F_{contact}
 - CONTACT가 검출된다.
 
 해당 주기의 현재 발끝 위치를 Stance 시작점으로 저장하고 즉시 STANCE로 전환한다. 다른 Swing 다리는 기존 궤적을 계속 수행한다.
+
+접촉 순간 현재 출력 중인 PWM 명령각으로 FK를 계산하고 자세 보정 전 궤적 좌표로 변환해 발 메모리를 같은 위치에 고정한다. 관절 ADC를 다시 읽거나 PWM을 다시 출력하지 않는다. 20 ms 후 PWM 명령 FK와 정상 착지 Z의 차이를 수집하고, 0.5 mm 데드밴드 초과분의 80%만 복구 후보로 사용한다. 착지당 최대 5 mm만 기존 잔량과 비교해 큰 값으로 유지한다. STANCE에서는 0.25초 Smoothstep S-curve로 진행해 시작과 끝의 적용량을 줄이고 중간 적용량을 높이며, Swing 중에는 진행률과 잔량을 유지한다.
 
 ### 11.3 Late Landing
 
@@ -762,7 +764,7 @@ v_{in}=0.8v_{search}=0.16\ \mathrm{m/s}
 \end{bmatrix}
 \]
 
-CONTACT가 검출되면 STANCE로 전환한다. 최대 탐색 거리와 최대 탐색 시간은 아직 정하지 않는다. 탐색 중 IK Invalid가 발생하면 Controller Fault를 Latch한다.
+CONTACT가 검출되면 STANCE로 전환한다. 최대 하강 거리는 0.05 m이고 현재 탐색 속도에서 최대 탐색 시간은 0.25 s이다. 한계에 도달하면 발 목표를 유지하고 `Late Landing` 원인의 Controller Fault를 Latch한다.
 
 ## 12. 좌표 변환과 IK
 
@@ -863,7 +865,7 @@ L_2+L_3-m_{ws}
 \[
 d=\sqrt{\rho^2+z^2},
 \qquad
-m_{ws}=0.0001\ \mathrm{m}
+m_{ws}=0.001\ \mathrm{m}
 \]
 
 IK 유효성은 거리, Cosine Law와 관절 범위를 함께 검사한다.
@@ -890,7 +892,7 @@ l_{phase}
 \sqrt{v_x^2+v_y^2}\times0.5
 \]
 
-x·y·Yaw가 동시에 입력되면 합성 방향과 회전 반경을 유지하도록 같은 비율과 공통 적용 여부를 사용한다. 다음 보행 궤적 전체가 유효할 때만 새 값을 적용하며 Phase 중간에는 적용값을 바꾸지 않는다.
+x·y·Yaw가 동시에 입력되면 합성 방향과 회전 반경을 유지하도록 같은 비율과 공통 적용 여부를 사용한다. 새 후보는 대기 상태로 저장하고 현재 위상 이후의 다음 5 ms, 남은 구간 중간과 위상 끝을 제어 주기마다 하나씩 검사한다. 각 지점에서 실제 Tripod 역할의 여섯 발 IK만 계산하므로 미래 검사는 총 18회이며 한 주기에는 6회만 추가된다. 세 지점이 모두 유효할 때 후보를 적용하고, 위험하면 직전 유효 명령을 유지한다. 이 거부는 IK Invalid Fault를 발생시키지 않는다.
 
 x·y를 각각 0.28 m/s로 동시에 고정하면 합성 속도가 한 축 제한을 넘을 수 있다. 실제 적용값은 합성 작업공간 검사를 통과한 범위로 제한하며 최대값 시험도 축별로 수행한다.
 
@@ -908,7 +910,7 @@ v_{request}[k]T_s
 
 ### 13.5 최종 발끝 보호
 
-동적 제한 이후 각 IK 입력에도 0.0001 m 여유의 발끝 제한을 적용한다. 이 제한은 수치 오차 보호용이다. 정상 동작에서 큰 발끝 수정이 발생하면 상위 동적 제한 오류로 판단한다.
+동적 제한 이후 각 IK 입력에도 0.001 m 링크 작업공간 여유와 0.5 deg 관절 여유를 적용한다. 링크 경계 제한 후에도 관절 범위를 벗어나면 기본 발 위치와 입력 사이를 이분 탐색해 유효한 가장 가까운 지점을 선택한다. 최종 제한 결과는 같은 IK 함수로 다시 확인하므로 유한한 입력은 관절 범위 안의 발 목표로 변환된다.
 
 ## 14. 전환 연속성
 
@@ -944,9 +946,11 @@ Controller\_Fault
 IMU\_Invalid
 \lor
 IK\_Invalid
+\lor
+LateLanding\_Limit
 \]
 
-IK Invalid는 6개 다리 중 하나라도 IK Valid가 0이면 참이다.
+IK Invalid는 6개 다리 중 하나라도 최종 제한 이후 IK Valid가 0이면 참이다. 최초 제어기 Fault는 원인, 다리 번호, 제어 주기, 제한 전·후 발 좌표와 제한 여부를 전원 재인가 전까지 별도로 보존한다.
 
 두 Fault는 한 번 발생하면 영구 Latch한다. Safety Reset은 없으며 자동 Recovery도 수행하지 않는다. Fault가 Latch되면 FAULT 상태를 거쳐 Kill을 활성화하고 6개 서보 전원 릴레이를 모두 끈다.
 
@@ -967,8 +971,6 @@ IK Invalid는 6개 다리 중 하나라도 IK Valid가 0이면 참이다.
 - Joint Jump Fault
 - 센서별 Timeout Fault
 - Stance Foot Slip의 Fault 승격
-
-Late Landing 최대 거리와 최대 시간도 아직 정하지 않는다.
 
 ## 16. Servo Output
 
@@ -1012,7 +1014,9 @@ Rate Limit 뒤에 관절별 방향·중립점 보정과 PWM 변환을 수행한�
 
 ## 17. 5 ms 실행 순서
 
-1. IMU, 관절 ADC와 압력센서 Snapshot을 갱신한다.
+TIM6 매 1 ms마다 압력센서 6채널을 갱신하고 새 접촉을 Latch한다. 다섯 번째 Tick에서는 다음 전체 제어를 실행한다.
+
+1. IMU, 관절 ADC와 센서 Snapshot을 갱신한다.
 2. CRSF 명령과 연결 상태를 갱신한다.
 3. 현재 IMU와 직전 IK 결과로 Safety를 평가한다.
 4. 상위 상태와 동작 허가를 결정한다.
@@ -1069,14 +1073,16 @@ GPS, LoRa와 Jetson SPI는 필요한 주기에 따라 백그라운드에서 처�
 | Posture | 명령 속도 제한 | ±15 deg/s |
 | Gait | Phase 시간 | 0.5 s |
 | Swing | 기본 높이 | 0.20 m |
-| Swing | 높이 범위 | 0.15~0.25 m |
+| Swing | 높이 범위 | 0.05~0.25 m |
 | Swing | 방사 오프셋 | 0.07 m |
 | Early | 판정 시작 | Swing 50% |
 | Late | 하강 속도 | 0.20 m/s |
 | Late | 안쪽 속도 | 0.16 m/s |
+| Late | 최대 탐색 | 0.05 m, 0.25 s |
 | Estimator | Slip 거리 | 0.05 m |
 | Estimator | Slip 확정 | 5 Sample, 25 ms |
-| Workspace | 여유 | 0.0001 m |
+| Workspace | 링크 여유 | 0.001 m |
+| Workspace | 관절 여유 | 0.5 deg |
 | Joint | 범위 | -135~135 deg |
 | Joint | 명령 속도 | 315.8 deg/s |
 | Joint | 5 ms 변화량 | 1.579 deg |

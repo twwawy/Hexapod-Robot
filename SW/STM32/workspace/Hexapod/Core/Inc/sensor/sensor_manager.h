@@ -19,6 +19,7 @@ typedef struct
     FootPressure_Handle_t pressure;       // 압력센서 변환 상태를 저장한다.
     MCP3008_Data_t adc;                   // 최근 ADC 값을 저장한다.
     RobotSensorSnapshot_t snapshot;       // 최근 센서 스냅샷을 저장한다.
+    uint8_t contact_latched_mask;         // 제어 전까지 유지할 접촉 비트를 저장한다.
 } SensorManager_Handle_t;
 
 void SensorManager_Init(SensorManager_Handle_t *handle,
@@ -27,6 +28,10 @@ void SensorManager_Init(SensorManager_Handle_t *handle,
                         MCP3008_Handle_t *mcp3008);  // 실제 센서 드라이버를 연결한다.
 
 bool SensorManager_Update(SensorManager_Handle_t *handle);  // 최신 실제 센서값을 갱신한다.
+
+bool SensorManager_UpdatePressure(SensorManager_Handle_t *handle);  // 압력 6채널만 갱신한다.
+
+uint8_t SensorManager_TakeContactLatch(SensorManager_Handle_t *handle);  // 접촉 비트를 한 번 꺼낸다.
 
 bool SensorManager_GetSnapshot(const SensorManager_Handle_t *handle,
                                RobotSensorSnapshot_t *snapshot);  // 제어용 스냅샷을 반환한다.

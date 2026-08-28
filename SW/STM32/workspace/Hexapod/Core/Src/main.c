@@ -648,7 +648,7 @@ static void MX_TIM6_Init(void)
   htim6.Instance = TIM6;
   htim6.Init.Prescaler = 83;
   htim6.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim6.Init.Period = 4999;
+  htim6.Init.Period = 999;
   htim6.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
   if (HAL_TIM_Base_Init(&htim6) != HAL_OK)
   {
@@ -931,10 +931,10 @@ void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
   HexapodApp_BoardUartErrorCallback(huart);  // 해당 UART 수신을 복구한다.
 }
 
-/* 제어 Timer 완료를 최종 앱으로 전달한다. */
+/* 압력·제어 Timer 완료를 최종 앱으로 전달한다. */
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
-  HexapodApp_BoardTimerCallback(htim);  // TIM6 제어 실행을 요청한다.
+  HexapodApp_BoardTimerCallback(htim);  // TIM6 압력·제어 실행을 요청한다.
 }
 
 /* USER CODE END 4 */

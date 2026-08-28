@@ -219,7 +219,7 @@ workspace_limiter ──────┬────────▶ leg_kinematic
 safety ──────────────────────────▶ common
 ```
 
-`workspace_limiter`는 보행 속도, 몸체 자세와 보정 위치 명령이 6개 다리의 IK 범위를 벗어나는지 미리 검사한다. `leg_kinematics`는 한 발의 좌표변환과 최종 IK 유효성만 판단하며 상위 명령 유지 여부를 결정하지 않는다.
+`workspace_limiter`는 새 보행 명령의 다음 5 ms·남은 구간 중간·위상 끝을 세 제어 주기에 나눠 검사한다. 각 지점에서 실제 Tripod 역할의 여섯 발만 검사하며 위험한 후보는 버리고 직전 유효 명령을 유지한다. 몸체 자세와 보정 위치 명령의 IK 범위도 검사하고 현재 발 목표를 최종 제한한다. `leg_kinematics`는 한 발의 좌표변환과 최종 IK 유효성만 판단하며 상위 명령 유지 여부를 결정하지 않는다.
 
 `safety`와 `control_priority`는 서로 직접 포함하지 않는다. `hexapod_app.c`가 Safety 결과를 Priority 입력으로 전달하여 순환 참조를 막는다.
 
@@ -319,13 +319,13 @@ Roll·Pitch와 보정 Yaw의 자세 PI를 계산하고 발끝 목표에 몸체 �
 
 ### `high_control/workspace_limiter.h`
 
-현재 발 배치에서 6개 다리가 모두 IK 가능한지 미리 확인하고 다음 세 명령을 동적으로 제한한다.
+새 보행 후보의 미래 세 지점을 주기당 한 점씩 검사하고 위험하면 직전 유효 명령을 유지한다. 한 지점에서는 실제 Tripod 역할의 여섯 IK만 계산한다.
 
 - 보행 x·y 속도와 Yaw 속도
 - Roll·Pitch와 보정 Yaw 자세
 - 보정 모드 X/Y/Z 이동
 
-후보가 유효하면 새 명령을 채택하고 유효하지 않으면 직전에 채택한 명령을 유지한다. 최종 IK 앞의 0.0001 m 수치 여유 검사는 `leg_kinematics`가 한 번 더 수행한다.
+후보가 유효하면 새 명령을 채택하고 유효하지 않으면 직전에 채택한 명령을 유지한다. 검사 중 도착한 최신 후보는 별도로 보존해 현재 후보가 끝난 다음 세 지점 검사를 이어간다. 최종 IK 앞에서는 `leg_kinematics`가 0.001 m 링크 여유와 0.5 deg 관절 여유를 적용하고, 관절 범위를 벗어나는 발은 기본 발 위치 방향의 유효 경계로 제한한다.
 
 ### `high_control/gait_manager.h`
 
@@ -341,11 +341,11 @@ STANCE 발이 지면의 같은 위치를 유지하도록 몸체 이동과 회전
 
 ### `high_control/swing_trajectory.h`
 
-착지점, Quintic 시간 스케일링, Bezier 궤적과 방사 오프셋을 계산한다. Swing Height 기본값은 0.20 m이며 0.15~0.25 m 범위에서 사용한다.
+착지점, Quintic 시간 스케일링, Bezier 궤적과 방사 오프셋을 계산한다. Swing Height 기본값은 0.20 m이며 몸체 Z Offset에 따라 0.05~0.25 m 범위에서 사용한다.
 
 ### `high_control/contact_adaptation.h`
 
-Swing 진행률 50% 이후의 Early Landing과 정상 Swing 종료 후 Late Landing을 처리한다. Late Landing 하강 속도는 0.20 m/s이다.
+Swing 진행률 50% 이후의 Early Landing과 정상 Swing 종료 후 Late Landing을 처리한다. 접촉 주기에는 직전 발 목표를 유지하며, 한 Tripod의 공통 하강 오차는 STANCE 동안 S-curve로 제거한다. Late Landing 하강 속도는 0.20 m/s이고 0.05 m 또는 0.25 s에서 발을 정지한 뒤 명시적인 Controller Fault를 발생시킨다.
 
 ### `high_control/leg_kinematics.h`
 
@@ -356,9 +356,9 @@ Swing 진행률 50% 이후의 Early Landing과 정상 Swing 종료 후 Late Land
 현재 Simulink `SafetyEvaluator`와 동일하게 다음 Fault를 Latch한다.
 
 - `Rollover_Fault`: 유효한 Roll 또는 Pitch 절댓값이 80 deg 이상이다.
-- `Controller_Fault`: IMU 값이 유한수가 아니거나 6개 다리 중 하나라도 IK Invalid이다.
+- `Controller_Fault`: IMU 값이 유한수가 아니거나, 최종 제한 뒤 IK가 Invalid이거나, Late Landing 한계를 초과한다.
 
-한 번 Fault가 발생하면 Reset 없이 유지한다. 결과는 `control_priority`와 `drone_controller`를 거쳐 Kill을 활성화하고 `relay`가 서보 전원 릴레이를 모두 끄게 한다. CRSF 연결 끊김은 Safety Fault가 아니라 `user_command`의 입력 Failsafe로 처리한다.
+한 번 Fault가 발생하면 Reset 없이 유지한다. 최초 IK·Late Landing Fault의 원인, 다리, 제어 주기와 발 좌표도 최종 앱 상태에 함께 보존한다. 결과는 `control_priority`와 `drone_controller`를 거쳐 Kill을 활성화하고 `relay`가 서보 전원 릴레이를 모두 끄게 한다. CRSF 연결 끊김은 Safety Fault가 아니라 `user_command`의 입력 Failsafe로 처리한다.
 
 ## 10. 하위 제어 파일
 
@@ -442,7 +442,7 @@ GPS, WT931과 MCP3008 24채널 raw 값, 수신 주기와 오류 횟수를 확인
 
 ### `test/workspace_test.h`
 
-Roll·Pitch ±45 deg, x·y 0.28 m/s, Yaw 45 deg/s와 보정 명령의 경계값을 넣어 동적 제한을 검사한다. 여러 축 동시 입력, 직전 명령 유지와 최종 0.0001 m 여유도 확인한다.
+Roll·Pitch ±45 deg, x·y 0.28 m/s, Yaw 45 deg/s와 보정 명령의 경계값을 넣어 동적 제한을 검사한다. 보행 후보가 세 주기 뒤 적용되는지, 위험한 후보에서 직전 명령을 유지하는지와 최종 0.001 m 여유도 확인한다.
 
 ### `test/gait_test.h`
 
@@ -522,13 +522,15 @@ Kill 상태를 반영한 Relay 출력
 | 최대 x·y 속도 | 각 ±0.28 m/s |
 | 최대 Yaw 속도 | ±45 deg/s |
 | 최대 Roll·Pitch | ±45 deg |
-| Swing Height | 기본 0.20 m, 범위 0.15~0.25 m |
+| Swing Height | 기본 0.20 m, 범위 0.05~0.25 m |
 | Early Landing 시작 | Swing 진행률 50% |
 | Late Landing 하강 | 0.20 m/s |
-| 작업공간 여유 | 0.0001 m |
+| Late Landing 최대 탐색 | 0.05 m, 0.25 s |
+| 작업공간 여유 | 0.001 m |
+| 관절 여유 | 0.5 deg |
 | Stance Foot Slip | 0.05 m, 5회 연속 |
 | 관절 명령 속도 | 315.8 deg/s, 5 ms당 1.579 deg |
 | Rollover Fault | Roll 또는 Pitch 절댓값 80 deg 이상 |
-| Controller Fault | 비유한 IMU 또는 IK Invalid |
+| Controller Fault | 비유한 IMU, 최종 제한 뒤 IK Invalid 또는 Late Landing 한계 초과 |
 
 관절 ADC, 압력센서 임계값, 서보 방향·중립점, 릴레이-다리 대응과 CRSF raw 보정값은 단계별 실측 테스트에서 채운다.

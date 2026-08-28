@@ -52,7 +52,25 @@ bool UserCommandTest_Run(void)
         return false;
     }
 
-    UserCommand_UpdateTimeout(&handle, 1306U);  // 마지막 프레임 100 ms 이후를 검사한다.
+    raw[6] = g_robot_calibration.crsf[6].raw_max;  // CH7 SC를 끝 위치로 둔다.
+    raw[8] = g_robot_calibration.crsf[8].raw_min;  // CH9 SE를 해제한다.
+    UserCommand_UpdateChannels(&handle, raw, 1210U);  // SC·SE 채널을 전달한다.
+    (void)UserCommand_Get(&handle, &command);          // 스위치 변환 결과를 읽는다.
+    if ((command.sc != 2U) || (command.se != 0U))
+    {
+        return false;
+    }
+
+    raw[6] = g_robot_calibration.crsf[6].raw_min;  // CH7 SC를 첫 위치로 둔다.
+    raw[8] = g_robot_calibration.crsf[8].raw_max;  // CH9 SE를 누른다.
+    UserCommand_UpdateChannels(&handle, raw, 1215U);  // 반대 SC·SE 상태를 전달한다.
+    (void)UserCommand_Get(&handle, &command);          // 스위치 변환 결과를 읽는다.
+    if ((command.sc != 0U) || (command.se != 1U))
+    {
+        return false;
+    }
+
+    UserCommand_UpdateTimeout(&handle, 1316U);  // 마지막 프레임 100 ms 이후를 검사한다.
     (void)UserCommand_Get(&handle, &command);    // Failsafe 명령을 읽는다.
     return !command.connected && !command.motion_armed &&
            (command.throttle == 0) && (command.yaw == 0);  // 연결 끊김 시 중립인지 확인한다.

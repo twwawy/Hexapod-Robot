@@ -33,8 +33,9 @@ bool ControllerTest_Run(void)
     BodyPostureController_Init(&posture_controller);  // 자세 명령을 초기화한다.
     LegKinematics_Init(&kinematics);       // IK 유지값을 초기화한다.
 
-    gait = GaitManager_Step(&gait_manager, false,
-                            ROBOT_TRIPOD_NORMAL, 0.0f, contact);  // 정지 Stance를 만든다.
+    gait = GaitManager_Step(&gait_manager, drone.manual_enable, false,
+                            true, true, ROBOT_TRIPOD_NORMAL,
+                            0.0f, contact);  // 정지 Stance를 만든다.
     feet = FootTrajectory_Step(&trajectory, &twist, &drone,
                                &gait, &measured);                 // 기본 발 위치를 만든다.
     posture = BodyPostureController_Step(&posture_controller,

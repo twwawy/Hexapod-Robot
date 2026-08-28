@@ -4,9 +4,11 @@
 #include <stddef.h>
 #include <string.h>
 
-#define LEG_ROOT_DISTANCE_M 0.1845f
-#define LEG_IK_TOLERANCE    1.0e-6f
-#define LEG_SMALL_VALUE     1.0e-9f
+#define LEG_ROOT_DISTANCE_M         0.1845f
+#define LEG_IK_TOLERANCE            1.0e-6f
+#define LEG_SMALL_VALUE             1.0e-9f
+#define LEG_JOINT_MARGIN_RAD        (0.5f * ROBOT_DEG_TO_RAD_F)
+#define LEG_LIMIT_BISECTION_COUNT   12U
 
 static const float leg_angle_rad[ROBOT_LEG_COUNT] =
 {
@@ -83,6 +85,18 @@ static bool LegKinematics_SolveLocal(const RobotVec3_t *local,
            (fabsf(angle_rad[0]) <= ROBOT_JOINT_MAX_RAD) &&
            (fabsf(angle_rad[1]) <= ROBOT_JOINT_MAX_RAD) &&
            (fabsf(angle_rad[2]) <= ROBOT_JOINT_MAX_RAD);  // 관절 제한을 함께 확인한다.
+}
+
+/* 최종 발 제한용 관절 여유를 포함해 다리 좌표를 검사한다. */
+static bool LegKinematics_LocalSafe(const RobotVec3_t *local)
+{
+    float angle_rad[ROBOT_JOINTS_PER_LEG];                           // 여유를 검사할 IK 해를 저장한다.
+    const float limit = ROBOT_JOINT_MAX_RAD - LEG_JOINT_MARGIN_RAD;  // 관절 경계 안쪽 기준을 계산한다.
+
+    return LegKinematics_SolveLocal(local, angle_rad) &&
+           (fabsf(angle_rad[0]) <= limit) &&
+           (fabsf(angle_rad[1]) <= limit) &&
+           (fabsf(angle_rad[2]) <= limit);  // 세 관절에 동일한 각도 여유를 적용한다.
 }
 
 /* 각 다리의 마지막 정상 IK 해를 영점으로 초기화한다. */
@@ -231,18 +245,22 @@ bool LegKinematics_IsReachable(uint8_t leg,
            LegKinematics_SolveLocal(&local, angle);  // 상태 변경 없이 IK 가능 여부만 반환한다.
 }
 
-/* 한 발을 2-link 작업공간 안으로 최소 수정한다. */
+/* 한 발을 링크·관절 여유 안의 유효 위치로 제한한다. */
 bool LegKinematics_LimitFoot(uint8_t leg,
                              const RobotVec3_t *input_body,
                              RobotVec3_t *output_body,
                              bool *limited)
 {
-    RobotVec3_t local;          // 다리 좌표 입력을 저장한다.
-    float radial;               // Coxa 수평 거리를 저장한다.
-    float planar;               // Femur 기준 평면 거리를 저장한다.
-    float reach;                // 2-link 원점 거리를 저장한다.
-    float limited_reach;        // 제한된 원점 거리를 저장한다.
-    float scale;                // 방사 방향 축척을 저장한다.
+    RobotVec3_t local;        // 다리 좌표 입력을 저장한다.
+    RobotVec3_t constrained;  // 기하학적 제한 결과를 저장한다.
+    RobotVec3_t safe;         // 관절 제한을 만족하는 결과를 저장한다.
+    RobotVec3_t unsafe;       // 관절 제한을 벗어난 결과를 저장한다.
+    float radial;             // Coxa 수평 거리를 저장한다.
+    float planar;             // Femur 기준 평면 거리를 저장한다.
+    float reach;              // 2-link 원점 거리를 저장한다.
+    float limited_reach;      // 제한된 원점 거리를 저장한다.
+    float scale;              // 방사 방향 축척을 저장한다.
+    uint32_t iteration;       // 관절 경계 이분 탐색 횟수를 저장한다.
 
     if ((input_body == NULL) || (output_body == NULL) || (limited == NULL) ||
         !LegKinematics_BodyToLeg(leg, input_body, &local) ||
@@ -251,27 +269,58 @@ bool LegKinematics_LimitFoot(uint8_t leg,
         return false;
     }
 
-    radial = sqrtf(local.x * local.x + local.y * local.y);                  // Coxa 수평 거리를 계산한다.
+    constrained = local;                                                     // 입력 좌표에서 제한을 시작한다.
+    radial = sqrtf(constrained.x * constrained.x + constrained.y * constrained.y);  // Coxa 수평 거리를 계산한다.
     planar = radial - ROBOT_LINK_1_M;                                        // 2-link 평면 좌표를 계산한다.
-    reach = sqrtf(planar * planar + local.z * local.z);                      // 2-link 원점 거리를 계산한다.
+    reach = sqrtf(planar * planar + constrained.z * constrained.z);          // 2-link 원점 거리를 계산한다.
     limited_reach = fminf(fmaxf(reach,
                                  fabsf(ROBOT_LINK_2_M - ROBOT_LINK_3_M) + ROBOT_WORKSPACE_MARGIN_M),
-                           ROBOT_LINK_2_M + ROBOT_LINK_3_M - ROBOT_WORKSPACE_MARGIN_M);  // 여유를 둔 작업공간으로 제한한다.
-    *limited = fabsf(limited_reach - reach) > LEG_SMALL_VALUE;               // 위치 수정 여부를 기록한다.
+                            ROBOT_LINK_2_M + ROBOT_LINK_3_M - ROBOT_WORKSPACE_MARGIN_M);  // 여유를 둔 작업공간으로 제한한다.
 
-    if (*limited)
+    if (fabsf(limited_reach - reach) > LEG_SMALL_VALUE)
     {
         scale = (reach > LEG_SMALL_VALUE) ? (limited_reach / reach) : 1.0f;  // 방사 방향 축척을 계산한다.
         planar *= scale;                                                      // 평면 거리를 제한한다.
-        local.z *= scale;                                                      // 수직 거리를 제한한다.
+        constrained.z *= scale;                                                // 수직 거리를 제한한다.
 
         if (radial > LEG_SMALL_VALUE)
         {
             const float xy_scale = (ROBOT_LINK_1_M + planar) / radial;  // Coxa 이후 반경의 축척을 계산한다.
-            local.x *= xy_scale;                                        // 다리 X를 제한한다.
-            local.y *= xy_scale;                                        // 다리 Y를 제한한다.
+            constrained.x *= xy_scale;                                  // 다리 X를 제한한다.
+            constrained.y *= xy_scale;                                  // 다리 Y를 제한한다.
         }
     }
 
-    return LegKinematics_LegToBody(leg, &local, output_body);  // 제한 결과를 Body 좌표로 반환한다.
+    if (!LegKinematics_LocalSafe(&constrained))
+    {
+        safe.x = ROBOT_BASE_FOOT_RADIUS_M;  // 기본 발의 안전한 다리 X를 선택한다.
+        safe.y = 0.0f;                      // 기본 발의 안전한 다리 Y를 선택한다.
+        safe.z = ROBOT_BASE_FOOT_Z_M;       // 기본 발의 안전한 다리 Z를 선택한다.
+        unsafe = constrained;               // 입력 방향의 관절 경계를 찾는다.
+
+        for (iteration = 0U; iteration < LEG_LIMIT_BISECTION_COUNT; ++iteration)
+        {
+            RobotVec3_t midpoint;                        // 이번 이분 탐색 좌표를 저장한다.
+            midpoint.x = 0.5f * (safe.x + unsafe.x);    // X 경계 중간을 계산한다.
+            midpoint.y = 0.5f * (safe.y + unsafe.y);    // Y 경계 중간을 계산한다.
+            midpoint.z = 0.5f * (safe.z + unsafe.z);    // Z 경계 중간을 계산한다.
+
+            if (LegKinematics_LocalSafe(&midpoint))
+            {
+                safe = midpoint;    // 유효한 쪽 경계를 입력에 접근시킨다.
+            }
+            else
+            {
+                unsafe = midpoint;  // 무효한 쪽 경계를 안전점에 접근시킨다.
+            }
+        }
+
+        constrained = safe;  // 관절 여유를 만족하는 최종 좌표를 선택한다.
+    }
+
+    *limited = (fabsf(constrained.x - local.x) > LEG_SMALL_VALUE) ||
+               (fabsf(constrained.y - local.y) > LEG_SMALL_VALUE) ||
+               (fabsf(constrained.z - local.z) > LEG_SMALL_VALUE);  // 실제 위치 수정 여부를 기록한다.
+    return LegKinematics_LocalSafe(&constrained) &&
+           LegKinematics_LegToBody(leg, &constrained, output_body);  // IK가 보장된 Body 좌표를 반환한다.
 }

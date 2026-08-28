@@ -1,2 +1,4 @@
 ../Core/Src/high_control/safety.c:8:6:Safety_Init	16	static
-../Core/Src/high_control/safety.c:17:21:Safety_Evaluate	40	static
+../Core/Src/high_control/safety.c:17:6:Safety_LatchControllerFault	16	static
+../Core/Src/high_control/safety.c:26:21:Safety_EvaluateImu	24	static
+../Core/Src/high_control/safety.c:56:21:Safety_Evaluate	40	static

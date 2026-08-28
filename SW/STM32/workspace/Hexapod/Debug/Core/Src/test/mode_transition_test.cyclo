@@ -1,1 +1,2 @@
-../Core/Src/test/mode_transition_test.c:9:6:ModeTransitionTest_Run	6
+../Core/Src/test/mode_transition_test.c:10:13:ModeTransitionTest_CheckSwitchFunctions	14
+../Core/Src/test/mode_transition_test.c:85:6:ModeTransitionTest_Run	9

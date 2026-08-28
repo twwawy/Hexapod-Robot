@@ -16,6 +16,7 @@ typedef enum
 typedef struct
 {
     ControlPriority_Supervisor_t supervisor;  // 상위 상태를 저장한다.
+    RobotControlMode_t motion_mode;            // SC가 마지막으로 선택한 동작 모드를 저장한다.
     bool stand_command_armed;                  // 서기 재입력 허가를 저장한다.
     bool motion_armed;                         // READY 입력 허가를 저장한다.
     float neutral_time_s;                      // READY 중립 유지 시간을 저장한다.
