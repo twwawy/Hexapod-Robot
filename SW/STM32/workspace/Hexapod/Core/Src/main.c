@@ -33,7 +33,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define JETSON_SPI_BRINGUP_TEST  1U
+#define JETSON_SPI_BRINGUP_TEST  0U
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/

@@ -7,7 +7,7 @@
 #include <stdint.h>
 
 #define ROBOT_BRINGUP_STAGE              6U                                 // 현재 실기 시험 단계를 선택한다.
-#define ROBOT_BRINGUP_STAGE_MIN          1U                                 // 첫 시험 단계를 정의한다.
+#define ROBOT_BRINGUP_STAGE_MIN          6U                                 // 첫 시험 단계를 정의한다.
 #define ROBOT_BRINGUP_STAGE_MAX          6U                                 // 최종 운용 단계를 정의한다.
 #define ROBOT_BRINGUP_LOW_SPEED_MPS      (ROBOT_MAX_LINEAR_SPEED_MPS * 0.5f) // 최대 선속도의 50%를 정의한다.
 #define ROBOT_BRINGUP_LOW_YAW_RATE_RADPS (ROBOT_MAX_YAW_RATE_RADPS * 0.5f)   // 최대 회전속도의 50%를 정의한다.

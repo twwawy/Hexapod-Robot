@@ -227,7 +227,8 @@ bool JetsonSpi_PrepareSensorFrame(JetsonSpi_Handle_t *handle,
     uint8_t contact_mask = 0U;
 
     if ((handle == NULL) || (snapshot == NULL) ||
-        (handle->spi == NULL) || !handle->protocol_ready)
+        (handle->spi == NULL) || !handle->protocol_ready ||
+        handle->tx_frame_ready || handle->transfer_active)
     {
         return false;
     }
