@@ -375,10 +375,10 @@ bool JetsonSpi_Process(JetsonSpi_Handle_t *handle)
     }
 
     handle->transfer_error = false;
-    status = HAL_SPI_TransmitReceive_IT(handle->spi,
-                                        handle->tx_frame,
-                                        handle->rx_frame,
-                                        JETSON_SPI_FRAME_SIZE);
+    status = HAL_SPI_TransmitReceive_DMA(handle->spi,
+                                         handle->tx_frame,
+                                         handle->rx_frame,
+                                         JETSON_SPI_FRAME_SIZE);
     if (status != HAL_OK)
     {
         handle->error_count++;

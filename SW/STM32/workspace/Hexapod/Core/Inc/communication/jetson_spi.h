@@ -78,7 +78,7 @@ typedef struct
     bool rx_packet_valid;                         // 마지막 트랜잭션의 수신 패킷 유효 여부다.
     bool command_pending;                         // 아직 상위 코드가 소비하지 않은 명령 존재 여부다.
     bool has_rx_sequence;                         // 수신 순번 기준값 존재 여부다.
-    volatile bool transfer_active;                // 인터럽트 방식 SPI 송수신 진행 여부다.
+    volatile bool transfer_active;                // DMA 방식 SPI 송수신 진행 여부다.
     volatile bool transfer_complete;              // ISR에서 설정하는 송수신 완료 플래그다.
     volatile bool transfer_error;                 // ISR에서 설정하는 SPI 오류 플래그다.
 } JetsonSpi_Handle_t;
@@ -100,7 +100,7 @@ bool JetsonSpi_PrepareSensorFrame(JetsonSpi_Handle_t *handle,
                                   uint32_t now_ms);  // 관절각, 발 접촉 상태와 IMU 자세로 송신 프레임을 만든다.
 
 /*
- * 준비된 32바이트를 SPI2 Slave 인터럽트 방식으로 동시 송수신한다.
+ * 준비된 32바이트를 SPI2 Slave DMA 방식으로 동시 송수신한다.
  * SPI를 먼저 Arm한 뒤 DRDY를 올리고, 완료된 프레임의 파싱은 메인 루프에서 처리한다.
  */
 bool JetsonSpi_Process(JetsonSpi_Handle_t *handle);
