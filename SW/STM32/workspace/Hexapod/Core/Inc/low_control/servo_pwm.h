@@ -33,9 +33,9 @@ typedef struct
     TIM_HandleTypeDef *timer[ROBOT_JOINT_COUNT];       // 관절별 타이머를 저장한다.
     uint32_t channel[ROBOT_JOINT_COUNT];               // 관절별 타이머 채널을 저장한다.
     ServoPwm_Calibration_t table[ROBOT_JOINT_COUNT];   // 관절별 서보 보정값을 저장한다.
-    float previous_angle_rad[ROBOT_JOINT_COUNT];       // Rate Limit 이전값을 저장한다.
+    float previous_angle_rad[ROBOT_JOINT_COUNT];       // 최근 PWM 명령각을 저장한다.
     uint16_t pulse_us[ROBOT_JOINT_COUNT];              // 최근 출력 Pulse를 저장한다.
-    bool seeded;                                       // 이전 관절각 초기화 여부를 저장한다.
+    bool seeded;                                       // PWM 명령각 초기화 여부를 저장한다.
     bool started;                                      // PWM 시작 여부를 저장한다.
 } ServoPwm_Handle_t;
 
@@ -56,7 +56,7 @@ HAL_StatusTypeDef ServoPwm_StartAngles(ServoPwm_Handle_t *handle,
                                        const float angle_rad[ROBOT_JOINT_COUNT]);  // 주어진 관절각에서 PWM을 시작한다.
 
 void ServoPwm_SeedAngles(ServoPwm_Handle_t *handle,
-                         const float angle_rad[ROBOT_JOINT_COUNT]);  // 현재 측정각으로 Rate Limit를 초기화한다.
+                         const float angle_rad[ROBOT_JOINT_COUNT]);  // 현재 측정각으로 PWM 명령값을 초기화한다.
 
 bool ServoPwm_WriteAngles(ServoPwm_Handle_t *handle,
                           const float target_rad[ROBOT_JOINT_COUNT]);  // 제한된 18개 관절 명령을 출력한다.

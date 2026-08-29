@@ -72,6 +72,7 @@ static bool GaitTest_CheckManualStanceHold(void)
     drone.body_control_enable = true;      // 발 궤적 계산을 활성화한다.
     drone.tripod_mode = ROBOT_TRIPOD_NORMAL;  // 정상 보행 모드를 선택한다.
     FootTrajectory_Init(&trajectory);         // 기본 발 위치를 준비한다.
+    trajectory.terrain_z_target_m = 0.010f;   // 정지 중 남아 있는 지형 Z 목표를 넣는다.
 
     for (leg = 0U; leg < ROBOT_LEG_COUNT; ++leg)
     {
@@ -94,18 +95,16 @@ static bool GaitTest_CheckManualStanceHold(void)
     return true;
 }
 
-/* Tripod 공통 하강 오차가 주기 제한량만큼 복구되는지 검사한다. */
+/* Tripod 공통 착지 오차가 양방향 지형 Z에 속도 제한되어 반영되는지 검사한다. */
 static bool GaitTest_CheckCommonZRecovery(void)
 {
     FootTrajectory_Handle_t trajectory;             // 시험용 발 궤적 상태를 저장한다.
-    LegKinematics_Handle_t kinematics;               // 실측각 생성용 IK 상태를 저장한다.
     RobotBodyTwist_t twist;                          // 정지 Body Twist를 저장한다.
     RobotDroneOutput_t drone;                        // 수동 보행 활성 상태를 저장한다.
     RobotGaitPhase_t gait;                            // 명시적 다리 상태를 저장한다.
     RobotEuler_t posture;                             // 수평 자세를 저장한다.
-    RobotVec3_t measured_foot[ROBOT_LEG_COUNT];      // 실측 FK에 대응할 발 위치를 저장한다.
-    float measured_angle[ROBOT_JOINT_COUNT];         // 실측 관절각을 저장한다.
-    float recovery_before;                           // Swing 전 복구 잔량을 저장한다.
+    RobotVec3_t measured_foot[ROBOT_LEG_COUNT];      // 첫 접촉 PWM 발 위치를 저장한다.
+    float applied_before;                            // 적용 전 지형 Z를 저장한다.
     uint32_t leg;                                    // 상태를 설정할 다리 번호를 저장한다.
 
     memset(&twist, 0, sizeof(twist));      // 정지 명령을 준비한다.
@@ -116,9 +115,9 @@ static bool GaitTest_CheckCommonZRecovery(void)
     drone.body_control_enable = true;      // 발 궤적 계산을 활성화한다.
     drone.tripod_enable = true;            // 정상 Tripod를 활성화한다.
     drone.tripod_mode = ROBOT_TRIPOD_NORMAL;  // 정상 보행 모드를 선택한다.
+    gait.enabled_internal = true;             // 실제 보행 중 지형 Z 적용을 활성화한다.
     FootTrajectory_Init(&trajectory);         // 기본 발 위치를 준비한다.
-    LegKinematics_Init(&kinematics);          // 시험용 IK 상태를 초기화한다.
-    LegKinematics_GetBaseFeet(measured_foot); // 기본 실측 발 위치를 준비한다.
+    LegKinematics_GetBaseFeet(measured_foot); // 기본 PWM 발 위치를 준비한다.
 
     for (leg = 0U; leg < ROBOT_LEG_COUNT; ++leg)
     {
@@ -127,60 +126,39 @@ static bool GaitTest_CheckCommonZRecovery(void)
             measured_foot[leg].z -= 0.003f;  // 1·3·5번 실측 발에 공통 -3 mm 오차를 넣는다.
         }
 
-        if (!LegKinematics_Inverse(&kinematics, (uint8_t)leg,
-                                   &measured_foot[leg],
-                                   &measured_angle[leg * ROBOT_JOINTS_PER_LEG]))
-        {
-            return false;
-        }
     }
 
     for (leg = 0U; leg < ROBOT_LEG_COUNT; leg += 2U)
     {
         if (!FootTrajectory_LatchTouchdown(&trajectory, (uint8_t)leg,
                                            &measured_foot[leg],
-                                           &posture, 100U))
+                                           &posture))
         {
             return false;
         }
         gait.state[leg] = ROBOT_LEG_STANCE;  // 1·3·5번을 접촉 Stance로 둔다.
         gait.progress[leg] = 0.75f;           // 조기 착지 진행률을 넣는다.
     }
-    FootTrajectory_UpdateCommandedLanding(&trajectory, measured_angle,
-                                           &gait, &posture, true,
-                                           100U + ROBOT_TOUCHDOWN_SETTLE_MS);  // 20 ms 후 PWM 명령 FK 오차를 수집한다.
-    if (fabsf(trajectory.common_z_recovery_remaining[0] - 0.00300f) > 0.000001f)
+    FootTrajectory_UpdateCommandedLanding(&trajectory, &gait, true);  // 접촉 확인 후 첫 PWM 명령 오차를 수집한다.
+    if (fabsf(trajectory.terrain_z_target_m + 0.00300f) > 0.000001f)
+    {
+        return false;  // 낮은 지면의 음수 목표를 확인한다.
+    }
+
+    applied_before = trajectory.terrain_z_applied_m;  // 적용 전 지형 Z를 저장한다.
+    (void)FootTrajectory_Step(&trajectory, &twist, &drone,
+                              &gait, &posture);  // 모든 발 기준에 속도 제한 Z를 적용한다.
+    if (fabsf((trajectory.terrain_z_applied_m - applied_before) +
+              ROBOT_TERRAIN_Z_RATE_MPS * ROBOT_CONTROL_PERIOD_S) > 0.0000001f)
     {
         return false;
     }
 
-    for (leg = 0U; leg < ROBOT_LEG_COUNT; leg += 2U)
-    {
-        gait.state[leg] = ROBOT_LEG_SWING;  // 해당 Tripod를 Swing으로 전환한다.
-    }
-    recovery_before = trajectory.common_z_recovery_remaining[0];  // Swing 전 잔량을 저장한다.
+    trajectory.terrain_z_target_m = 0.003f;  // 높은 지면의 양수 목표를 넣는다.
+    applied_before = trajectory.terrain_z_applied_m;  // 양수 적용 전 지형 Z를 저장한다.
     (void)FootTrajectory_Step(&trajectory, &twist, &drone,
-                              &gait, &posture);  // Swing 중 복구를 보류한다.
-    if (fabsf(trajectory.common_z_recovery_remaining[0] - recovery_before) > 0.0000001f)
-    {
-        return false;
-    }
-
-    for (leg = 0U; leg < ROBOT_LEG_COUNT; leg += 2U)
-    {
-        gait.state[leg] = ROBOT_LEG_STANCE;  // 해당 Tripod를 다시 Stance로 전환한다.
-    }
-    (void)FootTrajectory_Step(&trajectory, &twist, &drone,
-                              &gait, &posture);  // 남은 공통 Z 복구를 재개한다.
-    {
-        const float progress = ROBOT_CONTROL_PERIOD_S /
-                               ROBOT_COMMON_Z_RECOVERY_TIME_S;  // 첫 S-curve 진행률을 계산한다.
-        const float expected_step = recovery_before * progress * progress *
-                                    (3.0f - 2.0f * progress);  // 첫 Smoothstep 복구량을 계산한다.
-
-        return fabsf((recovery_before - trajectory.common_z_recovery_remaining[0]) -
-                     expected_step) < 0.0000001f;  // Stance 복귀 후 느린 시작량이 적용되는지 확인한다.
-    }
+                              &gait, &posture);  // 반대 방향 지형 Z를 한 주기 적용한다.
+    return trajectory.terrain_z_applied_m > applied_before;  // 높은 지면도 보정되는지 확인한다.
 }
 
 /* Late Landing이 100 mm에서 전원을 유지한 채 멈추는지 검사한다. */
@@ -513,12 +491,143 @@ static bool GaitTest_CheckResumeTripod(void)
            (gait.state[1] == ROBOT_LEG_SWING);  // 2·4·6 Swing 재개를 확인한다.
 }
 
+/* 실제 접촉 후보와 확정 입력으로 첫 정상 위상을 시작한다. */
+static RobotGaitPhase_t GaitTest_StartConfirmedNormal(
+    GaitManager_Handle_t *manager,
+    bool contact[ROBOT_LEG_COUNT],
+    bool contact_raw[ROBOT_LEG_COUNT])
+{
+    uint32_t cycle;  // 진행할 시작 대기·검사 주기를 저장한다.
+
+    memset(contact, 1, sizeof(bool) * ROBOT_LEG_COUNT);      // 시작 전 여섯 발 접촉을 확정한다.
+    memset(contact_raw, 1, sizeof(bool) * ROBOT_LEG_COUNT);  // 시작 전 여섯 접촉 후보를 준비한다.
+    for (cycle = 0U;
+         cycle < (ROBOT_GAIT_START_DELAY_CYCLES +
+                  ROBOT_GAIT_PREVIEW_SAMPLE_COUNT);
+         ++cycle)
+    {
+        (void)GaitManager_StepContacts(manager, true, true, false, false,
+                                       ROBOT_TRIPOD_NORMAL, 0.0f,
+                                       contact, contact_raw);  // 첫 대기와 분산 검사를 진행한다.
+    }
+    return GaitManager_StepContacts(manager, true, true, true, true,
+                                    ROBOT_TRIPOD_NORMAL, 0.0f,
+                                    contact, contact_raw);  // 검사 통과로 첫 위상을 시작한다.
+}
+
+/* 접촉 후보 취소와 5 ms 확정 착지를 구분하는지 검사한다. */
+static bool GaitTest_CheckTouchdownConfirmation(void)
+{
+    GaitManager_Handle_t manager;             // 접촉 확인 시험 상태를 저장한다.
+    RobotGaitPhase_t gait;                    // 접촉 후보 다리 상태를 저장한다.
+    bool contact[ROBOT_LEG_COUNT];            // 확정 접촉을 저장한다.
+    bool contact_raw[ROBOT_LEG_COUNT];        // 접촉 후보를 저장한다.
+    const uint32_t early_cycles =
+        (uint32_t)((ROBOT_GAIT_PHASE_TIME_S * ROBOT_EARLY_LANDING_PROGRESS) /
+                   ROBOT_CONTROL_PERIOD_S) + 1U;  // 조기 착지 허용 직후 주기를 계산한다.
+    uint32_t cycle;                           // 하강 구간까지 진행할 주기를 저장한다.
+
+    GaitManager_Init(&manager);  // 첫 정상 위상을 준비한다.
+    gait = GaitTest_StartConfirmedNormal(&manager, contact, contact_raw);  // 접촉 확인 시험을 시작한다.
+    contact[0] = false; contact[2] = false; contact[4] = false;          // Swing 그룹 비접촉을 확정한다.
+    contact_raw[0] = false; contact_raw[2] = false; contact_raw[4] = false;  // Swing 접촉 후보를 제거한다.
+
+    for (cycle = 0U; cycle < early_cycles; ++cycle)
+    {
+        gait = GaitManager_StepContacts(&manager, true, true, false, false,
+                                        ROBOT_TRIPOD_NORMAL, 0.0f,
+                                        contact, contact_raw);  // 착지 허용 하강 구간까지 진행한다.
+    }
+    contact_raw[0] = true;  // 1번 발의 짧은 접촉 후보를 넣는다.
+    gait = GaitManager_StepContacts(&manager, true, true, false, false,
+                                    ROBOT_TRIPOD_NORMAL, 0.0f,
+                                    contact, contact_raw);  // 확정 전 발을 일시정지한다.
+    if ((gait.state[0] != ROBOT_LEG_TOUCHDOWN_CANDIDATE) || manager.landed[0])
+    {
+        return false;
+    }
+
+    contact_raw[0] = false;  // 5 ms 전에 접촉 후보를 취소한다.
+    gait = GaitManager_StepContacts(&manager, true, true, false, false,
+                                    ROBOT_TRIPOD_NORMAL, 0.0f,
+                                    contact, contact_raw);  // 남은 Swing을 재개한다.
+    if (gait.state[0] != ROBOT_LEG_SWING)
+    {
+        return false;
+    }
+
+    contact_raw[0] = true;  // 다시 접촉 후보를 넣는다.
+    contact[0] = true;      // 5 ms 연속 확인 완료를 전달한다.
+    gait = GaitManager_StepContacts(&manager, true, true, false, false,
+                                    ROBOT_TRIPOD_NORMAL, 0.0f,
+                                    contact, contact_raw);  // 확정 접촉을 Stance로 전환한다.
+    return manager.landed[0] && (gait.state[0] == ROBOT_LEG_STANCE);
+}
+
+/* 지지발 이탈에서 위상을 멈추고 재접촉 뒤 같은 걸음을 재개하는지 검사한다. */
+static bool GaitTest_CheckSupportRecovery(void)
+{
+    GaitManager_Handle_t manager;       // 지지발 재착지 상태를 저장한다.
+    RobotGaitPhase_t gait;              // 일시정지 다리 상태를 저장한다.
+    bool contact[ROBOT_LEG_COUNT];      // 확정 접촉을 저장한다.
+    bool contact_raw[ROBOT_LEG_COUNT];  // 접촉 후보를 저장한다.
+    uint32_t frozen_cycle;              // 정지 순간 위상 주기를 저장한다.
+    uint32_t cycle;                     // 시험 보행 주기를 저장한다.
+
+    GaitManager_Init(&manager);  // 첫 정상 위상을 준비한다.
+    gait = GaitTest_StartConfirmedNormal(&manager, contact, contact_raw);  // 지지발 시험을 시작한다.
+    contact[0] = false; contact[2] = false; contact[4] = false;          // Swing 그룹 비접촉을 확정한다.
+    contact_raw[0] = false; contact_raw[2] = false; contact_raw[4] = false;  // Swing 접촉 후보를 제거한다.
+    for (cycle = 0U; cycle < 20U; ++cycle)
+    {
+        gait = GaitManager_StepContacts(&manager, true, true, false, false,
+                                        ROBOT_TRIPOD_NORMAL, 0.0f,
+                                        contact, contact_raw);  // 보행 중간까지 진행한다.
+    }
+
+    contact[1] = false;      // 기존 2번 지지발의 해제를 확정한다.
+    contact_raw[1] = false;  // 2번 지지발 접촉 후보를 제거한다.
+    frozen_cycle = manager.phase_cycle_count;  // 정지 전 위상 주기를 저장한다.
+    gait = GaitManager_StepContacts(&manager, true, true, false, false,
+                                    ROBOT_TRIPOD_NORMAL, 0.0f,
+                                    contact, contact_raw);  // 지지발 재착지를 시작한다.
+    if (!gait.support_recovery_active ||
+        (gait.support_recovery_mask != 0x2AU) ||
+        (gait.state[1] != ROBOT_LEG_LATE_LANDING) ||
+        (manager.phase_cycle_count != frozen_cycle))
+    {
+        return false;
+    }
+
+    contact_raw[1] = true;  // 2번 지지발의 재접촉 후보를 넣는다.
+    gait = GaitManager_StepContacts(&manager, true, true, false, false,
+                                    ROBOT_TRIPOD_NORMAL, 0.0f,
+                                    contact, contact_raw);  // 접촉 확인 중 하강을 멈춘다.
+    if ((gait.state[1] != ROBOT_LEG_TOUCHDOWN_CANDIDATE) ||
+        (manager.phase_cycle_count != frozen_cycle))
+    {
+        return false;
+    }
+
+    contact[1] = true;  // 2번 지지발의 5 ms 접촉 확정을 넣는다.
+    gait = GaitManager_StepContacts(&manager, true, true, false, false,
+                                    ROBOT_TRIPOD_NORMAL, 0.0f,
+                                    contact, contact_raw);  // 기존 위상 진행을 재개한다.
+    return !gait.support_recovery_active &&
+           (manager.phase_cycle_count == (frozen_cycle + 1U)) &&
+           (gait.state[0] == ROBOT_LEG_SWING) &&
+           (gait.state[1] == ROBOT_LEG_STANCE);  // 같은 Swing·Stance 역할로 재개되는지 확인한다.
+}
+
 /* 명시적 접촉 입력으로 Tripod 상태 전환과 짧은 Enable 변화를 검사한다. */
 bool GaitTest_Run(void)
 {
     GaitManager_Handle_t manager;                  // 시험용 Tripod 상태를 저장한다.
     RobotGaitPhase_t phase;                         // 한 주기 다리 상태를 저장한다.
     bool contact[ROBOT_LEG_COUNT];                  // 명시적 접촉 입력을 저장한다.
+    const uint32_t early_cycles =
+        (uint32_t)((ROBOT_GAIT_PHASE_TIME_S * ROBOT_EARLY_LANDING_PROGRESS) /
+                   ROBOT_CONTROL_PERIOD_S) + 1U;  // 조기 착지 허용 직후 주기를 계산한다.
     uint32_t cycle;                                 // 진행할 제어 주기 번호를 저장한다.
 
     if (!GaitTest_CheckImmediateContactHold() ||
@@ -528,7 +637,9 @@ bool GaitTest_Run(void)
         !GaitTest_CheckStartupDelay() ||
         !GaitTest_CheckPhaseTwistLatch() ||
         !GaitTest_CheckPreviewTransition() ||
-        !GaitTest_CheckResumeTripod())
+        !GaitTest_CheckResumeTripod() ||
+        !GaitTest_CheckTouchdownConfirmation() ||
+        !GaitTest_CheckSupportRecovery())
     {
         return false;
     }
@@ -541,7 +652,7 @@ bool GaitTest_Run(void)
         return false;
     }
 
-    for (cycle = 0U; cycle < 60U; ++cycle)
+    for (cycle = 0U; cycle < early_cycles; ++cycle)
     {
         phase = GaitManager_Step(&manager, true, true, false, false,
                                  ROBOT_TRIPOD_NORMAL,

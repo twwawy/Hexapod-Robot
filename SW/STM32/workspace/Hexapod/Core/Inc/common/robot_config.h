@@ -10,7 +10,12 @@
 #define ROBOT_CONTROL_PERIOD_S          0.005f      // 제어 주기를 초 단위로 정의한다.
 #define ROBOT_CONTROL_PERIOD_MS         5U          // 제어 주기를 밀리초 단위로 정의한다.
 #define ROBOT_PRESSURE_PERIOD_MS        1U          // 압력센서 읽기 주기를 정의한다.
-#define ROBOT_TOUCHDOWN_SETTLE_MS       20U         // 접촉 후 FK 안정 시간을 정의한다.
+#define ROBOT_PRESSURE_CONTACT_CONFIRM_MS 5U        // 접촉 확정 연속 시간을 정의한다.
+#define ROBOT_PRESSURE_RELEASE_CONFIRM_MS 10U       // 접촉 해제 확정 연속 시간을 정의한다.
+#define ROBOT_PRESSURE_CONTACT_CONFIRM_SAMPLES \
+    (ROBOT_PRESSURE_CONTACT_CONFIRM_MS / ROBOT_PRESSURE_PERIOD_MS)  // 접촉 확정 표본 수를 계산한다.
+#define ROBOT_PRESSURE_RELEASE_CONFIRM_SAMPLES \
+    (ROBOT_PRESSURE_RELEASE_CONFIRM_MS / ROBOT_PRESSURE_PERIOD_MS)  // 접촉 해제 표본 수를 계산한다.
 #define ROBOT_PI_F                      3.14159265358979323846f
 #define ROBOT_DEG_TO_RAD_F              (ROBOT_PI_F / 180.0f)
 #define ROBOT_RAD_TO_DEG_F              (180.0f / ROBOT_PI_F)
@@ -22,7 +27,7 @@
 #define ROBOT_BASE_FOOT_Z_M             (-0.287006f) // 기본 발 높이를 정의한다.
 #define ROBOT_WORKSPACE_MARGIN_M        0.001f      // IK 작업공간 여유를 정의한다.
 
-#define ROBOT_GAIT_PHASE_TIME_S         0.5f        // 한 Tripod 위상 시간을 정의한다.
+#define ROBOT_GAIT_PHASE_TIME_S         1.0f        // 한 Tripod 위상 시간을 정의한다.
 #define ROBOT_GAIT_START_DELAY_MS       100U        // 정지 상태의 첫 보행 입력 안정 시간을 정의한다.
 #define ROBOT_GAIT_NEXT_COMMAND_MS      25U         // 다음 위상 명령 확정 시점을 정의한다.
 #define ROBOT_GAIT_START_DELAY_CYCLES   \
@@ -34,8 +39,7 @@
 #define ROBOT_SETTLING_TIME_S           0.5f        // 자세 안정 시간을 정의한다.
 #define ROBOT_RECOVERY_TIME_S           0.5f        // Tripod 복구 시간을 정의한다.
 
-#define ROBOT_MAX_LINEAR_SPEED_MPS      0.28f       // X/Y 최대 이동 속도를 정의한다.
-#define ROBOT_MAX_LATERAL_SPEED_MPS     0.20f       // 조종 횡이동 최대 속도를 정의한다.
+#define ROBOT_MAX_LINEAR_SPEED_MPS      0.14f       // X/Y 최대 이동 속도를 정의한다.
 #define ROBOT_MAX_CORRECTION_SPEED_MPS  0.10f       // 보정 최대 이동 속도를 정의한다.
 #define ROBOT_MAX_YAW_RATE_RADPS        (18.0f * ROBOT_DEG_TO_RAD_F)  // 조종 Yaw 최대 속도를 기존의 40%로 제한한다.
 #define ROBOT_MAX_ROLL_RAD              (45.0f * ROBOT_DEG_TO_RAD_F)
@@ -59,7 +63,7 @@
 #define ROBOT_COMMON_Z_RECOVERY_DEADBAND_M  0.0005f   // 0.5 mm 이하 착지 오차를 무시한다.
 #define ROBOT_COMMON_Z_RECOVERY_GAIN        1.00f     // 데드밴드 초과 오차의 100%를 반영한다.
 #define ROBOT_COMMON_Z_RECOVERY_MAX_M       0.1000f   // 착지당 복구량을 최대 100 mm로 제한한다.
-#define ROBOT_COMMON_Z_RECOVERY_TIME_S      0.25f     // S-curve 복구 시간을 정의한다.
+#define ROBOT_TERRAIN_Z_RATE_MPS            0.040f    // 지형 몸체 Z 보정 속도를 정의한다.
 
 #define ROBOT_SLIP_DISTANCE_M           0.05f       // Stance Foot Slip 거리를 정의한다.
 #define ROBOT_SLIP_CONFIRM_SAMPLES      5U          // Slip 확정 연속 횟수를 정의한다.
@@ -71,8 +75,6 @@
 #define ROBOT_STARTUP_SENSOR_SETTLE_S    0.20f       // 서보 전원 안정 시간을 정의한다.
 #define ROBOT_STARTUP_SENSOR_SAMPLES     20U         // 초기 관절각 평균 횟수를 정의한다.
 #define ROBOT_STARTUP_ZERO_RATE_RADPS    (30.0f * ROBOT_DEG_TO_RAD_F)  // 초기 영점 정렬 속도를 정의한다.
-#define ROBOT_JOINT_RATE_RADPS          (315.8f * ROBOT_DEG_TO_RAD_F)
-#define ROBOT_JOINT_STEP_RAD            (ROBOT_JOINT_RATE_RADPS * ROBOT_CONTROL_PERIOD_S)
 
 #define ROBOT_SERVO_MIN_US              500U        // 서보 최소 Pulse를 정의한다.
 #define ROBOT_SERVO_NEUTRAL_US          1500U       // 서보 기본 중립 Pulse를 정의한다.

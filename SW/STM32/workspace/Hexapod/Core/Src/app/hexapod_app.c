@@ -415,7 +415,7 @@ HAL_StatusTypeDef HexapodApp_Init(HexapodApp_Handle_t *handle,
                                   const HexapodApp_Hardware_t *hardware)
 {
     HAL_StatusTypeDef status;  // 장치 초기화 결과를 저장한다.
-    float neutral_angle_rad[ROBOT_JOINT_COUNT] = {0.0f};  // 2단계 Rate Limit 시작각을 저장한다.
+    float neutral_angle_rad[ROBOT_JOINT_COUNT] = {0.0f};  // 2단계 PWM 시작각을 저장한다.
 
     if ((handle == NULL) || (hardware == NULL) ||
         (hardware->gps_uart == NULL) || (hardware->imu_uart == NULL) ||
@@ -486,7 +486,7 @@ HAL_StatusTypeDef HexapodApp_Init(HexapodApp_Handle_t *handle,
         }
         ServoPwm_SeedAngles(&handle->servo_pwm,
                             handle->bringup.neutral_output_active ?
-                            neutral_angle_rad : handle->joints.angle_rad);  // 시험 단계의 Rate Limit 시작점을 맞춘다.
+                            neutral_angle_rad : handle->joints.angle_rad);  // 시험 단계의 PWM 시작점을 맞춘다.
     }
 
     if (hardware->lora_uart != NULL)
@@ -616,8 +616,7 @@ void HexapodApp_Process(HexapodApp_Handle_t *handle)
 
 /* 센서에서 서보와 릴레이까지 제어 체인을 한 주기 실행한다. */
 /* 새 접촉 다리를 현재 PWM 명령각의 발 위치에 즉시 고정한다. */
-static void HexapodApp_ProcessTouchdownLatch(HexapodApp_Handle_t *handle,
-                                             uint32_t now_ms)
+static void HexapodApp_ProcessTouchdownLatch(HexapodApp_Handle_t *handle)
 {
     const uint8_t contact_mask = SensorManager_TakeContactLatch(&handle->sensors);  // 새 접촉 비트를 꺼낸다.
     uint32_t leg;                                                                    // 처리할 다리 번호를 저장한다.
@@ -637,7 +636,8 @@ static void HexapodApp_ProcessTouchdownLatch(HexapodApp_Handle_t *handle,
         RobotVec3_t commanded_foot;                          // 현재 PWM 명령의 FK를 저장한다.
 
         if (((contact_mask & (uint8_t)(1U << leg)) == 0U) ||
-            ((handle->gait.state[leg] != ROBOT_LEG_SWING) &&
+            (((handle->gait.state[leg] != ROBOT_LEG_SWING) ||
+              (handle->gait.progress[leg] < ROBOT_EARLY_LANDING_PROGRESS)) &&
              (handle->gait.state[leg] != ROBOT_LEG_LATE_LANDING)))
         {
             continue;
@@ -649,8 +649,7 @@ static void HexapodApp_ProcessTouchdownLatch(HexapodApp_Handle_t *handle,
             !FootTrajectory_LatchTouchdown(&handle->foot_trajectory,
                                            (uint8_t)leg,
                                            &commanded_foot,
-                                           &handle->posture_control.command_rad,
-                                           now_ms))
+                                           &handle->posture_control.command_rad))
         {
             continue;
         }
@@ -671,7 +670,7 @@ static bool HexapodApp_RunPressureIfDue(HexapodApp_Handle_t *handle)
         return false;
     }
 
-    HexapodApp_ProcessTouchdownLatch(handle, HAL_GetTick());  // 새 접촉을 즉시 처리한다.
+    HexapodApp_ProcessTouchdownLatch(handle);  // 새 접촉을 즉시 처리한다.
     return true;
 }
 
@@ -698,14 +697,14 @@ static void HexapodApp_ControlStep(HexapodApp_Handle_t *handle)
     now_ms = HAL_GetTick();                                       // 현재 제어 시각을 읽는다.
     sensor_start_cycle = ControlTimingDebug_ReadCycle();          // 센서 구간 시작 시각을 읽는다.
     sensor_updated = SensorManager_Update(&handle->sensors);      // 실제 센서 스냅샷을 갱신한다.
-    HexapodApp_ProcessTouchdownLatch(handle, now_ms);             // 전체 읽기에서 생긴 접촉도 처리한다.
+    HexapodApp_ProcessTouchdownLatch(handle);                     // 전체 읽기에서 생긴 접촉도 처리한다.
     (void)SensorManager_GetSnapshot(&handle->sensors,
                                     &handle->sensor_snapshot);     // 같은 주기의 센서값을 복사한다.
     for (leg = 0U; leg < ROBOT_LEG_COUNT; ++leg)
     {
         if ((handle->touchdown_control_mask & (uint8_t)(1U << leg)) != 0U)
         {
-            handle->sensor_snapshot.foot_contact[leg] = true;  // 1 ms 사이 접촉을 이번 제어에 전달한다.
+            handle->sensor_snapshot.foot_contact_raw[leg] = true;  // 1 ms 사이 접촉 후보를 이번 제어에 전달한다.
         }
     }
     sensor_end_cycle = ControlTimingDebug_ReadCycle();            // 센서 구간 종료 시각을 읽는다.
@@ -755,23 +754,22 @@ static void HexapodApp_ControlStep(HexapodApp_Handle_t *handle)
         &position.position_world,
         position.valid_leg_count,
         handle->sensor_snapshot.imu.attitude_rad.yaw);              // 사용자와 PI 보행 명령을 결합한다.
-    handle->gait = GaitManager_Step(&handle->gait_manager,
-                                    handle->drone.manual_enable,
-                                    handle->drone.tripod_enable,
-                                    handle->workspace_limiter.phase_result_valid,
-                                    handle->workspace_limiter.phase_result_accepted,
-                                    handle->drone.tripod_mode,
-                                    handle->drone.recovery_progress,
-                                    handle->sensor_snapshot.foot_contact);  // Tripod 상태와 진행률을 계산한다.
+    handle->gait = GaitManager_StepContacts(
+        &handle->gait_manager,
+        handle->drone.manual_enable,
+        handle->drone.tripod_enable,
+        handle->workspace_limiter.phase_result_valid,
+        handle->workspace_limiter.phase_result_accepted,
+        handle->drone.tripod_mode,
+        handle->drone.recovery_progress,
+        handle->sensor_snapshot.foot_contact,
+        handle->sensor_snapshot.foot_contact_raw);  // 접촉 후보와 확정값으로 Tripod 상태를 계산한다.
     FootTrajectory_UpdateCommandedLanding(
         &handle->foot_trajectory,
-        handle->servo_pwm.previous_angle_rad,
         &handle->gait,
-        &handle->posture_control.command_rad,
         (ROBOT_COMMON_Z_RECOVERY_ENABLE != 0U) &&
         handle->drone.manual_enable &&
-        (handle->drone.tripod_mode == ROBOT_TRIPOD_NORMAL),
-        now_ms);  // 활성 시 접촉 20 ms 후 PWM FK의 공통 Z 오차를 수집한다.
+        (handle->drone.tripod_mode == ROBOT_TRIPOD_NORMAL));  // 활성 시 접촉 확인 후 첫 PWM 명령의 공통 Z 오차를 수집한다.
     handle->touchdown_control_mask = 0U;  // Gait가 소비한 접촉 Latch를 비운다.
     twist = WorkspaceLimiter_Gait(&handle->workspace_limiter,
                                   &gait_pose.twist,

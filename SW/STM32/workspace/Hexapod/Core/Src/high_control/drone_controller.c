@@ -285,7 +285,7 @@ RobotDroneOutput_t DroneController_Step(DroneController_Handle_t *handle,
 
         if (lateral_mode)
         {
-            output.vy_user_mps = -ROBOT_MAX_LATERAL_SPEED_MPS * handle->yaw_filter;  // Yaw 짐벌을 반대 방향 횡이동으로 사용한다.
+            output.vy_user_mps = -ROBOT_MAX_LINEAR_SPEED_MPS * handle->yaw_filter;  // Yaw 짐벌을 반대 방향 횡이동으로 사용한다.
             output.wz_user_radps = 0.0f;                                           // 사용자 회전을 차단한다.
         }
         else

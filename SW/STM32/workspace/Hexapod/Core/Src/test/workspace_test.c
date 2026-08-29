@@ -54,7 +54,7 @@ bool WorkspaceTest_Run(void)
     gait.next_phase_preview = true;      // 다음 Tripod 검사를 시작한다.
     gait.next_phase_startup = false;     // 정상 전체 보폭을 선택한다.
     gait.next_phase_swing_mask = 0x2AU;  // 2·4·6번 다리를 Swing으로 둔다.
-    candidate.vx = 0.02f;                // 25 ms 시점의 후보를 넣는다.
+    candidate.vx = ROBOT_MAX_LINEAR_SPEED_MPS;  // 최대 전진 후보를 넣는다.
     applied = WorkspaceLimiter_Gait(&limiter, &candidate, true,
                                     &gait, &posture, false,
                                     &accepted);  // 첫 경로 지점과 속도를 고정한다.
@@ -67,8 +67,8 @@ bool WorkspaceTest_Run(void)
                                         &accepted);  // 고정 후보의 남은 네 지점을 검사한다.
     }
     if (accepted || !limiter.phase_result_accepted ||
-        (fabsf(applied.vx - 0.02f) > 1.0e-6f) ||
-        (fabsf(limiter.gait_pending.vx - 0.02f) > 1.0e-6f))
+        (fabsf(applied.vx - ROBOT_MAX_LINEAR_SPEED_MPS) > 1.0e-6f) ||
+        (fabsf(limiter.gait_pending.vx - ROBOT_MAX_LINEAR_SPEED_MPS) > 1.0e-6f))
     {
         return false;
     }
@@ -80,7 +80,7 @@ bool WorkspaceTest_Run(void)
                                     &accepted);  // 첫 위험 지점에서 후보를 거부한다.
     if (accepted || !limiter.phase_result_valid ||
         limiter.phase_result_accepted ||
-        (fabsf(applied.vx - 0.02f) > 1.0e-6f))
+        (fabsf(applied.vx - ROBOT_MAX_LINEAR_SPEED_MPS) > 1.0e-6f))
     {
         return false;
     }

@@ -8,4 +8,4 @@
 ../Core/Src/low_control/servo_pwm.c:173:19:ServoPwm_StartAngles	13
 ../Core/Src/low_control/servo_pwm.c:226:6:ServoPwm_SeedAngles	4
 ../Core/Src/low_control/servo_pwm.c:246:6:ServoPwm_WriteAngles	10
-../Core/Src/low_control/servo_pwm.c:288:6:ServoPwm_Stop	7
+../Core/Src/low_control/servo_pwm.c:284:6:ServoPwm_Stop	7

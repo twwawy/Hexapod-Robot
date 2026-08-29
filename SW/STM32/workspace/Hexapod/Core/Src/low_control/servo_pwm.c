@@ -205,7 +205,7 @@ HAL_StatusTypeDef ServoPwm_StartAngles(ServoPwm_Handle_t *handle,
         handle->previous_angle_rad[joint] = ServoPwm_Clamp(
             angle_rad[joint],
             ROBOT_JOINT_MIN_RAD,
-            ROBOT_JOINT_MAX_RAD);                             // Rate Limit 시작각을 맞춘다.
+            ROBOT_JOINT_MAX_RAD);                             // 초기 PWM 명령각을 맞춘다.
     }
 
     for (joint = 0U; joint < ROBOT_JOINT_COUNT; ++joint)
@@ -217,12 +217,12 @@ HAL_StatusTypeDef ServoPwm_StartAngles(ServoPwm_Handle_t *handle,
         }
     }
 
-    handle->seeded = true;   // Rate Limit 초기화를 표시한다.
+    handle->seeded = true;   // PWM 명령각 초기화를 표시한다.
     handle->started = true;  // 전체 PWM 시작을 표시한다.
     return HAL_OK;
 }
 
-/* 현재 측정 관절각으로 Rate Limiter의 이전값을 초기화한다. */
+/* 현재 측정 관절각으로 PWM 명령값을 초기화한다. */
 void ServoPwm_SeedAngles(ServoPwm_Handle_t *handle,
                          const float angle_rad[ROBOT_JOINT_COUNT])
 {
@@ -239,10 +239,10 @@ void ServoPwm_SeedAngles(ServoPwm_Handle_t *handle,
             ServoPwm_Clamp(angle_rad[joint], ROBOT_JOINT_MIN_RAD, ROBOT_JOINT_MAX_RAD);  // 현재 관절각을 안전 범위로 저장한다.
     }
 
-    handle->seeded = true;  // Rate Limiter 초기화를 표시한다.
+    handle->seeded = true;  // PWM 명령각 초기화를 표시한다.
 }
 
-/* 관절 범위와 속도를 제한하여 18개 PWM으로 출력한다. */
+/* 관절 범위를 제한하여 18개 PWM으로 출력한다. */
 bool ServoPwm_WriteAngles(ServoPwm_Handle_t *handle,
                           const float target_rad[ROBOT_JOINT_COUNT])
 {
@@ -255,7 +255,7 @@ bool ServoPwm_WriteAngles(ServoPwm_Handle_t *handle,
 
     if (!handle->seeded)
     {
-        ServoPwm_SeedAngles(handle, target_rad);  // 첫 유효 명령으로 이전값을 초기화한다.
+        ServoPwm_SeedAngles(handle, target_rad);  // 첫 유효 PWM 명령값을 초기화한다.
     }
 
     for (joint = 0U; joint < ROBOT_JOINT_COUNT; ++joint)
@@ -264,21 +264,17 @@ bool ServoPwm_WriteAngles(ServoPwm_Handle_t *handle,
         const float target = ServoPwm_Clamp(target_rad[joint],
                                             ROBOT_JOINT_MIN_RAD,
                                             ROBOT_JOINT_MAX_RAD);           // 목표 관절각을 제한한다.
-        float difference = target - handle->previous_angle_rad[joint];      // 이전 명령과 차이를 계산한다.
-        float limited;                                                       // 속도 제한 관절각을 저장한다.
-        uint16_t pulse;                                                      // 변환한 Pulse를 저장한다.
+        uint16_t pulse;                                                     // 변환한 Pulse를 저장한다.
 
-        difference = ServoPwm_Clamp(difference, -ROBOT_JOINT_STEP_RAD, ROBOT_JOINT_STEP_RAD);  // 5 ms 변화량을 제한한다.
-        limited = handle->previous_angle_rad[joint] + difference;                              // 새 관절 명령을 계산한다.
-        if (!ServoPwm_CalculatePulse(calibration, limited, &pulse))
+        if (!ServoPwm_CalculatePulse(calibration, target, &pulse))
         {
             return false;
         }
-        handle->pulse_us[joint] = pulse;                                                       // 보정된 Pulse를 저장한다.
-        handle->previous_angle_rad[joint] = limited;                                            // 다음 주기 이전값을 저장한다.
+        handle->pulse_us[joint] = pulse;                    // 보정된 Pulse를 저장한다.
+        handle->previous_angle_rad[joint] = target;         // 최근 PWM 명령각을 저장한다.
         __HAL_TIM_SET_COMPARE(handle->timer[joint],
                               handle->channel[joint],
-                              handle->pulse_us[joint]);                                         // PWM Compare를 갱신한다.
+                              handle->pulse_us[joint]);     // PWM Compare를 갱신한다.
     }
 
     return true;

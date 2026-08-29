@@ -23,6 +23,7 @@ bool CalibrationAlgorithmTest_Run(void)
     uint32_t leg;                                             // 다리 번호를 저장한다.
     uint32_t input;                                           // ADC 입력 번호를 저장한다.
     uint32_t joint;                                           // 관절 번호를 저장한다.
+    uint32_t sample;                                          // 접촉 확인 표본을 저장한다.
 
     if (!RobotCalibration_IsComplete(&g_robot_calibration))
     {
@@ -107,7 +108,28 @@ bool CalibrationAlgorithmTest_Run(void)
         }
         pressure_raw[leg] = g_robot_calibration.pressure[leg].contact_threshold;  // 접촉 진입값을 입력한다.
     }
-    FootPressure_Update(&pressure, pressure_raw, contact);  // 모든 다리 접촉을 갱신한다.
+    FootPressure_Update(&pressure, pressure_raw, contact);  // 1 ms 접촉 후보만 입력한다.
+    for (leg = 0U; leg < ROBOT_PRESSURE_COUNT; ++leg)
+    {
+        if (!pressure.raw_contact[leg] || contact[leg])
+        {
+            return false;  // 순간 접촉이 확정 상태로 올라오면 실패한다.
+        }
+        pressure_raw[leg] = g_robot_calibration.pressure[leg].release_threshold;  // 후보 취소값을 입력한다.
+    }
+    FootPressure_Update(&pressure, pressure_raw, contact);  // 1 ms 접촉 후보를 취소한다.
+    for (leg = 0U; leg < ROBOT_PRESSURE_COUNT; ++leg)
+    {
+        if (pressure.raw_contact[leg] || contact[leg])
+        {
+            return false;
+        }
+        pressure_raw[leg] = g_robot_calibration.pressure[leg].contact_threshold;  // 연속 접촉값을 다시 입력한다.
+    }
+    for (sample = 0U; sample < ROBOT_PRESSURE_CONTACT_CONFIRM_SAMPLES; ++sample)
+    {
+        FootPressure_Update(&pressure, pressure_raw, contact);  // 5 ms 연속 접촉을 입력한다.
+    }
     for (leg = 0U; leg < ROBOT_PRESSURE_COUNT; ++leg)
     {
         if (!contact[leg])
@@ -116,7 +138,10 @@ bool CalibrationAlgorithmTest_Run(void)
         }
         pressure_raw[leg] = g_robot_calibration.pressure[leg].release_threshold;  // 접촉 해제값을 입력한다.
     }
-    FootPressure_Update(&pressure, pressure_raw, contact);  // 모든 다리 해제를 갱신한다.
+    for (sample = 0U; sample < ROBOT_PRESSURE_RELEASE_CONFIRM_SAMPLES; ++sample)
+    {
+        FootPressure_Update(&pressure, pressure_raw, contact);  // 10 ms 연속 해제를 입력한다.
+    }
     for (leg = 0U; leg < ROBOT_PRESSURE_COUNT; ++leg)
     {
         if (contact[leg])

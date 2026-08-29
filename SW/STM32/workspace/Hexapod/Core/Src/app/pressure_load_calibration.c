@@ -64,6 +64,7 @@ static bool PressureLoadCalibration_BuildAndApply(
     FootPressure_Calibration_t table[ROBOT_PRESSURE_COUNT];  // 검증 후 함께 적용할 임계값을 저장한다.
     bool contact[ROBOT_PRESSURE_COUNT];                      // 새 표의 즉시 접촉 결과를 저장한다.
     uint32_t leg;                                            // 계산할 다리 번호를 저장한다.
+    uint32_t sample;                                         // 접촉 확인 표본을 저장한다.
 
     if ((handle->unloaded_count == 0U) || (handle->loaded_count == 0U))
     {
@@ -103,7 +104,10 @@ static bool PressureLoadCalibration_BuildAndApply(
         g_pressure_load_calibration.table[leg] = table[leg];               // 중앙 표 복사용 값을 저장한다.
     }
 
-    FootPressure_Update(pressure, raw, contact);  // 현재 기립값으로 새 임계값을 즉시 검사한다.
+    for (sample = 0U; sample < ROBOT_PRESSURE_CONTACT_CONFIRM_SAMPLES; ++sample)
+    {
+        FootPressure_Update(pressure, raw, contact);  // 현재 기립값을 5 ms 연속 접촉으로 확인한다.
+    }
     for (leg = 0U; leg < ROBOT_PRESSURE_COUNT; ++leg)
     {
         g_pressure_load_calibration.loaded_contact_detected[leg] = contact[leg];  // 적용 직후 접촉을 표시한다.

@@ -9,16 +9,18 @@ static void SensorManager_UpdateContactState(SensorManager_Handle_t *handle)
     bool previous[ROBOT_LEG_COUNT];  // 갱신 전 접촉 상태를 저장한다.
     uint32_t leg;                    // 확인할 다리 번호를 저장한다.
 
-    memcpy(previous, handle->snapshot.foot_contact, sizeof(previous));  // 이전 접촉을 보존한다.
+    memcpy(previous, handle->snapshot.foot_contact_raw, sizeof(previous));  // 이전 접촉 후보를 보존한다.
     FootPressure_Update(&handle->pressure,
                         handle->snapshot.pressure_raw,
-                        handle->snapshot.foot_contact);  // Hysteresis 접촉 상태를 갱신한다.
+                        handle->snapshot.foot_contact);  // 시간 확인 접촉 상태를 갱신한다.
 
     for (leg = 0U; leg < ROBOT_LEG_COUNT; ++leg)
     {
-        if (!previous[leg] && handle->snapshot.foot_contact[leg])
+        handle->snapshot.foot_contact_raw[leg] =
+            handle->pressure.raw_contact[leg];  // Hysteresis 직후 접촉 후보를 복사한다.
+        if (!previous[leg] && handle->snapshot.foot_contact_raw[leg])
         {
-            handle->contact_latched_mask |= (uint8_t)(1U << leg);  // 새 접촉을 제어 전까지 유지한다.
+            handle->contact_latched_mask |= (uint8_t)(1U << leg);  // 새 접촉 후보를 제어 전까지 유지한다.
         }
     }
 }

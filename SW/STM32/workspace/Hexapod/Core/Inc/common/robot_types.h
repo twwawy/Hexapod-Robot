@@ -61,10 +61,12 @@ typedef enum
 
 typedef enum
 {
-    ROBOT_LEG_STANCE = 0,       // 지지 상태를 나타낸다.
-    ROBOT_LEG_SWING,            // 공중 이동 상태를 나타낸다.
-    ROBOT_LEG_LATE_LANDING,     // 지면 탐색 상태를 나타낸다.
-    ROBOT_LEG_RECOVERY_SWING    // 착지 복구 Swing을 나타낸다.
+    ROBOT_LEG_STANCE = 0,          // 지지 상태를 나타낸다.
+    ROBOT_LEG_SWING,               // 공중 이동 상태를 나타낸다.
+    ROBOT_LEG_LATE_LANDING,        // 지면 탐색 상태를 나타낸다.
+    ROBOT_LEG_RECOVERY_SWING,      // 착지 복구 Swing을 나타낸다.
+    ROBOT_LEG_TOUCHDOWN_CANDIDATE, // 접촉 확인 대기 상태를 나타낸다.
+    ROBOT_LEG_HOLD                 // 보행 일시정지 상태를 나타낸다.
 } RobotLegState_t;
 
 typedef enum
@@ -100,7 +102,8 @@ typedef struct
     float joint_angle_rad[ROBOT_JOINT_COUNT];                 // 측정 관절각을 저장한다.
     uint16_t joint_raw[ROBOT_JOINT_COUNT];                    // 관절센서 raw 값을 저장한다.
     uint16_t pressure_raw[ROBOT_PRESSURE_COUNT];              // 압력센서 raw 값을 저장한다.
-    bool foot_contact[ROBOT_LEG_COUNT];                       // 발 접촉 상태를 저장한다.
+    bool foot_contact_raw[ROBOT_LEG_COUNT];                   // Hysteresis 직후 접촉 후보를 저장한다.
+    bool foot_contact[ROBOT_LEG_COUNT];                       // 시간 확인을 마친 접촉을 저장한다.
     uint32_t timestamp_ms;                                    // 스냅샷 시각을 저장한다.
 } RobotSensorSnapshot_t;
 
@@ -166,7 +169,9 @@ typedef struct
     bool next_phase_preview;                       // 다음 위상 검사 시작을 알린다.
     bool next_phase_startup;                       // 검사할 위상의 최초 보행 여부를 저장한다.
     uint8_t next_phase_swing_mask;                 // 검사할 다음 Swing 그룹을 저장한다.
+    uint8_t support_recovery_mask;                 // 재접촉을 기다리는 기존 지지발을 저장한다.
     bool late_landing_hold;                        // 탐색 한계 후 위치 고정을 저장한다.
+    bool support_recovery_active;                  // 지지발 재착지 일시정지를 저장한다.
     bool enabled_internal;                         // 내부 보행 상태를 저장한다.
     bool late_landing_stop;                        // Late Landing 한계 정지를 저장한다.
 } RobotGaitPhase_t;

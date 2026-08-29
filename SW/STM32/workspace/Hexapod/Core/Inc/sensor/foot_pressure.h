@@ -17,7 +17,10 @@ typedef struct
 typedef struct
 {
     FootPressure_Calibration_t table[ROBOT_PRESSURE_COUNT];  // 센서별 보정 테이블을 저장한다.
-    bool contact[ROBOT_PRESSURE_COUNT];                      // 현재 접촉 상태를 저장한다.
+    uint8_t contact_count[ROBOT_PRESSURE_COUNT];             // 접촉 연속 표본 수를 저장한다.
+    uint8_t release_count[ROBOT_PRESSURE_COUNT];             // 해제 연속 표본 수를 저장한다.
+    bool raw_contact[ROBOT_PRESSURE_COUNT];                  // Hysteresis 직후 상태를 저장한다.
+    bool contact[ROBOT_PRESSURE_COUNT];                      // 시간 확인을 마친 상태를 저장한다.
 } FootPressure_Handle_t;
 
 void FootPressure_Init(FootPressure_Handle_t *handle);   // 기본 임계값과 상태를 준비한다.
@@ -28,6 +31,6 @@ bool FootPressure_SetCalibration(FootPressure_Handle_t *handle,
 
 void FootPressure_Update(FootPressure_Handle_t *handle,
                          const uint16_t raw[ROBOT_PRESSURE_COUNT],
-                         bool contact[ROBOT_PRESSURE_COUNT]);  // Hysteresis 접촉 상태를 갱신한다.
+                         bool contact[ROBOT_PRESSURE_COUNT]);  // 시간 확인 접촉 상태를 갱신한다.
 
 #endif
