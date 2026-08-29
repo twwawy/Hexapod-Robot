@@ -9,6 +9,7 @@
 #include <string.h>
 
 extern SPI_HandleTypeDef hspi1;   // MCP3008 SPI Handle을 연결한다.
+extern SPI_HandleTypeDef hspi2;   // Jetson SPI2 Slave Handle을 연결한다.
 extern TIM_HandleTypeDef htim1;   // 1·6번 일부 서보 Timer를 연결한다.
 extern TIM_HandleTypeDef htim2;   // 2번 서보 Timer를 연결한다.
 extern TIM_HandleTypeDef htim3;   // 3·6번 일부 서보 Timer를 연결한다.
@@ -978,7 +979,7 @@ HAL_StatusTypeDef HexapodApp_BoardInit(void)
     hardware.lora_uart = NULL;             // 실기 검증 전 LoRa를 비활성화한다.
     hardware.crsf_uart = &huart6;          // CRSF를 USART6에 연결한다.
     hardware.adc_spi = &hspi1;             // MCP3008을 SPI1에 연결한다.
-    hardware.jetson_spi = NULL;            // 명령 형식 확정 전 Jetson을 비활성화한다.
+    hardware.jetson_spi = &hspi2;          // Jetson 32바이트 SPI2 Slave 통신을 활성화한다.
     hardware.control_timer = &htim6;       // 1 ms 기준 주기를 TIM6에 연결한다.
     hardware.servo_timers.tim1 = &htim1;   // TIM1 서보 채널을 연결한다.
     hardware.servo_timers.tim2 = &htim2;   // TIM2 서보 채널을 연결한다.

@@ -56,6 +56,7 @@
 
 /* External variables --------------------------------------------------------*/
 extern TIM_HandleTypeDef htim6;
+extern SPI_HandleTypeDef hspi2;
 extern UART_HandleTypeDef huart5;
 extern UART_HandleTypeDef huart2;
 extern UART_HandleTypeDef huart3;
@@ -201,6 +202,14 @@ void SysTick_Handler(void)
 /* For the available peripheral interrupt handler names,                      */
 /* please refer to the startup file (startup_stm32f4xx.s).                    */
 /******************************************************************************/
+
+/**
+  * @brief This function handles SPI2 global interrupt.
+  */
+void SPI2_IRQHandler(void)
+{
+  HAL_SPI_IRQHandler(&hspi2);
+}
 
 /**
   * @brief This function handles USART2 global interrupt.

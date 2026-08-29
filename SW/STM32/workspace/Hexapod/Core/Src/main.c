@@ -22,6 +22,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "app/hexapod_app.h"
+#include "communication/jetson_spi.h"
 
 /* USER CODE END Includes */
 
@@ -32,7 +33,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+#define JETSON_SPI_BRINGUP_TEST  1U
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -58,7 +59,10 @@ UART_HandleTypeDef huart3;
 UART_HandleTypeDef huart6;
 
 /* USER CODE BEGIN PV */
-
+#if JETSON_SPI_BRINGUP_TEST
+static JetsonSpi_Handle_t g_jetson_spi_test;
+static RobotSensorSnapshot_t g_jetson_sensor_test;
+#endif
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -128,10 +132,14 @@ int main(void)
   MX_USART3_UART_Init();
   MX_USART6_UART_Init();
   /* USER CODE BEGIN 2 */
+#if JETSON_SPI_BRINGUP_TEST
+  JetsonSpi_Init(&g_jetson_spi_test, &hspi2);  // 모터 앱 없이 SPI2 통신만 준비한다.
+#else
   if (HexapodApp_BoardInit() != HAL_OK)  // 실제 장치와 최종 제어 앱을 시작한다.
   {
     Error_Handler();                        // 초기화 실패 시 출력을 정지한다.
   }
+#endif
 
   /* USER CODE END 2 */
 
@@ -142,7 +150,17 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+#if JETSON_SPI_BRINGUP_TEST
+    if (!g_jetson_spi_test.tx_frame_ready)
+    {
+      (void)JetsonSpi_PrepareSensorFrame(&g_jetson_spi_test,
+                                         &g_jetson_sensor_test,
+                                         HAL_GetTick());
+    }
+    (void)JetsonSpi_Process(&g_jetson_spi_test);
+#else
     HexapodApp_BoardProcess();  // 통신과 5 ms 제어 요청을 계속 처리한다.
+#endif
   }
   /* USER CODE END 3 */
 }

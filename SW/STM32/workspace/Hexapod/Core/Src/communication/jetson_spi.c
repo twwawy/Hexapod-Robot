@@ -11,6 +11,8 @@
 #define JETSON_SPI_FIRST_DELTA_100US  50U
 #define JETSON_SPI_MAX_DELTA_MS       25U
 
+static JetsonSpi_Handle_t *g_jetson_spi_handle;
+
 static uint16_t JetsonSpi_ReadU16Le(const uint8_t *source)
 {
     return (uint16_t)source[0] |
@@ -109,6 +111,7 @@ void JetsonSpi_Init(JetsonSpi_Handle_t *handle,
 
     memset(handle, 0, sizeof(*handle));
     handle->spi = spi;
+    g_jetson_spi_handle = handle;
     HAL_GPIO_WritePin(DRDY_GPIO_Port, DRDY_Pin, GPIO_PIN_RESET);
 
     if (spi != NULL)
@@ -283,33 +286,19 @@ bool JetsonSpi_PrepareSensorFrame(JetsonSpi_Handle_t *handle,
     handle->tx_sequence++;
     handle->last_frame_ms = now_ms;
     handle->tx_frame_ready = true;
-    HAL_GPIO_WritePin(DRDY_GPIO_Port, DRDY_Pin, GPIO_PIN_SET);
     return true;
 }
 
-bool JetsonSpi_Process(JetsonSpi_Handle_t *handle)
+static bool JetsonSpi_FinalizeTransfer(JetsonSpi_Handle_t *handle)
 {
-    HAL_StatusTypeDef status;
     JetsonSpi_ParsedPacket_t parsed;
 
-    if ((handle == NULL) || (handle->spi == NULL) ||
-        !handle->protocol_ready || !handle->tx_frame_ready)
-    {
-        return false;
-    }
-
-    status = HAL_SPI_TransmitReceive(handle->spi,
-                                     handle->tx_frame,
-                                     handle->rx_frame,
-                                     JETSON_SPI_FRAME_SIZE,
-                                     HAL_MAX_DELAY);
-
-    HAL_GPIO_WritePin(DRDY_GPIO_Port, DRDY_Pin, GPIO_PIN_RESET);
     handle->tx_frame_ready = false;
     handle->rx_packet_valid = false;
 
-    if (status != HAL_OK)
+    if (handle->transfer_error)
     {
+        handle->transfer_error = false;
         handle->error_count++;
         return false;
     }
@@ -357,6 +346,75 @@ bool JetsonSpi_Process(JetsonSpi_Handle_t *handle)
     }
 
     return true;
+}
+
+bool JetsonSpi_Process(JetsonSpi_Handle_t *handle)
+{
+    HAL_StatusTypeDef status;
+
+    if ((handle == NULL) || (handle->spi == NULL) ||
+        !handle->protocol_ready)
+    {
+        return false;
+    }
+
+    if (handle->transfer_complete)
+    {
+        handle->transfer_complete = false;
+        return JetsonSpi_FinalizeTransfer(handle);
+    }
+
+    if (handle->transfer_active)
+    {
+        return true;
+    }
+
+    if (!handle->tx_frame_ready)
+    {
+        return false;
+    }
+
+    handle->transfer_error = false;
+    status = HAL_SPI_TransmitReceive_IT(handle->spi,
+                                        handle->tx_frame,
+                                        handle->rx_frame,
+                                        JETSON_SPI_FRAME_SIZE);
+    if (status != HAL_OK)
+    {
+        handle->error_count++;
+        return false;
+    }
+
+    handle->transfer_active = true;
+    HAL_GPIO_WritePin(DRDY_GPIO_Port, DRDY_Pin, GPIO_PIN_SET);
+    return true;
+}
+
+void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi)
+{
+    if ((g_jetson_spi_handle == NULL) ||
+        (g_jetson_spi_handle->spi != hspi))
+    {
+        return;
+    }
+
+    HAL_GPIO_WritePin(DRDY_GPIO_Port, DRDY_Pin, GPIO_PIN_RESET);
+    g_jetson_spi_handle->transfer_active = false;
+    g_jetson_spi_handle->transfer_complete = true;
+}
+
+void HAL_SPI_ErrorCallback(SPI_HandleTypeDef *hspi)
+{
+    if ((g_jetson_spi_handle == NULL) ||
+        (g_jetson_spi_handle->spi != hspi))
+    {
+        return;
+    }
+
+    HAL_GPIO_WritePin(DRDY_GPIO_Port, DRDY_Pin, GPIO_PIN_RESET);
+    g_jetson_spi_handle->transfer_active = false;
+    g_jetson_spi_handle->transfer_error = true;
+    g_jetson_spi_handle->transfer_complete = true;
 }
 
 bool JetsonSpi_GetLastRxPacket(const JetsonSpi_Handle_t *handle,
