@@ -1,2 +1,4 @@
-../Core/Src/test/mode_transition_test.c:10:13:ModeTransitionTest_CheckSwitchFunctions	14
-../Core/Src/test/mode_transition_test.c:85:6:ModeTransitionTest_Run	9
+../Core/Src/test/mode_transition_test.c:12:13:ModeTransitionTest_CheckSwitchFunctions	17
+../Core/Src/test/mode_transition_test.c:108:13:ModeTransitionTest_CheckCorrectionMemory	8
+../Core/Src/test/mode_transition_test.c:161:13:ModeTransitionTest_CheckCorrectionPostureMemory	9
+../Core/Src/test/mode_transition_test.c:220:6:ModeTransitionTest_Run	11

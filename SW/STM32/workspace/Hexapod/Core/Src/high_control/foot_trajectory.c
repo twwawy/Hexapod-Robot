@@ -117,7 +117,7 @@ static float FootTrajectory_Median3(float first, float second, float third)
     return second;
 }
 
-/* 지형 착지 Z 추정과 적용 상태를 제거한다. */
+/* 공통 착지 Z 복구 상태를 제거한다. */
 static void FootTrajectory_ClearCommonZRecovery(FootTrajectory_Handle_t *handle)
 {
     if (handle == NULL)
@@ -129,13 +129,15 @@ static void FootTrajectory_ClearCommonZRecovery(FootTrajectory_Handle_t *handle)
            sizeof(handle->landing_z_error_valid));  // 수집 중인 착지 오차를 제거한다.
     memset(handle->touchdown_pending, 0,
            sizeof(handle->touchdown_pending));  // 대기 중인 첫 명령 Z를 제거한다.
-    memset(handle->foothold_z_m, 0,
-           sizeof(handle->foothold_z_m));  // 다리별 착지 높이를 제거한다.
-    handle->terrain_z_target_m = 0.0f;   // 누적 지형 Z 목표를 제거한다.
-    handle->terrain_z_applied_m = 0.0f;  // 적용한 지형 Z를 제거한다.
+    memset(handle->common_z_recovery_remaining, 0,
+           sizeof(handle->common_z_recovery_remaining));  // 두 Tripod의 남은 복구량을 제거한다.
+    memset(handle->common_z_recovery_total, 0,
+           sizeof(handle->common_z_recovery_total));  // 두 Tripod의 전체 복구량을 제거한다.
+    memset(handle->common_z_recovery_progress, 0,
+           sizeof(handle->common_z_recovery_progress));  // 두 Tripod의 S-curve 진행률을 제거한다.
 }
 
-/* 한 Tripod의 공통 착지 높이를 양방향 지형 Z 목표에 누적한다. */
+/* 한 Tripod의 공통 하강 오차를 복구 대상으로 저장한다. */
 static void FootTrajectory_RecordLandingZ(FootTrajectory_Handle_t *handle,
                                            uint32_t leg,
                                            float landing_error)
@@ -145,12 +147,10 @@ static void FootTrajectory_RecordLandingZ(FootTrajectory_Handle_t *handle,
     const uint32_t second = first + 2U; // 현재 Tripod의 둘째 다리를 선택한다.
     const uint32_t third = first + 4U;  // 현재 Tripod의 셋째 다리를 선택한다.
     float common_error;                 // 세 다리의 공통 착지 오차를 저장한다.
-    float terrain_delta;                // 이득을 적용한 지형 Z 변화량을 저장한다.
+    float recovery;                     // 데드밴드와 이득을 적용한 복구량을 저장한다.
 
-    handle->landing_z_error[leg] = landing_error;      // PWM 명령 FK의 착지 Z 오차를 저장한다.
-    handle->landing_z_error_valid[leg] = true;         // 현재 다리 오차 수집을 표시한다.
-    handle->foothold_z_m[leg] =
-        handle->landing_target_z[leg] + landing_error;  // 확인된 개별 착지 Z를 저장한다.
+    handle->landing_z_error[leg] = landing_error;  // PWM 명령 FK의 착지 Z 오차를 저장한다.
+    handle->landing_z_error_valid[leg] = true;     // 현재 다리 오차 수집을 표시한다.
 
     if (!handle->landing_z_error_valid[first] ||
         !handle->landing_z_error_valid[second] ||
@@ -162,54 +162,83 @@ static void FootTrajectory_RecordLandingZ(FootTrajectory_Handle_t *handle,
     common_error = FootTrajectory_Median3(handle->landing_z_error[first],
                                            handle->landing_z_error[second],
                                            handle->landing_z_error[third]);  // 한 다리 이상값을 제외한 공통 오차를 선택한다.
-    if (fabsf(common_error) > ROBOT_COMMON_Z_RECOVERY_DEADBAND_M)
+    if (common_error < -ROBOT_COMMON_Z_RECOVERY_DEADBAND_M)
     {
-        terrain_delta = common_error * ROBOT_COMMON_Z_RECOVERY_GAIN;  // 높은·낮은 지형 변화 전체를 계산한다.
-        handle->terrain_z_target_m = fminf(
-            fmaxf(handle->terrain_z_target_m + terrain_delta,
-                  -ROBOT_COMMON_Z_RECOVERY_MAX_M),
-            ROBOT_COMMON_Z_RECOVERY_MAX_M);  // 누적 지형 높이를 ±100 mm로 제한한다.
+        recovery = fminf(
+            (-common_error) * ROBOT_COMMON_Z_RECOVERY_GAIN,
+            ROBOT_COMMON_Z_RECOVERY_MAX_M);  // 검출된 공통 하강 오차 전체를 복구 후보로 만든다.
+        if (recovery > handle->common_z_recovery_remaining[group])
+        {
+            handle->common_z_recovery_remaining[group] = recovery;  // 더 큰 복구량으로 잔량을 교체한다.
+            handle->common_z_recovery_total[group] = recovery;      // 새 S-curve 전체량을 저장한다.
+            handle->common_z_recovery_progress[group] = 0.0f;       // 새 S-curve를 처음부터 시작한다.
+        }
     }
     handle->landing_z_error_valid[first] = false;   // 첫 다리 수집을 완료한다.
     handle->landing_z_error_valid[second] = false;  // 둘째 다리 수집을 완료한다.
     handle->landing_z_error_valid[third] = false;   // 셋째 다리 수집을 완료한다.
 }
 
-/* 누적 지형 높이를 속도 제한해 모든 발 기준에 적용한다. */
+/* 착지한 Tripod의 공통 Z 오차를 Stance 중 천천히 제거한다. */
 static void FootTrajectory_ApplyCommonZRecovery(FootTrajectory_Handle_t *handle,
                                                  const RobotGaitPhase_t *gait)
 {
-    float difference;  // 남은 지형 Z 차이를 저장한다.
-    float step;        // 이번 주기 지형 Z 적용량을 저장한다.
-    uint32_t leg;      // 이동할 다리 번호를 저장한다.
+    uint32_t group;  // 확인할 Tripod 번호를 저장한다.
 
     if ((handle == NULL) || (gait == NULL))
     {
         return;
     }
 
-    if (gait->support_recovery_active)
+    for (group = 0U; group < 2U; ++group)
     {
-        return;  // 지지발 재착지 중 몸체 높이 변화를 보류한다.
-    }
+        const uint32_t first = group;        // 현재 Tripod의 첫 다리를 선택한다.
+        const uint32_t second = first + 2U;  // 현재 Tripod의 둘째 다리를 선택한다.
+        const uint32_t third = first + 4U;   // 현재 Tripod의 셋째 다리를 선택한다.
+        float previous_progress;             // 이번 주기 전 S-curve 진행률을 저장한다.
+        float next_progress;                 // 이번 주기 후 S-curve 진행률을 저장한다.
+        float previous_curve;                // 이번 주기 전 S-curve 위치를 저장한다.
+        float next_curve;                    // 이번 주기 후 S-curve 위치를 저장한다.
+        float recovery_step;                 // 이번 주기 복구량을 저장한다.
 
-    difference = handle->terrain_z_target_m - handle->terrain_z_applied_m;  // 남은 양방향 보정량을 계산한다.
-    step = fminf(fmaxf(difference,
-                       -ROBOT_TERRAIN_Z_RATE_MPS * ROBOT_CONTROL_PERIOD_S),
-                  ROBOT_TERRAIN_Z_RATE_MPS * ROBOT_CONTROL_PERIOD_S);  // 40 mm/s로 변화량을 제한한다.
-    if (step == 0.0f)
-    {
-        return;
-    }
+        if ((handle->common_z_recovery_remaining[group] <= 0.0f) ||
+            (gait->state[first] != ROBOT_LEG_STANCE) ||
+            (gait->state[second] != ROBOT_LEG_STANCE) ||
+            (gait->state[third] != ROBOT_LEG_STANCE))
+        {
+            continue;  // Swing과 지지발 재착지 중에는 복구를 보류한다.
+        }
 
-    handle->terrain_z_applied_m += step;  // 이번 지형 몸체 높이를 누적한다.
-    for (leg = 0U; leg < ROBOT_LEG_COUNT; ++leg)
-    {
-        handle->memory[leg].z -= step;          // 현재 발 목표를 새 몸체 높이에 맞춘다.
-        handle->swing_start[leg].z -= step;     // 정지 후 Swing 시작점을 함께 옮긴다.
-        handle->recovery_start[leg].z -= step;  // 복구 Swing 시작점을 함께 옮긴다.
-        handle->landing_target_z[leg] -= step;  // 대기 중인 정상 착지점을 함께 옮긴다.
-        handle->foothold_z_m[leg] -= step;      // 확인한 지지점의 상대 높이를 함께 옮긴다.
+        if (handle->common_z_recovery_total[group] <= 0.0f)
+        {
+            handle->common_z_recovery_total[group] =
+                handle->common_z_recovery_remaining[group];  // 누락된 전체량을 현재 잔량으로 복구한다.
+            handle->common_z_recovery_progress[group] = 0.0f;  // S-curve를 처음부터 시작한다.
+        }
+
+        previous_progress = handle->common_z_recovery_progress[group];  // 현재 진행률을 보존한다.
+        next_progress = fminf(previous_progress +
+                              ROBOT_CONTROL_PERIOD_S / ROBOT_COMMON_Z_RECOVERY_TIME_S,
+                              1.0f);  // Stance에서만 S-curve 시간을 진행한다.
+        previous_curve = previous_progress * previous_progress *
+                         (3.0f - 2.0f * previous_progress);  // 이전 Smoothstep 위치를 계산한다.
+        next_curve = next_progress * next_progress *
+                     (3.0f - 2.0f * next_progress);  // 다음 Smoothstep 위치를 계산한다.
+        recovery_step = fminf(
+            handle->common_z_recovery_remaining[group],
+            handle->common_z_recovery_total[group] *
+            (next_curve - previous_curve));  // 시작·끝은 느리고 중간은 빠르게 복구한다.
+        handle->memory[first].z += recovery_step;                       // 첫 지지발 Z를 복구한다.
+        handle->memory[second].z += recovery_step;                      // 둘째 지지발 Z를 복구한다.
+        handle->memory[third].z += recovery_step;                       // 셋째 지지발 Z를 복구한다.
+        handle->common_z_recovery_remaining[group] -= recovery_step;    // 적용한 복구량을 차감한다.
+        handle->common_z_recovery_progress[group] = next_progress;      // 새 S-curve 진행률을 저장한다.
+        if (handle->common_z_recovery_remaining[group] <= 0.0f)
+        {
+            handle->common_z_recovery_remaining[group] = 0.0f;  // 부동소수점 잔여량을 제거한다.
+            handle->common_z_recovery_total[group] = 0.0f;      // 완료한 전체량을 제거한다.
+            handle->common_z_recovery_progress[group] = 0.0f;   // 완료한 진행률을 제거한다.
+        }
     }
 }
 
@@ -401,7 +430,20 @@ void FootTrajectory_Init(FootTrajectory_Handle_t *handle)
     handle->initialized = true;  // 궤적 초기화를 표시한다.
 }
 
-/* 접촉 순간 PWM 명령 발 위치를 궤적 메모리에 고정한다. */
+/* 접촉 위치를 궤적 메모리와 지형 측정 대기에 저장한다. */
+static void FootTrajectory_SaveTouchdown(FootTrajectory_Handle_t *handle,
+                                         uint8_t leg,
+                                         const RobotVec3_t *trajectory_foot)
+{
+    handle->memory[leg] = *trajectory_foot;                  // 접촉 위치를 다음 목표로 고정한다.
+    handle->adapted_stance[leg] = true;                      // 접촉 위치 기반 Stance를 준비한다.
+    handle->landing_z_error[leg] = trajectory_foot->z -
+                                   handle->landing_target_z[leg];  // 접촉 후보의 원시 Z 오차를 임시 저장한다.
+    handle->landing_z_error_valid[leg] = false;              // 접촉 확인 전 오차를 보류한다.
+    handle->touchdown_pending[leg] = true;                   // 접촉 확인 후 Z 반영을 예약한다.
+}
+
+/* 접촉 순간 Body 발 위치를 궤적 좌표로 바꿔 고정한다. */
 bool FootTrajectory_LatchTouchdown(FootTrajectory_Handle_t *handle,
                                    uint8_t leg,
                                    const RobotVec3_t *commanded_foot_body,
@@ -418,16 +460,31 @@ bool FootTrajectory_LatchTouchdown(FootTrajectory_Handle_t *handle,
 
     commanded_trajectory = FootTrajectory_RotateForward(commanded_foot_body,
                                                          posture_rad);  // PWM 명령 발을 궤적 좌표로 변환한다.
-    handle->memory[leg] = commanded_trajectory;               // 접촉 순간 PWM 위치를 다음 목표로 고정한다.
-    handle->adapted_stance[leg] = true;                       // 접촉 위치 기반 Stance를 준비한다.
-    handle->landing_z_error[leg] = commanded_trajectory.z -
-                                   handle->landing_target_z[leg];  // 첫 접촉 명령의 착지 Z 오차를 고정한다.
-    handle->landing_z_error_valid[leg] = false;                   // 접촉 확인 전 오차를 보류한다.
-    handle->touchdown_pending[leg] = true;                    // 접촉 확인 후 첫 명령 Z 반영을 예약한다.
+    FootTrajectory_SaveTouchdown(handle,
+                                 leg,
+                                 &commanded_trajectory);  // 변환한 접촉 위치를 고정한다.
     return true;
 }
 
-/* 접촉 확인 후 첫 PWM 명령으로 두 Tripod의 공통 Z 오차를 수집한다. */
+/* 접촉 순간의 직전 궤적 명령 위치를 고정한다. */
+bool FootTrajectory_LatchCommandedTouchdown(FootTrajectory_Handle_t *handle,
+                                            uint8_t leg)
+{
+    RobotVec3_t commanded_trajectory;  // 직전 궤적 명령을 보존한다.
+
+    if ((handle == NULL) || (leg >= ROBOT_LEG_COUNT) || !handle->initialized)
+    {
+        return false;
+    }
+
+    commanded_trajectory = handle->memory[leg];  // 접촉 전 마지막 명령 위치를 복사한다.
+    FootTrajectory_SaveTouchdown(handle,
+                                 leg,
+                                 &commanded_trajectory);  // 지연 없는 궤적 위치를 고정한다.
+    return true;
+}
+
+/* 접촉 확인 후 고정한 궤적으로 두 Tripod의 공통 Z 오차를 수집한다. */
 void FootTrajectory_UpdateCommandedLanding(FootTrajectory_Handle_t *handle,
                                             const RobotGaitPhase_t *gait,
                                             bool common_z_enable)
@@ -452,7 +509,12 @@ void FootTrajectory_UpdateCommandedLanding(FootTrajectory_Handle_t *handle,
             continue;
         }
 
-        handle->touchdown_pending[leg] = false;  // 이번 접촉 측정을 한 번만 처리한다.
+        if (gait->state[leg] == ROBOT_LEG_TOUCHDOWN_CANDIDATE)
+        {
+            continue;  // 접촉 확정까지 처음 고정한 위치를 보존한다.
+        }
+
+        handle->touchdown_pending[leg] = false;  // 후보 취소 또는 확정 측정을 완료한다.
         if (gait->state[leg] != ROBOT_LEG_STANCE)
         {
             continue;
@@ -522,7 +584,7 @@ RobotFootTargets_t FootTrajectory_Step(FootTrajectory_Handle_t *handle,
         }
         else if (new_swing_mask != 0U)
         {
-            handle->phase_twist = applied_twist;  // 25 ms 전 검증을 마친 속도를 현재 위상에 고정한다.
+            handle->phase_twist = applied_twist;  // 착륙 시 세 지점 검증을 마친 속도를 현재 위상에 고정한다.
             handle->phase_twist_valid = true;     // 현재 위상 속도 고정을 활성화한다.
         }
 
@@ -568,9 +630,10 @@ RobotFootTargets_t FootTrajectory_Step(FootTrajectory_Handle_t *handle,
         FootTrajectory_ClearCommonZRecovery(handle);  // 다른 모드의 착지 오차를 제거한다.
     }
 
-    if (!drone->body_control_enable)
+    if (drone->reset_command || drone->stand_enable ||
+        drone->landing_enable || drone->kill_enable)
     {
-        memset(&handle->body_offset_m, 0, sizeof(handle->body_offset_m));  // 비활성 상태에서 보정 Offset을 제거한다.
+        memset(&handle->body_offset_m, 0, sizeof(handle->body_offset_m));  // 명시적 초기화 상태에서 보정 Offset을 제거한다.
     }
     else if (all_stance_mode)
     {
@@ -609,8 +672,7 @@ RobotFootTargets_t FootTrajectory_Step(FootTrajectory_Handle_t *handle,
     {
         corrected[leg].x = base[leg].x - handle->body_offset_m.x;  // 보정 기준 X를 계산한다.
         corrected[leg].y = base[leg].y - handle->body_offset_m.y;  // 보정 기준 Y를 계산한다.
-        corrected[leg].z = base[leg].z - handle->body_offset_m.z -
-                           handle->terrain_z_applied_m;  // 몸체와 지형 높이를 반영한 Z를 계산한다.
+        corrected[leg].z = base[leg].z - handle->body_offset_m.z;  // 보정 기준 Z를 계산한다.
     }
 
     if (!drone->body_control_enable || (drone->tripod_mode != ROBOT_TRIPOD_NORMAL))

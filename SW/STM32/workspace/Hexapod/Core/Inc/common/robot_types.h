@@ -55,7 +55,7 @@ typedef enum
     ROBOT_MODE_CORRECTION,      // 자세 보정 모드를 나타낸다.
     ROBOT_MODE_FAULT,           // 고장 모드를 나타낸다.
     ROBOT_MODE_KILL,            // 긴급 차단 모드를 나타낸다.
-    ROBOT_MODE_ARM,             // 추후 암 모드를 예약한다.
+    ROBOT_MODE_ARM,             // SC 매니퓰레이터 모드를 나타낸다.
     ROBOT_MODE_AUTONOMOUS       // 추후 자율주행 모드를 예약한다.
 } RobotControlMode_t;
 
@@ -165,7 +165,7 @@ typedef struct
     float progress[ROBOT_LEG_COUNT];               // 다리별 진행률을 저장한다.
     bool late_landing_exhausted[ROBOT_LEG_COUNT];  // 다리별 Late Landing 한계 도달을 저장한다.
     bool startup_phase;                            // 시작 위상 여부를 저장한다.
-    bool waiting_start;                            // 첫 속도 표본 대기 여부를 저장한다.
+    bool waiting_start;                            // 위상 경로 검사 중 발 고정 여부를 저장한다.
     bool next_phase_preview;                       // 다음 위상 검사 시작을 알린다.
     bool next_phase_startup;                       // 검사할 위상의 최초 보행 여부를 저장한다.
     uint8_t next_phase_swing_mask;                 // 검사할 다음 Swing 그룹을 저장한다.

@@ -1,6 +1,8 @@
-../Core/Src/sensor/joint_feedback.c:6:14:JointFeedback_Clamp	24	static
-../Core/Src/sensor/joint_feedback.c:20:13:JointFeedback_ConvertOne	40	static
-../Core/Src/sensor/joint_feedback.c:58:6:JointFeedback_Init	24	static
-../Core/Src/sensor/joint_feedback.c:81:6:JointFeedback_SetCalibration	32	static
-../Core/Src/sensor/joint_feedback.c:98:6:JointFeedback_ConvertJoint	24	static
-../Core/Src/sensor/joint_feedback.c:112:6:JointFeedback_Convert	32	static
+../Core/Src/sensor/joint_feedback.c:8:14:JointFeedback_Clamp	24	static
+../Core/Src/sensor/joint_feedback.c:22:14:JointFeedback_Median3	32	static
+../Core/Src/sensor/joint_feedback.c:49:13:JointFeedback_ConvertOne	40	static
+../Core/Src/sensor/joint_feedback.c:87:6:JointFeedback_Init	24	static
+../Core/Src/sensor/joint_feedback.c:111:6:JointFeedback_SetCalibration	32	static
+../Core/Src/sensor/joint_feedback.c:128:6:JointFeedback_ConvertJoint	24	static
+../Core/Src/sensor/joint_feedback.c:142:6:JointFeedback_Convert	32	static
+../Core/Src/sensor/joint_feedback.c:168:6:JointFeedback_UpdateEstimate	72	static

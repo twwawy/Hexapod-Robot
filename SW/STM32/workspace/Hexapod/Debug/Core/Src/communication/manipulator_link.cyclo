@@ -1,0 +1,8 @@
+../Core/Src/communication/manipulator_link.c:19:13:ManipulatorLink_WriteI16	1
+../Core/Src/communication/manipulator_link.c:28:16:ManipulatorLink_PackSwitches	4
+../Core/Src/communication/manipulator_link.c:43:6:ManipulatorLink_Init	2
+../Core/Src/communication/manipulator_link.c:56:10:ManipulatorLink_Crc16CcittFalse	5
+../Core/Src/communication/manipulator_link.c:85:6:ManipulatorLink_BuildPacket	10
+../Core/Src/communication/manipulator_link.c:132:6:ManipulatorLink_Process	8
+../Core/Src/communication/manipulator_link.c:177:6:ManipulatorLink_TxCpltCallback	4
+../Core/Src/communication/manipulator_link.c:191:6:ManipulatorLink_ErrorCallback	4

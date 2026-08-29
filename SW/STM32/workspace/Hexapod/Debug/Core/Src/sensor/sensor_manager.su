@@ -1,6 +1,6 @@
 ../Core/Src/sensor/sensor_manager.c:7:13:SensorManager_UpdateContactState	32	static
 ../Core/Src/sensor/sensor_manager.c:29:6:SensorManager_Init	24	static
-../Core/Src/sensor/sensor_manager.c:48:6:SensorManager_Update	200	static
-../Core/Src/sensor/sensor_manager.c:115:6:SensorManager_UpdatePressure	48	static
-../Core/Src/sensor/sensor_manager.c:146:9:SensorManager_TakeContactLatch	24	static
-../Core/Src/sensor/sensor_manager.c:161:6:SensorManager_GetSnapshot	16	static
+../Core/Src/sensor/sensor_manager.c:48:6:SensorManager_Update	224	static
+../Core/Src/sensor/sensor_manager.c:124:6:SensorManager_UpdatePressure	48	static
+../Core/Src/sensor/sensor_manager.c:155:9:SensorManager_TakeContactLatch	24	static
+../Core/Src/sensor/sensor_manager.c:170:6:SensorManager_GetSnapshot	16	static

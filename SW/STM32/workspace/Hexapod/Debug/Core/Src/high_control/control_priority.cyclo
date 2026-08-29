@@ -1,3 +1,3 @@
 ../Core/Src/high_control/control_priority.c:9:13:ControlPriority_SticksNeutral	6
 ../Core/Src/high_control/control_priority.c:19:6:ControlPriority_Init	2
-../Core/Src/high_control/control_priority.c:32:23:ControlPriority_Step	34
+../Core/Src/high_control/control_priority.c:32:23:ControlPriority_Step	37

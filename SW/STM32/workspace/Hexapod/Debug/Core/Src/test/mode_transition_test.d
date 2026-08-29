@@ -1,11 +1,15 @@
 Core/Src/test/mode_transition_test.o: \
  ../Core/Src/test/mode_transition_test.c \
  ../Core/Inc/test/mode_transition_test.h \
- ../Core/Inc/high_control/control_priority.h \
+ ../Core/Inc/high_control/body_posture_controller.h \
  ../Core/Inc/common/robot_types.h ../Core/Inc/common/robot_config.h \
- ../Core/Inc/high_control/drone_controller.h
+ ../Core/Inc/high_control/control_priority.h \
+ ../Core/Inc/high_control/drone_controller.h \
+ ../Core/Inc/high_control/foot_trajectory.h
 ../Core/Inc/test/mode_transition_test.h:
-../Core/Inc/high_control/control_priority.h:
+../Core/Inc/high_control/body_posture_controller.h:
 ../Core/Inc/common/robot_types.h:
 ../Core/Inc/common/robot_config.h:
+../Core/Inc/high_control/control_priority.h:
 ../Core/Inc/high_control/drone_controller.h:
+../Core/Inc/high_control/foot_trajectory.h:

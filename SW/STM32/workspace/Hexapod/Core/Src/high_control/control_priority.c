@@ -40,6 +40,7 @@ RobotPriorityOutput_t ControlPriority_Step(ControlPriority_Handle_t *handle,
     bool landing_request;          // SB 착지 요청을 저장한다.
     bool manual_request;           // SC 수동 요청을 저장한다.
     bool correction_request;       // SC 보정 요청을 저장한다.
+    bool arm_request;              // SC 매니퓰레이터 요청을 저장한다.
     bool ready_request;            // SE READY 요청을 저장한다.
     bool kill_request;             // SD Kill 요청을 저장한다.
 
@@ -55,6 +56,7 @@ RobotPriorityOutput_t ControlPriority_Step(ControlPriority_Handle_t *handle,
     stand_request = (user->sb == 1U);       // SB 가운데를 서기로 해석한다.
     landing_request = (user->sb == 2U);     // SB 끝을 착지로 해석한다.
     manual_request = (user->sc == 0U);      // SC 첫 위치를 수동으로 해석한다.
+    arm_request = (user->sc == 1U);         // SC 가운데를 ARM 모드로 해석한다.
     correction_request = (user->sc == 2U);  // SC 끝 위치를 보정으로 해석한다.
     ready_request = (user->se != 0U);       // SE 활성화를 READY로 해석한다.
     kill_request = (user->sd != 0U);        // SD 활성화를 Kill로 해석한다.
@@ -153,7 +155,15 @@ RobotPriorityOutput_t ControlPriority_Step(ControlPriority_Handle_t *handle,
 
     if ((handle->supervisor == CONTROL_SUPERVISOR_READY) && handle->motion_armed)
     {
-        if (manual_request)
+        if (ready_request)
+        {
+            output.active_mode = ROBOT_MODE_READY;  // SE 활성화 중 조종 명령을 차단한다.
+        }
+        else if (arm_request)
+        {
+            output.active_mode = ROBOT_MODE_ARM;  // SC 가운데에서 6족 자세를 고정한다.
+        }
+        else if (manual_request)
         {
             handle->motion_mode = ROBOT_MODE_MANUAL;      // SC 첫 위치에서 조종을 선택한다.
         }
@@ -162,9 +172,9 @@ RobotPriorityOutput_t ControlPriority_Step(ControlPriority_Handle_t *handle,
             handle->motion_mode = ROBOT_MODE_CORRECTION;  // SC 끝 위치에서 보정을 선택한다.
         }
 
-        if (!ready_request)
+        if (!arm_request && !ready_request)
         {
-            output.active_mode = handle->motion_mode;  // SC 가운데에서는 직전 동작 모드를 유지한다.
+            output.active_mode = handle->motion_mode;  // SC 첫·끝 위치의 동작 모드를 적용한다.
         }
     }
 

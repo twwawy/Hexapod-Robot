@@ -14,10 +14,10 @@ typedef struct
 
     float landing_target_z[ROBOT_LEG_COUNT];         // 다리별 정상 착지 Z를 저장한다.
     float landing_z_error[ROBOT_LEG_COUNT];          // 다리별 PWM 명령 착지 Z 오차를 저장한다.
-    float foothold_z_m[ROBOT_LEG_COUNT];             // 다리별 확인된 착지 Z를 저장한다.
+    float common_z_recovery_remaining[2];            // 두 Tripod의 남은 Z 복구량을 저장한다.
+    float common_z_recovery_total[2];                // 두 Tripod의 S-curve 전체 복구량을 저장한다.
+    float common_z_recovery_progress[2];             // 두 Tripod의 S-curve 진행률을 저장한다.
     float swing_resume_progress[ROBOT_LEG_COUNT];    // 정지 후 Swing 재개 진행률을 저장한다.
-    float terrain_z_target_m;                        // 누적 지형 몸체 Z 목표를 저장한다.
-    float terrain_z_applied_m;                       // 현재 적용한 지형 몸체 Z를 저장한다.
     RobotLegState_t previous_state[ROBOT_LEG_COUNT]; // 이전 다리 상태를 저장한다.
     uint8_t previous_swing_mask;                     // 직전 Swing 다리 비트를 저장한다.
 
@@ -37,9 +37,13 @@ bool FootTrajectory_LatchTouchdown(FootTrajectory_Handle_t *handle,
                                    const RobotVec3_t *commanded_foot_body,
                                    const RobotEuler_t *posture_rad);  // 접촉 순간 PWM 명령 발 위치를 고정한다.
 
+bool FootTrajectory_LatchCommandedTouchdown(
+    FootTrajectory_Handle_t *handle,
+    uint8_t leg);  // 접촉 순간의 직전 궤적 명령 위치를 고정한다.
+
 void FootTrajectory_UpdateCommandedLanding(FootTrajectory_Handle_t *handle,
                                             const RobotGaitPhase_t *gait,
-                                            bool common_z_enable);  // 접촉 확인 후 첫 PWM 명령 Z 오차를 반영한다.
+                                            bool common_z_enable);  // 접촉 확인 후 고정한 궤적 Z 오차를 반영한다.
 
 RobotFootTargets_t FootTrajectory_Step(FootTrajectory_Handle_t *handle,
                                        const RobotBodyTwist_t *twist,

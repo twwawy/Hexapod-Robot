@@ -31,6 +31,7 @@ Core/Src/test/communication_test.o: ../Core/Src/test/communication_test.c \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_tim.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_tim_ex.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_uart.h \
+ ../Core/Inc/communication/manipulator_link.h \
  ../Core/Inc/communication/robot_telemetry.h
 ../Core/Inc/test/communication_test.h:
 ../Core/Inc/communication/jetson_spi.h:
@@ -65,4 +66,5 @@ Core/Src/test/communication_test.o: ../Core/Src/test/communication_test.c \
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_tim.h:
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_tim_ex.h:
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_uart.h:
+../Core/Inc/communication/manipulator_link.h:
 ../Core/Inc/communication/robot_telemetry.h:

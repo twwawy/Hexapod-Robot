@@ -3,5 +3,5 @@
 ../Core/Src/high_control/gait_manager.c:32:16:GaitManager_SupportMask	24	static
 ../Core/Src/high_control/gait_manager.c:48:13:GaitManager_AllMaskContact	24	static
 ../Core/Src/high_control/gait_manager.c:64:6:GaitManager_Init	16	static
-../Core/Src/high_control/gait_manager.c:73:18:GaitManager_StepContacts	96	static
-../Core/Src/high_control/gait_manager.c:531:18:GaitManager_Step	72	static
+../Core/Src/high_control/gait_manager.c:73:18:GaitManager_StepContacts	104	static
+../Core/Src/high_control/gait_manager.c:522:18:GaitManager_Step	72	static

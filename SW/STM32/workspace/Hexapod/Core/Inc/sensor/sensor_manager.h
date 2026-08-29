@@ -27,7 +27,10 @@ void SensorManager_Init(SensorManager_Handle_t *handle,
                         IMU_Handle_t *imu,
                         MCP3008_Handle_t *mcp3008);  // 실제 센서 드라이버를 연결한다.
 
-bool SensorManager_Update(SensorManager_Handle_t *handle);  // 최신 실제 센서값을 갱신한다.
+bool SensorManager_Update(
+    SensorManager_Handle_t *handle,
+    const float pwm_angle_rad[ROBOT_JOINT_COUNT],
+    bool pwm_valid);  // 최신 센서값과 PWM 예측으로 스냅샷을 갱신한다.
 
 bool SensorManager_UpdatePressure(SensorManager_Handle_t *handle);  // 압력 6채널만 갱신한다.
 

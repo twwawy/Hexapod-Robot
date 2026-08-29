@@ -1,5 +1,8 @@
 #include "sensor/imu.h"
 
+#include "common/robot_config.h"
+
+#include <math.h>
 #include <string.h>
 
 #define IMU_PI                  3.14159265358979323846f
@@ -95,6 +98,7 @@ static void IMU_ParseFrame(IMU_Handle_t *handle)
             }
             handle->data.temperature_c = (float)IMU_ReadI16(&frame[8]) / 100.0f;
             handle->data.valid_mask |= IMU_VALID_ANGLE;
+            handle->data.angle_frame_counter++;  // 새 자세 표본 번호를 갱신한다.
             break;
 
         case 0x54U: /* magnetic field; keep device counts until calibrated */
@@ -262,4 +266,156 @@ void IMU_GetCalibration(const IMU_Handle_t *handle,
     }
 
     *calibration = handle->calibration;   // 시험 코드에 보정값을 전달한다.
+}
+
+/* 현재 IMU 표본이 수평 영점 측정에 사용할 정지 상태인지 확인한다. */
+static bool IMU_LevelCalibration_IsStationary(const IMU_Data_t *data)
+{
+    uint32_t axis;  // 검사할 각속도 축 번호를 저장한다.
+
+    if ((data == NULL) ||
+        ((data->valid_mask & IMU_VALID_ANGLE) == 0U) ||
+        ((data->valid_mask & IMU_VALID_GYROSCOPE) == 0U) ||
+        !isfinite(data->euler_angle_rad[0]) ||
+        !isfinite(data->euler_angle_rad[1]))
+    {
+        return false;
+    }
+
+    for (axis = 0U; axis < 3U; ++axis)
+    {
+        if (!isfinite(data->angular_velocity_radps[axis]) ||
+            (fabsf(data->angular_velocity_radps[axis]) > ROBOT_IMU_LEVEL_MAX_GYRO_RADPS))
+        {
+            return false;  // 한 축이라도 움직이면 현재 표본을 제외한다.
+        }
+    }
+    return true;
+}
+
+/* 현재 정지 자세 표본 누적을 처음부터 다시 준비한다. */
+static void IMU_LevelCalibration_ResetCapture(IMU_LevelCalibration_t *calibration,
+                                              uint32_t now_ms)
+{
+    calibration->capture_start_ms = now_ms;  // 새 정지 구간 시작 시각을 저장한다.
+    calibration->sample_count = 0U;          // 이전 정지 표본 수를 제거한다.
+    calibration->euler_sum_rad[0] = 0.0f;    // 이전 Roll 합계를 제거한다.
+    calibration->euler_sum_rad[1] = 0.0f;    // 이전 Pitch 합계를 제거한다.
+}
+
+/* Roll·Pitch 자동 영점 측정 상태를 초기화한다. */
+void IMU_LevelCalibration_Init(IMU_LevelCalibration_t *calibration,
+                               uint32_t now_ms)
+{
+    if (calibration == NULL)
+    {
+        return;
+    }
+
+    memset(calibration, 0, sizeof(*calibration));             // 이전 영점 측정값을 제거한다.
+    calibration->state = IMU_LEVEL_CALIBRATION_WAITING;       // IMU 안정 대기부터 시작한다.
+    calibration->start_ms = now_ms;                           // 전체 제한 시간 기준을 저장한다.
+    calibration->capture_start_ms = now_ms;                   // 첫 정지 구간 기준을 준비한다.
+}
+
+/* 정지 자세 평균을 현재 보정표에 더해 Roll·Pitch 영점으로 적용한다. */
+bool IMU_LevelCalibration_Update(IMU_LevelCalibration_t *calibration,
+                                 IMU_Handle_t *imu,
+                                 uint32_t now_ms)
+{
+    IMU_Calibration_t applied;  // 새로 적용할 IMU 보정표를 저장한다.
+    float average_rad[2];       // 측정한 Roll·Pitch 평균을 저장한다.
+    uint32_t axis;              // 계산할 수평 자세 축 번호를 저장한다.
+
+    if ((calibration == NULL) || (imu == NULL))
+    {
+        return false;
+    }
+    if (calibration->state == IMU_LEVEL_CALIBRATION_COMPLETE)
+    {
+        return true;
+    }
+    if (calibration->state == IMU_LEVEL_CALIBRATION_FAILED)
+    {
+        return false;
+    }
+    if ((now_ms - calibration->start_ms) >= ROBOT_IMU_LEVEL_TIMEOUT_MS)
+    {
+        calibration->state = IMU_LEVEL_CALIBRATION_FAILED;  // 제한 시간 초과를 고정한다.
+        return false;
+    }
+    if ((now_ms - calibration->start_ms) < ROBOT_IMU_LEVEL_SETTLE_MS)
+    {
+        return false;  // 장치 출력이 안정될 때까지 표본을 받지 않는다.
+    }
+    if ((imu->data.angle_frame_counter == 0U) ||
+        (imu->data.angle_frame_counter == calibration->last_angle_frame_count))
+    {
+        return false;  // 같은 자세 프레임을 중복 합산하지 않는다.
+    }
+
+    calibration->last_angle_frame_count = imu->data.angle_frame_counter;  // 새 자세 프레임을 소비한다.
+    if (!IMU_LevelCalibration_IsStationary(&imu->data))
+    {
+        calibration->state = IMU_LEVEL_CALIBRATION_WAITING;  // 정지 자세를 다시 기다린다.
+        IMU_LevelCalibration_ResetCapture(calibration, now_ms);  // 움직인 구간의 표본을 제거한다.
+        return false;
+    }
+
+    if (calibration->state != IMU_LEVEL_CALIBRATION_CAPTURING)
+    {
+        calibration->state = IMU_LEVEL_CALIBRATION_CAPTURING;  // 정지 표본 수집을 시작한다.
+        IMU_LevelCalibration_ResetCapture(calibration, now_ms); // 새 정지 구간으로 초기화한다.
+    }
+    else if (calibration->sample_count > 0U)
+    {
+        for (axis = 0U; axis < 2U; ++axis)
+        {
+            const float mean = calibration->euler_sum_rad[axis] /
+                               (float)calibration->sample_count;  // 현재 축 평균을 계산한다.
+
+            if (fabsf(imu->data.euler_angle_rad[axis] - mean) >
+                ROBOT_IMU_LEVEL_MAX_DEVIATION_RAD)
+            {
+                IMU_LevelCalibration_ResetCapture(calibration, now_ms);  // 자세가 흔들린 표본 구간을 제거한다.
+                break;
+            }
+        }
+    }
+
+    calibration->euler_sum_rad[0] += imu->data.euler_angle_rad[0];  // 현재 Roll을 합산한다.
+    calibration->euler_sum_rad[1] += imu->data.euler_angle_rad[1];  // 현재 Pitch를 합산한다.
+    calibration->sample_count++;                                   // 정상 표본 수를 갱신한다.
+
+    if ((calibration->sample_count < ROBOT_IMU_LEVEL_MIN_SAMPLES) ||
+        ((now_ms - calibration->capture_start_ms) < ROBOT_IMU_LEVEL_CAPTURE_MS))
+    {
+        return false;
+    }
+
+    for (axis = 0U; axis < 2U; ++axis)
+    {
+        average_rad[axis] = calibration->euler_sum_rad[axis] /
+                            (float)calibration->sample_count;  // 정지 자세 평균을 계산한다.
+        if (!isfinite(average_rad[axis]) ||
+            (fabsf(average_rad[axis]) > ROBOT_IMU_LEVEL_MAX_OFFSET_RAD))
+        {
+            calibration->state = IMU_LEVEL_CALIBRATION_FAILED;  // 기울어진 설치에서 자동 보정을 막는다.
+            return false;
+        }
+    }
+
+    IMU_GetCalibration(imu, &applied);  // 기존 축 방향과 영점값을 유지한다.
+    for (axis = 0U; axis < 2U; ++axis)
+    {
+        applied.euler_offset_rad[axis] += average_rad[axis];          // 기존 영점에 측정 편차를 더한다.
+        calibration->measured_offset_rad[axis] =
+            applied.euler_offset_rad[axis];                           // 최종 적용 영점을 표시한다.
+        calibration->measured_offset_deg[axis] =
+            applied.euler_offset_rad[axis] * ROBOT_RAD_TO_DEG_F;      // 최종 영점을 deg로 표시한다.
+        imu->data.euler_angle_rad[axis] -= average_rad[axis];         // 최신 자세값도 즉시 새 영점으로 맞춘다.
+    }
+    IMU_SetCalibration(imu, &applied);                                // 이후 자세 프레임에 새 영점을 적용한다.
+    calibration->state = IMU_LEVEL_CALIBRATION_COMPLETE;              // 정상 보정 완료를 고정한다.
+    return true;
 }

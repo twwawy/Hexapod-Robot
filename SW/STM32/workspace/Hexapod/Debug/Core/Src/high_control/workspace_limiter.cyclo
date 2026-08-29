@@ -4,4 +4,4 @@
 ../Core/Src/high_control/workspace_limiter.c:73:13:WorkspaceLimiter_PreviewPoint	5
 ../Core/Src/high_control/workspace_limiter.c:138:6:WorkspaceLimiter_Init	2
 ../Core/Src/high_control/workspace_limiter.c:147:6:WorkspaceLimiter_AllFeetValid	5
-../Core/Src/high_control/workspace_limiter.c:171:18:WorkspaceLimiter_Gait	12
+../Core/Src/high_control/workspace_limiter.c:171:18:WorkspaceLimiter_Gait	14

@@ -10,13 +10,17 @@
 /* 중앙 관절센서·압력·서보·IMU·ADC 값의 변환을 검사한다. */
 bool CalibrationAlgorithmTest_Run(void)
 {
-    JointFeedback_Handle_t joint_feedback;                    // 시험용 관절센서 변환 상태를 저장한다.
+    static JointFeedback_Handle_t joint_feedback;             // 큰 시험용 관절 상태를 정적 영역에 저장한다.
     FootPressure_Handle_t pressure;                           // 시험용 접촉 변환 상태를 저장한다.
     IMU_Handle_t imu;                                         // 시험용 IMU 보정 상태를 저장한다.
     IMU_Calibration_t imu_result;                             // 다시 읽은 IMU 보정값을 저장한다.
+    IMU_LevelCalibration_t imu_level;                         // 자동 수평 영점 상태를 저장한다.
     MCP3008_Handle_t adc;                                     // 시험용 ADC 매핑 상태를 저장한다.
     uint16_t joint_raw[ROBOT_JOINT_COUNT];                    // 관절센서 입력을 저장한다.
     float joint_angle[ROBOT_JOINT_COUNT];                     // 변환한 관절각을 저장한다.
+    static float filter_measured[ROBOT_JOINT_COUNT];          // 필터용 ADC 각도를 저장한다.
+    static float filter_pwm[ROBOT_JOINT_COUNT];               // 필터용 PWM 각도를 저장한다.
+    static float filter_estimated[ROBOT_JOINT_COUNT];         // 필터 추정 결과를 저장한다.
     uint16_t pressure_raw[ROBOT_PRESSURE_COUNT];              // 압력센서 입력을 저장한다.
     bool contact[ROBOT_PRESSURE_COUNT];                       // 변환한 접촉 상태를 저장한다.
     uint32_t axis;                                            // IMU 축 번호를 저장한다.
@@ -33,6 +37,9 @@ bool CalibrationAlgorithmTest_Run(void)
     memset(&imu, 0, sizeof(imu));                    // HAL 없이 보정 저장만 시험한다.
     memset(&adc, 0, sizeof(adc));                    // HAL 없이 매핑 저장만 시험한다.
     JointFeedback_Init(&joint_feedback);             // 관절 변환 기본 상태를 준비한다.
+    memset(filter_measured, 0, sizeof(filter_measured));  // 필터 ADC 시험값을 초기화한다.
+    memset(filter_pwm, 0, sizeof(filter_pwm));            // 필터 PWM 시험값을 초기화한다.
+    memset(filter_estimated, 0, sizeof(filter_estimated)); // 필터 출력 시험값을 초기화한다.
     FootPressure_Init(&pressure);                    // 접촉 변환 기본 상태를 준비한다.
     IMU_SetCalibration(&imu, &g_robot_calibration.imu);  // 중앙 IMU 값을 적용한다.
     IMU_GetCalibration(&imu, &imu_result);               // 적용된 값을 다시 읽는다.
@@ -47,6 +54,38 @@ bool CalibrationAlgorithmTest_Run(void)
         {
             return false;
         }
+    }
+
+    IMU_LevelCalibration_Init(&imu_level, 0U);               // 자동 수평 영점 측정을 준비한다.
+    imu.data.valid_mask = IMU_VALID_ANGLE | IMU_VALID_GYROSCOPE;  // 자세와 정지 각속도를 유효하게 만든다.
+    imu.data.euler_angle_rad[0] = 2.0f * ROBOT_DEG_TO_RAD_F;      // Roll 영점 편차를 입력한다.
+    imu.data.euler_angle_rad[1] = -1.5f * ROBOT_DEG_TO_RAD_F;     // Pitch 영점 편차를 입력한다.
+    imu.data.euler_angle_rad[2] = 0.4f;                           // 유지할 Yaw 값을 입력한다.
+    for (sample = 0U; sample < 1000U; ++sample)
+    {
+        imu.data.angle_frame_counter++;  // 매 반복을 새 자세 프레임으로 만든다.
+        if (IMU_LevelCalibration_Update(&imu_level,
+                                        &imu,
+                                        ROBOT_IMU_LEVEL_SETTLE_MS + sample * 10U))
+        {
+            break;  // 필요한 시간과 표본을 채우면 시험을 종료한다.
+        }
+    }
+    IMU_GetCalibration(&imu, &imu_result);  // 자동 적용된 Offset을 다시 읽는다.
+    if ((imu_level.state != IMU_LEVEL_CALIBRATION_COMPLETE) ||
+        (fabsf(imu_result.euler_offset_rad[0] -
+               (g_robot_calibration.imu.euler_offset_rad[0] +
+                2.0f * ROBOT_DEG_TO_RAD_F)) > CALIBRATION_TEST_ANGLE_TOLERANCE_RAD) ||
+        (fabsf(imu_result.euler_offset_rad[1] -
+               (g_robot_calibration.imu.euler_offset_rad[1] -
+                1.5f * ROBOT_DEG_TO_RAD_F)) > CALIBRATION_TEST_ANGLE_TOLERANCE_RAD) ||
+        (fabsf(imu_result.euler_offset_rad[2] -
+               g_robot_calibration.imu.euler_offset_rad[2]) >
+               CALIBRATION_TEST_ANGLE_TOLERANCE_RAD) ||
+        (fabsf(imu.data.euler_angle_rad[0]) > CALIBRATION_TEST_ANGLE_TOLERANCE_RAD) ||
+        (fabsf(imu.data.euler_angle_rad[1]) > CALIBRATION_TEST_ANGLE_TOLERANCE_RAD))
+    {
+        return false;
     }
 
     for (leg = 0U; leg < ROBOT_LEG_COUNT; ++leg)
@@ -97,6 +136,46 @@ bool CalibrationAlgorithmTest_Run(void)
         {
             return false;
         }
+    }
+
+    if (!JointFeedback_UpdateEstimate(&joint_feedback,
+                                      filter_measured,
+                                      NULL,
+                                      false,
+                                      filter_estimated))  // PWM 없이 필터 첫 표본을 입력한다.
+    {
+        return false;
+    }
+    filter_measured[0] = 1.0f;  // 첫 관절에 단발성 ADC 튐을 입력한다.
+    if (!JointFeedback_UpdateEstimate(&joint_feedback,
+                                      filter_measured,
+                                      NULL,
+                                      false,
+                                      filter_estimated) ||
+        (fabsf(filter_estimated[0]) > CALIBRATION_TEST_ANGLE_TOLERANCE_RAD))
+    {
+        return false;  // Median이 단발성 튐을 통과시키면 실패한다.
+    }
+    filter_measured[0] = 0.0f;  // ADC 각도를 영점으로 복원한다.
+    if (!JointFeedback_UpdateEstimate(&joint_feedback,
+                                      filter_measured,
+                                      filter_pwm,
+                                      true,
+                                      filter_estimated))  // 현재 PWM을 예측 기준으로 설정한다.
+    {
+        return false;
+    }
+    filter_pwm[0] = 1.0f;  // 첫 관절에 큰 PWM 명령 변화를 입력한다.
+    if (!JointFeedback_UpdateEstimate(&joint_feedback,
+                                      filter_measured,
+                                      filter_pwm,
+                                      true,
+                                      filter_estimated) ||
+        (filter_estimated[0] <= 0.0f) ||
+        (filter_estimated[0] >=
+         (ROBOT_JOINT_PWM_PREDICTION_RATE_RADPS * ROBOT_CONTROL_PERIOD_S)))
+    {
+        return false;  // PWM 예측이 속도 제한과 ADC 보정을 벗어나면 실패한다.
     }
 
     for (leg = 0U; leg < ROBOT_PRESSURE_COUNT; ++leg)

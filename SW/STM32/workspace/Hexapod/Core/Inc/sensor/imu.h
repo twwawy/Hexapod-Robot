@@ -27,6 +27,26 @@ typedef struct
     float euler_offset_rad[3];         // 자세 축별 Offset을 저장한다.
 } IMU_Calibration_t;
 
+typedef enum
+{
+    IMU_LEVEL_CALIBRATION_WAITING = 0,  // IMU 안정 시간을 기다린다.
+    IMU_LEVEL_CALIBRATION_CAPTURING,    // 정지 자세 표본을 수집한다.
+    IMU_LEVEL_CALIBRATION_COMPLETE,     // Roll·Pitch 영점 적용을 완료한다.
+    IMU_LEVEL_CALIBRATION_FAILED        // 제한 시간 또는 Offset 오류를 유지한다.
+} IMU_LevelCalibrationState_t;
+
+typedef struct
+{
+    IMU_LevelCalibrationState_t state;  // 현재 자동 영점 보정 상태를 저장한다.
+    uint32_t start_ms;                  // 전체 보정 시작 시각을 저장한다.
+    uint32_t capture_start_ms;          // 현재 정지 표본 수집 시작 시각을 저장한다.
+    uint32_t last_angle_frame_count;    // 마지막으로 처리한 자세 프레임 번호를 저장한다.
+    uint32_t sample_count;              // 누적한 정지 자세 표본 수를 저장한다.
+    float euler_sum_rad[2];             // Roll·Pitch 표본 합계를 저장한다.
+    float measured_offset_rad[2];       // 적용한 Roll·Pitch Offset을 저장한다.
+    float measured_offset_deg[2];       // 적용한 Roll·Pitch Offset을 deg로 저장한다.
+} IMU_LevelCalibration_t;
+
 typedef struct
 {
     uint32_t mcu_time_ms;
@@ -40,6 +60,7 @@ typedef struct
 
     uint32_t valid_mask;
     uint32_t frame_counter;
+    uint32_t angle_frame_counter;     // 수신한 자세 프레임 수를 저장한다.
     uint32_t checksum_error_count;
 } IMU_Data_t;
 
@@ -89,6 +110,13 @@ void IMU_SetCalibration(IMU_Handle_t *handle,
 
 void IMU_GetCalibration(const IMU_Handle_t *handle,
                         IMU_Calibration_t *calibration);         // 현재 축 보정값을 반환한다.
+
+void IMU_LevelCalibration_Init(IMU_LevelCalibration_t *calibration,
+                               uint32_t now_ms);                  // Roll·Pitch 자동 영점 측정을 준비한다.
+
+bool IMU_LevelCalibration_Update(IMU_LevelCalibration_t *calibration,
+                                 IMU_Handle_t *imu,
+                                 uint32_t now_ms);                 // 정지 표본으로 Roll·Pitch 영점을 적용한다.
 
 #ifdef __cplusplus
 }

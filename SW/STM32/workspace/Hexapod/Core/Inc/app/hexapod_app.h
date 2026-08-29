@@ -6,6 +6,7 @@
 #include "app/robot_bringup.h"
 #include "communication/jetson_spi.h"
 #include "communication/lora.h"
+#include "communication/manipulator_link.h"
 #include "communication/robot_telemetry.h"
 #include "high_control/body_position_estimator.h"
 #include "high_control/body_posture_controller.h"
@@ -31,10 +32,11 @@
 
 typedef struct
 {
-    UART_HandleTypeDef *gps_uart;       // GPS UART를 연결한다.
-    UART_HandleTypeDef *imu_uart;       // WT931 UART를 연결한다.
-    UART_HandleTypeDef *lora_uart;      // LoRa UART를 연결한다.
-    UART_HandleTypeDef *crsf_uart;      // CRSF UART를 연결한다.
+    UART_HandleTypeDef *gps_uart;          // GPS UART를 연결한다.
+    UART_HandleTypeDef *imu_uart;          // WT931 UART를 연결한다.
+    UART_HandleTypeDef *lora_uart;         // LoRa UART를 연결한다.
+    UART_HandleTypeDef *manipulator_uart;  // 유선 매니퓰레이터 UART를 연결한다.
+    UART_HandleTypeDef *crsf_uart;         // CRSF UART를 연결한다.
     SPI_HandleTypeDef *adc_spi;         // MCP3008 SPI를 연결한다.
     SPI_HandleTypeDef *jetson_spi;      // Jetson SPI를 연결한다.
     TIM_HandleTypeDef *control_timer;   // 1 ms TIM6를 연결한다.
@@ -77,6 +79,7 @@ typedef struct
     Safety_Handle_t safety_control;                    // 복구 없는 Fault Latch를 저장한다.
     ServoPwm_Handle_t servo_pwm;                       // 관절 PWM 출력 상태를 저장한다.
     LoRa_Handle_t lora;                                // LoRa 송수신 상태를 저장한다.
+    ManipulatorLink_Handle_t manipulator;              // 유선 매니퓰레이터 송신 상태를 저장한다.
     RobotTelemetry_Handle_t telemetry;                 // 관제 패킷 주기를 저장한다.
     JetsonSpi_Handle_t jetson;                         // Jetson 32바이트 SPI 프로토콜 상태를 저장한다.
     RobotSensorSnapshot_t sensor_snapshot;             // 최근 실제 센서값을 저장한다.
@@ -89,6 +92,7 @@ typedef struct
     RobotControllerFaultRecord_t controller_fault;    // 최초 제어기 Fault 원인을 저장한다.
     RobotBringupStatus_t bringup;                      // 단계별 출력 허가 상태를 저장한다.
     PressureLoadCalibration_Handle_t pressure_calibration;            // 기립 중 압력 자동 보정 상태를 저장한다.
+    IMU_LevelCalibration_t imu_level_calibration;                      // 부팅 시 Roll·Pitch 영점 측정 상태를 저장한다.
     HexapodApp_StartupZeroState_t startup_zero_state;                  // 서기 전 영점 정렬 상태를 저장한다.
     float startup_initial_angle_rad[ROBOT_JOINT_COUNT];                // 영점 정렬 시작각을 저장한다.
     float startup_command_angle_rad[ROBOT_JOINT_COUNT];                // 영점 정렬 명령각을 저장한다.
@@ -122,6 +126,9 @@ void HexapodApp_UartRxCallback(HexapodApp_Handle_t *handle,
 void HexapodApp_UartErrorCallback(HexapodApp_Handle_t *handle,
                                   UART_HandleTypeDef *uart);  // UART 오류를 해당 드라이버에 전달한다.
 
+void HexapodApp_UartTxCpltCallback(HexapodApp_Handle_t *handle,
+                                   UART_HandleTypeDef *uart);  // UART 송신 완료를 해당 드라이버에 전달한다.
+
 HAL_StatusTypeDef HexapodApp_BoardInit(void);  // 현재 CubeMX Handle로 최종 앱을 시작한다.
 
 void HexapodApp_BoardProcess(void);  // 압력·통신·5 ms 제어 요청을 처리한다.
@@ -131,5 +138,7 @@ void HexapodApp_BoardTimerCallback(TIM_HandleTypeDef *timer);  // 최종 앱에 
 void HexapodApp_BoardUartRxCallback(UART_HandleTypeDef *uart);  // 최종 앱에 UART 수신 완료를 전달한다.
 
 void HexapodApp_BoardUartErrorCallback(UART_HandleTypeDef *uart);  // 최종 앱에 UART 오류를 전달한다.
+
+void HexapodApp_BoardUartTxCpltCallback(UART_HandleTypeDef *uart);  // 최종 앱에 UART 송신 완료를 전달한다.
 
 #endif

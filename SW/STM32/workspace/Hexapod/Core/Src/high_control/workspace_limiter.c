@@ -55,16 +55,16 @@ static bool WorkspaceLimiter_TwistEqual(const RobotBodyTwist_t *first,
            (first->wz == second->wz);  // 네 축 명령을 함께 비교한다.
 }
 
-/* 새 보행 명령의 분산 검사를 시작한다. */
+/* 새 보행 명령의 세 지점 검사를 시작한다. */
 static void WorkspaceLimiter_StartPreview(WorkspaceLimiter_Handle_t *handle,
                                           const RobotBodyTwist_t *candidate,
                                           const RobotGaitPhase_t *gait)
 {
-    handle->gait_pending = *candidate;                         // 25 ms 시점의 후보를 고정한다.
+    handle->gait_pending = *candidate;                         // 착륙 시점의 후보를 고정한다.
     handle->preview_sample = 0U;                               // 첫 경로 지점부터 시작한다.
     handle->preview_swing_mask = gait->next_phase_swing_mask;  // 다음 Tripod 역할을 고정한다.
     handle->preview_startup_phase = gait->next_phase_startup;  // 첫 위상 여부를 저장한다.
-    handle->preview_active = true;                             // 분산 검사를 활성화한다.
+    handle->preview_active = true;                             // 세 지점 검사를 활성화한다.
     handle->phase_result_valid = false;                        // 이전 위상 검사 결과를 제거한다.
     handle->phase_result_accepted = false;                     // 새 후보를 미통과 상태로 둔다.
 }
@@ -77,7 +77,7 @@ static bool WorkspaceLimiter_PreviewPoint(const WorkspaceLimiter_Handle_t *handl
     RobotVec3_t feet[ROBOT_LEG_COUNT];  // 검사할 여섯 발 위치를 저장한다.
     const float progress =
         (float)handle->preview_sample /
-        (float)(ROBOT_GAIT_PREVIEW_SAMPLE_COUNT - 1U);  // 시작·중앙·끝을 포함한 다섯 지점을 만든다.
+        (float)(ROBOT_GAIT_PREVIEW_SAMPLE_COUNT - 1U);  // 시작·중앙·끝 세 지점을 만든다.
     uint32_t leg;  // 계산할 다리 번호를 저장한다.
 
     LegKinematics_GetBaseFeet(base);  // 기본 발 위치를 계산한다.
@@ -167,7 +167,7 @@ bool WorkspaceLimiter_AllFeetValid(const RobotVec3_t feet_body[ROBOT_LEG_COUNT],
     return true;
 }
 
-/* 25 ms 전에 고정한 다음 위상 후보를 다섯 주기에 분산 검사한다. */
+/* 다음 위상 후보의 세 지점을 한 제어 주기에 검사한다. */
 RobotBodyTwist_t WorkspaceLimiter_Gait(WorkspaceLimiter_Handle_t *handle,
                                        const RobotBodyTwist_t *candidate,
                                        bool manual_enable,
@@ -195,34 +195,36 @@ RobotBodyTwist_t WorkspaceLimiter_Gait(WorkspaceLimiter_Handle_t *handle,
     {
         if (gait->next_phase_preview)
         {
-            WorkspaceLimiter_StartPreview(handle, candidate, gait);  // 25 ms 시점의 후보를 검사에 고정한다.
-            *accepted = false;                                       // 다섯 지점 통과 전까지 적용을 보류한다.
+            WorkspaceLimiter_StartPreview(handle, candidate, gait);  // 착륙 시점의 후보를 검사에 고정한다.
+            *accepted = false;                                       // 세 지점 통과 전까지 적용을 보류한다.
         }
 
-        if (handle->preview_active)
+        while (handle->preview_active &&
+               (handle->preview_sample < ROBOT_GAIT_PREVIEW_SAMPLE_COUNT))
         {
             if (!WorkspaceLimiter_PreviewPoint(handle, posture_rad))
             {
-                handle->preview_active = false;        // 위험 지점에서 분산 검사를 종료한다.
+                handle->preview_active = false;        // 위험 지점에서 검사를 종료한다.
                 handle->phase_result_valid = true;     // 검사 실패 결과를 확정한다.
                 handle->phase_result_accepted = false; // 다음 위상 진입을 차단한다.
                 *accepted = false;                     // 직전 유효 명령을 유지한다.
             }
             else
             {
-                handle->preview_sample++;  // 다음 5 ms 검사 지점으로 이동한다.
+                handle->preview_sample++;  // 같은 5 ms 주기의 다음 검사 지점으로 이동한다.
                 *accepted = false;         // 전체 경로 통과 전까지 적용을 보류한다.
-
-                if (handle->preview_sample >= ROBOT_GAIT_PREVIEW_SAMPLE_COUNT)
-                {
-                    handle->gait_applied = handle->gait_pending;  // 검증한 25 ms 시점 후보를 예약한다.
-                    handle->preview_active = false;               // 다섯 지점 검사를 완료한다.
-                    handle->phase_result_valid = true;            // 검사 완료 결과를 확정한다.
-                    handle->phase_result_accepted = true;         // 다음 위상 진입을 허용한다.
-                    *accepted = WorkspaceLimiter_TwistEqual(candidate,
-                                                            &handle->gait_applied);  // 현재 후보 채택 여부를 표시한다.
-                }
             }
+        }
+
+        if (handle->preview_active &&
+            (handle->preview_sample >= ROBOT_GAIT_PREVIEW_SAMPLE_COUNT))
+        {
+            handle->gait_applied = handle->gait_pending;  // 세 지점을 통과한 후보를 예약한다.
+            handle->preview_active = false;               // 한 주기 검사를 완료한다.
+            handle->phase_result_valid = true;            // 검사 완료 결과를 확정한다.
+            handle->phase_result_accepted = true;         // 다음 위상 진입을 허용한다.
+            *accepted = WorkspaceLimiter_TwistEqual(candidate,
+                                                    &handle->gait_applied);  // 현재 후보 채택 여부를 표시한다.
         }
     }
     else

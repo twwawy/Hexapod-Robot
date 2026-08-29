@@ -33,7 +33,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define JETSON_SPI_BRINGUP_TEST  1U
+#define JETSON_SPI_BRINGUP_TEST  0U  // 실제 로봇 제어 앱을 실행한다.
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -960,10 +960,16 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
   HexapodApp_BoardUartRxCallback(huart);  // 해당 UART의 다음 수신을 준비한다.
 }
 
-/* UART 오류를 최종 앱으로 전달한다. */
+/* UART 송수신 오류를 최종 앱으로 전달한다. */
 void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
 {
-  HexapodApp_BoardUartErrorCallback(huart);  // 해당 UART 수신을 복구한다.
+  HexapodApp_BoardUartErrorCallback(huart);  // 해당 UART 송수신을 복구한다.
+}
+
+/* UART 송신 완료를 최종 앱으로 전달한다. */
+void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
+{
+  HexapodApp_BoardUartTxCpltCallback(huart);  // 해당 UART의 다음 송신을 허가한다.
 }
 
 /* 압력·제어 Timer 완료를 최종 앱으로 전달한다. */

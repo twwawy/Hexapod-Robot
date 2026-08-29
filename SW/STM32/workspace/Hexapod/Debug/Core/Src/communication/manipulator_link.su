@@ -1,0 +1,8 @@
+../Core/Src/communication/manipulator_link.c:19:13:ManipulatorLink_WriteI16	24	static
+../Core/Src/communication/manipulator_link.c:28:16:ManipulatorLink_PackSwitches	24	static
+../Core/Src/communication/manipulator_link.c:43:6:ManipulatorLink_Init	16	static
+../Core/Src/communication/manipulator_link.c:56:10:ManipulatorLink_Crc16CcittFalse	32	static
+../Core/Src/communication/manipulator_link.c:85:6:ManipulatorLink_BuildPacket	40	static
+../Core/Src/communication/manipulator_link.c:132:6:ManipulatorLink_Process	32	static
+../Core/Src/communication/manipulator_link.c:177:6:ManipulatorLink_TxCpltCallback	16	static
+../Core/Src/communication/manipulator_link.c:191:6:ManipulatorLink_ErrorCallback	16	static

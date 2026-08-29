@@ -7,16 +7,19 @@
 C_SRCS += \
 ../Core/Src/communication/jetson_spi.c \
 ../Core/Src/communication/lora.c \
+../Core/Src/communication/manipulator_link.c \
 ../Core/Src/communication/robot_telemetry.c 
 
 OBJS += \
 ./Core/Src/communication/jetson_spi.o \
 ./Core/Src/communication/lora.o \
+./Core/Src/communication/manipulator_link.o \
 ./Core/Src/communication/robot_telemetry.o 
 
 C_DEPS += \
 ./Core/Src/communication/jetson_spi.d \
 ./Core/Src/communication/lora.d \
+./Core/Src/communication/manipulator_link.d \
 ./Core/Src/communication/robot_telemetry.d 
 
 
@@ -27,7 +30,7 @@ Core/Src/communication/%.o Core/Src/communication/%.su Core/Src/communication/%.
 clean: clean-Core-2f-Src-2f-communication
 
 clean-Core-2f-Src-2f-communication:
-	-$(RM) ./Core/Src/communication/jetson_spi.cyclo ./Core/Src/communication/jetson_spi.d ./Core/Src/communication/jetson_spi.o ./Core/Src/communication/jetson_spi.su ./Core/Src/communication/lora.cyclo ./Core/Src/communication/lora.d ./Core/Src/communication/lora.o ./Core/Src/communication/lora.su ./Core/Src/communication/robot_telemetry.cyclo ./Core/Src/communication/robot_telemetry.d ./Core/Src/communication/robot_telemetry.o ./Core/Src/communication/robot_telemetry.su
+	-$(RM) ./Core/Src/communication/jetson_spi.cyclo ./Core/Src/communication/jetson_spi.d ./Core/Src/communication/jetson_spi.o ./Core/Src/communication/jetson_spi.su ./Core/Src/communication/lora.cyclo ./Core/Src/communication/lora.d ./Core/Src/communication/lora.o ./Core/Src/communication/lora.su ./Core/Src/communication/manipulator_link.cyclo ./Core/Src/communication/manipulator_link.d ./Core/Src/communication/manipulator_link.o ./Core/Src/communication/manipulator_link.su ./Core/Src/communication/robot_telemetry.cyclo ./Core/Src/communication/robot_telemetry.d ./Core/Src/communication/robot_telemetry.o ./Core/Src/communication/robot_telemetry.su
 
 .PHONY: clean-Core-2f-Src-2f-communication
 

@@ -4,6 +4,7 @@
 "./Core/Src/common/robot_calibration.o"
 "./Core/Src/communication/jetson_spi.o"
 "./Core/Src/communication/lora.o"
+"./Core/Src/communication/manipulator_link.o"
 "./Core/Src/communication/robot_telemetry.o"
 "./Core/Src/high_control/body_position_estimator.o"
 "./Core/Src/high_control/body_posture_controller.o"

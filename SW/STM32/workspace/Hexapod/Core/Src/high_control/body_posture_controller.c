@@ -101,9 +101,10 @@ BodyPostureController_Output_t BodyPostureController_Step(
     candidate = handle->command_rad;   // 직전 정상 자세에서 후보를 시작한다.
     integral_candidate = handle->integral;  // 직전 적분에서 후보를 시작한다.
 
-    if (reset_command || !drone->posture_enable)
+    if (reset_command || drone->stand_enable ||
+        drone->landing_enable || drone->kill_enable)
     {
-        memset(&handle->command_rad, 0, sizeof(handle->command_rad));  // 자세 명령을 제거한다.
+        memset(&handle->command_rad, 0, sizeof(handle->command_rad));  // 명시적 초기화 상태에서 자세 명령을 제거한다.
         memset(&handle->integral, 0, sizeof(handle->integral));        // 자세 적분을 제거한다.
         handle->correction_yaw_base_rad = measured_rad->yaw;           // 현재 Yaw를 보정 기준으로 저장한다.
     }

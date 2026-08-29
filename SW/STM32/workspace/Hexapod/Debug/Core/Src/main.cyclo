@@ -17,5 +17,6 @@
 ../Core/Src/main.c:906:13:MX_GPIO_Init	1
 ../Core/Src/main.c:958:6:HAL_UART_RxCpltCallback	1
 ../Core/Src/main.c:964:6:HAL_UART_ErrorCallback	1
-../Core/Src/main.c:970:6:HAL_TIM_PeriodElapsedCallback	1
-../Core/Src/main.c:981:6:Error_Handler	1
+../Core/Src/main.c:970:6:HAL_UART_TxCpltCallback	1
+../Core/Src/main.c:976:6:HAL_TIM_PeriodElapsedCallback	1
+../Core/Src/main.c:987:6:Error_Handler	1

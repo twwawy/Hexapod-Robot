@@ -44,8 +44,11 @@ void SensorManager_Init(SensorManager_Handle_t *handle,
     FootPressure_Init(&handle->pressure);     // 압력센서 임계값을 준비한다.
 }
 
-/* GPS·WT931·MCP3008의 최신 실제 측정값을 스냅샷으로 만든다. */
-bool SensorManager_Update(SensorManager_Handle_t *handle)
+/* GPS·WT931·MCP3008 측정과 PWM 예측으로 스냅샷을 만든다. */
+bool SensorManager_Update(
+    SensorManager_Handle_t *handle,
+    const float pwm_angle_rad[ROBOT_JOINT_COUNT],
+    bool pwm_valid)
 {
     GPS_Data_t gps_data;   // 최근 GPS 값을 저장한다.
     IMU_Data_t imu_data;   // 최근 IMU 값을 저장한다.
@@ -103,7 +106,13 @@ bool SensorManager_Update(SensorManager_Handle_t *handle)
 
         (void)JointFeedback_Convert(&handle->joints,
                                     handle->snapshot.joint_raw,
-                                    handle->snapshot.joint_angle_rad);       // 관절각을 변환한다.
+                                    handle->snapshot.joint_angle_rad);       // ADC를 보정 관절각으로 변환한다.
+        (void)JointFeedback_UpdateEstimate(
+            &handle->joints,
+            handle->snapshot.joint_angle_rad,
+            pwm_angle_rad,
+            pwm_valid,
+            handle->snapshot.joint_angle_rad);                              // ADC와 PWM을 최종 관절각으로 융합한다.
         SensorManager_UpdateContactState(handle);                            // 접촉과 새 접촉 Latch를 갱신한다.
         handle->snapshot.timestamp_ms = handle->adc.mcu_time_ms;             // 스냅샷 시각을 갱신한다.
     }

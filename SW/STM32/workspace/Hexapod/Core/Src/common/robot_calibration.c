@@ -18,10 +18,15 @@ const RobotCalibration_t g_robot_calibration =
 {
     .imu =
     {
-        .acceleration_sign = {1, 1, 1},        // WT931에서 설정한 X·Y·Z 방향을 그대로 사용한다.
-        .angular_velocity_sign = {1, 1, 1},    // WT931에서 설정한 회전 방향을 그대로 사용한다.
-        .euler_angle_sign = {1, 1, 1},         // 확인한 Roll·Pitch·Yaw 부호를 그대로 사용한다.
-        .euler_offset_rad = {0.0f, 0.0f, 0.0f} // WT931에서 설정한 자세 영점을 그대로 사용한다.
+        .acceleration_sign = {1, 1, 1},      // WT931에서 설정한 X·Y·Z 방향을 그대로 사용한다.
+        .angular_velocity_sign = {1, 1, 1},  // WT931에서 설정한 회전 방향을 그대로 사용한다.
+        .euler_angle_sign = {1, 1, 1},       // 확인한 Roll·Pitch·Yaw 부호를 그대로 사용한다.
+        .euler_offset_rad =
+        {
+            -0.537427843f * ROBOT_DEG_TO_RAD_F,  // 실측한 Roll 영점을 저장한다.
+             3.97391176f * ROBOT_DEG_TO_RAD_F,   // 실측한 Pitch 영점을 저장한다.
+             0.0f                                // Yaw 영점은 기존 값을 유지한다.
+        }
     },
     .imu_calibrated = true,                   // WT931 축·부호·영점 확인 완료를 표시한다.
 

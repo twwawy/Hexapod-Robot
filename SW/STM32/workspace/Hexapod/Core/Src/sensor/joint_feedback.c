@@ -1,6 +1,8 @@
 #include "sensor/joint_feedback.h"
 
+#include <math.h>
 #include <stddef.h>
+#include <string.h>
 
 /* 입력값을 지정한 범위로 제한한다. */
 static float JointFeedback_Clamp(float value, float minimum, float maximum)
@@ -14,6 +16,33 @@ static float JointFeedback_Clamp(float value, float minimum, float maximum)
         return maximum;
     }
     return value;
+}
+
+/* 세 입력의 가운데 값을 선택한다. */
+static float JointFeedback_Median3(float first, float second, float third)
+{
+    float temporary;  // 값 교환에 사용한다.
+
+    if (first > second)
+    {
+        temporary = first;  // 첫 값을 보존한다.
+        first = second;     // 작은 값을 앞으로 옮긴다.
+        second = temporary; // 큰 값을 뒤로 옮긴다.
+    }
+    if (second > third)
+    {
+        temporary = second; // 둘째 값을 보존한다.
+        second = third;     // 작은 값을 가운데로 옮긴다.
+        third = temporary;  // 큰 값을 뒤로 옮긴다.
+    }
+    if (first > second)
+    {
+        temporary = first;  // 첫 값을 보존한다.
+        first = second;     // 작은 값을 앞으로 옮긴다.
+        second = temporary; // 가운데 값을 선택한다.
+    }
+
+    return second;
 }
 
 /* 한 관절의 ADC 값을 관절각으로 변환한다. */
@@ -64,6 +93,7 @@ void JointFeedback_Init(JointFeedback_Handle_t *handle)
         return;
     }
 
+    memset(handle, 0, sizeof(*handle));  // 보정표와 필터 상태를 초기화한다.
     for (joint = 0U; joint < ROBOT_JOINT_COUNT; ++joint)
     {
         handle->table[joint].raw_min = 0U;                         // 임시 ADC 최소값을 넣는다.
@@ -131,5 +161,107 @@ bool JointFeedback_Convert(const JointFeedback_Handle_t *handle,
         }
     }
 
+    return valid;
+}
+
+/* 보정 ADC와 PWM 예측을 결합해 최종 관절각을 갱신한다. */
+bool JointFeedback_UpdateEstimate(
+    JointFeedback_Handle_t *handle,
+    const float measured_angle_rad[ROBOT_JOINT_COUNT],
+    const float pwm_angle_rad[ROBOT_JOINT_COUNT],
+    bool pwm_valid,
+    float estimated_angle_rad[ROBOT_JOINT_COUNT])
+{
+    const float maximum_prediction_step =
+        ROBOT_JOINT_PWM_PREDICTION_RATE_RADPS * ROBOT_CONTROL_PERIOD_S;  // 주기당 PWM 예측 한계를 계산한다.
+    const uint32_t history_index = handle != NULL ?
+        (handle->filter_sample_count % 3U) : 0U;                          // 이번 Median 저장 위치를 계산한다.
+    bool valid = true;                                                   // 전체 입력 유효성을 저장한다.
+    uint32_t joint;                                                       // 갱신할 관절 번호를 저장한다.
+
+    if ((handle == NULL) || (measured_angle_rad == NULL) ||
+        (estimated_angle_rad == NULL) || (pwm_valid && (pwm_angle_rad == NULL)))
+    {
+        return false;
+    }
+
+    if (handle->filter_sample_count == 0U)
+    {
+        for (joint = 0U; joint < ROBOT_JOINT_COUNT; ++joint)
+        {
+            const float measured = isfinite(measured_angle_rad[joint]) ?
+                measured_angle_rad[joint] : 0.0f;  // 첫 비정상 측정은 영점으로 대체한다.
+            uint32_t history;                      // 초기화할 Median 위치를 저장한다.
+
+            valid = valid && isfinite(measured_angle_rad[joint]);  // 첫 측정 유효성을 누적한다.
+            for (history = 0U; history < 3U; ++history)
+            {
+                handle->adc_history_rad[joint][history] = measured;  // 첫 측정으로 Median 창을 채운다.
+            }
+            handle->adc_filtered_rad[joint] = measured;              // 첫 ADC 각도로 저역통과를 시작한다.
+            handle->estimated_angle_rad[joint] = measured;           // 첫 출력은 ADC 절대각으로 시작한다.
+            handle->pwm_prediction_angle_rad[joint] =
+                (pwm_valid && isfinite(pwm_angle_rad[joint])) ?
+                pwm_angle_rad[joint] : measured;                      // 현재 PWM 예측 기준을 맞춘다.
+            estimated_angle_rad[joint] = measured;                    // 초기 추정각을 반환한다.
+        }
+        handle->filter_sample_count = 1U;          // 첫 필터 표본을 기록한다.
+        handle->pwm_prediction_valid = pwm_valid;  // PWM 기준 준비 여부를 기록한다.
+        return valid;
+    }
+
+    for (joint = 0U; joint < ROBOT_JOINT_COUNT; ++joint)
+    {
+        const bool measured_valid = isfinite(measured_angle_rad[joint]);  // ADC 각도 유효성을 검사한다.
+        const float measured = measured_valid ? measured_angle_rad[joint] :
+            handle->adc_filtered_rad[joint];                             // 비정상 ADC는 직전 필터값으로 대체한다.
+        float median;                                                     // Median 3점 결과를 저장한다.
+        float prediction;                                                 // PWM 기반 예측각을 저장한다.
+
+        valid = valid && measured_valid;                                  // ADC 유효성을 누적한다.
+        handle->adc_history_rad[joint][history_index] = measured;          // 최신 보정각을 Median 창에 넣는다.
+        median = JointFeedback_Median3(handle->adc_history_rad[joint][0],
+                                       handle->adc_history_rad[joint][1],
+                                       handle->adc_history_rad[joint][2]); // 단발성 ADC 튐을 제거한다.
+        handle->adc_filtered_rad[joint] +=
+            ROBOT_JOINT_ADC_LPF_ALPHA *
+            (median - handle->adc_filtered_rad[joint]);                   // Median 각도의 잔노이즈를 줄인다.
+        prediction = handle->estimated_angle_rad[joint];                  // 직전 추정각에서 예측을 시작한다.
+
+        if (pwm_valid && isfinite(pwm_angle_rad[joint]))
+        {
+            if (handle->pwm_prediction_valid)
+            {
+                const float prediction_step = JointFeedback_Clamp(
+                    pwm_angle_rad[joint] - handle->pwm_prediction_angle_rad[joint],
+                    -maximum_prediction_step,
+                    maximum_prediction_step);                              // PWM 변화를 서보 속도로 제한한다.
+
+                handle->pwm_prediction_angle_rad[joint] += prediction_step;  // 제한된 PWM 기준각을 갱신한다.
+                prediction += prediction_step;                               // 빠른 명령 변화를 예측각에 반영한다.
+            }
+            else
+            {
+                handle->pwm_prediction_angle_rad[joint] = pwm_angle_rad[joint];  // 새 PWM 기준을 현재 명령에 맞춘다.
+            }
+
+            handle->estimated_angle_rad[joint] = prediction +
+                ROBOT_JOINT_ADC_CORRECTION_GAIN *
+                (handle->adc_filtered_rad[joint] - prediction);             // ADC 절대각으로 예측 오차를 보정한다.
+        }
+        else
+        {
+            handle->estimated_angle_rad[joint] = handle->adc_filtered_rad[joint];  // PWM 없이는 ADC 필터각을 사용한다.
+        }
+
+        handle->estimated_angle_rad[joint] = JointFeedback_Clamp(
+            handle->estimated_angle_rad[joint],
+            ROBOT_JOINT_MIN_RAD,
+            ROBOT_JOINT_MAX_RAD);                                           // 최종 추정각을 관절 범위로 제한한다.
+        estimated_angle_rad[joint] = handle->estimated_angle_rad[joint];     // 이번 추정각을 반환한다.
+    }
+
+    handle->filter_sample_count++;                 // 정상 갱신 시도를 기록한다.
+    handle->pwm_prediction_valid = pwm_valid;       // 다음 주기의 PWM 기준 상태를 기록한다.
     return valid;
 }

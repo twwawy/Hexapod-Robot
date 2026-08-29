@@ -37,7 +37,8 @@ static int16_t UserCommand_Normalize(const UserCommand_ChannelCalibration_t *cal
     if (raw >= calibration->raw_center)
     {
         normalized = ((int32_t)raw - (int32_t)calibration->raw_center) * 1000 /
-                     ((int32_t)calibration->raw_max - (int32_t)calibration->raw_center);  // 양수 구간을 변환한다.
+
+        		((int32_t)calibration->raw_max - (int32_t)calibration->raw_center);  // 양수 구간을 변환한다.
     }
     else
     {

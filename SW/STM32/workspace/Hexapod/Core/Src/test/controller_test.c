@@ -77,5 +77,5 @@ bool ControllerTest_Run(void)
     }
 
     return (fabsf(drone.vx_user_mps - ROBOT_MAX_LINEAR_SPEED_MPS) <= 0.00001f) &&
-           (fabsf(drone.vy_user_mps + ROBOT_MAX_LINEAR_SPEED_MPS) <= 0.00001f);  // X/Y 최대 조종 속도가 설정값과 일치하는지 확인한다.
+           (fabsf(drone.vy_user_mps + ROBOT_MAX_LATERAL_SPEED_MPS) <= 0.00001f);  // X/Y 최대 조종 속도가 설정값과 일치하는지 확인한다.
 }

@@ -19,6 +19,7 @@ extern TIM_HandleTypeDef htim6;   // 1 ms 기준 Timer를 연결한다.
 extern TIM_HandleTypeDef htim8;   // 5번 일부 서보 Timer를 연결한다.
 extern UART_HandleTypeDef huart2; // GPS UART Handle을 연결한다.
 extern UART_HandleTypeDef huart3; // WT931 UART Handle을 연결한다.
+extern UART_HandleTypeDef huart5; // 매니퓰레이터 UART Handle을 연결한다.
 extern UART_HandleTypeDef huart6; // CRSF UART Handle을 연결한다.
 
 HexapodApp_Handle_t g_hexapod_app;              // 최종 앱의 전체 실행 상태를 저장한다.
@@ -509,6 +510,8 @@ HAL_StatusTypeDef HexapodApp_Init(HexapodApp_Handle_t *handle,
             }
         }
     }
+    ManipulatorLink_Init(&handle->manipulator,
+                         hardware->manipulator_uart);  // UART5 유선 매니퓰레이터 송신을 준비한다.
     RobotTelemetry_Init(&handle->telemetry);  // 관제 패킷 주기를 초기화한다.
 
     if (hardware->jetson_spi != NULL)
@@ -525,6 +528,13 @@ HAL_StatusTypeDef HexapodApp_Init(HexapodApp_Handle_t *handle,
     if (status != HAL_OK)
     {
         return status;
+    }
+    IMU_LevelCalibration_Init(&handle->imu_level_calibration,
+                              HAL_GetTick());  // 부팅 자세의 Roll·Pitch 영점 측정을 준비한다.
+    if (ROBOT_IMU_AUTO_LEVEL_ENABLE == 0U)
+    {
+        handle->imu_level_calibration.state =
+            IMU_LEVEL_CALIBRATION_COMPLETE;  // 비활성 설정에서는 중앙 보정표를 그대로 사용한다.
     }
     status = CRSF_Receiver_Start(&handle->crsf_receiver);  // USART6 CRSF 수신을 시작한다.
     if (status != HAL_OK)
@@ -575,6 +585,10 @@ void HexapodApp_Process(HexapodApp_Handle_t *handle)
     UserCommand_UpdateTimeout(&handle->user_command, now_ms);  // 연결 끊김과 중립 재허가를 갱신한다.
     (void)UserCommand_Get(&handle->user_command, &handle->user);  // 안전한 현재 명령을 복사한다.
     HexapodApp_UpdateSimulatedRc(handle, now_ms);                  // 2·3단계이면 실제 CRSF 대신 시험 명령을 넣는다.
+    (void)ManipulatorLink_Process(&handle->manipulator,
+                                  &handle->user,
+                                  handle->priority.active_mode,
+                                  now_ms);  // 최신 조종값을 200 Hz 유선 패킷으로 전송한다.
 
     if ((handle->hardware.lora_uart != NULL) &&
         RobotTelemetry_BuildNext(&handle->telemetry,
@@ -614,8 +628,7 @@ void HexapodApp_Process(HexapodApp_Handle_t *handle)
                                      handle->crsf_protocol.crc_error_count);  // 통신 시간과 CRSF 오류를 기록한다.
 }
 
-/* 센서에서 서보와 릴레이까지 제어 체인을 한 주기 실행한다. */
-/* 새 접촉 다리를 현재 PWM 명령각의 발 위치에 즉시 고정한다. */
+/* 새 접촉 다리를 현재 추정 관절각의 발 위치에 즉시 고정한다. */
 static void HexapodApp_ProcessTouchdownLatch(HexapodApp_Handle_t *handle)
 {
     const uint8_t contact_mask = SensorManager_TakeContactLatch(&handle->sensors);  // 새 접촉 비트를 꺼낸다.
@@ -630,11 +643,6 @@ static void HexapodApp_ProcessTouchdownLatch(HexapodApp_Handle_t *handle)
 
     for (leg = 0U; leg < ROBOT_LEG_COUNT; ++leg)
     {
-        const uint32_t first = leg * ROBOT_JOINTS_PER_LEG;  // 첫 관절 위치를 계산한다.
-        const float *command_angle =
-            &handle->servo_pwm.previous_angle_rad[first];   // 현재 PWM 명령각을 선택한다.
-        RobotVec3_t commanded_foot;                          // 현재 PWM 명령의 FK를 저장한다.
-
         if (((contact_mask & (uint8_t)(1U << leg)) == 0U) ||
             (((handle->gait.state[leg] != ROBOT_LEG_SWING) ||
               (handle->gait.progress[leg] < ROBOT_EARLY_LANDING_PROGRESS)) &&
@@ -643,13 +651,9 @@ static void HexapodApp_ProcessTouchdownLatch(HexapodApp_Handle_t *handle)
             continue;
         }
 
-        if (!LegKinematics_Forward((uint8_t)leg,
-                                   command_angle,
-                                   &commanded_foot) ||
-            !FootTrajectory_LatchTouchdown(&handle->foot_trajectory,
-                                           (uint8_t)leg,
-                                           &commanded_foot,
-                                           &handle->posture_control.command_rad))
+        if (!FootTrajectory_LatchCommandedTouchdown(
+                &handle->foot_trajectory,
+                (uint8_t)leg))  // 접촉 직전 궤적 명령 위치를 고정한다.
         {
             continue;
         }
@@ -686,6 +690,7 @@ static void HexapodApp_ControlStep(HexapodApp_Handle_t *handle)
     bool gait_accepted;                       // 보행 명령 채택 여부를 저장한다.
     bool relay_enable;                        // 모터 전원 허가를 저장한다.
     bool sensor_updated;                      // 관절 초기각 갱신 성공 여부를 저장한다.
+    bool imu_calibration_ready;               // 부팅 IMU 영점 적용 완료를 저장한다.
     uint32_t leg;                             // 다리 계산 번호를 저장한다.
     uint32_t now_ms;                          // 압력 보정 시각을 저장한다.
     uint32_t sensor_start_cycle;              // 센서 구간 시작 Cycle을 저장한다.
@@ -696,10 +701,13 @@ static void HexapodApp_ControlStep(HexapodApp_Handle_t *handle)
 
     now_ms = HAL_GetTick();                                       // 현재 제어 시각을 읽는다.
     sensor_start_cycle = ControlTimingDebug_ReadCycle();          // 센서 구간 시작 시각을 읽는다.
-    sensor_updated = SensorManager_Update(&handle->sensors);      // 실제 센서 스냅샷을 갱신한다.
-    HexapodApp_ProcessTouchdownLatch(handle);                     // 전체 읽기에서 생긴 접촉도 처리한다.
+    sensor_updated = SensorManager_Update(
+        &handle->sensors,
+        handle->servo_pwm.previous_angle_rad,
+        handle->servo_pwm.started && handle->servo_pwm.seeded);   // ADC와 유효한 PWM 명령으로 관절각을 추정한다.
     (void)SensorManager_GetSnapshot(&handle->sensors,
                                     &handle->sensor_snapshot);     // 같은 주기의 센서값을 복사한다.
+    HexapodApp_ProcessTouchdownLatch(handle);                      // 전체 읽기에서 생긴 접촉도 처리한다.
     for (leg = 0U; leg < ROBOT_LEG_COUNT; ++leg)
     {
         if ((handle->touchdown_control_mask & (uint8_t)(1U << leg)) != 0U)
@@ -708,6 +716,26 @@ static void HexapodApp_ControlStep(HexapodApp_Handle_t *handle)
         }
     }
     sensor_end_cycle = ControlTimingDebug_ReadCycle();            // 센서 구간 종료 시각을 읽는다.
+    imu_calibration_ready = (ROBOT_IMU_AUTO_LEVEL_ENABLE == 0U) ||
+        IMU_LevelCalibration_Update(&handle->imu_level_calibration,
+                                    &handle->imu,
+                                    now_ms);                        // 정지 자세에서 Roll·Pitch 영점을 적용한다.
+    if (!imu_calibration_ready)
+    {
+        handle->touchdown_control_mask = 0U;                        // 보정 대기 중 접촉 이력을 제거한다.
+        Relay_AllOff();                                             // 영점 확정 전 서보 전원을 차단한다.
+        handle->bringup.relay_enabled = false;                      // 실제 출력 차단 상태를 표시한다.
+        handle->control_count++;                                    // 완료한 센서 전용 주기를 기록한다.
+        output_end_cycle = ControlTimingDebug_ReadCycle();          // 보정 대기 주기 종료 시각을 읽는다.
+        ControlTimingDebug_RecordBreakdown(sensor_end_cycle - sensor_start_cycle,
+                                           0U,
+                                           output_end_cycle - sensor_end_cycle);  // 센서와 영점 검사 시간을 기록한다.
+        return;
+    }
+    handle->sensor_snapshot.imu.attitude_rad.roll =
+        handle->imu.data.euler_angle_rad[0];                        // 새 Roll 영점을 현재 스냅샷에 반영한다.
+    handle->sensor_snapshot.imu.attitude_rad.pitch =
+        handle->imu.data.euler_angle_rad[1];                        // 새 Pitch 영점을 현재 스냅샷에 반영한다.
     handle->safety = Safety_EvaluateImu(
         &handle->safety_control,
         &handle->sensor_snapshot.imu);                            // 현재 자세 Fault를 먼저 평가한다.
@@ -743,10 +771,10 @@ static void HexapodApp_ControlStep(HexapodApp_Handle_t *handle)
     HexapodApp_LimitDroneCommand(handle, &handle->drone);                          // 현재 단계의 최대 속도를 적용한다.
     position = BodyPositionEstimator_Step(
         &handle->position_estimator,
-        handle->servo_pwm.previous_angle_rad,
+        handle->sensor_snapshot.joint_angle_rad,
         &handle->gait,
         handle->sensor_snapshot.foot_contact,
-        &handle->sensor_snapshot.imu.attitude_rad);                 // 직전 서보 명령각으로 Stance FK를 계산한다.
+        &handle->sensor_snapshot.imu.attitude_rad);                 // 추정 관절각으로 Stance FK를 계산한다.
     gait_pose = GaitPoseController_Step(
         &handle->gait_pose_control,
         handle->drone.reset_command,
@@ -769,7 +797,7 @@ static void HexapodApp_ControlStep(HexapodApp_Handle_t *handle)
         &handle->gait,
         (ROBOT_COMMON_Z_RECOVERY_ENABLE != 0U) &&
         handle->drone.manual_enable &&
-        (handle->drone.tripod_mode == ROBOT_TRIPOD_NORMAL));  // 활성 시 접촉 확인 후 첫 PWM 명령의 공통 Z 오차를 수집한다.
+        (handle->drone.tripod_mode == ROBOT_TRIPOD_NORMAL));  // 활성 시 확정 접촉의 공통 Z 오차를 수집한다.
     handle->touchdown_control_mask = 0U;  // Gait가 소비한 접촉 Latch를 비운다.
     twist = WorkspaceLimiter_Gait(&handle->workspace_limiter,
                                   &gait_pose.twist,
@@ -844,6 +872,13 @@ static void HexapodApp_ControlStep(HexapodApp_Handle_t *handle)
                                      &handle->sensor_snapshot.imu,
                                      handle->joints.ik_valid);        // 현재 IK 실패의 연속 횟수를 평가한다.
 
+    if (handle->priority.active_mode == ROBOT_MODE_ARM)
+    {
+        memcpy(handle->joints.angle_rad,
+               handle->servo_pwm.previous_angle_rad,
+               sizeof(handle->joints.angle_rad));  // ARM 진입 직전 18개 관절 명령을 유지한다.
+    }
+
     if (handle->bringup.neutral_output_active)
     {
         memset(handle->joints.angle_rad, 0,
@@ -862,10 +897,11 @@ static void HexapodApp_ControlStep(HexapodApp_Handle_t *handle)
                     handle->user.motion_armed) ||
                    ((ROBOT_BRINGUP_STAGE >= 3U) &&
                     ((handle->priority.active_mode == ROBOT_MODE_STAND) ||
-                     (handle->priority.active_mode == ROBOT_MODE_READY) ||
-                     (handle->priority.active_mode == ROBOT_MODE_MANUAL) ||
-                     (handle->priority.active_mode == ROBOT_MODE_CORRECTION) ||
-                     ((handle->priority.active_mode == ROBOT_MODE_LANDING) &&
+                      (handle->priority.active_mode == ROBOT_MODE_READY) ||
+                      (handle->priority.active_mode == ROBOT_MODE_MANUAL) ||
+                      (handle->priority.active_mode == ROBOT_MODE_CORRECTION) ||
+                      (handle->priority.active_mode == ROBOT_MODE_ARM) ||
+                      ((handle->priority.active_mode == ROBOT_MODE_LANDING) &&
                       !handle->drone.landing_done)));                  // 연결 확인 후 현재 단계가 허용한 동작에서만 전원을 요청한다.
     relay_enable = relay_enable &&
                    !handle->safety.rollover_fault &&
@@ -952,7 +988,7 @@ void HexapodApp_UartRxCallback(HexapodApp_Handle_t *handle,
     CRSF_Receiver_RxCpltCallback(&handle->crsf_receiver, uart);// CRSF UART이면 다음 수신을 건다.
 }
 
-/* UART 오류를 네 개 실제 통신 드라이버에 전달한다. */
+/* UART 오류를 다섯 개 실제 통신 드라이버에 전달한다. */
 void HexapodApp_UartErrorCallback(HexapodApp_Handle_t *handle,
                                   UART_HandleTypeDef *uart)
 {
@@ -964,7 +1000,20 @@ void HexapodApp_UartErrorCallback(HexapodApp_Handle_t *handle,
     GPS_ErrorCallback(&handle->gps, uart);                     // GPS 오류를 복구한다.
     IMU_ErrorCallback(&handle->imu, uart);                     // WT931 오류를 복구한다.
     LoRa_ErrorCallback(&handle->lora, uart);                   // LoRa 오류를 복구한다.
+    ManipulatorLink_ErrorCallback(&handle->manipulator, uart);  // 매니퓰레이터 송신 오류를 복구한다.
     CRSF_Receiver_ErrorCallback(&handle->crsf_receiver, uart); // CRSF 오류를 복구한다.
+}
+
+/* UART 송신 완료를 유선 매니퓰레이터 드라이버에 전달한다. */
+void HexapodApp_UartTxCpltCallback(HexapodApp_Handle_t *handle,
+                                   UART_HandleTypeDef *uart)
+{
+    if (handle == NULL)
+    {
+        return;
+    }
+
+    ManipulatorLink_TxCpltCallback(&handle->manipulator, uart);  // UART5이면 다음 송신을 허가한다.
 }
 
 /* 현재 CubeMX Handle을 최종 앱 장치에 연결한다. */
@@ -975,6 +1024,7 @@ HAL_StatusTypeDef HexapodApp_BoardInit(void)
     hardware.gps_uart = &huart2;           // GPS를 USART2에 연결한다.
     hardware.imu_uart = &huart3;           // WT931을 USART3에 연결한다.
     hardware.lora_uart = NULL;             // 실기 검증 전 LoRa를 비활성화한다.
+    hardware.manipulator_uart = &huart5;   // 기존 LoRa 포트를 유선 매니퓰레이터 TX로 사용한다.
     hardware.crsf_uart = &huart6;          // CRSF를 USART6에 연결한다.
     hardware.adc_spi = &hspi1;             // MCP3008을 SPI1에 연결한다.
     hardware.jetson_spi = &hspi2;          // Jetson 32바이트 SPI2 Slave 통신을 활성화한다.
@@ -1013,4 +1063,10 @@ void HexapodApp_BoardUartRxCallback(UART_HandleTypeDef *uart)
 void HexapodApp_BoardUartErrorCallback(UART_HandleTypeDef *uart)
 {
     HexapodApp_UartErrorCallback(&g_hexapod_app, uart);  // 해당 UART 드라이버의 수신을 복구한다.
+}
+
+/* 보드 UART 송신 완료를 최종 앱으로 전달한다. */
+void HexapodApp_BoardUartTxCpltCallback(UART_HandleTypeDef *uart)
+{
+    HexapodApp_UartTxCpltCallback(&g_hexapod_app, uart);  // 해당 UART 드라이버의 다음 송신을 허가한다.
 }

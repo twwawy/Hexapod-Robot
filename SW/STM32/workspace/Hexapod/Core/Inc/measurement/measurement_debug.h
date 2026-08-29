@@ -44,6 +44,10 @@ typedef struct
 
     float imu_euler_current_rad[3];                                    // WT931 최근 자세값을 rad로 저장한다.
     float imu_euler_current_deg[3];                                    // WT931 최근 자세값을 deg로 저장한다.
+    float imu_euler_offset_rad[3];                                     // 자동 측정한 자세 Offset을 rad로 저장한다.
+    float imu_euler_offset_deg[3];                                     // 자동 측정한 자세 Offset을 deg로 저장한다.
+    uint32_t imu_calibration_sample_count;                             // 누적한 정지 자세 표본 수를 저장한다.
+    uint8_t imu_calibration_state;                                     // 자동 영점 보정 상태를 저장한다.
     bool imu_axis_confirmed[3];                                        // Roll·Pitch·Yaw 방향 확인을 저장한다.
     bool imu_check_complete;                                           // WT931 최종 확인 완료를 저장한다.
 

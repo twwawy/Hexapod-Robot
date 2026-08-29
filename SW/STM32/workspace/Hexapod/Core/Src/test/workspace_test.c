@@ -20,7 +20,6 @@ bool WorkspaceTest_Run(void)
     RobotVec3_t limited;                          // 최종 제한 발 위치를 저장한다.
     bool accepted;                                // 보행 채택 여부를 저장한다.
     bool was_limited;                             // 발 제한 여부를 저장한다.
-    uint32_t leg;                                 // 준비할 다리 번호를 저장한다.
 
     WorkspaceLimiter_Init(&limiter);       // 직전 명령을 0으로 준비한다.
     gait.enabled_internal = true;          // 정상 보행 상태를 활성화한다.
@@ -29,20 +28,9 @@ bool WorkspaceTest_Run(void)
     gait.next_phase_swing_mask = 0x15U;    // 1·3·5번 다리를 Swing으로 둔다.
     candidate.vx = 0.01f;                  // 안전한 전진 후보를 넣는다.
 
-    for (leg = 0U; leg < ROBOT_GAIT_PREVIEW_SAMPLE_COUNT; ++leg)
-    {
-        applied = WorkspaceLimiter_Gait(&limiter, &candidate, true,
-                                        &gait, &posture, false,
-                                        &accepted);  // 5 ms마다 다음 경로 한 점을 검사한다.
-        gait.next_phase_preview = false;             // 검사 시작 신호를 한 번만 유지한다.
-        if ((leg + 1U) < ROBOT_GAIT_PREVIEW_SAMPLE_COUNT)
-        {
-            if (accepted || limiter.phase_result_valid || (applied.vx != 0.0f))
-            {
-                return false;
-            }
-        }
-    }
+    applied = WorkspaceLimiter_Gait(&limiter, &candidate, true,
+                                    &gait, &posture, false,
+                                    &accepted);  // 한 5 ms 주기에서 시작·중앙·끝을 검사한다.
     if (!accepted || !limiter.phase_result_valid ||
         !limiter.phase_result_accepted ||
         (fabsf(applied.vx - candidate.vx) > 1.0e-6f) ||
@@ -57,16 +45,8 @@ bool WorkspaceTest_Run(void)
     candidate.vx = ROBOT_MAX_LINEAR_SPEED_MPS;  // 최대 전진 후보를 넣는다.
     applied = WorkspaceLimiter_Gait(&limiter, &candidate, true,
                                     &gait, &posture, false,
-                                    &accepted);  // 첫 경로 지점과 속도를 고정한다.
-    gait.next_phase_preview = false;  // 남은 검사에서 새 입력 고정을 막는다.
-    candidate.vx = 0.03f;             // 검사 중 들어온 최신 입력을 넣는다.
-    for (leg = 1U; leg < ROBOT_GAIT_PREVIEW_SAMPLE_COUNT; ++leg)
-    {
-        applied = WorkspaceLimiter_Gait(&limiter, &candidate, true,
-                                        &gait, &posture, false,
-                                        &accepted);  // 고정 후보의 남은 네 지점을 검사한다.
-    }
-    if (accepted || !limiter.phase_result_accepted ||
+                                    &accepted);  // 최대 후보의 세 지점을 한 주기에 검사한다.
+    if (!accepted || !limiter.phase_result_accepted ||
         (fabsf(applied.vx - ROBOT_MAX_LINEAR_SPEED_MPS) > 1.0e-6f) ||
         (fabsf(limiter.gait_pending.vx - ROBOT_MAX_LINEAR_SPEED_MPS) > 1.0e-6f))
     {

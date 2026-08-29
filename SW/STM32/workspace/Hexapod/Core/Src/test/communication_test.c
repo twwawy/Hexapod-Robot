@@ -1,6 +1,7 @@
 #include "test/communication_test.h"
 
 #include "communication/jetson_spi.h"
+#include "communication/manipulator_link.h"
 #include "communication/robot_telemetry.h"
 
 #include <string.h>
@@ -14,7 +15,9 @@ bool CommunicationTest_Run(void)
     JetsonSpi_Handle_t jetson;                          // 비초기화 SPI 상태를 저장한다.
     JetsonSpi_ParsedPacket_t parsed;                    // SPI 파싱 결과를 저장한다.
     JetsonSpi_CommandFrame_t command;                   // 명령 전용 파싱 결과를 저장한다.
+    RobotUserCommand_t user;                            // 매니퓰레이터 패킷 조종값을 저장한다.
     uint8_t spi_frame[JETSON_SPI_FRAME_SIZE];           // CRC 시험 패킷을 저장한다.
+    uint8_t manipulator_packet[MANIPULATOR_PACKET_SIZE];  // 유선 조종 패킷을 저장한다.
     uint16_t crc;                                       // 시험 패킷 CRC를 저장한다.
     char text[ROBOT_TELEMETRY_MAX_TEXT + 1U];           // 생성한 패킷을 저장한다.
 
@@ -30,6 +33,7 @@ bool CommunicationTest_Run(void)
     memset(&sensor, 0, sizeof(sensor));  // 관제 센서 입력을 0으로 준비한다.
     memset(&safety, 0, sizeof(safety));  // 정상 Safety 입력을 준비한다.
     memset(&jetson, 0, sizeof(jetson));  // 비초기화 SPI Handle을 준비한다.
+    memset(&user, 0, sizeof(user));      // 매니퓰레이터 조종값을 0으로 준비한다.
     memset(spi_frame, 0, sizeof(spi_frame));  // SPI 시험 패킷을 0으로 준비한다.
     RobotTelemetry_Init(&telemetry);     // 패킷 주기를 초기화한다.
     if (RobotTelemetry_BuildNext(&telemetry, 999U, ROBOT_MODE_READY,
@@ -80,6 +84,56 @@ bool CommunicationTest_Run(void)
     if (JetsonSpi_ParseFrame(spi_frame, &parsed))
     {
         return false;
+    }
+
+    user.roll = -1000;           // 음수 Roll의 Little-endian 저장을 검사한다.
+    user.pitch = 1000;           // 양수 Pitch의 Little-endian 저장을 검사한다.
+    user.throttle = -321;        // 음수 Throttle 저장을 검사한다.
+    user.yaw = 456;              // 양수 Yaw 저장을 검사한다.
+    user.sa = 1U;                // 그리퍼 놓기 명령을 선택한다.
+    user.sb = 2U;                // SB 끝 위치를 선택한다.
+    user.sc = 1U;                // SC ARM 모드를 선택한다.
+    user.sd = 0U;                // SD Kill을 해제한다.
+    user.s1 = 1U;                // S1 두 번째 기능을 선택한다.
+    user.connected = true;       // 조종기 연결을 표시한다.
+    user.motion_armed = true;    // 조종 입력 허가를 표시한다.
+
+    if (!ManipulatorLink_BuildPacket(manipulator_packet,
+                                     0x34U,
+                                     &user,
+                                     ROBOT_MODE_ARM) ||
+        (manipulator_packet[0] != 0xA5U) ||
+        (manipulator_packet[1] != 0x5AU) ||
+        (manipulator_packet[4] != 0x07U) ||
+        (manipulator_packet[5] != 0x8DU) ||
+        (manipulator_packet[6] != 0x18U) ||
+        (manipulator_packet[7] != 0xFCU) ||
+        (manipulator_packet[14] != 0x6CU) ||
+        (manipulator_packet[15] != 0x1CU))
+    {
+        return false;  // 고정 패킷 배치와 알려진 CRC 값을 확인한다.
+    }
+
+    user.sa = 0U;  // 그리퍼 잡기 명령을 선택한다.
+    if (!ManipulatorLink_BuildPacket(manipulator_packet,
+                                     0x35U,
+                                     &user,
+                                     ROBOT_MODE_ARM) ||
+        (manipulator_packet[4] != 0x07U) ||
+        ((manipulator_packet[5] & 0x01U) != 0U))
+    {
+        return false;  // SA 잡기 명령이 ARM 허가를 해제하지 않는지 확인한다.
+    }
+
+    user.sd = 1U;  // SD Kill을 활성화한다.
+    if (!ManipulatorLink_BuildPacket(manipulator_packet,
+                                     0x36U,
+                                     &user,
+                                     ROBOT_MODE_ARM) ||
+        (manipulator_packet[4] != 0x03U) ||
+        (manipulator_packet[5] != 0xACU))
+    {
+        return false;  // Kill 상태가 ARM 허가를 제거하는지 확인한다.
     }
 
     return !JetsonSpi_Process(&jetson);  // 준비되지 않은 SPI 전송을 거부하는지 확인한다.

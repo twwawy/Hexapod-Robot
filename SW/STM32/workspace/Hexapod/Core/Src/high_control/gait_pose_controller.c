@@ -149,8 +149,8 @@ GaitPoseController_Output_t GaitPoseController_Step(
                 ROBOT_MAX_LINEAR_SPEED_MPS);  // X속도 후보를 계산한다.
             output.twist.vy = GaitPoseController_Clamp(
                 drone->vy_user_mps + feedback_y_body,
-                -ROBOT_MAX_LINEAR_SPEED_MPS,
-                ROBOT_MAX_LINEAR_SPEED_MPS);  // Y속도 후보를 계산한다.
+                -ROBOT_MAX_LATERAL_SPEED_MPS,
+                ROBOT_MAX_LATERAL_SPEED_MPS);  // Y속도 후보를 계산한다.
             output.twist.wz = GaitPoseController_Clamp(
                 drone->wz_user_radps + output.yaw_feedback_radps,
                 -ROBOT_MAX_YAW_RATE_RADPS,
@@ -163,8 +163,8 @@ GaitPoseController_Output_t GaitPoseController_Step(
                                                    -ROBOT_MAX_LINEAR_SPEED_MPS,
                                                    ROBOT_MAX_LINEAR_SPEED_MPS);  // 보정 X속도를 전달한다.
         output.twist.vy = GaitPoseController_Clamp(drone->correction_velocity_mps.y,
-                                                   -ROBOT_MAX_LINEAR_SPEED_MPS,
-                                                   ROBOT_MAX_LINEAR_SPEED_MPS);  // 보정 Y속도를 전달한다.
+                                                   -ROBOT_MAX_LATERAL_SPEED_MPS,
+                                                   ROBOT_MAX_LATERAL_SPEED_MPS);  // 보정 Y속도를 전달한다.
         output.twist.vz = GaitPoseController_Clamp(drone->correction_velocity_mps.z,
                                                    -ROBOT_MAX_CORRECTION_SPEED_MPS,
                                                    ROBOT_MAX_CORRECTION_SPEED_MPS);  // 보정 Z속도를 전달한다.

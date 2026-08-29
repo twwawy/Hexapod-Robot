@@ -102,8 +102,6 @@ RobotGaitPhase_t GaitManager_StepContacts(
         {
             handle->initialized = false;       // 수동 모드 밖에서 정상 위상을 초기화한다.
             handle->phase_index = 0U;          // 다음 수동 진입을 첫 Tripod로 준비한다.
-            handle->start_wait_count = 0U;     // 첫 보행 대기 시간을 제거한다.
-            handle->start_preview_count = 0U;  // 첫 위상 검사 시간을 제거한다.
             handle->phase_cycle_count = 0U;    // 현재 위상 주기를 제거한다.
             handle->phase_time_s = 0.0f;       // 진행 중인 위상 시간을 제거한다.
             handle->run_enable = false;        // 내부 보행을 비활성화한다.
@@ -116,6 +114,7 @@ RobotGaitPhase_t GaitManager_StepContacts(
             handle->support_recovery_active = false;  // 지지발 재착지 상태를 제거한다.
 
             memset(handle->airborne_seen, 0, sizeof(handle->airborne_seen));  // 비접촉 이력을 제거한다.
+            memset(handle->touchdown_seen, 0, sizeof(handle->touchdown_seen));  // 첫 접촉 이력을 제거한다.
             memset(handle->landed, 0, sizeof(handle->landed));                // 착지 이력을 제거한다.
         }
         else if (handle->late_landing_hold)
@@ -134,8 +133,6 @@ RobotGaitPhase_t GaitManager_StepContacts(
                 {
                     handle->phase_index = 0U;   // 최초 보행은 1·3·5 Swing부터 시작한다.
                 }
-                handle->start_wait_count = 0U;     // 첫 명령 안정 대기를 시작한다.
-                handle->start_preview_count = 0U;  // 첫 위상 검사를 준비한다.
                 handle->phase_cycle_count = 0U;    // 첫 위상 주기를 초기화한다.
                 handle->phase_time_s = 0.0f;       // 위상 시간을 초기화한다.
                 handle->next_phase_enable = false; // 확정 전 Enable을 초기화한다.
@@ -143,6 +140,7 @@ RobotGaitPhase_t GaitManager_StepContacts(
                 handle->support_recovery_mask = 0U;       // 이전 재착지 대상을 제거한다.
                 handle->support_recovery_active = false;  // 새 보행의 재착지를 준비한다.
                 memset(handle->airborne_seen, 0, sizeof(handle->airborne_seen));  // 비접촉 이력을 제거한다.
+                memset(handle->touchdown_seen, 0, sizeof(handle->touchdown_seen));  // 첫 접촉 이력을 제거한다.
                 memset(handle->landed, 0, sizeof(handle->landed));                // 착지 이력을 제거한다.
             }
 
@@ -152,8 +150,6 @@ RobotGaitPhase_t GaitManager_StepContacts(
                  !handle->next_phase_locked)
         {
             handle->run_enable = false;        // 확정 전 해제된 첫 보행을 취소한다.
-            handle->start_wait_count = 0U;     // 다음 시작 대기를 초기화한다.
-            handle->start_preview_count = 0U;  // 미완료 검사를 제거한다.
             handle->phase_cycle_count = 0U;    // 사용하지 않은 위상 주기를 제거한다.
             handle->phase_time_s = 0.0f;       // 사용하지 않은 위상 시간을 제거한다.
             handle->stop_pending = false;      // 실행되지 않은 정지 예약을 제거한다.
@@ -167,8 +163,6 @@ RobotGaitPhase_t GaitManager_StepContacts(
         else
         {
             handle->initialized = false;       // 정지 중 위상 시간만 초기화한다.
-            handle->start_wait_count = 0U;     // 다음 시작 대기를 준비한다.
-            handle->start_preview_count = 0U;  // 다음 첫 위상 검사를 준비한다.
             handle->phase_cycle_count = 0U;    // 정지 중 위상 주기를 제거한다.
             handle->phase_time_s = 0.0f;       // 정지 중 위상 시간을 제거한다.
             handle->stop_pending = false;      // 완료한 정지 예약을 제거한다.
@@ -178,6 +172,7 @@ RobotGaitPhase_t GaitManager_StepContacts(
             handle->support_recovery_active = false;  // 정지 중 재착지를 비활성화한다.
 
             memset(handle->airborne_seen, 0, sizeof(handle->airborne_seen));  // 비접촉 이력을 제거한다.
+            memset(handle->touchdown_seen, 0, sizeof(handle->touchdown_seen));  // 첫 접촉 이력을 제거한다.
             memset(handle->landed, 0, sizeof(handle->landed));                // 착지 이력을 제거한다.
         }
     }
@@ -185,8 +180,6 @@ RobotGaitPhase_t GaitManager_StepContacts(
     {
         handle->initialized = false;       // 특수 착지에서 정상 위상을 초기화한다.
         handle->phase_index = 0U;          // 다음 정상 보행을 최초 그룹으로 준비한다.
-        handle->start_wait_count = 0U;     // 첫 보행 대기 시간을 제거한다.
-        handle->start_preview_count = 0U;  // 첫 위상 검사 시간을 제거한다.
         handle->phase_cycle_count = 0U;    // 정상 위상 주기를 제거한다.
         handle->phase_time_s = 0.0f;       // 정상 위상 시간을 제거한다.
         handle->run_enable = false;        // 정상 보행을 비활성화한다.
@@ -198,6 +191,7 @@ RobotGaitPhase_t GaitManager_StepContacts(
         handle->support_recovery_active = false;  // 특수 모드에서 재착지를 비활성화한다.
 
         memset(handle->airborne_seen, 0, sizeof(handle->airborne_seen));  // 비접촉 이력을 제거한다.
+        memset(handle->touchdown_seen, 0, sizeof(handle->touchdown_seen));  // 첫 접촉 이력을 제거한다.
         memset(handle->landed, 0, sizeof(handle->landed));                // 착지 이력을 제거한다.
     }
 
@@ -206,29 +200,16 @@ RobotGaitPhase_t GaitManager_StepContacts(
         float progress;             // 현재 위상 진행률을 저장한다.
         bool all_swing_landed = true;  // Swing 그룹 전체 착지를 저장한다.
 
-        if (!handle->initialized &&
-            (handle->start_wait_count < ROBOT_GAIT_START_DELAY_CYCLES))
+        if (!handle->initialized && !handle->next_phase_locked)
         {
-            handle->start_wait_count++;  // 첫 짐벌 입력이 안정될 때까지 기다린다.
+            handle->next_phase_enable = tripod_enable;  // 현재 보행 Enable을 시작 명령으로 고정한다.
+            handle->next_phase_locked = true;            // 첫 위상 검사 요청을 표시한다.
+            output.next_phase_preview = true;            // 첫 위상 세 지점 검사를 요청한다.
+            output.next_phase_startup = !handle->resume_phase;  // 최초 반 보폭 여부를 전달한다.
+            output.next_phase_swing_mask =
+                GaitManager_SwingMask(handle->phase_index);  // 시작할 Tripod 그룹을 전달한다.
             output.startup_phase = !handle->resume_phase;  // 최초 보행의 반 보폭 여부를 유지한다.
-            output.waiting_start = true;                   // 대기 중 현재 발 위치를 고정한다.
-        }
-        else if (!handle->initialized &&
-                 (handle->start_preview_count < ROBOT_GAIT_PREVIEW_SAMPLE_COUNT))
-        {
-            if (handle->start_preview_count == 0U)
-            {
-                handle->next_phase_enable = tripod_enable;  // 0.1초 시점의 보행 Enable을 확정한다.
-                handle->next_phase_locked = true;            // 첫 위상 명령 확정을 표시한다.
-                output.next_phase_preview = true;            // 첫 위상 분산 검사를 시작한다.
-                output.next_phase_startup = !handle->resume_phase;  // 최초 반 보폭 여부를 전달한다.
-                output.next_phase_swing_mask =
-                    GaitManager_SwingMask(handle->phase_index);  // 시작할 Tripod 그룹을 전달한다.
-            }
-
-            handle->start_preview_count++;            // 다섯 검사 주기를 진행한다.
-            output.startup_phase = !handle->resume_phase;  // 첫 위상 종류를 유지한다.
-            output.waiting_start = true;                   // 검사 중 서보 목표를 고정한다.
+            output.waiting_start = true;                   // 한 제어 주기 검사 중 발 목표를 고정한다.
         }
         else if (!handle->initialized &&
                  (!phase_validation_done || !phase_validation_accepted))
@@ -236,8 +217,6 @@ RobotGaitPhase_t GaitManager_StepContacts(
             if (phase_validation_done)
             {
                 handle->run_enable = false;        // 첫 경로가 위험하면 보행을 시작하지 않는다.
-                handle->start_wait_count = 0U;     // 다음 시작 대기를 준비한다.
-                handle->start_preview_count = 0U;  // 실패한 검사 시간을 제거한다.
                 handle->next_phase_enable = false; // 실패한 Enable 결정을 제거한다.
                 handle->next_phase_locked = false; // 다음 첫 위상 검사를 준비한다.
             }
@@ -251,7 +230,7 @@ RobotGaitPhase_t GaitManager_StepContacts(
         {
             if (!handle->initialized)
             {
-                handle->initialized = true;  // 대기 후 정상 위상을 활성화한다.
+                handle->initialized = true;  // 세 지점 검사 후 정상 위상을 활성화한다.
                 if (!handle->resume_phase)
                 {
                     handle->phase_index = 0U;  // 최초 보행 위상을 선택한다.
@@ -259,7 +238,7 @@ RobotGaitPhase_t GaitManager_StepContacts(
                 handle->phase_cycle_count = 0U;    // 첫 위상 주기를 초기화한다.
                 handle->phase_time_s = 0.0f;       // 첫 위상 시간을 초기화한다.
                 handle->next_phase_enable = false; // 다음 위상 Enable을 준비한다.
-                handle->next_phase_locked = false; // 다음 25 ms 확정을 준비한다.
+                handle->next_phase_locked = false; // 다음 착륙 검사를 준비한다.
                 handle->support_recovery_mask = 0U;       // 첫 위상의 재착지 대상을 비운다.
                 handle->support_recovery_active = false;  // 첫 위상의 재착지를 대기 상태로 둔다.
             }
@@ -324,23 +303,6 @@ RobotGaitPhase_t GaitManager_StepContacts(
             }
             else
             {
-                if (!handle->next_phase_locked &&
-                    (handle->phase_cycle_count >=
-                     ((uint32_t)(ROBOT_GAIT_PHASE_TIME_S /
-                                 ROBOT_CONTROL_PERIOD_S) -
-                      ROBOT_GAIT_PREVIEW_SAMPLE_COUNT)))
-                {
-                    handle->next_phase_enable = tripod_enable;  // 종료 25 ms 전 Enable을 확정한다.
-                    handle->next_phase_locked = true;            // 현재 위상의 결정을 고정한다.
-                    if (handle->next_phase_enable)
-                    {
-                        output.next_phase_preview = true;             // 다음 위상 검사를 시작한다.
-                        output.next_phase_startup = false;             // 반복 위상 전체 보폭을 선택한다.
-                        output.next_phase_swing_mask =
-                            GaitManager_SwingMask(handle->phase_index + 1U);  // 반대 Tripod 그룹을 전달한다.
-                    }
-                }
-
                 for (leg = 0U; leg < ROBOT_LEG_COUNT; ++leg)
                 {
                     if (!GaitManager_IsSwingLeg(handle->phase_index, leg))
@@ -351,6 +313,13 @@ RobotGaitPhase_t GaitManager_StepContacts(
                     if (!contact[leg])
                     {
                         handle->airborne_seen[leg] = true;  // 확정 비접촉을 확인한다.
+                    }
+
+                    if ((handle->airborne_seen[leg] || handle->stop_pending) &&
+                        contact_raw[leg] &&
+                        (progress >= ROBOT_EARLY_LANDING_PROGRESS))
+                    {
+                        handle->touchdown_seen[leg] = true;  // 첫 접촉 뒤 Swing 재상승을 금지한다.
                     }
 
                     if ((handle->airborne_seen[leg] || handle->stop_pending) &&
@@ -365,31 +334,53 @@ RobotGaitPhase_t GaitManager_StepContacts(
                     }
                 }
 
-                if ((progress >= 1.0f) && all_swing_landed)
+                if (all_swing_landed &&
+                    GaitManager_AllMaskContact(
+                        (uint8_t)((1U << ROBOT_LEG_COUNT) - 1U), contact))
                 {
-                    if (!handle->next_phase_enable ||
-                        (phase_validation_done && !phase_validation_accepted))
+                    bool preview_started = false;  // 이번 주기의 새 검사 요청 여부를 저장한다.
+
+                    if (!handle->next_phase_locked)
                     {
-                        handle->run_enable = false;         // 25 ms 전 0 또는 검사 실패면 착지 후 정지한다.
+                        handle->next_phase_enable = tripod_enable;  // 여섯 발 착륙 시점의 Enable을 고정한다.
+                        handle->next_phase_locked = true;            // 다음 위상 결정을 고정한다.
+                        preview_started = handle->next_phase_enable; // 활성 명령에서 새 검사를 표시한다.
+                        if (preview_started)
+                        {
+                            output.next_phase_preview = true;             // 다음 위상 세 지점 검사를 요청한다.
+                            output.next_phase_startup = false;             // 반복 위상 전체 보폭을 선택한다.
+                            output.next_phase_swing_mask =
+                                GaitManager_SwingMask(handle->phase_index + 1U);  // 반대 Tripod 그룹을 전달한다.
+                        }
+                    }
+
+                    if (!handle->next_phase_enable ||
+                        (!preview_started && phase_validation_done &&
+                         !phase_validation_accepted))
+                    {
+                        handle->run_enable = false;         // 정지 입력 또는 검사 실패면 착지 후 정지한다.
                         handle->stop_pending = false;       // 완료한 정지 예약을 제거한다.
                         handle->initialized = false;        // 현재 정상 위상을 종료한다.
                         handle->phase_index++;              // 재시작할 다음 Tripod 그룹을 보존한다.
-                        handle->start_wait_count = 0U;      // 재시작 입력 대기를 준비한다.
-                        handle->start_preview_count = 0U;   // 재시작 경로 검사를 준비한다.
                         handle->phase_cycle_count = 0U;     // 완료한 위상 주기를 제거한다.
                         handle->phase_time_s = 0.0f;        // 완료한 위상 시간을 제거한다.
                         handle->resume_phase = true;        // 정지 자세에서 다음 그룹 재개를 준비한다.
                         handle->next_phase_enable = false;  // 완료한 Enable 결정을 제거한다.
                         handle->next_phase_locked = false;  // 다음 위상 결정을 준비한다.
                     }
-                    else if (phase_validation_done && phase_validation_accepted)
+                    else if (!preview_started && phase_validation_done &&
+                             phase_validation_accepted)
                     {
                         handle->phase_index++;              // 다음 Tripod 그룹으로 전환한다.
                         handle->phase_cycle_count = 0U;     // 새 위상 주기를 초기화한다.
                         handle->phase_time_s = 0.0f;        // 새 위상 시간을 초기화한다.
                         handle->next_phase_enable = false;  // 다음 위상 Enable을 준비한다.
-                        handle->next_phase_locked = false;  // 다음 25 ms 확정을 준비한다.
+                        handle->next_phase_locked = false;  // 다음 착륙 검사를 준비한다.
                         progress = 0.0f;                    // 새 위상 진행률을 0으로 둔다.
+                    }
+                    else
+                    {
+                        output.waiting_start = true;  // 세 지점 검사 완료까지 여섯 발을 고정한다.
                     }
 
                     handle->support_recovery_mask = 0U;       // 완료한 위상의 재착지 대상을 제거한다.
@@ -397,6 +388,7 @@ RobotGaitPhase_t GaitManager_StepContacts(
                     if (!handle->run_enable || !handle->next_phase_locked)
                     {
                         memset(handle->airborne_seen, 0, sizeof(handle->airborne_seen));  // 새 위상의 비접촉 이력을 초기화한다.
+                        memset(handle->touchdown_seen, 0, sizeof(handle->touchdown_seen));  // 새 위상의 첫 접촉 이력을 초기화한다.
                         memset(handle->landed, 0, sizeof(handle->landed));                // 새 위상의 착지 이력을 초기화한다.
                     }
                 }
@@ -407,7 +399,7 @@ RobotGaitPhase_t GaitManager_StepContacts(
                     {
                         const bool swing = GaitManager_IsSwingLeg(handle->phase_index, leg);  // 현재 Swing 그룹을 확인한다.
                         const bool candidate = swing && !handle->landed[leg] &&
-                            (handle->airborne_seen[leg] || handle->stop_pending) &&
+                            handle->touchdown_seen[leg] &&
                             contact_raw[leg] &&
                             (progress >= ROBOT_EARLY_LANDING_PROGRESS);  // 접촉 확인 대기 조건을 계산한다.
 
@@ -419,9 +411,9 @@ RobotGaitPhase_t GaitManager_StepContacts(
                         {
                             output.state[leg] = ROBOT_LEG_TOUCHDOWN_CANDIDATE;  // 접촉 확인까지 현재 발을 고정한다.
                         }
-                        else if (progress >= 1.0f)
+                        else if (handle->touchdown_seen[leg] || (progress >= 1.0f))
                         {
-                            output.state[leg] = ROBOT_LEG_LATE_LANDING;  // 정상 시간 이후 지면을 탐색한다.
+                            output.state[leg] = ROBOT_LEG_LATE_LANDING;  // 첫 접촉 취소 뒤 재상승 없이 지면을 탐색한다.
                         }
                         else
                         {
@@ -501,8 +493,6 @@ RobotGaitPhase_t GaitManager_StepContacts(
             handle->initialized = false;        // 완료하지 못한 위상을 비활성화한다.
             handle->stop_pending = false;       // 남은 정지 예약을 제거한다.
             handle->resume_phase = true;        // 같은 Tripod 그룹 재시작을 준비한다.
-            handle->start_wait_count = 0U;      // 재시작 입력 대기를 준비한다.
-            handle->start_preview_count = 0U;   // 재시작 경로 검사를 준비한다.
             handle->phase_cycle_count = 0U;     // 완료하지 못한 위상 주기를 제거한다.
             handle->phase_time_s = 0.0f;        // 완료하지 못한 위상 시간을 제거한다.
             handle->next_phase_enable = false;  // 다음 위상 Enable 결정을 제거한다.
@@ -511,6 +501,7 @@ RobotGaitPhase_t GaitManager_StepContacts(
             handle->support_recovery_active = false;  // 중단한 재착지 상태를 제거한다.
 
             memset(handle->airborne_seen, 0, sizeof(handle->airborne_seen));  // 비접촉 이력을 제거한다.
+            memset(handle->touchdown_seen, 0, sizeof(handle->touchdown_seen));  // 첫 접촉 이력을 제거한다.
             memset(handle->landed, 0, sizeof(handle->landed));                // 착지 이력을 제거한다.
         }
     }
