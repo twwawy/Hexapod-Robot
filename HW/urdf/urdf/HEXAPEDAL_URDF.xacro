@@ -426,7 +426,7 @@
 
 <link name="RB_flame4_1">
   <inertial>
-    <origin xyz="-0.020163841378835465 0.020163841393334644 -0.003624618500374904" rpy="0 0 0"/>
+    <origin xyz="-0.020163841378833314 0.02016384139333624 -0.0036246185003608977" rpy="0 0 0"/>
     <mass value="0.06395081687871436"/>
     <inertia ixx="6.2e-05" iyy="6.2e-05" izz="7.4e-05" ixy="1.7e-05" iyz="2e-06" ixz="-2e-06"/>
   </inertial>
@@ -531,7 +531,7 @@
 
 <link name="LF_flame4_1">
   <inertial>
-    <origin xyz="0.020163841378832717 -0.020163841393343346 -0.0036246185003829686" rpy="0 0 0"/>
+    <origin xyz="0.020163841378835992 -0.020163841393339085 -0.003624618500361524" rpy="0 0 0"/>
     <mass value="0.06395081687871436"/>
     <inertia ixx="6.2e-05" iyy="6.2e-05" izz="7.4e-05" ixy="1.7e-05" iyz="-2e-06" ixz="2e-06"/>
   </inertial>
@@ -552,7 +552,7 @@
 
 <link name="RF_DS51150_270_1_1">
   <inertial>
-    <origin xyz="-0.02303277026668618 -0.023032770253798768 -0.006733285359171658" rpy="0 0 0"/>
+    <origin xyz="-0.023032770266679756 -0.023032770253798393 -0.0067332853591638014" rpy="0 0 0"/>
     <mass value="0.16496568495572975"/>
     <inertia ixx="6.8e-05" iyy="6.8e-05" izz="7.3e-05" ixy="-2.4e-05" iyz="0.0" ixz="0.0"/>
   </inertial>
@@ -594,7 +594,7 @@
 
 <link name="RB_DS51150_270_1_1">
   <inertial>
-    <origin xyz="-0.02303277025380847 0.023032770266688846 -0.006733285359181024" rpy="0 0 0"/>
+    <origin xyz="-0.023032770253802626 0.023032770266685404 -0.006733285359163047" rpy="0 0 0"/>
     <mass value="0.16496568495572975"/>
     <inertia ixx="6.8e-05" iyy="6.8e-05" izz="7.3e-05" ixy="2.4e-05" iyz="-0.0" ixz="0.0"/>
   </inertial>
@@ -615,7 +615,7 @@
 
 <link name="LF_DS51150_270_1_1">
   <inertial>
-    <origin xyz="0.023032770253793314 -0.023032770266692065 -0.0067332853591978185" rpy="0 0 0"/>
+    <origin xyz="0.0230327702538011 -0.02303277026668407 -0.006733285359159725" rpy="0 0 0"/>
     <mass value="0.16496568495572975"/>
     <inertia ixx="6.8e-05" iyy="6.8e-05" izz="7.3e-05" ixy="2.4e-05" iyz="0.0" ixz="-0.0"/>
   </inertial>
@@ -720,7 +720,7 @@
 
 <link name="RB_bearing_1_1">
   <inertial>
-    <origin xyz="-2.011289320369425e-07 2.0112892845647323e-07 -0.0020000000000233685" rpy="0 0 0"/>
+    <origin xyz="-2.011289298720076e-07 2.0112893012180777e-07 -0.0020000000000093623" rpy="0 0 0"/>
     <mass value="0.003999875766550524"/>
     <inertia ixx="0.0" iyy="0.0" izz="0.0" ixy="0.0" iyz="0.0" ixz="0.0"/>
   </inertial>
@@ -741,9 +741,9 @@
 
 <link name="LF_bearing_1_1">
   <inertial>
-    <origin xyz="2.0112893234225382e-07 -2.0112894041912632e-07 -0.0020000000000358793" rpy="0 0 0"/>
+    <origin xyz="2.0112893564516732e-07 -2.0112893614476768e-07 -0.0020000000000144035" rpy="0 0 0"/>
     <mass value="0.003999875766550524"/>
-    <inertia ixx="0.0" iyy="0.0" izz="0.0" ixy="0.0" iyz="0.0" ixz="0.0"/>
+    <inertia ixx="0.0" iyy="0.0" izz="0.0" ixy="0.0" iyz="0.0" ixz="-0.0"/>
   </inertial>
   <visual>
     <origin xyz="-0.130461 0.130461 0.0273" rpy="0 0 0"/>
@@ -1098,49 +1098,49 @@
 
 <link name="M_column_3_1">
   <inertial>
-    <origin xyz="-0.020000085460240125 0.013550502923226248 0.024026980815015697" rpy="0 0 0"/>
+    <origin xyz="0.019999914539759828 0.026450075088331488 -0.024026980815016585" rpy="0 0 0"/>
     <mass value="0.41107126565484164"/>
-    <inertia ixx="0.000227" iyy="0.000223" izz="0.000209" ixy="0.0" iyz="1.4e-05" ixz="0.0"/>
+    <inertia ixx="0.000227" iyy="0.000223" izz="0.000209" ixy="-0.0" iyz="1.4e-05" ixz="-0.0"/>
   </inertial>
   <visual>
-    <origin xyz="-0.020071 0.020071 -0.3391" rpy="0 0 0"/>
+    <origin xyz="0.019929 0.020071 -0.3351" rpy="0 0 0"/>
     <geometry>
       <mesh filename="package://HEXAPEDAL_URDF_description/meshes/M_column_3_1.stl" scale="0.001 0.001 0.001"/>
     </geometry>
     <material name="silver"/>
   </visual>
   <collision>
-    <origin xyz="-0.020071 0.020071 -0.3391" rpy="0 0 0"/>
+    <origin xyz="0.019929 0.020071 -0.3351" rpy="0 0 0"/>
     <geometry>
       <mesh filename="package://HEXAPEDAL_URDF_description/meshes/M_column_3_1.stl" scale="0.001 0.001 0.001"/>
     </geometry>
   </collision>
 </link>
 
-<link name="MID-360_4_2_1_1">
+<link name="livox_mid_360_1">
   <inertial>
-    <origin xyz="0.018056496720877998 -0.021736152653647717 -0.010317011776493301" rpy="0 0 0"/>
-    <mass value="0.12034682690234494"/>
-    <inertia ixx="4.2e-05" iyy="5.2e-05" izz="7.3e-05" ixy="0.0" iyz="-1.8e-05" ixz="0.0"/>
+    <origin xyz="-0.0180002892165137 -0.012662743628037466 -0.026067727094593318" rpy="0 0 0"/>
+    <mass value="1.055789101972525"/>
+    <inertia ixx="0.000443" iyy="0.000506" izz="0.000632" ixy="0.0" iyz="-0.000109" ixz="-0.0"/>
   </inertial>
   <visual>
-    <origin xyz="0.017929 -0.004714 -0.393473" rpy="0 0 0"/>
+    <origin xyz="-0.018071 -0.036714 -0.304727" rpy="0 0 0"/>
     <geometry>
-      <mesh filename="package://HEXAPEDAL_URDF_description/meshes/MID-360_4_2_1_1.stl" scale="0.001 0.001 0.001"/>
+      <mesh filename="package://HEXAPEDAL_URDF_description/meshes/livox_mid_360_1.stl" scale="0.001 0.001 0.001"/>
     </geometry>
     <material name="silver"/>
   </visual>
   <collision>
-    <origin xyz="0.017929 -0.004714 -0.393473" rpy="0 0 0"/>
+    <origin xyz="-0.018071 -0.036714 -0.304727" rpy="0 0 0"/>
     <geometry>
-      <mesh filename="package://HEXAPEDAL_URDF_description/meshes/MID-360_4_2_1_1.stl" scale="0.001 0.001 0.001"/>
+      <mesh filename="package://HEXAPEDAL_URDF_description/meshes/livox_mid_360_1.stl" scale="0.001 0.001 0.001"/>
     </geometry>
   </collision>
 </link>
 
 <link name="LF_motor_horn_1_1">
   <inertial>
-    <origin xyz="2.0112882836986756e-07 -2.0112901788493787e-07 -0.0029620014636270384" rpy="0 0 0"/>
+    <origin xyz="2.0112883633571776e-07 -2.0112900966928748e-07 -0.0029620014635887496" rpy="0 0 0"/>
     <mass value="0.0019994583976964877"/>
     <inertia ixx="0.0" iyy="0.0" izz="0.0" ixy="0.0" iyz="-0.0" ixz="-0.0"/>
   </inertial>
@@ -1182,7 +1182,7 @@
 
 <link name="LB_motor_horn_1_1">
   <inertial>
-    <origin xyz="2.011290100023544e-07 2.0112882784251163e-07 -0.0029620014636008683" rpy="0 0 0"/>
+    <origin xyz="2.0112900539492884e-07 2.0112883239442603e-07 -0.002962001463592448" rpy="0 0 0"/>
     <mass value="0.0019994583976964877"/>
     <inertia ixx="0.0" iyy="0.0" izz="0.0" ixy="-0.0" iyz="-0.0" ixz="0.0"/>
   </inertial>
@@ -1245,7 +1245,7 @@
 
 <link name="RB_motor_horn_1_1">
   <inertial>
-    <origin xyz="-2.0112884444034584e-07 2.0112901552571394e-07 -0.0029620014636034253" rpy="0 0 0"/>
+    <origin xyz="-2.0112883974965357e-07 2.0112901288893426e-07 -0.0029620014635853113" rpy="0 0 0"/>
     <mass value="0.0019994583976964877"/>
     <inertia ixx="0.0" iyy="0.0" izz="0.0" ixy="0.0" iyz="0.0" ixz="0.0"/>
   </inertial>
@@ -1287,7 +1287,7 @@
 
 <link name="RM_coxaR_1">
   <inertial>
-    <origin xyz="-0.03700000085533775 0.00042260385343186437 -0.034222602666993715" rpy="0 0 0"/>
+    <origin xyz="-0.037000000855337584 0.0004226038534422383 -0.03422260266699357" rpy="0 0 0"/>
     <mass value="0.09366200268610271"/>
     <inertia ixx="0.000108" iyy="0.000126" izz="0.000126" ixy="1e-06" iyz="-0.0" ixz="1e-06"/>
   </inertial>
@@ -1308,7 +1308,7 @@
 
 <link name="RB_coxaR_1">
   <inertial>
-    <origin xyz="-0.025864326587127562 0.026461978688168936 -0.034222602667003915" rpy="0 0 0"/>
+    <origin xyz="-0.025864326587123065 0.02646197868816627 -0.034222602666985784" rpy="0 0 0"/>
     <mass value="0.09366200268610271"/>
     <inertia ixx="0.000118" iyy="0.000115" izz="0.000126" ixy="9e-06" iyz="-1e-06" ixz="1e-06"/>
   </inertial>
@@ -1329,7 +1329,7 @@
 
 <link name="LF_coxaL_1">
   <inertial>
-    <origin xyz="0.026461977339766296 -0.0258643279355191 -0.03422260266704109" rpy="0 0 0"/>
+    <origin xyz="0.026461977339774206 -0.02586432793551094 -0.0342226026670027" rpy="0 0 0"/>
     <mass value="0.09366200268610271"/>
     <inertia ixx="0.000115" iyy="0.000118" izz="0.000126" ixy="9e-06" iyz="1e-06" ixz="-1e-06"/>
   </inertial>
@@ -1371,7 +1371,7 @@
 
 <link name="LB_coxaL_1">
   <inertial>
-    <origin xyz="0.02586432793551041 0.026461977339764214 -0.0342226026670124" rpy="0 0 0"/>
+    <origin xyz="0.025864327935505804 0.026461977339768905 -0.03422260266700408" rpy="0 0 0"/>
     <mass value="0.09366200268610271"/>
     <inertia ixx="0.000118" iyy="0.000115" izz="0.000126" ixy="-9e-06" iyz="-1e-06" ixz="-1e-06"/>
   </inertial>
@@ -1413,7 +1413,7 @@
 
 <link name="RM_motor_horn_2_1">
   <inertial>
-    <origin xyz="2.7755575615628914e-16 0.00386200146358686 -1.2329364841068194e-13" rpy="0 0 0"/>
+    <origin xyz="-1.2212453270876722e-15 0.003862001463596998 -1.2308238216877004e-13" rpy="0 0 0"/>
     <mass value="0.0019994583976964877"/>
     <inertia ixx="0.0" iyy="0.0" izz="0.0" ixy="0.0" iyz="0.0" ixz="-0.0"/>
   </inertial>
@@ -1434,19 +1434,19 @@
 
 <link name="RB_motor_horn_2_1">
   <inertial>
-    <origin xyz="0.0027305352830171714 0.002730741156487887 -1.3337612854330877e-13" rpy="0 0 0"/>
+    <origin xyz="0.0027305352830218066 0.002730741156485167 -1.1531083698720926e-13" rpy="0 0 0"/>
     <mass value="0.0019994583976964877"/>
     <inertia ixx="0.0" iyy="0.0" izz="0.0" ixy="0.0" iyz="0.0" ixz="0.0"/>
   </inertial>
   <visual>
-    <origin xyz="0.206687 -0.158887 0.0" rpy="0 0 0"/>
+    <origin xyz="0.206687 -0.158887 -0.0" rpy="0 0 0"/>
     <geometry>
       <mesh filename="package://HEXAPEDAL_URDF_description/meshes/RB_motor_horn_2_1.stl" scale="0.001 0.001 0.001"/>
     </geometry>
     <material name="silver"/>
   </visual>
   <collision>
-    <origin xyz="0.206687 -0.158887 0.0" rpy="0 0 0"/>
+    <origin xyz="0.206687 -0.158887 -0.0" rpy="0 0 0"/>
     <geometry>
       <mesh filename="package://HEXAPEDAL_URDF_description/meshes/RB_motor_horn_2_1.stl" scale="0.001 0.001 0.001"/>
     </geometry>
@@ -1455,19 +1455,19 @@
 
 <link name="LF_motor_horn_2_1">
   <inertial>
-    <origin xyz="0.002730741156475508 0.002730535283013563 8.548115031890303e-14" rpy="0 0 0"/>
+    <origin xyz="0.0027307411564834183 0.0027305352830214458 1.2307251773562983e-13" rpy="0 0 0"/>
     <mass value="0.0019994583976964877"/>
     <inertia ixx="0.0" iyy="0.0" izz="0.0" ixy="0.0" iyz="-0.0" ixz="-0.0"/>
   </inertial>
   <visual>
-    <origin xyz="-0.158887 0.206687 0.0" rpy="0 0 0"/>
+    <origin xyz="-0.158887 0.206687 -0.0" rpy="0 0 0"/>
     <geometry>
       <mesh filename="package://HEXAPEDAL_URDF_description/meshes/LF_motor_horn_2_1.stl" scale="0.001 0.001 0.001"/>
     </geometry>
     <material name="silver"/>
   </visual>
   <collision>
-    <origin xyz="-0.158887 0.206687 0.0" rpy="0 0 0"/>
+    <origin xyz="-0.158887 0.206687 -0.0" rpy="0 0 0"/>
     <geometry>
       <mesh filename="package://HEXAPEDAL_URDF_description/meshes/LF_motor_horn_2_1.stl" scale="0.001 0.001 0.001"/>
     </geometry>
@@ -1497,7 +1497,7 @@
 
 <link name="LB_motor_horn_2_1">
   <inertial>
-    <origin xyz="-0.0027305352830239438 0.0027307411564732598 1.1333888079242351e-13" rpy="0 0 0"/>
+    <origin xyz="-0.0027305352830285234 0.002730741156477867 1.216963209818856e-13" rpy="0 0 0"/>
     <mass value="0.0019994583976964877"/>
     <inertia ixx="0.0" iyy="0.0" izz="0.0" ixy="-0.0" iyz="-0.0" ixz="0.0"/>
   </inertial>
@@ -1518,19 +1518,19 @@
 
 <link name="LF_DS51150_270_2_1">
   <inertial>
-    <origin xyz="0.03560985654621199 0.008136788935386469 9.072852876170052e-12" rpy="0 0 0"/>
+    <origin xyz="0.03560985654621959 0.008136788935394268 9.110513602833456e-12" rpy="0 0 0"/>
     <mass value="0.16496568495572975"/>
     <inertia ixx="5.8e-05" iyy="5.9e-05" izz="9.3e-05" ixy="1.5e-05" iyz="0.0" ixz="0.0"/>
   </inertial>
   <visual>
-    <origin xyz="-0.159523 0.206051 0.0" rpy="0 0 0"/>
+    <origin xyz="-0.159523 0.206051 -0.0" rpy="0 0 0"/>
     <geometry>
       <mesh filename="package://HEXAPEDAL_URDF_description/meshes/LF_DS51150_270_2_1.stl" scale="0.001 0.001 0.001"/>
     </geometry>
     <material name="silver"/>
   </visual>
   <collision>
-    <origin xyz="-0.159523 0.206051 0.0" rpy="0 0 0"/>
+    <origin xyz="-0.159523 0.206051 -0.0" rpy="0 0 0"/>
     <geometry>
       <mesh filename="package://HEXAPEDAL_URDF_description/meshes/LF_DS51150_270_2_1.stl" scale="0.001 0.001 0.001"/>
     </geometry>
@@ -1539,7 +1539,7 @@
 
 <link name="LM_DS51150_270_2_1">
   <inertial>
-    <origin xyz="0.019426246833090577 0.03093328535916428 9.10862149369396e-12" rpy="0 0 0"/>
+    <origin xyz="0.01942624683309052 0.03093328535916428 9.108625902271619e-12" rpy="0 0 0"/>
     <mass value="0.16496568495572975"/>
     <inertia ixx="4.4e-05" iyy="7.3e-05" izz="9.3e-05" ixy="-0.0" iyz="0.0" ixz="-0.0"/>
   </inertial>
@@ -1560,7 +1560,7 @@
 
 <link name="LB_DS51150_270_2_1">
   <inertial>
-    <origin xyz="-0.008136788935395461 0.03560985654620624 9.100279146254787e-12" rpy="0 0 0"/>
+    <origin xyz="-0.008136788935400124 0.03560985654621082 9.108673217267947e-12" rpy="0 0 0"/>
     <mass value="0.16496568495572975"/>
     <inertia ixx="5.9e-05" iyy="5.8e-05" izz="9.3e-05" ixy="-1.5e-05" iyz="0.0" ixz="-0.0"/>
   </inertial>
@@ -1602,7 +1602,7 @@
 
 <link name="RM_DS51150_270_2_1">
   <inertial>
-    <origin xyz="-0.019426246833087912 0.03093328535915816 -9.10996944823753e-12" rpy="0 0 0"/>
+    <origin xyz="-0.01942624683308497 0.03093328535917127 -9.111592340665953e-12" rpy="0 0 0"/>
     <mass value="0.16496568495572975"/>
     <inertia ixx="4.4e-05" iyy="7.3e-05" izz="9.3e-05" ixy="0.0" iyz="-0.0" ixz="-0.0"/>
   </inertial>
@@ -1623,28 +1623,49 @@
 
 <link name="RB_DS51150_270_2_1">
   <inertial>
-    <origin xyz="0.0081367889353893 0.035609856546221175 -9.120399476032414e-12" rpy="0 0 0"/>
+    <origin xyz="0.00813678893539413 0.03560985654621854 -9.102308010916462e-12" rpy="0 0 0"/>
     <mass value="0.16496568495572975"/>
     <inertia ixx="5.9e-05" iyy="5.8e-05" izz="9.3e-05" ixy="1.5e-05" iyz="-0.0" ixz="-0.0"/>
   </inertial>
   <visual>
-    <origin xyz="0.206051 -0.159523 0.0" rpy="0 0 0"/>
+    <origin xyz="0.206051 -0.159523 -0.0" rpy="0 0 0"/>
     <geometry>
       <mesh filename="package://HEXAPEDAL_URDF_description/meshes/RB_DS51150_270_2_1.stl" scale="0.001 0.001 0.001"/>
     </geometry>
     <material name="silver"/>
   </visual>
   <collision>
-    <origin xyz="0.206051 -0.159523 0.0" rpy="0 0 0"/>
+    <origin xyz="0.206051 -0.159523 -0.0" rpy="0 0 0"/>
     <geometry>
       <mesh filename="package://HEXAPEDAL_URDF_description/meshes/RB_DS51150_270_2_1.stl" scale="0.001 0.001 0.001"/>
     </geometry>
   </collision>
 </link>
 
+<link name="mid-360-fov-asm_ver.ksh_MID-360_4_1_1_1">
+  <inertial>
+    <origin xyz="-2.784486891456114e-07 0.005174945755449259 -0.008963272176272019" rpy="0 0 0"/>
+    <mass value="0.2760142598595122"/>
+    <inertia ixx="4.7e-05" iyy="5.2e-05" izz="6.2e-05" ixy="-0.0" iyz="-9e-06" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="-7.1e-05 -0.033453 -0.262375" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://HEXAPEDAL_URDF_description/meshes/mid-360-fov-asm_ver.ksh_MID-360_4_1_1_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-7.1e-05 -0.033453 -0.262375" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://HEXAPEDAL_URDF_description/meshes/mid-360-fov-asm_ver.ksh_MID-360_4_1_1_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
 <link name="RF_link1_right_1">
   <inertial>
-    <origin xyz="-0.022677021050098972 -0.03745516077457217 -0.015609126867096599" rpy="0 0 0"/>
+    <origin xyz="-0.022677020519566077 -0.037455160000820775 -0.015609126867096363" rpy="0 0 0"/>
     <mass value="0.05250233789665554"/>
     <inertia ixx="6.3e-05" iyy="6.3e-05" izz="0.000106" ixy="-4.5e-05" iyz="-1e-06" ixz="1e-06"/>
   </inertial>
@@ -1665,7 +1686,7 @@
 
 <link name="RF_DS51150_270_3_1">
   <inertial>
-    <origin xyz="0.017106763797174407 -0.017211590721209924 -0.01499999999089773" rpy="0 0 0"/>
+    <origin xyz="0.017106763843891093 -0.017211590398439225 -0.014999999990897343" rpy="0 0 0"/>
     <mass value="0.16496568495572975"/>
     <inertia ixx="5.9e-05" iyy="5.8e-05" izz="9.3e-05" ixy="-1.5e-05" iyz="0.0" ixz="-0.0"/>
   </inertial>
@@ -1686,7 +1707,7 @@
 
 <link name="RF_bearing_2_1">
   <inertial>
-    <origin xyz="-0.0014145445240567045 0.0014139128534798595 -7.793169765454425e-15" rpy="0 0 0"/>
+    <origin xyz="-0.0014145438679431521 0.001413913558223956 -7.574574939285309e-15" rpy="0 0 0"/>
     <mass value="0.003999875766550524"/>
     <inertia ixx="0.0" iyy="0.0" izz="0.0" ixy="-0.0" iyz="0.0" ixz="0.0"/>
   </inertial>
@@ -1707,7 +1728,7 @@
 
 <link name="RF_bearing_3_1">
   <inertial>
-    <origin xyz="-0.00141457383079302 0.0014138835467424338 -6.671790675630351e-15" rpy="0 0 0"/>
+    <origin xyz="-0.001414573372445882 0.0014138844492528058 -6.518651033802115e-15" rpy="0 0 0"/>
     <mass value="0.003999875766550524"/>
     <inertia ixx="0.0" iyy="0.0" izz="0.0" ixy="-0.0" iyz="0.0" ixz="-0.0"/>
   </inertial>
@@ -1728,7 +1749,7 @@
 
 <link name="RM_link1_right_1">
   <inertial>
-    <origin xyz="-0.04251961166602958 -0.010449696254225434 -0.01560912686708989" rpy="0 0 0"/>
+    <origin xyz="-0.04251961074375893 -0.010449696082221856 -0.015609126867088947" rpy="0 0 0"/>
     <mass value="0.05250233789665554"/>
     <inertia ixx="1.8e-05" iyy="0.000108" izz="0.000106" ixy="0.0" iyz="-1e-06" ixz="0.0"/>
   </inertial>
@@ -1749,7 +1770,7 @@
 
 <link name="RM_DS51150_270_3_1">
   <inertial>
-    <origin xyz="-7.375391196973169e-05 -0.02426671464084055 -0.014999999990891074" rpy="0 0 0"/>
+    <origin xyz="-7.375365070272366e-05 -0.02426671444562294 -0.014999999990891844" rpy="0 0 0"/>
     <mass value="0.16496568495572975"/>
     <inertia ixx="4.4e-05" iyy="7.3e-05" izz="9.3e-05" ixy="-0.0" iyz="0.0" ixz="-0.0"/>
   </inertial>
@@ -1770,9 +1791,9 @@
 
 <link name="RM_bearing_2_1">
   <inertial>
-    <origin xyz="9.387737254229478e-10 0.0019999999999936666 -9.936434388075706e-16" rpy="0 0 0"/>
+    <origin xyz="1.9010492624538244e-09 0.0020000000343989334 -1.0595268767677703e-15" rpy="0 0 0"/>
     <mass value="0.003999875766550524"/>
-    <inertia ixx="0.0" iyy="0.0" izz="0.0" ixy="0.0" iyz="0.0" ixz="-0.0"/>
+    <inertia ixx="0.0" iyy="0.0" izz="0.0" ixy="0.0" iyz="-0.0" ixz="-0.0"/>
   </inertial>
   <visual>
     <origin xyz="0.2605 -0.0273 0.0" rpy="0 0 0"/>
@@ -1791,9 +1812,9 @@
 
 <link name="RM_bearing_3_1">
   <inertial>
-    <origin xyz="-1.89244730997018e-09 0.0019999999999949607 3.74119312038047e-17" rpy="0 0 0"/>
+    <origin xyz="-9.301727721400255e-10 0.0020000003140845067 -2.076281183175288e-15" rpy="0 0 0"/>
     <mass value="0.003999875766550524"/>
-    <inertia ixx="0.0" iyy="0.0" izz="0.0" ixy="-0.0" iyz="0.0" ixz="-0.0"/>
+    <inertia ixx="0.0" iyy="0.0" izz="0.0" ixy="0.0" iyz="-0.0" ixz="-0.0"/>
   </inertial>
   <visual>
     <origin xyz="0.3825 -0.0273 -0.0" rpy="0 0 0"/>
@@ -1812,7 +1833,7 @@
 
 <link name="RB_link1_right_1">
   <inertial>
-    <origin xyz="-0.037455160774581636 0.022677021050102525 -0.015609126867100497" rpy="0 0 0"/>
+    <origin xyz="-0.03745516000082588 0.022677020519567354 -0.015609126867082355" rpy="0 0 0"/>
     <mass value="0.05250233789665554"/>
     <inertia ixx="6.3e-05" iyy="6.3e-05" izz="0.000106" ixy="4.5e-05" iyz="-1e-06" ixz="-1e-06"/>
   </inertial>
@@ -1833,7 +1854,7 @@
 
 <link name="RB_DS51150_270_3_1">
   <inertial>
-    <origin xyz="-0.01721159072121875 -0.01710676379717052 -0.014999999990901883" rpy="0 0 0"/>
+    <origin xyz="-0.017211590398443666 -0.017106763843889927 -0.014999999990883821" rpy="0 0 0"/>
     <mass value="0.16496568495572975"/>
     <inertia ixx="5.8e-05" iyy="5.9e-05" izz="9.3e-05" ixy="1.5e-05" iyz="0.0" ixz="0.0"/>
   </inertial>
@@ -1854,19 +1875,19 @@
 
 <link name="RB_bearing_2_1">
   <inertial>
-    <origin xyz="0.0014139128534695067 0.001414544524060063 -1.1139468287595774e-14" rpy="0 0 0"/>
+    <origin xyz="0.0014139135582180717 0.0014145438679447342 7.061226578872426e-15" rpy="0 0 0"/>
     <mass value="0.003999875766550524"/>
     <inertia ixx="0.0" iyy="0.0" izz="0.0" ixy="0.0" iyz="-0.0" ixz="-0.0"/>
   </inertial>
   <visual>
-    <origin xyz="0.164897 -0.203505 0.0" rpy="0 0 0"/>
+    <origin xyz="0.164897 -0.203505 -0.0" rpy="0 0 0"/>
     <geometry>
       <mesh filename="package://HEXAPEDAL_URDF_description/meshes/RB_bearing_2_1.stl" scale="0.001 0.001 0.001"/>
     </geometry>
     <material name="silver"/>
   </visual>
   <collision>
-    <origin xyz="0.164897 -0.203505 0.0" rpy="0 0 0"/>
+    <origin xyz="0.164897 -0.203505 -0.0" rpy="0 0 0"/>
     <geometry>
       <mesh filename="package://HEXAPEDAL_URDF_description/meshes/RB_bearing_2_1.stl" scale="0.001 0.001 0.001"/>
     </geometry>
@@ -1875,19 +1896,19 @@
 
 <link name="RB_bearing_3_1">
   <inertial>
-    <origin xyz="0.0014138835467338018 0.0014145738307965727 -1.1351845354229122e-14" rpy="0 0 0"/>
+    <origin xyz="0.001413884449248115 0.0014145733724471032 6.672263166827228e-15" rpy="0 0 0"/>
     <mass value="0.003999875766550524"/>
     <inertia ixx="0.0" iyy="0.0" izz="0.0" ixy="0.0" iyz="-0.0" ixz="-0.0"/>
   </inertial>
   <visual>
-    <origin xyz="0.251164 -0.289772 0.0" rpy="0 0 0"/>
+    <origin xyz="0.251164 -0.289772 -0.0" rpy="0 0 0"/>
     <geometry>
       <mesh filename="package://HEXAPEDAL_URDF_description/meshes/RB_bearing_3_1.stl" scale="0.001 0.001 0.001"/>
     </geometry>
     <material name="silver"/>
   </visual>
   <collision>
-    <origin xyz="0.251164 -0.289772 0.0" rpy="0 0 0"/>
+    <origin xyz="0.251164 -0.289772 -0.0" rpy="0 0 0"/>
     <geometry>
       <mesh filename="package://HEXAPEDAL_URDF_description/meshes/RB_bearing_3_1.stl" scale="0.001 0.001 0.001"/>
     </geometry>
@@ -1896,7 +1917,7 @@
 
 <link name="LF_link1_left_1">
   <inertial>
-    <origin xyz="0.02267702099938479 -0.03745516071143279 -0.015609126838057477" rpy="0 0 0"/>
+    <origin xyz="0.022677020468858777 -0.03745515993767315 -0.015609126838019842" rpy="0 0 0"/>
     <mass value="0.05250233779836387"/>
     <inertia ixx="6.3e-05" iyy="6.3e-05" izz="0.000106" ixy="4.5e-05" iyz="-1e-06" ixz="-1e-06"/>
   </inertial>
@@ -1917,7 +1938,7 @@
 
 <link name="LF_DS51150_270_3_1">
   <inertial>
-    <origin xyz="-0.01710676379717596 -0.0172115907212263 -0.015000000009144365" rpy="0 0 0"/>
+    <origin xyz="-0.017106763843885986 -0.017211590398447885 -0.015000000009106607" rpy="0 0 0"/>
     <mass value="0.16496568495572975"/>
     <inertia ixx="5.9e-05" iyy="5.8e-05" izz="9.3e-05" ixy="1.5e-05" iyz="-0.0" ixz="-0.0"/>
   </inertial>
@@ -1938,19 +1959,19 @@
 
 <link name="LF_bearing_2_1">
   <inertial>
-    <origin xyz="0.001414544524053235 0.001413912853468452 -3.649558158190688e-14" rpy="0 0 0"/>
+    <origin xyz="0.0014145438679472877 0.0014139135582207918 1.19610330443271e-15" rpy="0 0 0"/>
     <mass value="0.003999875766550524"/>
     <inertia ixx="0.0" iyy="0.0" izz="0.0" ixy="0.0" iyz="-0.0" ixz="0.0"/>
   </inertial>
   <visual>
-    <origin xyz="-0.203505 0.164897 0.0" rpy="0 0 0"/>
+    <origin xyz="-0.203505 0.164897 -0.0" rpy="0 0 0"/>
     <geometry>
       <mesh filename="package://HEXAPEDAL_URDF_description/meshes/LF_bearing_2_1.stl" scale="0.001 0.001 0.001"/>
     </geometry>
     <material name="silver"/>
   </visual>
   <collision>
-    <origin xyz="-0.203505 0.164897 0.0" rpy="0 0 0"/>
+    <origin xyz="-0.203505 0.164897 -0.0" rpy="0 0 0"/>
     <geometry>
       <mesh filename="package://HEXAPEDAL_URDF_description/meshes/LF_bearing_2_1.stl" scale="0.001 0.001 0.001"/>
     </geometry>
@@ -1959,19 +1980,19 @@
 
 <link name="LF_bearing_3_1">
   <inertial>
-    <origin xyz="0.0014145738307937972 0.001413883546727085 -3.4680946410901594e-14" rpy="0 0 0"/>
+    <origin xyz="0.001414573372453376 0.001413884449245173 3.13471817050423e-15" rpy="0 0 0"/>
     <mass value="0.003999875766550524"/>
-    <inertia ixx="0.0" iyy="0.0" izz="0.0" ixy="0.0" iyz="0.0" ixz="-0.0"/>
+    <inertia ixx="0.0" iyy="0.0" izz="0.0" ixy="0.0" iyz="0.0" ixz="0.0"/>
   </inertial>
   <visual>
-    <origin xyz="-0.289772 0.251164 0.0" rpy="0 0 0"/>
+    <origin xyz="-0.289772 0.251164 -0.0" rpy="0 0 0"/>
     <geometry>
       <mesh filename="package://HEXAPEDAL_URDF_description/meshes/LF_bearing_3_1.stl" scale="0.001 0.001 0.001"/>
     </geometry>
     <material name="silver"/>
   </visual>
   <collision>
-    <origin xyz="-0.289772 0.251164 0.0" rpy="0 0 0"/>
+    <origin xyz="-0.289772 0.251164 -0.0" rpy="0 0 0"/>
     <geometry>
       <mesh filename="package://HEXAPEDAL_URDF_description/meshes/LF_bearing_3_1.stl" scale="0.001 0.001 0.001"/>
     </geometry>
@@ -1980,7 +2001,7 @@
 
 <link name="LM_link1_left_1">
   <inertial>
-    <origin xyz="0.04251961158551765 -0.010449696245422203 -0.015609126838021492" rpy="0 0 0"/>
+    <origin xyz="0.04251961066324994 -0.010449696073440587 -0.015609126838021506" rpy="0 0 0"/>
     <mass value="0.05250233779836387"/>
     <inertia ixx="1.8e-05" iyy="0.000108" izz="0.000106" ixy="-0.0" iyz="-1e-06" ixz="-0.0"/>
   </inertial>
@@ -2001,7 +2022,7 @@
 
 <link name="LM_DS51150_270_3_1">
   <inertial>
-    <origin xyz="7.375391197395054e-05 -0.024266714640835692 -0.015000000009107959" rpy="0 0 0"/>
+    <origin xyz="7.375365070472206e-05 -0.02426671444563577 -0.015000000009107999" rpy="0 0 0"/>
     <mass value="0.16496568495572975"/>
     <inertia ixx="4.4e-05" iyy="7.3e-05" izz="9.3e-05" ixy="0.0" iyz="-0.0" ixz="-0.0"/>
   </inertial>
@@ -2022,9 +2043,9 @@
 
 <link name="LM_bearing_2_1">
   <inertial>
-    <origin xyz="-9.387710053765375e-10 0.0020000000000007477 -1.0322227201778589e-15" rpy="0 0 0"/>
+    <origin xyz="-1.9010418794707107e-09 0.00200000003438797 -8.965947566427212e-16" rpy="0 0 0"/>
     <mass value="0.003999875766550524"/>
-    <inertia ixx="0.0" iyy="0.0" izz="0.0" ixy="0.0" iyz="-0.0" ixz="-0.0"/>
+    <inertia ixx="0.0" iyy="0.0" izz="0.0" ixy="-0.0" iyz="0.0" ixz="-0.0"/>
   </inertial>
   <visual>
     <origin xyz="-0.2605 -0.0273 0.0" rpy="0 0 0"/>
@@ -2043,9 +2064,9 @@
 
 <link name="LM_bearing_3_1">
   <inertial>
-    <origin xyz="1.892451861884581e-09 0.002000000000000439 1.6651940855514826e-15" rpy="0 0 0"/>
+    <origin xyz="9.301808767681052e-10 0.002000000314071479 1.919395170964776e-15" rpy="0 0 0"/>
     <mass value="0.003999875766550524"/>
-    <inertia ixx="0.0" iyy="0.0" izz="0.0" ixy="0.0" iyz="-0.0" ixz="-0.0"/>
+    <inertia ixx="0.0" iyy="0.0" izz="0.0" ixy="-0.0" iyz="0.0" ixz="-0.0"/>
   </inertial>
   <visual>
     <origin xyz="-0.3825 -0.0273 -0.0" rpy="0 0 0"/>
@@ -2064,7 +2085,7 @@
 
 <link name="LB_link1_left_1">
   <inertial>
-    <origin xyz="0.03745516071142213 0.02267702099937552 -0.0156091268380308" rpy="0 0 0"/>
+    <origin xyz="0.03745515993766657 0.02267702046884687 -0.015609126838022421" rpy="0 0 0"/>
     <mass value="0.05250233779836387"/>
     <inertia ixx="6.3e-05" iyy="6.3e-05" izz="0.000106" ixy="-4.5e-05" iyz="-1e-06" ixz="1e-06"/>
   </inertial>
@@ -2085,7 +2106,7 @@
 
 <link name="LB_DS51150_270_3_1">
   <inertial>
-    <origin xyz="0.01721159072121292 -0.017106763797186175 -0.015000000009118136" rpy="0 0 0"/>
+    <origin xyz="0.017211590398438448 -0.017106763843899198 -0.01500000000910997" rpy="0 0 0"/>
     <mass value="0.16496568495572975"/>
     <inertia ixx="5.8e-05" iyy="5.9e-05" izz="9.3e-05" ixy="-1.5e-05" iyz="-0.0" ixz="0.0"/>
   </inertial>
@@ -2106,7 +2127,7 @@
 
 <link name="LB_bearing_2_1">
   <inertial>
-    <origin xyz="-0.0014139128534752243 0.0014145445240454635 -9.169504665650572e-15" rpy="0 0 0"/>
+    <origin xyz="-0.001413913558223956 0.0014145438679371847 -8.749456561701143e-16" rpy="0 0 0"/>
     <mass value="0.003999875766550524"/>
     <inertia ixx="0.0" iyy="0.0" izz="0.0" ixy="-0.0" iyz="0.0" ixz="0.0"/>
   </inertial>
@@ -2127,7 +2148,7 @@
 
 <link name="LB_bearing_3_1">
   <inertial>
-    <origin xyz="-0.0014138835467400468 0.0014145738307808076 -8.886829812456087e-15" rpy="0 0 0"/>
+    <origin xyz="-0.001413884449253805 0.0014145733724377219 -3.4574807966223135e-16" rpy="0 0 0"/>
     <mass value="0.003999875766550524"/>
     <inertia ixx="0.0" iyy="0.0" izz="0.0" ixy="-0.0" iyz="0.0" ixz="0.0"/>
   </inertial>
@@ -2148,19 +2169,19 @@
 
 <link name="LF_motor_horn_3_1">
   <inertial>
-    <origin xyz="0.0020939825504509013 0.0020942938890370355 -1.5717556907526455e-13" rpy="0 0 0"/>
+    <origin xyz="0.002093982657406568 0.002094294184112 -1.196087197181719e-13" rpy="0 0 0"/>
     <mass value="0.0019994583976964877"/>
     <inertia ixx="0.0" iyy="0.0" izz="0.0" ixy="0.0" iyz="0.0" ixz="0.0"/>
   </inertial>
   <visual>
-    <origin xyz="-0.247205 0.293732 0.0" rpy="0 0 0"/>
+    <origin xyz="-0.247205 0.293732 -0.0" rpy="0 0 0"/>
     <geometry>
       <mesh filename="package://HEXAPEDAL_URDF_description/meshes/LF_motor_horn_3_1.stl" scale="0.001 0.001 0.001"/>
     </geometry>
     <material name="silver"/>
   </visual>
   <collision>
-    <origin xyz="-0.247205 0.293732 0.0" rpy="0 0 0"/>
+    <origin xyz="-0.247205 0.293732 -0.0" rpy="0 0 0"/>
     <geometry>
       <mesh filename="package://HEXAPEDAL_URDF_description/meshes/LF_motor_horn_3_1.stl" scale="0.001 0.001 0.001"/>
     </geometry>
@@ -2169,9 +2190,9 @@
 
 <link name="LM_motor_horn_3_1">
   <inertial>
-    <origin xyz="7.450619565751992e-10 0.002962001463592625 -1.2031508985967192e-13" rpy="0 0 0"/>
+    <origin xyz="6.120383644336869e-10 0.002962001747859707 -1.2023055468018243e-13" rpy="0 0 0"/>
     <mass value="0.0019994583976964877"/>
-    <inertia ixx="0.0" iyy="0.0" izz="0.0" ixy="0.0" iyz="0.0" ixz="-0.0"/>
+    <inertia ixx="0.0" iyy="0.0" izz="0.0" ixy="-0.0" iyz="0.0" ixz="-0.0"/>
   </inertial>
   <visual>
     <origin xyz="-0.3825 0.0329 -0.0" rpy="0 0 0"/>
@@ -2190,7 +2211,7 @@
 
 <link name="LB_motor_horn_3_1">
   <inertial>
-    <origin xyz="-0.0020942938890535223 0.0020939825504411314 -1.3104925978296721e-13" rpy="0 0 0"/>
+    <origin xyz="-0.0020942941841241014 0.0020939826573942166 -1.2295240692276787e-13" rpy="0 0 0"/>
     <mass value="0.0019994583976964877"/>
     <inertia ixx="0.0" iyy="0.0" izz="0.0" ixy="-0.0" iyz="0.0" ixz="-0.0"/>
   </inertial>
@@ -2211,7 +2232,7 @@
 
 <link name="RF_motor_horn_3_1">
   <inertial>
-    <origin xyz="-0.002093982550453871 0.0020942938890560203 1.1560698000509212e-13" rpy="0 0 0"/>
+    <origin xyz="-0.0020939826574027653 0.0020942941841232687 1.1580953608458333e-13" rpy="0 0 0"/>
     <mass value="0.0019994583976964877"/>
     <inertia ixx="0.0" iyy="0.0" izz="0.0" ixy="-0.0" iyz="-0.0" ixz="0.0"/>
   </inertial>
@@ -2232,7 +2253,7 @@
 
 <link name="RM_motor_horn_3_1">
   <inertial>
-    <origin xyz="-7.450580707946131e-10 0.0029620014635881355 1.2184885910627765e-13" rpy="0 0 0"/>
+    <origin xyz="-6.120419171473657e-10 0.0029620017478768045 1.21678301711805e-13" rpy="0 0 0"/>
     <mass value="0.0019994583976964877"/>
     <inertia ixx="0.0" iyy="0.0" izz="0.0" ixy="0.0" iyz="-0.0" ixz="-0.0"/>
   </inertial>
@@ -2253,19 +2274,19 @@
 
 <link name="RB_motor_horn_3_1">
   <inertial>
-    <origin xyz="0.00209429388904786 0.0020939825504572296 1.1107417848804733e-13" rpy="0 0 0"/>
+    <origin xyz="0.0020942941841194385 0.0020939826574037923 1.2927562495528287e-13" rpy="0 0 0"/>
     <mass value="0.0019994583976964877"/>
     <inertia ixx="0.0" iyy="0.0" izz="0.0" ixy="0.0" iyz="-0.0" ixz="-0.0"/>
   </inertial>
   <visual>
-    <origin xyz="0.293732 -0.247205 0.0" rpy="0 0 0"/>
+    <origin xyz="0.293732 -0.247205 -0.0" rpy="0 0 0"/>
     <geometry>
       <mesh filename="package://HEXAPEDAL_URDF_description/meshes/RB_motor_horn_3_1.stl" scale="0.001 0.001 0.001"/>
     </geometry>
     <material name="silver"/>
   </visual>
   <collision>
-    <origin xyz="0.293732 -0.247205 0.0" rpy="0 0 0"/>
+    <origin xyz="0.293732 -0.247205 -0.0" rpy="0 0 0"/>
     <geometry>
       <mesh filename="package://HEXAPEDAL_URDF_description/meshes/RB_motor_horn_3_1.stl" scale="0.001 0.001 0.001"/>
     </geometry>
@@ -2274,19 +2295,19 @@
 
 <link name="LF_link2_1">
   <inertial>
-    <origin xyz="0.09093054656907501 -0.04242084106300542 -8.139563276721162e-09" rpy="0 0 0"/>
+    <origin xyz="0.09093054688305185 -0.04242084036353849 -8.139525395911562e-09" rpy="0 0 0"/>
     <mass value="1.968249128476684"/>
     <inertia ixx="0.004544" iyy="0.004433" izz="0.008367" ixy="0.003202" iyz="0.0" ixz="-0.0"/>
   </inertial>
   <visual>
-    <origin xyz="-0.246568 0.294369 0.0" rpy="0 0 0"/>
+    <origin xyz="-0.246568 0.294369 -0.0" rpy="0 0 0"/>
     <geometry>
       <mesh filename="package://HEXAPEDAL_URDF_description/meshes/LF_link2_1.stl" scale="0.001 0.001 0.001"/>
     </geometry>
     <material name="silver"/>
   </visual>
   <collision>
-    <origin xyz="-0.246568 0.294369 0.0" rpy="0 0 0"/>
+    <origin xyz="-0.246568 0.294369 -0.0" rpy="0 0 0"/>
     <geometry>
       <mesh filename="package://HEXAPEDAL_URDF_description/meshes/LF_link2_1.stl" scale="0.001 0.001 0.001"/>
     </geometry>
@@ -2295,7 +2316,7 @@
 
 <link name="LB_link2_1">
   <inertial>
-    <origin xyz="0.04242084106298982 0.09093054656906507 -8.139537599483049e-09" rpy="0 0 0"/>
+    <origin xyz="0.04242084036352772 0.09093054688303898 -8.139529077411111e-09" rpy="0 0 0"/>
     <mass value="1.968249128476684"/>
     <inertia ixx="0.004433" iyy="0.004544" izz="0.008367" ixy="-0.003202" iyz="-0.0" ixz="-0.0"/>
   </inertial>
@@ -2316,7 +2337,7 @@
 
 <link name="RF_link2_1">
   <inertial>
-    <origin xyz="-0.0909305465690774 -0.04242084106298727 8.139521572303465e-09" rpy="0 0 0"/>
+    <origin xyz="-0.09093054688304791 -0.04242084036352739 8.139521550099005e-09" rpy="0 0 0"/>
     <mass value="1.968249128476684"/>
     <inertia ixx="0.004544" iyy="0.004433" izz="0.008367" ixy="-0.003202" iyz="-0.0" ixz="-0.0"/>
   </inertial>
@@ -2337,7 +2358,7 @@
 
 <link name="RM_link2_1">
   <inertial>
-    <origin xyz="-0.09429389136996374 0.03430113046921441 8.139528455686218e-09" rpy="0 0 0"/>
+    <origin xyz="-0.09429389109738179 0.034301131185848384 8.139524374506379e-09" rpy="0 0 0"/>
     <mass value="1.968249128476684"/>
     <inertia ixx="0.001286" iyy="0.007691" izz="0.008367" ixy="-5.6e-05" iyz="0.0" ixz="-0.0"/>
   </inertial>
@@ -2358,19 +2379,19 @@
 
 <link name="RB_link2_1">
   <inertial>
-    <origin xyz="-0.042420841062995485 0.09093054656908112 8.139517304606159e-09" rpy="0 0 0"/>
+    <origin xyz="-0.042420840363531276 0.09093054688304897 8.139535228046668e-09" rpy="0 0 0"/>
     <mass value="1.968249128476684"/>
     <inertia ixx="0.004433" iyy="0.004544" izz="0.008367" ixy="0.003202" iyz="0.0" ixz="-0.0"/>
   </inertial>
   <visual>
-    <origin xyz="0.294369 -0.246568 0.0" rpy="0 0 0"/>
+    <origin xyz="0.294369 -0.246568 -0.0" rpy="0 0 0"/>
     <geometry>
       <mesh filename="package://HEXAPEDAL_URDF_description/meshes/RB_link2_1.stl" scale="0.001 0.001 0.001"/>
     </geometry>
     <material name="silver"/>
   </visual>
   <collision>
-    <origin xyz="0.294369 -0.246568 0.0" rpy="0 0 0"/>
+    <origin xyz="0.294369 -0.246568 -0.0" rpy="0 0 0"/>
     <geometry>
       <mesh filename="package://HEXAPEDAL_URDF_description/meshes/RB_link2_1.stl" scale="0.001 0.001 0.001"/>
     </geometry>
@@ -2379,7 +2400,7 @@
 
 <link name="LM_link2_1">
   <inertial>
-    <origin xyz="0.09429389136996819 0.03430113046921869 -8.139526213035708e-09" rpy="0 0 0"/>
+    <origin xyz="0.09429389109738456 0.03430113118581153 -8.139523099970348e-09" rpy="0 0 0"/>
     <mass value="1.968249128476684"/>
     <inertia ixx="0.001286" iyy="0.007691" izz="0.008367" ixy="5.6e-05" iyz="-0.0" ixz="-0.0"/>
   </inertial>
@@ -2400,7 +2421,7 @@
 
 <link name="LF_foot_1_1">
   <inertial>
-    <origin xyz="-0.019873693212568377 0.01987360462746779 0.003538514539403721" rpy="0 0 0"/>
+    <origin xyz="-0.019873692600057113 0.01987360562351681 0.003538514539441144" rpy="0 0 0"/>
     <mass value="0.17136403212360193"/>
     <inertia ixx="3.5e-05" iyy="3.5e-05" izz="5.8e-05" ixy="1.1e-05" iyz="-0.0" ixz="0.0"/>
   </inertial>
@@ -2421,7 +2442,7 @@
 
 <link name="LM_foot_1_1">
   <inertial>
-    <origin xyz="-0.028105547347562765 4.857996219981655e-08 0.00353851453944117" rpy="0 0 0"/>
+    <origin xyz="-0.028105547618765825 4.971735864794653e-08 0.0035385145394440827" rpy="0 0 0"/>
     <mass value="0.17136403212360193"/>
     <inertia ixx="2.4e-05" iyy="4.6e-05" izz="5.8e-05" ixy="-0.0" iyz="-0.0" ixz="0.0"/>
   </inertial>
@@ -2442,7 +2463,7 @@
 
 <link name="LB_foot_1_1">
   <inertial>
-    <origin xyz="-0.01987360462748261 -0.01987369321257909 0.00353851453942898" rpy="0 0 0"/>
+    <origin xyz="-0.019873605623526525 -0.019873692600071102 0.0035385145394379557" rpy="0 0 0"/>
     <mass value="0.17136403212360193"/>
     <inertia ixx="3.5e-05" iyy="3.5e-05" izz="5.8e-05" ixy="-1.1e-05" iyz="0.0" ixz="0.0"/>
   </inertial>
@@ -2463,7 +2484,7 @@
 
 <link name="RF_foot_1_1">
   <inertial>
-    <origin xyz="0.019873535783633323 0.01987406917511997 0.0035385442328292258" rpy="0 0 0"/>
+    <origin xyz="0.019873535171129997 0.019874070171167657 0.0035385442328290436" rpy="0 0 0"/>
     <mass value="0.17136403212360193"/>
     <inertia ixx="3.5e-05" iyy="3.5e-05" izz="5.8e-05" ixy="-1.1e-05" iyz="-0.0" ixz="-0.0"/>
   </inertial>
@@ -2484,7 +2505,7 @@
 
 <link name="RM_foot_1_1">
   <inertial>
-    <origin xyz="0.028106057406502072 1.9549058867036244e-07 0.003538544232836562" rpy="0 0 0"/>
+    <origin xyz="0.028106057677708907 1.966280456167568e-07 0.003538544232830499" rpy="0 0 0"/>
     <mass value="0.17136403212360193"/>
     <inertia ixx="2.4e-05" iyy="4.6e-05" izz="5.8e-05" ixy="-0.0" iyz="0.0" ixz="-0.0"/>
   </inertial>
@@ -2505,7 +2526,7 @@
 
 <link name="RB_foot_1_1">
   <inertial>
-    <origin xyz="0.01987406917511192 -0.019873535783629492 0.003538544232825201" rpy="0 0 0"/>
+    <origin xyz="0.019874070171163605 -0.019873535171128887 0.0035385442328431157" rpy="0 0 0"/>
     <mass value="0.17136403212360193"/>
     <inertia ixx="3.5e-05" iyy="3.5e-05" izz="5.8e-05" ixy="1.1e-05" iyz="0.0" ixz="-0.0"/>
   </inertial>
@@ -2526,19 +2547,19 @@
 
 <link name="LF_foot_2_1">
   <inertial>
-    <origin xyz="0.0019356719925107124 -0.001935899560351062 0.011535157888852616" rpy="0 0 0"/>
+    <origin xyz="0.001935672605184624 -0.001935898564140115 0.011535157888890112" rpy="0 0 0"/>
     <mass value="0.1674566879251433"/>
     <inertia ixx="3.5e-05" iyy="3.5e-05" izz="5.8e-05" ixy="1.1e-05" iyz="0.0" ixz="-0.0"/>
   </inertial>
   <visual>
-    <origin xyz="-0.400284 0.400001 0.0" rpy="0 0 0"/>
+    <origin xyz="-0.400284 0.400001 -0.0" rpy="0 0 0"/>
     <geometry>
       <mesh filename="package://HEXAPEDAL_URDF_description/meshes/LF_foot_2_1.stl" scale="0.001 0.001 0.001"/>
     </geometry>
     <material name="silver"/>
   </visual>
   <collision>
-    <origin xyz="-0.400284 0.400001 0.0" rpy="0 0 0"/>
+    <origin xyz="-0.400284 0.400001 -0.0" rpy="0 0 0"/>
     <geometry>
       <mesh filename="package://HEXAPEDAL_URDF_description/meshes/LF_foot_2_1.stl" scale="0.001 0.001 0.001"/>
     </geometry>
@@ -2547,7 +2568,7 @@
 
 <link name="LM_foot_2_1">
   <inertial>
-    <origin xyz="0.002737564880733845 -4.969567538799552e-08 0.011535157888890053" rpy="0 0 0"/>
+    <origin xyz="0.0027375646095293416 -4.8558061535971175e-08 0.0115351578889062" rpy="0 0 0"/>
     <mass value="0.1674566879251433"/>
     <inertia ixx="2.4e-05" iyy="4.5e-05" izz="5.8e-05" ixy="0.0" iyz="-0.0" ixz="-0.0"/>
   </inertial>
@@ -2568,7 +2589,7 @@
 
 <link name="LB_foot_2_1">
   <inertial>
-    <origin xyz="0.001935899560336074 0.0019356719924998878 0.01153515788887788" rpy="0 0 0"/>
+    <origin xyz="0.001935898564130012 0.0019356726051708018 0.011535157888886953" rpy="0 0 0"/>
     <mass value="0.1674566879251433"/>
     <inertia ixx="3.5e-05" iyy="3.5e-05" izz="5.8e-05" ixy="-1.1e-05" iyz="-0.0" ixz="-0.0"/>
   </inertial>
@@ -2589,7 +2610,7 @@
 
 <link name="RF_foot_2_1">
   <inertial>
-    <origin xyz="-0.001935968404185584 -0.0019352960299595101 0.011535187582278108" rpy="0 0 0"/>
+    <origin xyz="-0.001935969016851058 -0.001935295033748785 0.011535187582277775" rpy="0 0 0"/>
     <mass value="0.1674566879251433"/>
     <inertia ixx="3.5e-05" iyy="3.5e-05" izz="5.8e-05" ixy="-1.1e-05" iyz="0.0" ixz="0.0"/>
   </inertial>
@@ -2610,7 +2631,7 @@
 
 <link name="RM_foot_2_1">
   <inertial>
-    <origin xyz="-0.002737054821794538 2.9376622623150314e-07 0.011535187582285458" rpy="0 0 0"/>
+    <origin xyz="-0.002737054550587814 2.9490391404213474e-07 0.011535187582279404" rpy="0 0 0"/>
     <mass value="0.1674566879251433"/>
     <inertia ixx="2.4e-05" iyy="4.5e-05" izz="5.8e-05" ixy="0.0" iyz="0.0" ixz="0.0"/>
   </inertial>
@@ -2631,7 +2652,7 @@
 
 <link name="RB_foot_2_1">
   <inertial>
-    <origin xyz="-0.0019352960299671707 0.0019359684041893033 0.011535187582274094" rpy="0 0 0"/>
+    <origin xyz="-0.0019352950337527264 0.0019359690168521126 0.011535187582292222" rpy="0 0 0"/>
     <mass value="0.1674566879251433"/>
     <inertia ixx="3.5e-05" iyy="3.5e-05" izz="5.8e-05" ixy="1.1e-05" iyz="-0.0" ixz="0.0"/>
   </inertial>
@@ -2652,19 +2673,19 @@
 
 <link name="LF_foot_3_1">
   <inertial>
-    <origin xyz="0.0019952283121527636 -0.0019953855994889746 -3.4723077607565925e-14" rpy="0 0 0"/>
+    <origin xyz="0.001995229041856117 -0.0019953844862484194 2.7708375447619718e-15" rpy="0 0 0"/>
     <mass value="0.004532023320514249"/>
     <inertia ixx="0.0" iyy="0.0" izz="0.0" ixy="-0.0" iyz="-0.0" ixz="-0.0"/>
   </inertial>
   <visual>
-    <origin xyz="-0.425749 0.425466 0.0" rpy="0 0 0"/>
+    <origin xyz="-0.425749 0.425466 -0.0" rpy="0 0 0"/>
     <geometry>
       <mesh filename="package://HEXAPEDAL_URDF_description/meshes/LF_foot_3_1.stl" scale="0.001 0.001 0.001"/>
     </geometry>
     <material name="silver"/>
   </visual>
   <collision>
-    <origin xyz="-0.425749 0.425466 0.0" rpy="0 0 0"/>
+    <origin xyz="-0.425749 0.425466 -0.0" rpy="0 0 0"/>
     <geometry>
       <mesh filename="package://HEXAPEDAL_URDF_description/meshes/LF_foot_3_1.stl" scale="0.001 0.001 0.001"/>
     </geometry>
@@ -2673,7 +2694,7 @@
 
 <link name="LM_foot_3_1">
   <inertial>
-    <origin xyz="0.002821688905706554 1.4553885440554692e-13 2.890075775964473e-15" rpy="0 0 0"/>
+    <origin xyz="0.0028216886345038272 1.303257499124912e-09 2.3496071700597926e-14" rpy="0 0 0"/>
     <mass value="0.004532023320514249"/>
     <inertia ixx="0.0" iyy="0.0" izz="0.0" ixy="0.0" iyz="-0.0" ixz="0.0"/>
   </inertial>
@@ -2694,9 +2715,9 @@
 
 <link name="LB_foot_3_1">
   <inertial>
-    <origin xyz="0.001995385599474264 0.001995228312141828 -9.509363781867489e-15" rpy="0 0 0"/>
+    <origin xyz="0.0019953844862390935 0.001995229041841795 -2.4187364468029574e-16" rpy="0 0 0"/>
     <mass value="0.004532023320514249"/>
-    <inertia ixx="0.0" iyy="0.0" izz="0.0" ixy="0.0" iyz="-0.0" ixz="0.0"/>
+    <inertia ixx="0.0" iyy="0.0" izz="0.0" ixy="0.0" iyz="0.0" ixz="0.0"/>
   </inertial>
   <visual>
     <origin xyz="-0.425466 -0.425749 0.0" rpy="0 0 0"/>
@@ -2715,7 +2736,7 @@
 
 <link name="RF_foot_3_1">
   <inertial>
-    <origin xyz="-0.0019952283120512893 -0.0019953855995746284 1.384807951236185e-13" rpy="0 0 0"/>
+    <origin xyz="-0.001995229041745372 -0.001995384486339291 1.5425268978831917e-13" rpy="0 0 0"/>
     <mass value="0.004532023320514249"/>
     <inertia ixx="0.0" iyy="0.0" izz="0.0" ixy="0.0" iyz="-0.0" ixz="-0.0"/>
   </inertial>
@@ -2736,19 +2757,19 @@
 
 <link name="RM_foot_3_1">
   <inertial>
-    <origin xyz="-0.0028216889057022243 1.4164393941605569e-13 3.152291039688181e-16" rpy="0 0 0"/>
+    <origin xyz="-0.0028216886345008296 1.303331485379318e-09 3.181194691507138e-15" rpy="0 0 0"/>
     <mass value="0.004532023320514249"/>
     <inertia ixx="0.0" iyy="0.0" izz="0.0" ixy="-0.0" iyz="0.0" ixz="-0.0"/>
   </inertial>
   <visual>
-    <origin xyz="0.6019 -0.0002 -0.0" rpy="0 0 0"/>
+    <origin xyz="0.6019 -0.0002 0.0" rpy="0 0 0"/>
     <geometry>
       <mesh filename="package://HEXAPEDAL_URDF_description/meshes/RM_foot_3_1.stl" scale="0.001 0.001 0.001"/>
     </geometry>
     <material name="silver"/>
   </visual>
   <collision>
-    <origin xyz="0.6019 -0.0002 -0.0" rpy="0 0 0"/>
+    <origin xyz="0.6019 -0.0002 0.0" rpy="0 0 0"/>
     <geometry>
       <mesh filename="package://HEXAPEDAL_URDF_description/meshes/RM_foot_3_1.stl" scale="0.001 0.001 0.001"/>
     </geometry>
@@ -2757,19 +2778,19 @@
 
 <link name="RB_foot_3_1">
   <inertial>
-    <origin xyz="-0.001995385599582622 0.001995228312055286 -1.5679041533457799e-13" rpy="0 0 0"/>
+    <origin xyz="-0.0019953844863444536 0.001995229041749369 -1.3862687878290162e-13" rpy="0 0 0"/>
     <mass value="0.004532023320514249"/>
     <inertia ixx="0.0" iyy="0.0" izz="0.0" ixy="-0.0" iyz="-0.0" ixz="0.0"/>
   </inertial>
   <visual>
-    <origin xyz="0.425466 -0.425749 0.0" rpy="0 0 0"/>
+    <origin xyz="0.425466 -0.425749 -0.0" rpy="0 0 0"/>
     <geometry>
       <mesh filename="package://HEXAPEDAL_URDF_description/meshes/RB_foot_3_1.stl" scale="0.001 0.001 0.001"/>
     </geometry>
     <material name="silver"/>
   </visual>
   <collision>
-    <origin xyz="0.425466 -0.425749 0.0" rpy="0 0 0"/>
+    <origin xyz="0.425466 -0.425749 -0.0" rpy="0 0 0"/>
     <geometry>
       <mesh filename="package://HEXAPEDAL_URDF_description/meshes/RB_foot_3_1.stl" scale="0.001 0.001 0.001"/>
     </geometry>
@@ -3082,16 +3103,16 @@
   <child link="M_column_2_1"/>
 </joint>
 
-<joint name="강체 195" type="fixed">
-  <origin xyz="-0.039326 0.142983 0.0099" rpy="0 0 0"/>
+<joint name="강체 199" type="fixed">
+  <origin xyz="-0.079326 0.142983 0.0059" rpy="0 0 0"/>
   <parent link="M_column_2_1"/>
   <child link="M_column_3_1"/>
 </joint>
 
-<joint name="강체 196" type="fixed">
-  <origin xyz="-0.038 0.024785 0.054373" rpy="0 0 0"/>
+<joint name="강체 202" type="fixed">
+  <origin xyz="0.038 0.056785 -0.030373" rpy="0 0 0"/>
   <parent link="M_column_3_1"/>
-  <child link="MID-360_4_2_1_1"/>
+  <child link="livox_mid_360_1"/>
 </joint>
 
 <joint name="LF_1" type="revolute">
@@ -3250,7 +3271,7 @@
   <origin xyz="0.0 0.0009 0.0" rpy="0 0 0"/>
   <parent link="RM_motor_horn_2_1"/>
   <child link="RM_DS51150_270_2_1"/>
-  <axis xyz="0.0 1.0 0.0"/>
+  <axis xyz="0.0 1.0 -0.0"/>
   <limit upper="2.356194" lower="-2.356194" effort="100" velocity="100"/>
 </joint>
 
@@ -3260,6 +3281,12 @@
   <child link="RB_DS51150_270_2_1"/>
   <axis xyz="0.707107 0.707107 -0.0"/>
   <limit upper="2.356194" lower="-2.356194" effort="100" velocity="100"/>
+</joint>
+
+<joint name="강체 201" type="fixed">
+  <origin xyz="-0.018 -0.003261 -0.042352" rpy="0 0 0"/>
+  <parent link="livox_mid_360_1"/>
+  <child link="mid-360-fov-asm_ver.ksh_MID-360_4_1_1_1"/>
 </joint>
 
 <joint name="강체 95" type="fixed">
@@ -3434,7 +3461,7 @@
   <origin xyz="0.025243 -0.052821 -0.015" rpy="0 0 0"/>
   <parent link="RF_DS51150_270_3_1"/>
   <child link="RF_motor_horn_3_1"/>
-  <axis xyz="0.707107 -0.707107 -0.0"/>
+  <axis xyz="0.707107 -0.707107 0.0"/>
   <limit upper="2.356194" lower="-2.356194" effort="100" velocity="100"/>
 </joint>
 
@@ -3442,7 +3469,7 @@
   <origin xyz="-0.0195 -0.0552 -0.015" rpy="0 0 0"/>
   <parent link="RM_DS51150_270_3_1"/>
   <child link="RM_motor_horn_3_1"/>
-  <axis xyz="-0.0 -1.0 -0.0"/>
+  <axis xyz="-0.0 -1.0 0.0"/>
   <limit upper="2.356194" lower="-2.356194" effort="100" velocity="100"/>
 </joint>
 
@@ -3450,7 +3477,7 @@
   <origin xyz="-0.052821 -0.025243 -0.015" rpy="0 0 0"/>
   <parent link="RB_DS51150_270_3_1"/>
   <child link="RB_motor_horn_3_1"/>
-  <axis xyz="-0.707107 -0.707107 -0.0"/>
+  <axis xyz="-0.707107 -0.707107 0.0"/>
   <limit upper="2.356194" lower="-2.356194" effort="100" velocity="100"/>
 </joint>
 
