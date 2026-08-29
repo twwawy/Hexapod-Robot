@@ -591,12 +591,15 @@ void HexapodApp_Process(HexapodApp_Handle_t *handle)
                             telemetry_text);  // 주기가 된 관제 패킷 하나를 전송한다.
     }
 
-    if ((handle->hardware.jetson_spi != NULL) &&
-        JetsonSpi_PrepareSensorFrame(&handle->jetson,
-                                     &handle->sensor_snapshot,
-                                     now_ms))
+    if (handle->hardware.jetson_spi != NULL)
     {
-        (void)JetsonSpi_Process(&handle->jetson);  // 준비된 센서 패킷을 Jetson과 교환한다.
+        if (!handle->jetson.tx_frame_ready && !handle->jetson.transfer_active)
+        {
+            (void)JetsonSpi_PrepareSensorFrame(&handle->jetson,
+                                               &handle->sensor_snapshot,
+                                               now_ms);  // DMA가 비어 있을 때만 다음 센서 패킷을 만든다.
+        }
+        (void)JetsonSpi_Process(&handle->jetson);  // DMA 완료 처리 또는 다음 전송 Arm을 수행한다.
     }
 
     crsf_buffer_used = (uint16_t)((handle->crsf_receiver.head -
