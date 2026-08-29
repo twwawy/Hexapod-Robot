@@ -37,7 +37,10 @@
 #define ROBOT_BASE_FOOT_Z_M             (-0.287006f) // 기본 발 높이를 정의한다.
 #define ROBOT_WORKSPACE_MARGIN_M        0.001f      // IK 작업공간 여유를 정의한다.
 
-#define ROBOT_GAIT_PHASE_TIME_S         1.0f        // 한 Tripod 위상 최대 시간을 정의한다.
+#define ROBOT_GAIT_PHASE_TIME_S         1.0f        // 한 Tripod 위상 시간을 정의한다.
+#define ROBOT_GAIT_START_DELAY_MS       100U        // 정지 상태의 첫 보행 입력 안정 시간을 정의한다.
+#define ROBOT_GAIT_START_DELAY_CYCLES   \
+    (ROBOT_GAIT_START_DELAY_MS / ROBOT_CONTROL_PERIOD_MS)  // 첫 보행 대기 주기 수를 계산한다.
 #define ROBOT_GAIT_PREVIEW_SAMPLE_COUNT 3U          // 시작·중앙·끝 검사 지점 수를 정의한다.
 #define ROBOT_STAND_TIME_S              5.6f        // 서기 시간을 정의한다.
 #define ROBOT_LANDING_TIME_S            5.6f        // 착지 하강 시간을 정의한다.

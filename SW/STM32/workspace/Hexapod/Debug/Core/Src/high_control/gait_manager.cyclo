@@ -3,5 +3,5 @@
 ../Core/Src/high_control/gait_manager.c:32:16:GaitManager_SupportMask	4
 ../Core/Src/high_control/gait_manager.c:48:13:GaitManager_AllMaskContact	4
 ../Core/Src/high_control/gait_manager.c:64:6:GaitManager_Init	2
-../Core/Src/high_control/gait_manager.c:73:18:GaitManager_StepContacts	100
-../Core/Src/high_control/gait_manager.c:522:18:GaitManager_Step	9
+../Core/Src/high_control/gait_manager.c:73:18:GaitManager_StepContacts	99
+../Core/Src/high_control/gait_manager.c:523:18:GaitManager_Step	9

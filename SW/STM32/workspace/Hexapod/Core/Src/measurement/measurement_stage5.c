@@ -19,6 +19,7 @@
 #define MEASUREMENT_STAGE5_RELAY_OFF_TIME_MS      500U
 #define MEASUREMENT_STAGE5_MINIMUM_RAW_SPAN        20U
 #define MEASUREMENT_STAGE5_TEST_ANGLE_DEG         20.0f
+#define MEASUREMENT_STAGE5_TARGET_COUNT             2U
 
 typedef enum
 {
@@ -37,18 +38,22 @@ static JointCalibrationMeasurement_t measurement_joint;            // 관절별 
 static JointFeedback_Calibration_t measurement_table[ROBOT_JOINT_COUNT]; // 완성한 관절 보정표를 저장한다.
 static MeasurementRunner_t measurement_runner;                     // 현재 실측 단계를 저장한다.
 static float measurement_target_rad[ROBOT_JOINT_COUNT];             // 현재 18개 관절 목표각을 저장한다.
-static float measurement_minimum_angle_rad[ROBOT_JOINT_COUNT];      // -20도 보정각을 저장한다.
-static float measurement_zero_angle_rad[ROBOT_JOINT_COUNT];         // 0도 보정각을 저장한다.
-static float measurement_maximum_angle_rad[ROBOT_JOINT_COUNT];      // +20도 보정각을 저장한다.
 static int8_t measurement_direction[ROBOT_JOINT_COUNT];             // ADC 증가 방향을 저장한다.
 static uint32_t measurement_last_control_ms;                        // 최근 PWM 갱신 시각을 저장한다.
 static uint32_t measurement_last_adc_ms;                            // 최근 ADC 실행 시각을 저장한다.
 static uint32_t measurement_phase_start_ms;                         // 현재 측정 단계 시작 시각을 저장한다.
 static uint32_t measurement_sample_sum;                             // 현재 위치 ADC 합계를 저장한다.
 static uint16_t measurement_sample_count;                           // 현재 위치 ADC 표본 수를 저장한다.
-static uint8_t measurement_joint_index;                             // 현재 전체 관절 번호 0~17을 저장한다.
+static uint8_t measurement_target_index;                            // 현재 대상 순서를 저장한다.
+static uint8_t measurement_joint_index;                             // 현재 전체 관절 번호를 저장한다.
 static MeasurementStage5_Phase_t measurement_phase;                // 현재 관절 측정 단계를 저장한다.
 static bool measurement_initialized;                               // 5단계 실행 가능 여부를 저장한다.
+
+static const uint8_t measurement_target_joint[MEASUREMENT_STAGE5_TARGET_COUNT] =
+{
+    2U,  // L1 J3 전체 관절 번호를 저장한다.
+    5U   // L2 J3 전체 관절 번호를 저장한다.
+};
 
 /* 모든 다리 전원과 PWM을 정지한다. */
 static void MeasurementStage5_StopOutputs(void)
@@ -180,30 +185,45 @@ static bool MeasurementStage5_ValidateJoint(void)
     return true;
 }
 
-/* 18개 관절의 세 위치 결과로 최종 보정표를 만든다. */
+/* 선택한 두 관절만 새 ADC 보정값으로 교체한다. */
 static bool MeasurementStage5_BuildTable(void)
 {
-    uint32_t joint;  // 보정각을 준비할 관절 번호를 저장한다.
+    uint32_t target;  // 교체할 대상 순서를 저장한다.
 
-    measurement_joint.minimum_captured = true;  // 전체 -20도 측정 완료를 표시한다.
-    measurement_joint.zero_captured = true;     // 전체 0도 측정 완료를 표시한다.
-    measurement_joint.maximum_captured = true;  // 전체 +20도 측정 완료를 표시한다.
+    memcpy(measurement_table,
+           g_robot_calibration.joint,
+           sizeof(measurement_table));  // 비대상 관절의 기존 보정값을 유지한다.
 
-    for (joint = 0U; joint < ROBOT_JOINT_COUNT; ++joint)
+    for (target = 0U; target < MEASUREMENT_STAGE5_TARGET_COUNT; ++target)
     {
-        measurement_minimum_angle_rad[joint] =
-            -MEASUREMENT_STAGE5_TEST_ANGLE_DEG * ROBOT_DEG_TO_RAD_F;  // 음의 보정각을 넣는다.
-        measurement_zero_angle_rad[joint] = 0.0f;                     // 영점 보정각을 넣는다.
-        measurement_maximum_angle_rad[joint] =
-             MEASUREMENT_STAGE5_TEST_ANGLE_DEG * ROBOT_DEG_TO_RAD_F;  // 양의 보정각을 넣는다.
+        const uint8_t joint = measurement_target_joint[target];                // 교체할 관절을 선택한다.
+        const uint16_t negative = measurement_joint.minimum[joint];             // -20도 ADC를 읽는다.
+        const uint16_t zero = measurement_joint.zero[joint];                    // 0도 ADC를 읽는다.
+        const uint16_t positive = measurement_joint.maximum[joint];             // +20도 ADC를 읽는다.
+        const uint16_t raw_min = (negative < positive) ? negative : positive;   // 작은 ADC 끝점을 선택한다.
+        const uint16_t raw_max = (negative > positive) ? negative : positive;   // 큰 ADC 끝점을 선택한다.
+
+        if ((raw_min >= zero) || (zero >= raw_max) ||
+            ((measurement_direction[joint] != 1) &&
+             (measurement_direction[joint] != -1)))
+        {
+            return false;
+        }
+
+        measurement_table[joint].raw_min = raw_min;                                  // 작은 ADC 끝점을 저장한다.
+        measurement_table[joint].raw_zero = zero;                                    // 영점 ADC를 저장한다.
+        measurement_table[joint].raw_max = raw_max;                                  // 큰 ADC 끝점을 저장한다.
+        measurement_table[joint].angle_min_rad =
+            -MEASUREMENT_STAGE5_TEST_ANGLE_DEG * ROBOT_DEG_TO_RAD_F;                 // -20도 보정각을 저장한다.
+        measurement_table[joint].angle_zero_rad = 0.0f;                              // 영점 보정각을 저장한다.
+        measurement_table[joint].angle_max_rad =
+             MEASUREMENT_STAGE5_TEST_ANGLE_DEG * ROBOT_DEG_TO_RAD_F;                 // +20도 보정각을 저장한다.
+        measurement_table[joint].direction = measurement_direction[joint];           // ADC 증가 방향을 저장한다.
+        measurement_table[joint].calibrated = true;                                  // 대상 관절 실측 완료를 표시한다.
+        g_measurement_debug.calibration.joint[joint] = measurement_table[joint];     // 최종 보정값을 디버거에 표시한다.
     }
 
-    return JointCalibrationMeasurement_Build(&measurement_joint,
-                                              measurement_minimum_angle_rad,
-                                              measurement_zero_angle_rad,
-                                              measurement_maximum_angle_rad,
-                                              measurement_direction,
-                                              measurement_table);  // 18개 관절 보정표를 생성한다.
+    return true;
 }
 
 /* ADC 24채널을 읽고 현재 관절 표본을 누적한다. */
@@ -257,7 +277,7 @@ static void MeasurementStage5_UpdateAdc(uint32_t now_ms)
     }
 }
 
-/* SPI1 ADC와 18개 보정 PWM의 자동 관절센서 측정을 준비한다. */
+/* SPI1 ADC와 대상 두 관절의 자동 센서 측정을 준비한다. */
 bool MeasurementStage5_Init(SPI_HandleTypeDef *adc_spi,
                             TIM_HandleTypeDef *tim1,
                             TIM_HandleTypeDef *tim2,
@@ -276,8 +296,8 @@ bool MeasurementStage5_Init(SPI_HandleTypeDef *adc_spi,
     (void)MeasurementRunner_CompleteCurrent(&measurement_runner);  // 완료한 2단계를 건너뛴다.
     (void)MeasurementRunner_CompleteCurrent(&measurement_runner);  // 완료한 3단계를 건너뛴다.
     (void)MeasurementRunner_CompleteCurrent(&measurement_runner);  // 완료한 4단계를 건너뛴다.
-    g_measurement_debug.calibration = g_robot_calibration;         // 앞 단계의 중앙 설정값을 유지한다.
     JointCalibrationMeasurement_Init(&measurement_joint);         // 관절 ADC 측정 상태를 준비한다.
+    g_measurement_debug.calibration = g_robot_calibration;         // 비대상 관절의 기존 보정값을 복원한다.
     memset(&measurement_adc_data, 0, sizeof(measurement_adc_data)); // 이전 ADC 값을 제거한다.
     memset(measurement_table, 0, sizeof(measurement_table));       // 이전 보정표를 제거한다.
     memset(measurement_target_rad, 0, sizeof(measurement_target_rad));  // 전체 목표를 0도로 준비한다.
@@ -285,7 +305,8 @@ bool MeasurementStage5_Init(SPI_HandleTypeDef *adc_spi,
     Relay_Init();                                                  // 모든 다리 전원을 차단한다.
     ServoPwm_Init(&measurement_servo, &timers);                    // 18개 PWM 채널을 준비한다.
     measurement_initialized = false;                              // 초기화 완료 전 실행을 막는다.
-    measurement_joint_index = 0U;                                 // 1번 다리 J1부터 시작한다.
+    measurement_target_index = 0U;                                // 첫 대상부터 시작한다.
+    measurement_joint_index = measurement_target_joint[0];        // L1 J3를 첫 관절로 선택한다.
     g_measurement_debug.joint_calibration_completed_count = 0U;   // 완료 관절 수를 초기화한다.
     g_measurement_debug.joint_calibration_error_joint = 0U;       // 오류 관절을 초기화한다.
     g_measurement_debug.joint_calibration_complete = false;       // 전체 완료 전으로 표시한다.
@@ -350,7 +371,7 @@ bool MeasurementStage5_Init(SPI_HandleTypeDef *adc_spi,
     return true;
 }
 
-/* 한 관절씩 -20·0·+20도 ADC를 평균하여 보정표를 만든다. */
+/* 대상 두 관절의 -20·0·+20도 ADC를 평균한다. */
 void MeasurementStage5_Process(void)
 {
     const uint32_t now_ms = HAL_GetTick();  // 현재 실측 시각을 저장한다.
@@ -427,12 +448,11 @@ void MeasurementStage5_Process(void)
     if ((measurement_phase == MEASUREMENT_STAGE5_RELAY_OFF) &&
         (elapsed_ms >= MEASUREMENT_STAGE5_RELAY_OFF_TIME_MS))
     {
-        ++measurement_joint_index;  // 다음 전체 관절 번호로 이동한다.
-        if (measurement_joint_index >= ROBOT_JOINT_COUNT)
+        ++measurement_target_index;  // 다음 대상 관절로 이동한다.
+        if (measurement_target_index >= MEASUREMENT_STAGE5_TARGET_COUNT)
         {
             if (!MeasurementStage5_BuildTable())
             {
-                measurement_joint_index = ROBOT_JOINT_COUNT - 1U;  // 오류 표시 관절을 범위 안에 둔다.
                 MeasurementStage5_Fail();  // 최종 보정표 생성 실패를 표시한다.
                 return;
             }
@@ -450,6 +470,8 @@ void MeasurementStage5_Process(void)
             return;
         }
 
+        measurement_joint_index =
+            measurement_target_joint[measurement_target_index];  // 다음 실측 관절을 선택한다.
         if (!MeasurementStage5_StartJoint(now_ms))
         {
             MeasurementStage5_Fail();  // 다음 릴레이 시작 실패 시 시험을 중단한다.

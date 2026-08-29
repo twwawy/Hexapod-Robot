@@ -11,7 +11,7 @@ bool MeasurementStage5_Init(SPI_HandleTypeDef *adc_spi,
                             TIM_HandleTypeDef *tim3,
                             TIM_HandleTypeDef *tim4,
                             TIM_HandleTypeDef *tim5,
-                            TIM_HandleTypeDef *tim8);  // 5단계 관절 ADC 자동 보정을 준비한다.
-void MeasurementStage5_Process(void);  // 한 관절씩 ±20도에서 ADC 보정을 진행한다.
+                            TIM_HandleTypeDef *tim8);  // L1 J3·L2 J3 ADC 자동 보정을 준비한다.
+void MeasurementStage5_Process(void);  // 대상 두 관절의 ±20도 ADC 보정을 진행한다.
 
 #endif

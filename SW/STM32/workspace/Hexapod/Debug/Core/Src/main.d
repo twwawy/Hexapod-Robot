@@ -50,7 +50,9 @@ Core/Src/main.o: ../Core/Src/main.c ../Core/Inc/main.h \
  ../Core/Inc/sensor/sensor_manager.h ../Core/Inc/sensor/joint_feedback.h \
  ../Core/Inc/user_command/crsf_protocol.h \
  ../Core/Inc/user_command/crsf_receiver.h \
- ../Core/Inc/user_command/user_command.h
+ ../Core/Inc/user_command/user_command.h \
+ ../Core/Inc/measurement/measurement_stage4.h \
+ ../Core/Inc/measurement/measurement_stage5.h
 ../Core/Inc/main.h:
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal.h:
 ../Core/Inc/stm32f4xx_hal_conf.h:
@@ -111,3 +113,5 @@ Core/Src/main.o: ../Core/Src/main.c ../Core/Inc/main.h \
 ../Core/Inc/user_command/crsf_protocol.h:
 ../Core/Inc/user_command/crsf_receiver.h:
 ../Core/Inc/user_command/user_command.h:
+../Core/Inc/measurement/measurement_stage4.h:
+../Core/Inc/measurement/measurement_stage5.h:

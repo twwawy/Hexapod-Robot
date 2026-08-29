@@ -45,10 +45,10 @@ const RobotCalibration_t g_robot_calibration =
     {
         JOINT_CALIBRATION( 91U, 104U, 118U, -1),  // L1 J1의 ADC 보정값과 방향을 저장한다.
         JOINT_CALIBRATION( 98U, 112U, 126U,  1),  // L1 J2의 ADC 보정값과 방향을 저장한다.
-        JOINT_CALIBRATION(106U, 121U, 133U, -1),  // L1 J3의 ADC 보정값과 방향을 저장한다.
+        JOINT_CALIBRATION( 97U, 111U, 124U, -1),  // L1 J3의 ADC 보정값과 방향을 저장한다.
         JOINT_CALIBRATION(100U, 113U, 127U, -1),  // L2 J1의 ADC 보정값과 방향을 저장한다.
         JOINT_CALIBRATION( 96U, 109U, 123U,  1),  // L2 J2의 ADC 보정값과 방향을 저장한다.
-        JOINT_CALIBRATION(101U, 115U, 129U, -1),  // L2 J3의 ADC 보정값과 방향을 저장한다.
+        JOINT_CALIBRATION(100U, 113U, 127U, -1),  // L2 J3의 ADC 보정값과 방향을 저장한다.
         JOINT_CALIBRATION(101U, 114U, 129U, -1),  // L3 J1의 ADC 보정값과 방향을 저장한다.
         JOINT_CALIBRATION(100U, 113U, 127U,  1),  // L3 J2의 ADC 보정값과 방향을 저장한다.
         JOINT_CALIBRATION( 93U, 106U, 119U, -1),  // L3 J3의 ADC 보정값과 방향을 저장한다.
@@ -65,8 +65,8 @@ const RobotCalibration_t g_robot_calibration =
 
     .pressure =
     {
-        { 46U, 15U, true, true},  // 다리 1의 30% 접촉·10% 해제값을 저장한다.
-        {120U, 40U, true, true},  // 다리 2의 30% 접촉·10% 해제값을 저장한다.
+        { 35U, 11U, true, true},  // 다리 1의 30% 접촉·10% 해제값을 저장한다.
+        {165U, 55U, true, true},  // 다리 2의 30% 접촉·10% 해제값을 저장한다.
         { 44U, 14U, true, true},  // 다리 3의 30% 접촉·10% 해제값을 저장한다.
         { 31U, 11U, true, true},  // 다리 4의 30% 접촉·10% 해제값을 저장한다.
         { 51U, 17U, true, true},  // 다리 5의 30% 접촉·10% 해제값을 저장한다.
@@ -77,10 +77,10 @@ const RobotCalibration_t g_robot_calibration =
     {
         SERVO_CALIBRATION(-12.0f,  1),  // L1 J1의 중립각과 방향을 저장한다.
         SERVO_CALIBRATION(  7.0f, -1),  // L1 J2의 중립각과 방향을 저장한다.
-        SERVO_CALIBRATION(  8.0f,  1),  // L1 J3의 중립각과 방향을 저장한다.
+        SERVO_CALIBRATION( -3.0f,  1),  // L1 J3의 중립각과 방향을 저장한다.
         SERVO_CALIBRATION(  6.0f,  1),  // L2 J1의 중립각과 방향을 저장한다.
         SERVO_CALIBRATION(  9.0f, -1),  // L2 J2의 중립각과 방향을 저장한다.
-        SERVO_CALIBRATION(  1.0f,  1),  // L2 J3의 중립각과 방향을 저장한다.
+        SERVO_CALIBRATION( -2.0f,  1),  // L2 J3의 중립각과 방향을 저장한다.
         SERVO_CALIBRATION( -2.0f,  1),  // L3 J1의 중립각과 방향을 저장한다.
         SERVO_CALIBRATION(  4.0f, -1),  // L3 J2의 중립각과 방향을 저장한다.
         SERVO_CALIBRATION( -7.0f,  1),  // L3 J3의 중립각과 방향을 저장한다.

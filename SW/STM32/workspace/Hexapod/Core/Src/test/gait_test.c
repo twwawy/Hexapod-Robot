@@ -269,19 +269,32 @@ static bool GaitTest_CheckLateLandingLimit(void)
     return true;
 }
 
-/* 첫 보행이 지연 없이 세 지점 검사를 요청하는지 확인한다. */
+/* 첫 보행이 0.1초 대기 후 세 지점 검사를 요청하는지 확인한다. */
 static bool GaitTest_CheckStartupPreview(void)
 {
     GaitManager_Handle_t manager;   // 시험용 첫 보행 상태를 저장한다.
     RobotGaitPhase_t gait;          // 첫 보행 다리 상태를 저장한다.
     bool contact[ROBOT_LEG_COUNT];  // 시험용 발 접촉 상태를 저장한다.
+    uint32_t cycle;                 // 입력 안정 대기 주기를 저장한다.
 
     memset(contact, 0, sizeof(contact));  // Swing 허용용 미접촉 상태를 만든다.
     GaitManager_Init(&manager);           // 첫 보행 상태를 초기화한다.
 
+    for (cycle = 0U; cycle < ROBOT_GAIT_START_DELAY_CYCLES; ++cycle)
+    {
+        gait = GaitManager_Step(&manager, true, true, false, false,
+                                ROBOT_TRIPOD_NORMAL,
+                                0.0f, contact);  // 0.1초 동안 입력을 안정시킨다.
+        if (!gait.enabled_internal || !gait.startup_phase ||
+            !gait.waiting_start || gait.next_phase_preview)
+        {
+            return false;
+        }
+    }
+
     gait = GaitManager_Step(&manager, true, true, false, false,
                             ROBOT_TRIPOD_NORMAL,
-                            0.0f, contact);  // 첫 제어 주기에 세 지점 검사를 요청한다.
+                            0.0f, contact);  // 대기 후 세 지점 검사를 요청한다.
     if (!gait.enabled_internal || !gait.startup_phase || !gait.waiting_start ||
         !gait.next_phase_preview || (gait.next_phase_swing_mask != 0x15U))
     {
@@ -290,7 +303,7 @@ static bool GaitTest_CheckStartupPreview(void)
 
     gait = GaitManager_Step(&manager, true, true, true, true,
                             ROBOT_TRIPOD_NORMAL,
-                            0.0f, contact);  // 다음 제어 주기에 첫 위상을 시작한다.
+                            0.0f, contact);  // 검사 통과 후 첫 위상을 시작한다.
     return (gait.state[0] == ROBOT_LEG_SWING) &&
            (gait.state[1] == ROBOT_LEG_STANCE) &&
            (gait.progress[0] == 0.0f);  // 1·3·5 Swing이 진행률 0에서 시작하는지 확인한다.
@@ -368,10 +381,18 @@ static bool GaitTest_CheckPhaseTwistLatch(void)
     return fabsf(trajectory.phase_twist.vx - 0.20f) < 0.0000001f;  // 0.20 m/s 고정을 확인한다.
 }
 
-/* 한 주기 경로 검사를 통과시켜 정상 보행을 시작한다. */
+/* 입력 안정 대기와 세 지점 검사를 통과시켜 정상 보행을 시작한다. */
 static RobotGaitPhase_t GaitTest_StartNormal(GaitManager_Handle_t *manager,
                                              const bool contact[ROBOT_LEG_COUNT])
 {
+    uint32_t cycle;  // 입력 안정 대기 주기를 저장한다.
+
+    for (cycle = 0U; cycle < ROBOT_GAIT_START_DELAY_CYCLES; ++cycle)
+    {
+        (void)GaitManager_Step(manager, true, true, false, false,
+                               ROBOT_TRIPOD_NORMAL,
+                               0.0f, contact);  // 첫 입력 안정 대기를 진행한다.
+    }
     (void)GaitManager_Step(manager, true, true, false, false,
                            ROBOT_TRIPOD_NORMAL,
                            0.0f, contact);  // 첫 위상 세 지점 검사를 요청한다.
@@ -381,7 +402,7 @@ static RobotGaitPhase_t GaitTest_StartNormal(GaitManager_Handle_t *manager,
                             0.0f, contact);  // 검사 통과 결과로 첫 위상을 시작한다.
 }
 
-/* 여섯 발 착륙 즉시 검사 요청과 다음 위상 전환을 확인한다. */
+/* 조기 착지 뒤에도 위상 끝에서 검사와 다음 전환을 수행하는지 확인한다. */
 static bool GaitTest_CheckPreviewTransition(void)
 {
     GaitManager_Handle_t manager;   // 시험용 다음 위상 상태를 저장한다.
@@ -407,11 +428,32 @@ static bool GaitTest_CheckPreviewTransition(void)
     memset(contact, 1, sizeof(contact));  // 여섯 발의 확정 착지를 만든다.
     gait = GaitManager_Step(&manager, true, true, false, false,
                             ROBOT_TRIPOD_NORMAL,
-                            0.0f, contact);  // 1초 전에 다음 경로 검사를 요청한다.
+                            0.0f, contact);  // 조기 착지를 확정하되 현재 위상을 유지한다.
+    if (gait.next_phase_preview || (manager.phase_index != 0U) ||
+        (manager.phase_time_s >= ROBOT_GAIT_PHASE_TIME_S))
+    {
+        return false;
+    }
+
+    while (manager.phase_cycle_count <
+           ((uint32_t)(ROBOT_GAIT_PHASE_TIME_S / ROBOT_CONTROL_PERIOD_S) - 1U))
+    {
+        gait = GaitManager_Step(&manager, true, true, false, false,
+                                ROBOT_TRIPOD_NORMAL,
+                                0.0f, contact);  // 착지한 발로 남은 위상을 완료한다.
+        if (gait.next_phase_preview || (manager.phase_index != 0U))
+        {
+            return false;
+        }
+    }
+
+    gait = GaitManager_Step(&manager, true, true, false, false,
+                            ROBOT_TRIPOD_NORMAL,
+                            0.0f, contact);  // 실제 위상 끝에서 세 지점 검사를 요청한다.
     if (!gait.next_phase_preview || (gait.next_phase_swing_mask != 0x2AU) ||
         !gait.waiting_start || !manager.next_phase_enable ||
         !manager.next_phase_locked ||
-        (manager.phase_time_s >= ROBOT_GAIT_PHASE_TIME_S))
+        (manager.phase_time_s < ROBOT_GAIT_PHASE_TIME_S))
     {
         return false;
     }
@@ -449,26 +491,19 @@ static bool GaitTest_CheckResumeTripod(void)
     }
 
     memset(contact, 1, sizeof(contact));  // 여섯 발의 확정 착지를 만든다.
-    gait = GaitManager_Step(&manager, true, false, false, false,
-                            ROBOT_TRIPOD_NORMAL,
-                            0.0f, contact);  // 착륙 시 정지 입력을 반영한다.
+    do
+    {
+        gait = GaitManager_Step(&manager, true, false, false, false,
+                                ROBOT_TRIPOD_NORMAL,
+                                0.0f, contact);  // 정지 입력으로 남은 현재 위상을 완료한다.
+    } while (gait.enabled_internal &&
+             (manager.phase_time_s <= ROBOT_GAIT_PHASE_TIME_S));
     if (gait.enabled_internal || !manager.resume_phase || (manager.phase_index != 1U))
     {
         return false;
     }
 
-    gait = GaitManager_Step(&manager, true, true, false, false,
-                            ROBOT_TRIPOD_NORMAL,
-                            0.0f, contact);  // 재시작 즉시 세 지점 검사를 요청한다.
-    if (!gait.waiting_start || !gait.next_phase_preview ||
-        (gait.next_phase_swing_mask != 0x2AU))
-    {
-        return false;
-    }
-
-    gait = GaitManager_Step(&manager, true, true, true, true,
-                            ROBOT_TRIPOD_NORMAL,
-                            0.0f, contact);  // 다음 제어 주기에 반대 Tripod를 재개한다.
+    gait = GaitTest_StartNormal(&manager, contact);  // 입력 대기 후 반대 Tripod를 재개한다.
     return !gait.startup_phase &&
            (gait.state[0] == ROBOT_LEG_STANCE) &&
            (gait.state[1] == ROBOT_LEG_SWING);  // 2·4·6 Swing 재개를 확인한다.
@@ -480,8 +515,16 @@ static RobotGaitPhase_t GaitTest_StartConfirmedNormal(
     bool contact[ROBOT_LEG_COUNT],
     bool contact_raw[ROBOT_LEG_COUNT])
 {
+    uint32_t cycle;  // 입력 안정 대기 주기를 저장한다.
+
     memset(contact, 1, sizeof(bool) * ROBOT_LEG_COUNT);      // 시작 전 여섯 발 접촉을 확정한다.
     memset(contact_raw, 1, sizeof(bool) * ROBOT_LEG_COUNT);  // 시작 전 여섯 접촉 후보를 준비한다.
+    for (cycle = 0U; cycle < ROBOT_GAIT_START_DELAY_CYCLES; ++cycle)
+    {
+        (void)GaitManager_StepContacts(manager, true, true, false, false,
+                                       ROBOT_TRIPOD_NORMAL, 0.0f,
+                                       contact, contact_raw);  // 첫 입력 안정 대기를 진행한다.
+    }
     (void)GaitManager_StepContacts(manager, true, true, false, false,
                                    ROBOT_TRIPOD_NORMAL, 0.0f,
                                    contact, contact_raw);  // 첫 위상 세 지점 검사를 요청한다.
@@ -490,7 +533,7 @@ static RobotGaitPhase_t GaitTest_StartConfirmedNormal(
                                     contact, contact_raw);  // 검사 통과로 첫 위상을 시작한다.
 }
 
-/* 접촉 후보 취소 뒤 재상승 없이 착지를 계속하는지 검사한다. */
+/* 접촉 후보 취소 뒤 남은 Swing을 이어가는지 검사한다. */
 static bool GaitTest_CheckTouchdownConfirmation(void)
 {
     GaitManager_Handle_t manager;             // 접촉 확인 시험 상태를 저장한다.
@@ -525,8 +568,8 @@ static bool GaitTest_CheckTouchdownConfirmation(void)
     contact_raw[0] = false;  // 5 ms 전에 접촉 후보를 취소한다.
     gait = GaitManager_StepContacts(&manager, true, true, false, false,
                                     ROBOT_TRIPOD_NORMAL, 0.0f,
-                                    contact, contact_raw);  // 현재 높이에서 지면 탐색을 재개한다.
-    if (gait.state[0] != ROBOT_LEG_LATE_LANDING)
+                                    contact, contact_raw);  // 고정 위치에서 남은 Swing을 재개한다.
+    if (gait.state[0] != ROBOT_LEG_SWING)
     {
         return false;
     }

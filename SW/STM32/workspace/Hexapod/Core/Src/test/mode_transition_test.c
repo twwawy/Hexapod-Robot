@@ -85,9 +85,9 @@ static bool ModeTransitionTest_CheckSwitchFunctions(void)
 
     user.sb = 1U;  // SB 서기 유지 위치로 돌아간다.
     user.sc = 2U;  // SE 해제 후 복원할 보정 모드를 선택한다.
-    user.se = 1U;  // SE의 명령 없는 READY를 요청한다.
-    output = ControlPriority_Step(&control, &user, true, false, &safety);  // SE 기능을 적용한다.
-    if ((output.active_mode != ROBOT_MODE_READY) || output.reset_command)
+    user.se = 1U;  // SE의 기본 자세 READY를 요청한다.
+    output = ControlPriority_Step(&control, &user, true, false, &safety);  // SE 기본 자세 복귀를 적용한다.
+    if ((output.active_mode != ROBOT_MODE_READY) || !output.reset_command)
     {
         return false;
     }

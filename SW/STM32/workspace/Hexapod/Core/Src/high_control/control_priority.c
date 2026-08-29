@@ -158,6 +158,7 @@ RobotPriorityOutput_t ControlPriority_Step(ControlPriority_Handle_t *handle,
         if (ready_request)
         {
             output.active_mode = ROBOT_MODE_READY;  // SE 활성화 중 조종 명령을 차단한다.
+            output.reset_command = true;            // SE 활성화 중 기본 자세로 복귀한다.
         }
         else if (arm_request)
         {

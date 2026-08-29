@@ -40,6 +40,17 @@ static int32_t JetsonSpi_RoundFloat(float value)
     return (int32_t)(value - 0.5f);
 }
 
+/* Jetson 좌표계에 맞춰 송신할 관절각의 부호만 변환한다. */
+static float JetsonSpi_GetTransmitJointAngle(uint32_t joint, float angle_rad)
+{
+    const uint32_t leg = joint / ROBOT_JOINTS_PER_LEG;             // 0부터 시작하는 다리 번호를 구한다.
+    const uint32_t joint_in_leg = joint % ROBOT_JOINTS_PER_LEG;    // 다리 안의 관절 번호를 구한다.
+    const bool invert = ((leg < 3U) && (joint_in_leg == 1U)) ||
+                        ((leg >= 3U) && (joint_in_leg == 2U));      // 앞 세 다리 2번과 뒤 세 다리 3번 관절을 선택한다.
+
+    return invert ? -angle_rad : angle_rad;                        // 원본을 바꾸지 않고 송신값만 반전한다.
+}
+
 static uint8_t JetsonSpi_EncodeJoint(float angle_rad)
 {
     float normalized;
@@ -259,7 +270,8 @@ bool JetsonSpi_PrepareSensorFrame(JetsonSpi_Handle_t *handle,
     for (joint = 0U; joint < ROBOT_JOINT_COUNT; ++joint)
     {
         handle->tx_frame[JETSON_SPI_OFFSET_JOINTS + joint] =
-            JetsonSpi_EncodeJoint(snapshot->joint_angle_rad[joint]);
+            JetsonSpi_EncodeJoint(JetsonSpi_GetTransmitJointAngle(
+                joint, snapshot->joint_angle_rad[joint]));  // Jetson 송신 좌표계로만 변환해 인코딩한다.
     }
 
     for (leg = 0U; leg < ROBOT_LEG_COUNT; ++leg)
