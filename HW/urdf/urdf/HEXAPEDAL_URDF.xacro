@@ -1119,19 +1119,19 @@
 
 <link name="livox_mid_360_1">
   <inertial>
-    <origin xyz="-0.0180002892165137 -0.012662743628037466 -0.026067727094593318" rpy="0 0 0"/>
+    <origin xyz="-0.024 0.018 -0.016243934732367332" rpy="0 0 0"/>
     <mass value="1.055789101972525"/>
-    <inertia ixx="0.000443" iyy="0.000506" izz="0.000632" ixy="0.0" iyz="-0.000109" ixz="-0.0"/>
+    <inertia ixx="0.00044310323098749614" iyy="0.000443" izz="0.0006948967690125037" ixy="0.0" iyz="0.0" ixz="5.9600438419613695e-8"/>
   </inertial>
   <visual>
-    <origin xyz="-0.018071 -0.036714 -0.304727" rpy="0 0 0"/>
+    <origin xyz="-0.18415863546375527 0.01807071078348564 -0.24554431588256895" rpy="-0.5235987755982988 0 -1.5707963267948966"/>
     <geometry>
       <mesh filename="package://HEXAPEDAL_URDF_description/meshes/livox_mid_360_1.stl" scale="0.001 0.001 0.001"/>
     </geometry>
     <material name="silver"/>
   </visual>
   <collision>
-    <origin xyz="-0.018071 -0.036714 -0.304727" rpy="0 0 0"/>
+    <origin xyz="-0.18415863546375527 0.01807071078348564 -0.24554431588256895" rpy="-0.5235987755982988 0 -1.5707963267948966"/>
     <geometry>
       <mesh filename="package://HEXAPEDAL_URDF_description/meshes/livox_mid_360_1.stl" scale="0.001 0.001 0.001"/>
     </geometry>
@@ -3110,7 +3110,8 @@
 </joint>
 
 <joint name="강체 202" type="fixed">
-  <origin xyz="0.038 0.056785 -0.030373" rpy="0 0 0"/>
+  <!-- Fusion joint geometryOne: red X, green Y, blue Z. -->
+  <origin xyz="0.03799971078348564 0.0567848986966054 -0.03037306695894683" rpy="0 -0.5235987755982988 1.5707963267948966"/>
   <parent link="M_column_3_1"/>
   <child link="livox_mid_360_1"/>
 </joint>
@@ -3284,7 +3285,8 @@
 </joint>
 
 <joint name="강체 201" type="fixed">
-  <origin xyz="-0.018 -0.003261 -0.042352" rpy="0 0 0"/>
+  <!-- Counter-transform keeps the FOV mesh at its original world pose. -->
+  <origin xyz="-0.024 0.018 -0.035047" rpy="-0.5235987755982988 0 -1.5707963267948966"/>
   <parent link="livox_mid_360_1"/>
   <child link="mid-360-fov-asm_ver.ksh_MID-360_4_1_1_1"/>
 </joint>
