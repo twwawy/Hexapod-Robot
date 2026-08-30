@@ -17,9 +17,8 @@ extern TIM_HandleTypeDef htim4;   // 4·6번 일부 서보 Timer를 연결한다
 extern TIM_HandleTypeDef htim5;   // 5번 일부 서보 Timer를 연결한다.
 extern TIM_HandleTypeDef htim6;   // 1 ms 기준 Timer를 연결한다.
 extern TIM_HandleTypeDef htim8;   // 5번 일부 서보 Timer를 연결한다.
-extern UART_HandleTypeDef huart2; // GPS UART Handle을 연결한다.
+extern UART_HandleTypeDef huart2; // CN3 USART2 UART Handle을 연결한다.
 extern UART_HandleTypeDef huart3; // WT931 UART Handle을 연결한다.
-extern UART_HandleTypeDef huart5; // 매니퓰레이터 UART Handle을 연결한다.
 extern UART_HandleTypeDef huart6; // CRSF UART Handle을 연결한다.
 
 HexapodApp_Handle_t g_hexapod_app;              // 최종 앱의 전체 실행 상태를 저장한다.
@@ -511,7 +510,7 @@ HAL_StatusTypeDef HexapodApp_Init(HexapodApp_Handle_t *handle,
         }
     }
     ManipulatorLink_Init(&handle->manipulator,
-                         hardware->manipulator_uart);  // UART5 유선 매니퓰레이터 송신을 준비한다.
+                         hardware->manipulator_uart);  // USART2 유선 매니퓰레이터 송신을 준비한다.
     RobotTelemetry_Init(&handle->telemetry);  // 관제 패킷 주기를 초기화한다.
 
     if (hardware->jetson_spi != NULL)
@@ -1029,7 +1028,7 @@ void HexapodApp_UartTxCpltCallback(HexapodApp_Handle_t *handle,
         return;
     }
 
-    ManipulatorLink_TxCpltCallback(&handle->manipulator, uart);  // UART5이면 다음 송신을 허가한다.
+    ManipulatorLink_TxCpltCallback(&handle->manipulator, uart);  // 매니퓰레이터 UART이면 다음 송신을 허가한다.
 }
 
 /* 현재 CubeMX Handle을 최종 앱 장치에 연결한다. */
@@ -1040,7 +1039,7 @@ HAL_StatusTypeDef HexapodApp_BoardInit(void)
     hardware.gps_uart = &huart2;           // GPS를 USART2에 연결한다.
     hardware.imu_uart = &huart3;           // WT931을 USART3에 연결한다.
     hardware.lora_uart = NULL;             // 실기 검증 전 LoRa를 비활성화한다.
-    hardware.manipulator_uart = &huart5;   // 기존 LoRa 포트를 유선 매니퓰레이터 TX로 사용한다.
+    hardware.manipulator_uart = &huart2;   // CN3의 USART2 TX로 매니퓰레이터 명령을 송신한다.
     hardware.crsf_uart = &huart6;          // CRSF를 USART6에 연결한다.
     hardware.adc_spi = &hspi1;             // MCP3008을 SPI1에 연결한다.
     hardware.jetson_spi = &hspi2;          // Jetson 32바이트 SPI2 Slave 통신을 활성화한다.
