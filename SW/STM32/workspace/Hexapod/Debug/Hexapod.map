@@ -491,7 +491,7 @@ Discarded input sections
  .debug_macro   0x00000000       0x3c ./Core/Src/app/pressure_load_calibration.o
  .debug_macro   0x00000000       0x20 ./Core/Src/app/pressure_load_calibration.o
  .debug_line    0x00000000      0xa6c ./Core/Src/app/pressure_load_calibration.o
- .debug_str     0x00000000     0x8a94 ./Core/Src/app/pressure_load_calibration.o
+ .debug_str     0x00000000     0x8a95 ./Core/Src/app/pressure_load_calibration.o
  .comment       0x00000000       0x44 ./Core/Src/app/pressure_load_calibration.o
  .debug_frame   0x00000000       0xe4 ./Core/Src/app/pressure_load_calibration.o
  .ARM.attributes
@@ -1208,6 +1208,7 @@ Discarded input sections
  .text.ContactAdaptation_IsEarlyLanding
                 0x00000000       0x4a ./Core/Src/high_control/contact_adaptation.o
  .debug_macro   0x00000000      0xad8 ./Core/Src/high_control/contact_adaptation.o
+ .debug_macro   0x00000000      0x208 ./Core/Src/high_control/contact_adaptation.o
  .debug_macro   0x00000000       0x22 ./Core/Src/high_control/contact_adaptation.o
  .debug_macro   0x00000000       0x22 ./Core/Src/high_control/contact_adaptation.o
  .debug_macro   0x00000000       0x8e ./Core/Src/high_control/contact_adaptation.o
@@ -12318,7 +12319,7 @@ LOAD C:/Program_TW/ST/STM32CubeIDE_2.2.0/STM32CubeIDE/plugins/com.st.stm32cube.i
  .debug_rnglists
                 0x000013c4      0x1bc ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_uart.o
 
-.debug_macro    0x00000000    0x28288
+.debug_macro    0x00000000    0x28080
  .debug_macro   0x00000000      0x318 ./Core/Src/app/control_timing_debug.o
  .debug_macro   0x00000318      0xad8 ./Core/Src/app/control_timing_debug.o
  .debug_macro   0x00000df0      0x208 ./Core/Src/app/control_timing_debug.o
@@ -12413,74 +12414,73 @@ LOAD C:/Program_TW/ST/STM32CubeIDE_2.2.0/STM32CubeIDE/plugins/com.st.stm32cube.i
  .debug_macro   0x00022172      0x177 ./Core/Src/high_control/body_position_estimator.o
  .debug_macro   0x000222e9      0x18f ./Core/Src/high_control/body_posture_controller.o
  .debug_macro   0x00022478      0x13d ./Core/Src/high_control/contact_adaptation.o
- .debug_macro   0x000225b5      0x208 ./Core/Src/high_control/contact_adaptation.o
- .debug_macro   0x000227bd      0x1a1 ./Core/Src/high_control/control_priority.o
- .debug_macro   0x0002295e      0x16d ./Core/Src/high_control/drone_controller.o
- .debug_macro   0x00022acb      0x1a5 ./Core/Src/high_control/foot_trajectory.o
- .debug_macro   0x00022c70      0x16d ./Core/Src/high_control/gait_manager.o
- .debug_macro   0x00022ddd      0x1a9 ./Core/Src/high_control/gait_pose_controller.o
- .debug_macro   0x00022f86      0x18b ./Core/Src/high_control/leg_kinematics.o
- .debug_macro   0x00023111      0x16d ./Core/Src/high_control/safety.o
- .debug_macro   0x0002327e      0x13d ./Core/Src/high_control/stance_trajectory.o
- .debug_macro   0x000233bb      0x149 ./Core/Src/high_control/stand_landing.o
- .debug_macro   0x00023504      0x13d ./Core/Src/high_control/swing_trajectory.o
- .debug_macro   0x00023641      0x191 ./Core/Src/high_control/workspace_limiter.o
- .debug_macro   0x000237d2      0x24e ./Core/Src/low_control/relay.o
- .debug_macro   0x00023a20      0x2dd ./Core/Src/low_control/servo_pwm.o
- .debug_macro   0x00023cfd      0x34c ./Core/Src/main.o
- .debug_macro   0x00024049       0x94 ./Core/Src/main.o
- .debug_macro   0x000240dd       0x76 ./Core/Src/main.o
- .debug_macro   0x00024153      0x1e7 ./Core/Src/stm32f4xx_hal_msp.o
- .debug_macro   0x0002433a      0x1f1 ./Core/Src/stm32f4xx_it.o
- .debug_macro   0x0002452b      0x274 ./Core/Src/syscalls.o
- .debug_macro   0x0002479f       0x5b ./Core/Src/syscalls.o
- .debug_macro   0x000247fa       0x94 ./Core/Src/syscalls.o
- .debug_macro   0x0002488e       0x57 ./Core/Src/syscalls.o
- .debug_macro   0x000248e5       0x10 ./Core/Src/syscalls.o
- .debug_macro   0x000248f5       0x10 ./Core/Src/syscalls.o
- .debug_macro   0x00024905       0x10 ./Core/Src/syscalls.o
- .debug_macro   0x00024915       0x10 ./Core/Src/syscalls.o
- .debug_macro   0x00024925       0x1c ./Core/Src/syscalls.o
- .debug_macro   0x00024941       0x52 ./Core/Src/syscalls.o
- .debug_macro   0x00024993       0x22 ./Core/Src/syscalls.o
- .debug_macro   0x000249b5       0x10 ./Core/Src/syscalls.o
- .debug_macro   0x000249c5       0x52 ./Core/Src/syscalls.o
- .debug_macro   0x00024a17       0xcf ./Core/Src/syscalls.o
- .debug_macro   0x00024ae6       0x1c ./Core/Src/syscalls.o
- .debug_macro   0x00024b02       0x3d ./Core/Src/syscalls.o
- .debug_macro   0x00024b3f       0x35 ./Core/Src/syscalls.o
- .debug_macro   0x00024b74      0x12c ./Core/Src/syscalls.o
- .debug_macro   0x00024ca0       0x10 ./Core/Src/syscalls.o
- .debug_macro   0x00024cb0      0x242 ./Core/Src/syscalls.o
- .debug_macro   0x00024ef2       0x10 ./Core/Src/syscalls.o
- .debug_macro   0x00024f02      0x18a ./Core/Src/syscalls.o
- .debug_macro   0x0002508c       0x16 ./Core/Src/syscalls.o
- .debug_macro   0x000250a2       0xce ./Core/Src/syscalls.o
- .debug_macro   0x00025170      0x112 ./Core/Src/sysmem.o
- .debug_macro   0x00025282      0x23c ./Core/Src/sysmem.o
- .debug_macro   0x000254be      0x1d8 ./Core/Src/system_stm32f4xx.o
- .debug_macro   0x00025696      0x251 ./Core/Src/measurement/measurement_debug.o
- .debug_macro   0x000258e7       0x92 ./Core/Src/sensor/foot_pressure.o
- .debug_macro   0x00025979      0x317 ./Core/Src/sensor/gps.o
- .debug_macro   0x00025c90      0x2f2 ./Core/Src/sensor/imu.o
- .debug_macro   0x00025f82       0x2e ./Core/Src/sensor/imu.o
- .debug_macro   0x00025fb0      0x16d ./Core/Src/sensor/joint_feedback.o
- .debug_macro   0x0002611d      0x2c7 ./Core/Src/sensor/mcp3008.o
- .debug_macro   0x000263e4      0x305 ./Core/Src/sensor/sensor_manager.o
- .debug_macro   0x000266e9      0x16c ./Core/Src/test/rc_command_generator.o
- .debug_macro   0x00026855      0x2e7 ./Core/Src/user_command/crsf_protocol.o
- .debug_macro   0x00026b3c      0x2c3 ./Core/Src/user_command/crsf_receiver.o
- .debug_macro   0x00026dff      0x178 ./Core/Src/user_command/user_command.o
- .debug_macro   0x00026f77      0x238 ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal.o
- .debug_macro   0x000271af      0x1d8 ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_cortex.o
- .debug_macro   0x00027387      0x1de ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_dma.o
- .debug_macro   0x00027565      0x1de ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_gpio.o
- .debug_macro   0x00027743      0x1fc ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_rcc.o
- .debug_macro   0x0002793f      0x1d8 ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_rcc_ex.o
- .debug_macro   0x00027b17      0x1e7 ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_spi.o
- .debug_macro   0x00027cfe      0x1d9 ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_tim.o
- .debug_macro   0x00027ed7      0x1d8 ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_tim_ex.o
- .debug_macro   0x000280af      0x1d9 ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_uart.o
+ .debug_macro   0x000225b5      0x1a1 ./Core/Src/high_control/control_priority.o
+ .debug_macro   0x00022756      0x16d ./Core/Src/high_control/drone_controller.o
+ .debug_macro   0x000228c3      0x1a5 ./Core/Src/high_control/foot_trajectory.o
+ .debug_macro   0x00022a68      0x16d ./Core/Src/high_control/gait_manager.o
+ .debug_macro   0x00022bd5      0x1a9 ./Core/Src/high_control/gait_pose_controller.o
+ .debug_macro   0x00022d7e      0x18b ./Core/Src/high_control/leg_kinematics.o
+ .debug_macro   0x00022f09      0x16d ./Core/Src/high_control/safety.o
+ .debug_macro   0x00023076      0x13d ./Core/Src/high_control/stance_trajectory.o
+ .debug_macro   0x000231b3      0x149 ./Core/Src/high_control/stand_landing.o
+ .debug_macro   0x000232fc      0x13d ./Core/Src/high_control/swing_trajectory.o
+ .debug_macro   0x00023439      0x191 ./Core/Src/high_control/workspace_limiter.o
+ .debug_macro   0x000235ca      0x24e ./Core/Src/low_control/relay.o
+ .debug_macro   0x00023818      0x2dd ./Core/Src/low_control/servo_pwm.o
+ .debug_macro   0x00023af5      0x34c ./Core/Src/main.o
+ .debug_macro   0x00023e41       0x94 ./Core/Src/main.o
+ .debug_macro   0x00023ed5       0x76 ./Core/Src/main.o
+ .debug_macro   0x00023f4b      0x1e7 ./Core/Src/stm32f4xx_hal_msp.o
+ .debug_macro   0x00024132      0x1f1 ./Core/Src/stm32f4xx_it.o
+ .debug_macro   0x00024323      0x274 ./Core/Src/syscalls.o
+ .debug_macro   0x00024597       0x5b ./Core/Src/syscalls.o
+ .debug_macro   0x000245f2       0x94 ./Core/Src/syscalls.o
+ .debug_macro   0x00024686       0x57 ./Core/Src/syscalls.o
+ .debug_macro   0x000246dd       0x10 ./Core/Src/syscalls.o
+ .debug_macro   0x000246ed       0x10 ./Core/Src/syscalls.o
+ .debug_macro   0x000246fd       0x10 ./Core/Src/syscalls.o
+ .debug_macro   0x0002470d       0x10 ./Core/Src/syscalls.o
+ .debug_macro   0x0002471d       0x1c ./Core/Src/syscalls.o
+ .debug_macro   0x00024739       0x52 ./Core/Src/syscalls.o
+ .debug_macro   0x0002478b       0x22 ./Core/Src/syscalls.o
+ .debug_macro   0x000247ad       0x10 ./Core/Src/syscalls.o
+ .debug_macro   0x000247bd       0x52 ./Core/Src/syscalls.o
+ .debug_macro   0x0002480f       0xcf ./Core/Src/syscalls.o
+ .debug_macro   0x000248de       0x1c ./Core/Src/syscalls.o
+ .debug_macro   0x000248fa       0x3d ./Core/Src/syscalls.o
+ .debug_macro   0x00024937       0x35 ./Core/Src/syscalls.o
+ .debug_macro   0x0002496c      0x12c ./Core/Src/syscalls.o
+ .debug_macro   0x00024a98       0x10 ./Core/Src/syscalls.o
+ .debug_macro   0x00024aa8      0x242 ./Core/Src/syscalls.o
+ .debug_macro   0x00024cea       0x10 ./Core/Src/syscalls.o
+ .debug_macro   0x00024cfa      0x18a ./Core/Src/syscalls.o
+ .debug_macro   0x00024e84       0x16 ./Core/Src/syscalls.o
+ .debug_macro   0x00024e9a       0xce ./Core/Src/syscalls.o
+ .debug_macro   0x00024f68      0x112 ./Core/Src/sysmem.o
+ .debug_macro   0x0002507a      0x23c ./Core/Src/sysmem.o
+ .debug_macro   0x000252b6      0x1d8 ./Core/Src/system_stm32f4xx.o
+ .debug_macro   0x0002548e      0x251 ./Core/Src/measurement/measurement_debug.o
+ .debug_macro   0x000256df       0x92 ./Core/Src/sensor/foot_pressure.o
+ .debug_macro   0x00025771      0x317 ./Core/Src/sensor/gps.o
+ .debug_macro   0x00025a88      0x2f2 ./Core/Src/sensor/imu.o
+ .debug_macro   0x00025d7a       0x2e ./Core/Src/sensor/imu.o
+ .debug_macro   0x00025da8      0x16d ./Core/Src/sensor/joint_feedback.o
+ .debug_macro   0x00025f15      0x2c7 ./Core/Src/sensor/mcp3008.o
+ .debug_macro   0x000261dc      0x305 ./Core/Src/sensor/sensor_manager.o
+ .debug_macro   0x000264e1      0x16c ./Core/Src/test/rc_command_generator.o
+ .debug_macro   0x0002664d      0x2e7 ./Core/Src/user_command/crsf_protocol.o
+ .debug_macro   0x00026934      0x2c3 ./Core/Src/user_command/crsf_receiver.o
+ .debug_macro   0x00026bf7      0x178 ./Core/Src/user_command/user_command.o
+ .debug_macro   0x00026d6f      0x238 ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal.o
+ .debug_macro   0x00026fa7      0x1d8 ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_cortex.o
+ .debug_macro   0x0002717f      0x1de ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_dma.o
+ .debug_macro   0x0002735d      0x1de ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_gpio.o
+ .debug_macro   0x0002753b      0x1fc ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_rcc.o
+ .debug_macro   0x00027737      0x1d8 ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_rcc_ex.o
+ .debug_macro   0x0002790f      0x1e7 ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_spi.o
+ .debug_macro   0x00027af6      0x1d9 ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_tim.o
+ .debug_macro   0x00027ccf      0x1d8 ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_tim_ex.o
+ .debug_macro   0x00027ea7      0x1d9 ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_uart.o
 
 .debug_line     0x00000000    0x2c8ae
  .debug_line    0x00000000     0x1109 ./Core/Src/app/control_timing_debug.o
@@ -12535,59 +12535,59 @@ LOAD C:/Program_TW/ST/STM32CubeIDE_2.2.0/STM32CubeIDE/plugins/com.st.stm32cube.i
  .debug_line    0x00028968     0x19af ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_tim_ex.o
  .debug_line    0x0002a317     0x2597 ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_uart.o
 
-.debug_str      0x00000000    0xdd6a5
- .debug_str     0x00000000    0xdd6a5 ./Core/Src/app/control_timing_debug.o
+.debug_str      0x00000000    0xdd682
+ .debug_str     0x00000000    0xdd682 ./Core/Src/app/control_timing_debug.o
                               0xd0384 (size before relaxing)
- .debug_str     0x000dd6a5    0xd3157 ./Core/Src/app/hexapod_app.o
- .debug_str     0x000dd6a5    0xd0636 ./Core/Src/common/robot_calibration.o
- .debug_str     0x000dd6a5    0xcfae9 ./Core/Src/communication/jetson_spi.o
- .debug_str     0x000dd6a5    0xcee0a ./Core/Src/communication/lora.o
- .debug_str     0x000dd6a5    0xcf4bd ./Core/Src/communication/manipulator_link.o
- .debug_str     0x000dd6a5     0x92c2 ./Core/Src/communication/robot_telemetry.o
- .debug_str     0x000dd6a5     0x8c06 ./Core/Src/high_control/body_position_estimator.o
- .debug_str     0x000dd6a5     0x8cca ./Core/Src/high_control/body_posture_controller.o
- .debug_str     0x000dd6a5     0x88ad ./Core/Src/high_control/contact_adaptation.o
- .debug_str     0x000dd6a5     0x8c82 ./Core/Src/high_control/control_priority.o
- .debug_str     0x000dd6a5     0x8dcb ./Core/Src/high_control/drone_controller.o
- .debug_str     0x000dd6a5     0x9267 ./Core/Src/high_control/foot_trajectory.o
- .debug_str     0x000dd6a5     0x8cc3 ./Core/Src/high_control/gait_manager.o
- .debug_str     0x000dd6a5     0x8da2 ./Core/Src/high_control/gait_pose_controller.o
- .debug_str     0x000dd6a5     0x8b21 ./Core/Src/high_control/leg_kinematics.o
- .debug_str     0x000dd6a5     0x8977 ./Core/Src/high_control/safety.o
- .debug_str     0x000dd6a5     0x87d9 ./Core/Src/high_control/stance_trajectory.o
- .debug_str     0x000dd6a5     0x8972 ./Core/Src/high_control/stand_landing.o
- .debug_str     0x000dd6a5     0x8826 ./Core/Src/high_control/swing_trajectory.o
- .debug_str     0x000dd6a5     0x8d77 ./Core/Src/high_control/workspace_limiter.o
- .debug_str     0x000dd6a5    0xcc150 ./Core/Src/low_control/relay.o
- .debug_str     0x000dd6a5    0xcfac0 ./Core/Src/low_control/servo_pwm.o
- .debug_str     0x000dd6a5    0xcdefb ./Core/Src/main.o
- .debug_str     0x000dd6a5    0xcbf23 ./Core/Src/stm32f4xx_hal_msp.o
- .debug_str     0x000dd6a5    0xcb878 ./Core/Src/stm32f4xx_it.o
- .debug_str     0x000dd6a5     0x9967 ./Core/Src/syscalls.o
- .debug_str     0x000dd6a5     0x7711 ./Core/Src/sysmem.o
- .debug_str     0x000dd6a5    0xcadd6 ./Core/Src/system_stm32f4xx.o
- .debug_str     0x000dd6a5    0xcca5f ./Core/Src/measurement/measurement_debug.o
- .debug_str     0x000dd6a5     0x4fad ./Core/Src/sensor/foot_pressure.o
- .debug_str     0x000dd6a5    0xcf30d ./Core/Src/sensor/gps.o
- .debug_str     0x000dd6a5    0xcfd5e ./Core/Src/sensor/imu.o
- .debug_str     0x000dd6a5     0x8b16 ./Core/Src/sensor/joint_feedback.o
- .debug_str     0x000dd6a5    0xce81b ./Core/Src/sensor/mcp3008.o
- .debug_str     0x000dd6a5    0xcfc69 ./Core/Src/sensor/sensor_manager.o
- .debug_str     0x000dd6a5     0x81db ./Core/Src/test/rc_command_generator.o
- .debug_str     0x000dd6a5    0xcf190 ./Core/Src/user_command/crsf_protocol.o
- .debug_str     0x000dd6a5    0xce3a4 ./Core/Src/user_command/crsf_receiver.o
- .debug_str     0x000dd6a5     0x8320 ./Core/Src/user_command/user_command.o
- .debug_str     0x000dd6a5       0x89 ./Core/Startup/startup_stm32f446retx.o
- .debug_str     0x000dd6a5    0xcb99b ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal.o
- .debug_str     0x000dd6a5    0xcb6f2 ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_cortex.o
- .debug_str     0x000dd6a5    0xcb1cb ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_dma.o
- .debug_str     0x000dd6a5    0xcaf51 ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_gpio.o
- .debug_str     0x000dd6a5    0xcb20f ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_rcc.o
- .debug_str     0x000dd6a5    0xcb242 ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_rcc_ex.o
- .debug_str     0x000dd6a5    0xcb66f ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_spi.o
- .debug_str     0x000dd6a5    0xcc13b ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_tim.o
- .debug_str     0x000dd6a5    0xcb947 ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_tim_ex.o
- .debug_str     0x000dd6a5    0xcb7c6 ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_uart.o
+ .debug_str     0x000dd682    0xd3157 ./Core/Src/app/hexapod_app.o
+ .debug_str     0x000dd682    0xd0636 ./Core/Src/common/robot_calibration.o
+ .debug_str     0x000dd682    0xcfae9 ./Core/Src/communication/jetson_spi.o
+ .debug_str     0x000dd682    0xcee0a ./Core/Src/communication/lora.o
+ .debug_str     0x000dd682    0xcf4bd ./Core/Src/communication/manipulator_link.o
+ .debug_str     0x000dd682     0x92c2 ./Core/Src/communication/robot_telemetry.o
+ .debug_str     0x000dd682     0x8c06 ./Core/Src/high_control/body_position_estimator.o
+ .debug_str     0x000dd682     0x8cca ./Core/Src/high_control/body_posture_controller.o
+ .debug_str     0x000dd682     0x88ad ./Core/Src/high_control/contact_adaptation.o
+ .debug_str     0x000dd682     0x8c82 ./Core/Src/high_control/control_priority.o
+ .debug_str     0x000dd682     0x8dcb ./Core/Src/high_control/drone_controller.o
+ .debug_str     0x000dd682     0x9267 ./Core/Src/high_control/foot_trajectory.o
+ .debug_str     0x000dd682     0x8cc3 ./Core/Src/high_control/gait_manager.o
+ .debug_str     0x000dd682     0x8da2 ./Core/Src/high_control/gait_pose_controller.o
+ .debug_str     0x000dd682     0x8b21 ./Core/Src/high_control/leg_kinematics.o
+ .debug_str     0x000dd682     0x8977 ./Core/Src/high_control/safety.o
+ .debug_str     0x000dd682     0x87d9 ./Core/Src/high_control/stance_trajectory.o
+ .debug_str     0x000dd682     0x8972 ./Core/Src/high_control/stand_landing.o
+ .debug_str     0x000dd682     0x8826 ./Core/Src/high_control/swing_trajectory.o
+ .debug_str     0x000dd682     0x8d77 ./Core/Src/high_control/workspace_limiter.o
+ .debug_str     0x000dd682    0xcc150 ./Core/Src/low_control/relay.o
+ .debug_str     0x000dd682    0xcfac0 ./Core/Src/low_control/servo_pwm.o
+ .debug_str     0x000dd682    0xcdefb ./Core/Src/main.o
+ .debug_str     0x000dd682    0xcbf23 ./Core/Src/stm32f4xx_hal_msp.o
+ .debug_str     0x000dd682    0xcb878 ./Core/Src/stm32f4xx_it.o
+ .debug_str     0x000dd682     0x9967 ./Core/Src/syscalls.o
+ .debug_str     0x000dd682     0x7711 ./Core/Src/sysmem.o
+ .debug_str     0x000dd682    0xcadd6 ./Core/Src/system_stm32f4xx.o
+ .debug_str     0x000dd682    0xcca5f ./Core/Src/measurement/measurement_debug.o
+ .debug_str     0x000dd682     0x4fad ./Core/Src/sensor/foot_pressure.o
+ .debug_str     0x000dd682    0xcf30d ./Core/Src/sensor/gps.o
+ .debug_str     0x000dd682    0xcfd5e ./Core/Src/sensor/imu.o
+ .debug_str     0x000dd682     0x8b16 ./Core/Src/sensor/joint_feedback.o
+ .debug_str     0x000dd682    0xce81b ./Core/Src/sensor/mcp3008.o
+ .debug_str     0x000dd682    0xcfc69 ./Core/Src/sensor/sensor_manager.o
+ .debug_str     0x000dd682     0x81db ./Core/Src/test/rc_command_generator.o
+ .debug_str     0x000dd682    0xcf190 ./Core/Src/user_command/crsf_protocol.o
+ .debug_str     0x000dd682    0xce3a4 ./Core/Src/user_command/crsf_receiver.o
+ .debug_str     0x000dd682     0x8320 ./Core/Src/user_command/user_command.o
+ .debug_str     0x000dd682       0x89 ./Core/Startup/startup_stm32f446retx.o
+ .debug_str     0x000dd682    0xcb99b ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal.o
+ .debug_str     0x000dd682    0xcb6f2 ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_cortex.o
+ .debug_str     0x000dd682    0xcb1cb ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_dma.o
+ .debug_str     0x000dd682    0xcaf51 ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_gpio.o
+ .debug_str     0x000dd682    0xcb20f ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_rcc.o
+ .debug_str     0x000dd682    0xcb242 ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_rcc_ex.o
+ .debug_str     0x000dd682    0xcb66f ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_spi.o
+ .debug_str     0x000dd682    0xcc13b ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_tim.o
+ .debug_str     0x000dd682    0xcb947 ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_tim_ex.o
+ .debug_str     0x000dd682    0xcb7c6 ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_uart.o
 
 .comment        0x00000000       0x43
  .comment       0x00000000       0x43 ./Core/Src/app/control_timing_debug.o

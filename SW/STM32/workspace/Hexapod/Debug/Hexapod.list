@@ -14030,7 +14030,7 @@ void ContactAdaptation_ApplyLateLanding(RobotVec3_t *position,
  8006d80:	46bd      	mov	sp, r7
  8006d82:	ecbd 8b02 	vpop	{d8}
  8006d86:	bd80      	pop	{r7, pc}
- 8006d88:	3d449ba6 	.word	0x3d449ba6
+ 8006d88:	3dc49ba6 	.word	0x3dc49ba6
  8006d8c:	3ba3d70a 	.word	0x3ba3d70a
  8006d90:	3a1d4951 	.word	0x3a1d4951
 
