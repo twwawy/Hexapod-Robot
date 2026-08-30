@@ -7,7 +7,7 @@
 | 경로 | 내용 |
 |---|---|
 | [HW](HW/README.md) | 기구, PCB, 부품, URDF와 제작 파일 |
-| [SW/Controller](SW/Controller/Controller_Architecture.md) | MATLAB/Simulink 보행 제어기 |
+| [SW/Controller](SW/Controller/Controller_Architecture.md) | STM32에 구현된 보행 제어기 설계와 수식 |
 | [SW/STM32](SW/STM32/STM32F446RE%20설정%20정리본.md) | STM32 설정과 펌웨어 |
 | [SW/Jetson](SW/Jetson/README.md) | Jetson 상위 제어 소프트웨어 |
 
@@ -18,4 +18,7 @@
 - [좌표계와 관절 정의](SW/Controller/좌표축/README.md)
 - [드론 조종기 입력](SW/Controller/드론%20조종기%20입력/README.md)
 - [STM32F446RE 설정](SW/STM32/STM32F446RE%20설정%20정리본.md)
+- [STM32 코드 구조](SW/STM32/STM32%20코드%20구조%20정리본.md)
+- [STM32–Jetson SPI 프로토콜](SW/STM32/STM32-Jetson%20SPI%2032바이트%20패킷%20프로토콜.md)
+- [매니퓰레이터 UART 프로토콜](SW/STM32/Manipulator_UART_Protocol.md)
 - [하드웨어 부품 목록](HW/parts.md)

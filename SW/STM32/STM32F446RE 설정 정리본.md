@@ -230,10 +230,13 @@ STM32F446RE = SPI Slave
 | CPHA | 1 Edge |
 | NSS | Hardware Input |
 | CRC | Disable |
+| RX DMA | DMA1 Stream 3, Channel 0, Normal, High Priority |
+| TX DMA | DMA1 Stream 4, Channel 0, Normal, High Priority |
+| SPI2 NVIC | Enable, Priority 5 |
 
-### 프로토콜 결정 상태
+### 현재 프로토콜
 
-SPI2 핀과 `DRDY` 핀만 물리적으로 설정되어 있다. 실제 명령, 송수신 프레임, CRC, 타임아웃과 `DRDY` 동작 순서는 Jetson 통신 프로토콜을 정할 때 확정한다.
+SPI2는 고정 32바이트 v2 프레임을 DMA 전이중 방식으로 송수신한다. STM32가 DMA를 먼저 Arm한 뒤 `DRDY`를 High로 만들고, 32바이트 전송 완료 또는 오류 콜백에서 `DRDY`를 Low로 내린다. 센서 프레임에는 18개 관절각, 6개 발 접촉과 IMU Roll·Pitch·Yaw를 넣고 CRC-16/CCITT-FALSE로 검증한다. 수신 `COMMAND`의 24바이트 Payload는 보관하지만 자율주행 제어에는 아직 연결하지 않는다. 바이트 배치와 Jetson 처리 순서는 [STM32–Jetson SPI 32바이트 패킷 프로토콜](STM32-Jetson%20SPI%2032바이트%20패킷%20프로토콜.md)을 따른다.
 
 ---
 
@@ -285,9 +288,9 @@ WT931 9축 IMU 모듈
 
 ---
 
-## 9. UART5 / LoRa 통신 모듈
+## 9. UART5 / 매니퓰레이터 유선 통신
 
-RYLR998 계열 UART LoRa 통신 모듈
+현재 최종 앱은 기존 LoRa 포트를 매니퓰레이터 보드의 유선 UART로 사용한다. LoRa 드라이버는 코드에 남아 있지만 `HexapodApp_BoardInit()`에서 `lora_uart = NULL`로 비활성화한다.
 
 | 기능 | STM32 Pin |
 |---|---|
@@ -306,6 +309,8 @@ RYLR998 계열 UART LoRa 통신 모듈
 | Data Direction | TX/RX |
 | Hardware Flow Control | Disable |
 | Over Sampling | 16 Samples |
+
+STM32는 `PC12` TX로 고정 16바이트 명령 패킷을 5 ms, 200 Hz마다 송신한다. `PD2` RX는 현재 패킷 흐름에서 사용하지 않는다. 동기 바이트, Flags, Switches와 CRC 형식은 [매니퓰레이터 유선 UART 패킷 명세](Manipulator_UART_Protocol.md)를 따른다.
 
 ---
 
@@ -375,20 +380,20 @@ STM32의 `user_command`는 CH1~CH4를 위 이름으로 다시 배치하고, 네 
 
 ---
 
-## 11. TIM6 / 5ms 제어 루프용 타이머
+## 11. TIM6 / 1 ms 압력·5 ms 제어 기준 타이머
 
 ### 설정
 
 | 항목 | 설정 |
 |---|---|
 | TIM6 Prescaler | 83 |
-| TIM6 Period | 4999 |
-| 주기 | 5 ms |
+| TIM6 Period | 999 |
+| 기준 주기 | 1 ms |
 | 인터럽트 | TIM6_DAC_IRQn Enable |
 
 ### 용도
 
-5 ms 제어 주기를 만드는 기준 타이머로 사용한다.
+TIM6 콜백은 매 1 ms마다 압력센서 읽기 요청을 남긴다. 다섯 번째 Tick마다 전체 제어 요청도 함께 남겨 5 ms, 200 Hz 제어를 만든다. ISR에서는 센서 읽기나 제어 계산을 직접 수행하지 않고 Main Loop의 `HexapodApp_BoardProcess()`가 압력, 통신, 제어 순서로 요청을 처리한다.
 
 ```c
 HAL_TIM_Base_Start_IT(&htim6);

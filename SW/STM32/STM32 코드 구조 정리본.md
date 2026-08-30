@@ -17,125 +17,61 @@ STM32 사용자 코드를 기능별 폴더로 나누고 `main.c`에는 초기화
 - CubeMX 생성 파일과 HAL 파일은 기존 위치를 유지한다.
 - 5 ms 제어 계산은 인터럽트 안에서 직접 수행하지 않는다. TIM6 콜백은 실행 요청만 남긴다.
 - UART 인터럽트는 수신 바이트 저장과 다음 수신 시작만 담당한다.
-- 실제 운용 빌드에는 `test` 폴더의 입력 생성 코드를 포함하지 않는다.
+- `test` 폴더가 함께 컴파일되어도 정상 운용 경로에서는 호출하지 않는다.
 
 ## 3. 최종 폴더 구조
 
+`Inc`와 `Src`는 아래 기능 폴더를 같은 이름으로 공유하며, 특별한 경우를 제외하면 각 헤더에 대응하는 소스가 있다.
+
 ```text
 Core
-├─ Inc
+├─ Inc / Src
+│  ├─ app
+│  │  ├─ hexapod_app.*
+│  │  ├─ robot_bringup.h
+│  │  ├─ control_timing_debug.*
+│  │  └─ pressure_load_calibration.*
 │  ├─ common
 │  │  ├─ robot_config.h
-│  │  └─ robot_types.h
-│  ├─ app
-│  │  └─ hexapod_app.h
+│  │  ├─ robot_types.h
+│  │  └─ robot_calibration.*
 │  ├─ sensor
-│  │  ├─ gps.h
-│  │  ├─ imu.h
-│  │  ├─ mcp3008.h
-│  │  ├─ joint_feedback.h
-│  │  ├─ foot_pressure.h
-│  │  └─ sensor_manager.h
+│  │  ├─ gps.* / imu.* / mcp3008.*
+│  │  ├─ joint_feedback.* / foot_pressure.*
+│  │  └─ sensor_manager.*
 │  ├─ user_command
-│  │  ├─ crsf_receiver.h
-│  │  ├─ crsf_protocol.h
-│  │  └─ user_command.h
+│  │  ├─ crsf_receiver.* / crsf_protocol.*
+│  │  └─ user_command.*
 │  ├─ high_control
-│  │  ├─ control_priority.h
-│  │  ├─ drone_controller.h
-│  │  ├─ stand_landing.h
-│  │  ├─ body_position_estimator.h
-│  │  ├─ gait_pose_controller.h
-│  │  ├─ body_posture_controller.h
-│  │  ├─ workspace_limiter.h
-│  │  ├─ gait_manager.h
-│  │  ├─ foot_trajectory.h
-│  │  ├─ stance_trajectory.h
-│  │  ├─ swing_trajectory.h
-│  │  ├─ contact_adaptation.h
-│  │  ├─ leg_kinematics.h
-│  │  └─ safety.h
+│  │  ├─ control_priority.* / drone_controller.* / stand_landing.*
+│  │  ├─ body_position_estimator.* / gait_pose_controller.*
+│  │  ├─ body_posture_controller.* / workspace_limiter.*
+│  │  ├─ gait_manager.* / foot_trajectory.*
+│  │  ├─ stance_trajectory.* / swing_trajectory.*
+│  │  ├─ contact_adaptation.* / leg_kinematics.*
+│  │  └─ safety.*
 │  ├─ low_control
-│  │  ├─ servo_pwm.h
-│  │  └─ relay.h
+│  │  └─ servo_pwm.* / relay.*
 │  ├─ communication
-│  │  ├─ lora.h
-│  │  ├─ robot_telemetry.h
-│  │  └─ jetson_spi.h
+│  │  ├─ jetson_spi.* / manipulator_link.*
+│  │  └─ lora.* / robot_telemetry.*
+│  ├─ measurement
+│  │  ├─ measurement_runner.* / measurement_debug.*
+│  │  ├─ measurement_stage0.* ... measurement_stage7.*
+│  │  ├─ sensor_raw_measurement.* / adc_mapping_measurement.*
+│  │  ├─ servo_relay_measurement.*
+│  │  ├─ joint_calibration_measurement.*
+│  │  ├─ foot_pressure_measurement.*
+│  │  └─ crsf_calibration_measurement.*
 │  └─ test
-│     ├─ test_runner.h
-│     ├─ sensor_test.h
-│     ├─ imu_calibration_test.h
-│     ├─ low_control_test.h
-│     ├─ joint_sensor_calibration_test.h
-│     ├─ foot_pressure_calibration_test.h
-│     ├─ servo_relay_calibration_test.h
-│     ├─ crsf_calibration_test.h
-│     ├─ rc_command_generator.h
-│     ├─ user_command_test.h
-│     ├─ leg6_test.h
-│     ├─ kinematics_test.h
-│     ├─ workspace_test.h
-│     ├─ gait_test.h
-│     ├─ mode_transition_test.h
-│     ├─ controller_test.h
-│     ├─ safety_test.h
-│     └─ communication_test.h
-└─ Src
-   ├─ app
-   │  └─ hexapod_app.c
-   ├─ sensor
-   │  ├─ gps.c
-   │  ├─ imu.c
-   │  ├─ mcp3008.c
-   │  ├─ joint_feedback.c
-   │  ├─ foot_pressure.c
-   │  └─ sensor_manager.c
-   ├─ user_command
-   │  ├─ crsf_receiver.c
-   │  ├─ crsf_protocol.c
-   │  └─ user_command.c
-   ├─ high_control
-   │  ├─ control_priority.c
-   │  ├─ drone_controller.c
-   │  ├─ stand_landing.c
-   │  ├─ body_position_estimator.c
-   │  ├─ gait_pose_controller.c
-   │  ├─ body_posture_controller.c
-   │  ├─ workspace_limiter.c
-   │  ├─ gait_manager.c
-   │  ├─ foot_trajectory.c
-   │  ├─ stance_trajectory.c
-   │  ├─ swing_trajectory.c
-   │  ├─ contact_adaptation.c
-   │  ├─ leg_kinematics.c
-   │  └─ safety.c
-   ├─ low_control
-   │  ├─ servo_pwm.c
-   │  └─ relay.c
-   ├─ communication
-   │  ├─ lora.c
-   │  ├─ robot_telemetry.c
-   │  └─ jetson_spi.c
-   └─ test
-      ├─ test_runner.c
-      ├─ sensor_test.c
-      ├─ imu_calibration_test.c
-      ├─ low_control_test.c
-      ├─ joint_sensor_calibration_test.c
-      ├─ foot_pressure_calibration_test.c
-      ├─ servo_relay_calibration_test.c
-      ├─ crsf_calibration_test.c
-      ├─ rc_command_generator.c
-      ├─ user_command_test.c
-      ├─ leg6_test.c
-      ├─ kinematics_test.c
-      ├─ workspace_test.c
-      ├─ gait_test.c
-      ├─ mode_transition_test.c
-      ├─ controller_test.c
-      ├─ safety_test.c
-      └─ communication_test.c
+│     ├─ test_runner.* / calibration_algorithm_test.*
+│     ├─ rc_command_generator.* / user_command_test.*
+│     ├─ kinematics_test.* / controller_test.*
+│     ├─ workspace_test.* / gait_test.*
+│     ├─ mode_transition_test.* / safety_test.*
+│     └─ communication_test.*
+├─ Inc/main.h, stm32f4xx_*.h
+└─ Src/main.c, stm32f4xx_*.*, syscalls.c, sysmem.c
 ```
 
 ## 4. Simulink 코드 반영 범위
@@ -154,11 +90,11 @@ Core
 | `TripodGaitManager` | `high_control/gait_manager.*` |
 | `TripodFootTrajectory` 조합 | `high_control/foot_trajectory.*` |
 | Stance 계산 | `high_control/stance_trajectory.*` |
-| Swing과 Bezier 계산 | `high_control/swing_trajectory.*` |
+| Swing Smoothstep과 포물선 높이 계산 | `high_control/swing_trajectory.*` |
 | Early/Late Landing | `high_control/contact_adaptation.*` |
 | `BaseFootPosition`, FK, Body↔Leg 변환과 IK | `high_control/leg_kinematics.*` |
 | `SafetyEvaluator` | `high_control/safety.*` |
-| `JointRateLimiter` | `low_control/servo_pwm.*` |
+| 관절 범위와 보정 PWM 출력 | `low_control/servo_pwm.*` |
 | `RelaySafetyGate` | `low_control/relay.*` |
 
 ### 4.2 STM32에 옮기지 않는 기능
@@ -178,7 +114,9 @@ Core
 ### 5.1 폴더 간 참조 방향
 
 ```text
-main.c ───────────────▶ app/hexapod_app.h
+main.c ───────────────┬▶ app/hexapod_app.h
+                     ├▶ communication/jetson_spi.h
+                     └▶ measurement/measurement_stage4.h, stage5.h
 
 app/hexapod_app.c ────┬▶ sensor
                       ├▶ user_command
@@ -195,7 +133,7 @@ communication ────────┘
 test/*.c ─────────────▶ 시험 대상 모듈
 ```
 
-`common`은 다른 프로젝트 폴더를 참조하지 않는다. `main.c`는 `app/hexapod_app.h`만 직접 포함하며, 개별 모듈의 호출 순서와 전체 조합은 `hexapod_app.c`에서 수행한다.
+`common`은 다른 프로젝트 폴더를 참조하지 않는다. 정상 운용에서 `main.c`는 `HexapodApp_Board*()`만 호출한다. 관절 영점·ADC 측정 또는 Jetson SPI 단독 Bring-up 매크로를 켠 경우에만 해당 전용 모듈을 직접 호출한다. 전체 운용 조합과 호출 순서는 `hexapod_app.c`에서 수행한다.
 
 ### 5.2 high_control 내부 참조
 
@@ -227,9 +165,13 @@ safety ────────────────────────�
 
 ### `common/robot_config.h`
 
-다리 수, 관절 수, 5 ms 주기, 기구 치수, 작업공간 여유, 제어 Gain과 출력 한계 같은 공통 설정값을 정의한다. 핀과 HAL Handle은 CubeMX 생성 파일의 정의를 사용한다.
+다리 수, 관절 수, 1 ms 압력·5 ms 제어 주기, 기구 치수, 작업공간 여유와 출력 한계 같은 공통 설정값을 정의한다. 현재 운용 한계는 x 0.10 m/s, y 0.07 m/s, Yaw 18 deg/s, 1.0 s Phase이다. 핀과 HAL Handle은 CubeMX 생성 파일의 정의를 사용한다.
 
-관절 ADC, 압력센서, 서보와 CRSF의 채널별 보정 테이블은 해당 기능 모듈에 둔다. 아직 측정하지 않은 값을 공통 설정에 임의로 넣지 않는다.
+관절 ADC, 압력센서, 서보, 릴레이와 CRSF의 중앙 실측값은 `common/robot_calibration.c`에 모아 두고 초기화 때 각 기능 모듈에 적용한다.
+
+### `common/robot_calibration.h`
+
+WT931 영점·부호, ADC 채널 배치, 18개 관절 ADC, 6개 압력센서, 18개 서보, 릴레이와 CRSF의 실측 보정표를 정의한다. `RobotCalibration_Apply()`는 필수 보정 완료 여부를 확인한 뒤 센서·출력·입력 모듈에 한 번에 적용한다.
 
 ### `common/robot_types.h`
 
@@ -240,14 +182,27 @@ safety ────────────────────────�
 전체 사용자 코드의 진입점만 공개한다. `main.c`에서는 다음 수준의 함수만 호출한다.
 
 ```text
-HexapodApp_Init(...)
-HexapodApp_Process()
-HexapodApp_UartRxCallback(...)
-HexapodApp_UartErrorCallback(...)
-HexapodApp_TimerCallback(...)
+HexapodApp_BoardInit()
+HexapodApp_BoardProcess()
+HexapodApp_BoardTimerCallback(...)
+HexapodApp_BoardUartRxCallback(...)
+HexapodApp_BoardUartErrorCallback(...)
+HexapodApp_BoardUartTxCpltCallback(...)
 ```
 
-센서, 제어기, 출력과 통신 모듈의 실제 호출 순서는 `hexapod_app.c`에 둔다.
+`HexapodApp_Init()` 계열은 Handle을 직접 주입하는 테스트·재사용 인터페이스이고, `main.c`는 현재 CubeMX Handle을 묶은 `Board` Wrapper만 호출한다. 센서, 제어기, 출력과 통신 모듈의 실제 호출 순서는 `hexapod_app.c`에 둔다.
+
+### `app/robot_bringup.h`
+
+실기 허가 단계, 속도 한계, 릴레이 허가와 디버거 긴급정지 상태를 정의한다. 현재 빌드는 최종 운용 단계 6만 허용한다.
+
+### `app/control_timing_debug.h`
+
+DWT Cycle Counter로 5 ms 주기, 제어 실행시간, 백그라운드 통신시간, Timer 요청 누락과 CRSF Overflow를 기록한다. 최근 이상 이벤트 16개와 Yaw 진단 문맥을 Live Expressions에서 확인할 수 있게 보존한다.
+
+### `app/pressure_load_calibration.h`
+
+실기 운용 전에 압력센서 무부하·부하 표본을 수집하고 보정 완료 또는 실패 상태를 관리한다.
 
 ## 7. 센서 파일
 
@@ -269,7 +224,7 @@ SPI1에 연결된 MCP3008 세 개의 24개 raw 채널을 읽는다. 값의 물�
 
 ### `sensor/foot_pressure.h`
 
-압력센서 raw 값 6개를 접촉 상태로 변환한다. 채널, 접촉 진입 임계값과 접촉 해제 임계값 테이블을 관리한다.
+압력센서 raw 값 6개를 접촉 상태로 변환한다. 접촉 진입 뒤 10 ms 창에서 8개 이상 유효 표본이 있으면 접촉을 확정하고, 해제 임계값은 10 ms 연속 통과해야 해제한다.
 
 ### `sensor/sensor_manager.h`
 
@@ -311,7 +266,7 @@ CRSF 채널을 프로젝트 명령으로 변환한다. 네 짐벌 축은 보정 
 
 ### `high_control/gait_pose_controller.h`
 
-Position PI, Heading PI와 사용자 이동 명령을 결합하여 Body Twist 후보를 만든다. 최대 x·y 속도는 각 0.28 m/s, 최대 Yaw 속도는 45 deg/s이다.
+Position PI, Heading PI와 사용자 이동 명령을 결합하여 Body Twist 후보를 만든다. 최대 x 속도는 0.10 m/s, y 속도는 0.07 m/s, Yaw 속도는 18 deg/s이다.
 
 ### `high_control/body_posture_controller.h`
 
@@ -325,11 +280,11 @@ Roll·Pitch와 보정 Yaw의 자세 PI를 계산하고 발끝 목표에 몸체 �
 - Roll·Pitch와 보정 Yaw 자세
 - 보정 모드 X/Y/Z 이동
 
-후보가 유효하면 새 명령을 채택하고 유효하지 않으면 직전에 채택한 명령을 유지한다. 검사 중 도착한 최신 후보는 별도로 보존해 현재 후보가 끝난 다음 세 지점 검사를 이어간다. 최종 IK 앞에서는 `leg_kinematics`가 0.001 m 링크 여유와 0.5 deg 관절 여유를 적용하고, 관절 범위를 벗어나는 발은 기본 발 위치 방향의 유효 경계로 제한한다.
+후보가 유효하면 새 사용자 명령을 두 Tripod 걸음 동안 채택한다. 다음 위상의 시작·중앙·끝 세 지점은 한 5 ms 제어에서 모두 검사한다. Heading Feedback은 사용자 명령 기억과 분리해 걸음 중에도 최신값을 합한다. 최종 IK 앞에서는 `leg_kinematics`가 0.001 m 링크 여유를 적용하고, 관절 범위를 벗어나는 발은 기본 발 위치 방향의 유효 경계로 제한한다.
 
 ### `high_control/gait_manager.h`
 
-Tripod A와 B의 STANCE/SWING 상태, 진행률과 0.5 s Phase를 관리한다. 모드 전환과 접촉 적응 중 발생하는 한 주기 Enable 변화에도 발 상태가 초기화되지 않도록 한다.
+Tripod A와 B의 STANCE/SWING 상태, 진행률과 1.0 s Phase를 관리한다. 시작 입력은 100 ms 동안 확인하며 한 명령으로 반대 Tripod까지 두 걸음을 완성한다. 지지발 접촉이 사라지면 위상을 멈추고 재접촉을 기다린다.
 
 ### `high_control/foot_trajectory.h`
 
@@ -341,11 +296,11 @@ STANCE 발이 지면의 같은 위치를 유지하도록 몸체 이동과 회전
 
 ### `high_control/swing_trajectory.h`
 
-착지점, Quintic 시간 스케일링, Bezier 궤적과 방사 오프셋을 계산한다. Swing Height 기본값은 0.20 m이며 몸체 Z Offset에 따라 0.05~0.25 m 범위에서 사용한다.
+착지점, Cubic Smoothstep, 포물선 높이와 방사 오프셋을 계산한다. Swing Height 기본값은 0.20 m이며 몸체 Z Offset에 따라 0.05~0.25 m 범위에서 사용한다.
 
 ### `high_control/contact_adaptation.h`
 
-Swing 진행률 50% 이후의 Early Landing과 정상 Swing 종료 후 Late Landing을 처리한다. 접촉 주기에는 직전 발 목표를 유지하며, 한 Tripod의 공통 하강 오차는 STANCE 동안 S-curve로 제거한다. Late Landing 하강 속도는 0.20 m/s이고 0.05 m 또는 0.25 s에서 발을 정지한 뒤 명시적인 Controller Fault를 발생시킨다.
+Swing 진행률 50% 이후의 Early Landing과 정상 Swing 종료 후 Late Landing을 처리한다. 접촉 주기에는 직전 발 목표를 유지하며, 한 Tripod의 공통 하강 오차는 STANCE 동안 S-curve로 제거한다. Late Landing은 0.12 m/s로 최대 0.10 m를 탐색하고 한계에서는 전원을 유지한 채 보행을 정지한다.
 
 ### `high_control/leg_kinematics.h`
 
@@ -353,12 +308,12 @@ Swing 진행률 50% 이후의 Early Landing과 정상 Swing 종료 후 Late Land
 
 ### `high_control/safety.h`
 
-현재 Simulink `SafetyEvaluator`와 동일하게 다음 Fault를 Latch한다.
+현재 STM32 `safety` 모듈은 다음 Fault를 Latch한다.
 
 - `Rollover_Fault`: 유효한 Roll 또는 Pitch 절댓값이 80 deg 이상이다.
-- `Controller_Fault`: IMU 값이 유한수가 아니거나, 최종 제한 뒤 IK가 Invalid이거나, Late Landing 한계를 초과한다.
+- `Controller_Fault`: IMU 값이 유한수가 아니거나 최종 제한 뒤 IK Invalid가 3회 연속 발생한다.
 
-한 번 Fault가 발생하면 Reset 없이 유지한다. 최초 IK·Late Landing Fault의 원인, 다리, 제어 주기와 발 좌표도 최종 앱 상태에 함께 보존한다. 결과는 `control_priority`와 `drone_controller`를 거쳐 Kill을 활성화하고 `relay`가 서보 전원 릴레이를 모두 끄게 한다. CRSF 연결 끊김은 Safety Fault가 아니라 `user_command`의 입력 Failsafe로 처리한다.
+한 번 Fault가 발생하면 Reset 없이 유지한다. 최초 IK Fault의 원인, 다리, 제어 주기와 발 좌표도 최종 앱 상태에 함께 보존한다. 결과는 `control_priority`와 `drone_controller`를 거쳐 Kill을 활성화하고 `relay`가 서보 전원 릴레이를 모두 끄게 한다. CRSF 연결 끊김과 Late Landing 한계 정지는 Safety Fault가 아니다.
 
 ## 10. 하위 제어 파일
 
@@ -366,11 +321,11 @@ Swing 진행률 50% 이후의 Early Landing과 정상 Swing 종료 후 Late Land
 
 18개 관절 목표각을 DS51150-270 PWM으로 변환한다. 채널, 방향, 중립 Pulse와 최소·최대 Pulse 테이블을 관리한다.
 
-관절각 범위 제한 후 315.8 deg/s, 즉 5 ms당 1.579 deg의 관절 명령 속도 제한을 적용한다. 그 다음 서보 보정과 500~2500 us Pulse 제한을 적용한다.
+관절각을 -135~135 deg로 제한한 뒤 관절별 방향, 영점, pulse/rad와 실측 최소·최대 Pulse 보정을 적용한다. 현재 운용 출력에는 관절 명령 Rate Limiter가 없고, 서기 전 영점 정렬만 30 deg/s로 수행한다.
 
 ### `low_control/relay.h`
 
-INA1~INC2 여섯 Active High 출력을 관리한다. 초기 상태는 OFF이며 Kill이 활성화되면 모든 릴레이를 즉시 끈다. 릴레이-다리 대응은 `servo_relay_calibration_test`에서 기록하며 현재 운용 Kill은 여섯 채널을 동시에 차단하므로 개별 다리 매핑에 의존하지 않는다.
+INA1~INC2 여섯 Active High 출력을 관리한다. 초기 상태는 OFF이며 Kill이 활성화되면 모든 릴레이를 즉시 끈다. 릴레이-다리 대응은 `measurement/servo_relay_measurement.*`에서 기록하며 현재 운용 Kill은 여섯 채널을 동시에 차단하므로 개별 다리 매핑에 의존하지 않는다.
 
 ## 11. 통신 파일
 
@@ -384,43 +339,33 @@ UART5 115200 baud에 연결된 RYLR998의 AT 명령, 주소·Network 설정, 송
 
 ### `communication/jetson_spi.h`
 
-SPI2 Slave의 최소 인터페이스 자리만 유지한다. 명령, 프레임, CRC, 타임아웃과 DRDY 동작은 프로토콜이 확정된 뒤 설계한다.
+SPI2 Slave에서 32바이트 v2 프레임을 DMA 전이중 송수신한다. 센서 프레임에는 관절각, 발 접촉과 IMU 자세를 넣고 CRC-16/CCITT-FALSE로 보호한다. 수신 `COMMAND`의 24바이트 Payload는 검증·보관하지만 자율주행 명령에는 아직 연결하지 않는다. 세부 규격은 [STM32–Jetson SPI 프로토콜](STM32-Jetson%20SPI%2032바이트%20패킷%20프로토콜.md)을 따른다.
+
+### `communication/manipulator_link.h`
+
+UART5로 정규화된 CRSF 네 축, 스위치와 ARM 허가를 고정 16바이트 패킷으로 200 Hz 전송한다. 상세 규격은 [매니퓰레이터 UART 프로토콜](Manipulator_UART_Protocol.md)을 따른다.
+
+현재 `HexapodApp_BoardInit()`은 UART5를 매니퓰레이터에 할당하고 LoRa Handle을 `NULL`로 두므로 `lora`와 `robot_telemetry`는 빌드되지만 실기 운용 경로에서는 비활성이다.
 
 ## 12. 테스트 파일
 
-테스트 파일은 실제 운용 경로와 분리한다. 한 번에 하나의 테스트만 실행하고 액추에이터 테스트는 기본적으로 릴레이 OFF에서 시작한다.
+실측 코드는 `measurement`, 순수 알고리즘 검증은 `test`에 분리한다. 액추에이터 측정 모드는 기본적으로 릴레이 OFF에서 시작한다.
 
 ### `test/test_runner.h`
 
-선택한 테스트 하나의 초기화와 반복 실행만 담당한다. 정상 운용 빌드에서는 테스트 모듈을 호출하지 않는다.
+`CALIBRATION_TABLE`, 변환, 사용자 명령, 기구학, 제어기, 작업공간, 보행, 모드 전환, Safety와 통신의 10단계를 순서대로 실행한다. 첫 실패에서 정지하며 단계별 통과 상태를 보존한다.
 
-### `test/sensor_test.h`
+### `measurement/measurement_runner.h`
 
-GPS, WT931과 MCP3008 24채널 raw 값, 수신 주기와 오류 횟수를 확인한다. 가상 센서값은 만들지 않는다.
+센서 Raw, IMU, ADC 배치, 릴레이, 서보, 관절 피드백, 발 압력과 CRSF의 8개 실측 단계를 관리한다. 실제 단계 구현은 `measurement_stage0.*`부터 `measurement_stage7.*`까지이며 결과는 `measurement_debug`에서 확인한다.
 
-### `test/imu_calibration_test.h`
+### `measurement/*_measurement.h`
 
-로봇을 수평으로 정지한 상태에서 WT931 Roll·Pitch·Yaw 평균 Offset을 기록한다. +X 전진, +Y 왼쪽, +Z 위쪽이 되도록 확인한 가속도·각속도·자세 축별 부호와 함께 `imu` 보정값을 만든다.
+센서 Raw 수집, ADC 채널 배치, 서보·릴레이 대응, 관절 보정, 압력센서 무부하·부하와 CRSF 범위를 실제 장치에서 측정한다. `main.c`의 `JOINT_ZERO_CALIBRATION_MODE`와 `JOINT_ADC_CALIBRATION_MODE`는 필요한 전용 측정 경로를 선택한다.
 
-### `test/low_control_test.h`
+### `test/calibration_algorithm_test.h`
 
-릴레이 여섯 채널과 PWM 18채널의 전기적 출력만 확인한다. 서보 전원과 기구를 분리하고 오실로스코프로 먼저 검사한다.
-
-### `test/joint_sensor_calibration_test.h`
-
-18개 관절센서의 ADC 최소·영점·최대, 각도 범위와 방향을 측정하여 `joint_feedback` 설정 테이블을 완성한다.
-
-### `test/foot_pressure_calibration_test.h`
-
-6개 압력센서의 무부하와 접촉 raw 값을 반복 측정하여 접촉·해제 임계값을 정하고 `foot_pressure` 설정 테이블을 완성한다.
-
-### `test/servo_relay_calibration_test.h`
-
-한 번에 서보 한 채널과 릴레이 한 채널만 동작시킨다. 서보 방향·중립점·Pulse 범위와 릴레이-다리 대응 관계를 확인하여 두 설정 테이블을 완성한다.
-
-### `test/crsf_calibration_test.h`
-
-실제 조종기가 준비되면 CH1~CH10 raw 최소·중립·최대, 방향과 스위치 위치를 기록하여 CRSF 보정 테이블을 완성한다.
+중앙 보정표의 완성 여부와 관절 ADC·PWM 예측, 압력 및 CRSF 변환을 검증한다.
 
 ### `test/rc_command_generator.h`
 
@@ -432,17 +377,13 @@ GPS, WT931과 MCP3008 24채널 raw 값, 수신 주기와 오류 횟수를 확인
 
 정규화, Dead Zone, S1 왼쪽 회전, S1 오른쪽 횡이동, 모드 전환 필터 초기화, 100 ms 연결 끊김과 0.2 s 재활성 조건을 검사한다.
 
-### `test/leg6_test.h`
-
-6번 다리 세 관절만 작은 범위로 움직여 ADC, PWM, 방향과 중립점의 전체 경로를 먼저 확인한다.
-
 ### `test/kinematics_test.h`
 
 기본 발 위치, Body↔Leg 좌표변환, FK와 IK를 여섯 다리에 대해 수치 비교한다.
 
 ### `test/workspace_test.h`
 
-Roll·Pitch ±45 deg, x·y 0.28 m/s, Yaw 45 deg/s와 보정 명령의 경계값을 넣어 동적 제한을 검사한다. 보행 후보가 세 주기 뒤 적용되는지, 위험한 후보에서 직전 명령을 유지하는지와 최종 0.001 m 여유도 확인한다.
+Roll·Pitch ±45 deg, x 0.10 m/s, y 0.07 m/s, Yaw 18 deg/s와 보정 명령의 경계값을 넣어 동적 제한을 검사한다. 다음 위상 세 지점 검사, 두 걸음 명령 유지와 최종 0.001 m 여유를 확인한다.
 
 ### `test/gait_test.h`
 
@@ -454,23 +395,23 @@ READY↔MANUAL, MANUAL↔CORRECTION, S1 전환, 정지와 재시작에서 필터
 
 ### `test/controller_test.h`
 
-Simulink와 같은 명시적 입력 벡터를 제어 함수에 전달하고 상위 제어부터 IK 직전까지 결과를 비교한다. VirtualIMU나 TestContact 코드는 사용하지 않는다.
+명시적 입력 벡터를 제어 함수에 전달하고 상위 제어부터 IK 직전까지 결과를 비교한다. 위치·Heading·자세 PI와 현재 한계값을 검사한다.
 
 ### `test/safety_test.h`
 
-Roll/Pitch 80 deg 경계, NaN·Inf IMU, 각 다리 IK Invalid, Fault Latch와 릴레이 차단을 각각 검사한다. Safety Reset 시험은 만들지 않는다.
+Roll/Pitch 80 deg 경계, NaN·Inf IMU, IK Invalid 3회 연속 조건과 Fault Latch를 검사한다. Safety Reset 시험은 만들지 않는다.
 
 ### `test/communication_test.h`
 
-LoRa와 Robot Telemetry 패킷을 검사한다. Jetson SPI는 인터페이스 빌드만 확인하고 프로토콜 시험은 규격 확정 후 추가한다.
+LoRa, Robot Telemetry, Jetson SPI v2 프레임·CRC·Dummy 프레임·릴레이 OFF 관절각과 매니퓰레이터 UART 패킷을 검사한다.
 
 ## 13. 단계별 구현과 시험 순서
 
 1. `robot_config`, `robot_types`와 App 인터페이스를 정의한다.
-2. `sensor_test`로 GPS, WT931과 MCP3008 실제 raw 값을 확인한다.
-3. `imu_calibration_test`로 WT931 축 부호와 수평 Offset을 확정한다.
-4. `low_control_test`로 릴레이와 PWM의 전기적 출력을 확인한다.
-5. 관절센서, 압력센서, 서보·릴레이 보정 테스트로 설정 테이블을 완성한다.
+2. Measurement Stage 0에서 GPS, WT931과 MCP3008 실제 raw 값을 확인한다.
+3. Measurement Stage 1에서 WT931 축 부호와 수평 Offset을 확정한다.
+4. Measurement Stage 2~4에서 ADC 배치, 릴레이와 PWM 출력을 확인한다.
+5. Measurement Stage 5~7에서 관절센서, 압력센서와 CRSF 보정 테이블을 완성한다.
 6. 임시 RC 명령으로 상위 입력을 시험하고 실제 조종기가 오면 CRSF 테이블을 보정한다.
 7. `kinematics_test`로 좌표변환, FK와 IK를 확인한다.
 8. Priority, Drone Controller, Position·Heading·Posture 제어기를 Simulink 결과와 비교한다.
@@ -478,14 +419,14 @@ LoRa와 Robot Telemetry 패킷을 검사한다. Jetson SPI는 인터페이스 �
 10. Gait Manager와 발끝 궤적을 연결하고 접촉 적응을 시험한다.
 11. `mode_transition_test`로 모드 사이의 순간이동과 한 주기 Enable 변화를 확인한다.
 12. `safety_test`로 Fault Latch와 릴레이 차단을 확인한다.
-13. 낮은 속도에서 시작하여 최대 0.28 m/s까지 실제 보행을 검증한다.
-14. LoRa를 추가하고 Jetson SPI는 프로토콜 확정 전까지 비워둔다.
-15. 모든 시험이 끝난 뒤 마지막으로 `main.c`를 `hexapod_app` 함수 호출 중심으로 정리한다.
+13. 낮은 속도에서 시작하여 x 0.10 m/s, y 0.07 m/s와 Yaw 18 deg/s까지 실제 보행을 검증한다.
+14. Jetson SPI v2 DMA 센서 전송과 UART5 매니퓰레이터 링크를 통합 검증한다.
+15. LoRa는 UART5와 포트를 공유하지 않는 새 배선이 정해진 뒤 다시 활성화한다.
 
 ## 14. 5 ms 제어 흐름
 
 ```text
-TIM6 5 ms 실행 요청
+TIM6 1 ms 압력 요청, 5분주 제어 요청
     ↓
 실제 Sensor Snapshot 생성
     ↓
@@ -519,18 +460,23 @@ Kill 상태를 반영한 Relay 출력
 | 제어 주기 | 5 ms, 200 Hz |
 | WT931 | USART3, 115200 baud |
 | CRSF | USART6, 420000 baud, NVIC 사용 |
-| 최대 x·y 속도 | 각 ±0.28 m/s |
-| 최대 Yaw 속도 | ±45 deg/s |
+| 최대 x 속도 | ±0.10 m/s |
+| 최대 y 속도 | ±0.07 m/s |
+| 최대 Yaw 속도 | ±18 deg/s |
 | 최대 Roll·Pitch | ±45 deg |
 | Swing Height | 기본 0.20 m, 범위 0.05~0.25 m |
 | Early Landing 시작 | Swing 진행률 50% |
-| Late Landing 하강 | 0.20 m/s |
-| Late Landing 최대 탐색 | 0.05 m, 0.25 s |
+| Phase 시간 | 1.0 s |
+| 보행 시작 확인 | 100 ms |
+| Late Landing 하강·안쪽 | 0.12 m/s, 0.048 m/s |
+| Late Landing 최대 탐색 | 0.10 m, 약 0.833 s |
 | 작업공간 여유 | 0.001 m |
-| 관절 여유 | 0.5 deg |
 | Stance Foot Slip | 0.05 m, 5회 연속 |
-| 관절 명령 속도 | 315.8 deg/s, 5 ms당 1.579 deg |
+| 압력 접촉 | 10 ms 중 8 Sample, 해제 10 ms 연속 |
+| 서기 전 영점 정렬 | 30 deg/s |
 | Rollover Fault | Roll 또는 Pitch 절댓값 80 deg 이상 |
-| Controller Fault | 비유한 IMU, 최종 제한 뒤 IK Invalid 또는 Late Landing 한계 초과 |
+| Controller Fault | 비유한 IMU 또는 최종 IK Invalid 3회 연속 |
+| Jetson SPI | SPI2 Slave DMA, 32바이트 v2, CRC-16/CCITT-FALSE |
+| 매니퓰레이터 | UART5, 115200 baud, 16바이트, 200 Hz |
 
-관절 ADC, 압력센서 임계값, 서보 방향·중립점, 릴레이-다리 대응과 CRSF raw 보정값은 단계별 실측 테스트에서 채운다.
+관절 ADC, 압력센서 임계값, 서보 방향·영점, 릴레이-다리 대응과 CRSF raw 보정값은 현재 `common/robot_calibration.c`에 저장되어 있다. 기구나 배선이 바뀌면 Measurement Stage 결과로 이 중앙 테이블을 다시 갱신한다.

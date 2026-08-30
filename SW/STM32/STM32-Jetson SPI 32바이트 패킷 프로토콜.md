@@ -143,6 +143,8 @@ Bit 6~7 = 예약, 항상 0
 
 해상도는 약 `1.059도/LSB`다. 이 정밀도는 상태 확인과 상위 판단용으로 사용할 수 있지만, Jetson에서 정밀한 저수준 관절 제어를 수행하는 용도로는 부족할 수 있다.
 
+STM32 내부 좌표를 Jetson 표시 좌표에 맞추기 위해 송신할 때만 Leg 1~3의 Joint 2와 Leg 4~6의 Joint 3 부호를 반전한다. 내부 센서 스냅샷은 변경하지 않는다. 서보 전원 릴레이가 모두 꺼져 있으면 ADC 자세 대신 18개 관절을 모두 0도로 인코딩한다.
+
 ```c
 #include <math.h>
 #include <stdint.h>
@@ -497,8 +499,8 @@ def read_stm32_sensor_packet() -> SensorPacket:
 권장 트랜잭션 순서는 다음과 같다.
 
 1. STM32가 최신 센서 스냅샷으로 다음 `tx_frame[32]`를 완성한다.
-2. STM32가 `DRDY`를 High로 만든다.
-3. Jetson이 `DRDY == High`를 확인한다.
+2. STM32가 `HAL_SPI_TransmitReceive_DMA()`로 32바이트 Slave DMA를 Arm한다.
+3. DMA Arm이 성공하면 STM32가 `DRDY`를 High로 만들고 Jetson이 이를 확인한다.
 4. Jetson이 NSS/CS를 Low로 만들고 정확히 32바이트의 SPI 클록을 발생시킨다.
 5. Jetson은 MOSI로 명령 또는 NOP 패킷을 보내면서 동시에 MISO로 센서 패킷을 받는다.
 6. 32바이트 교환 후 Jetson이 NSS/CS를 High로 만든다.
@@ -534,16 +536,17 @@ CRC 오류 패킷의 순번은 마지막 정상 순번으로 갱신하지 않는
 - `COMMAND` 패킷의 24바이트 Raw Payload 보관 및 일회성 소비 API
 - 수신 순번 유실, 유효 패킷, 잘못된 패킷과 HAL SPI 오류 횟수 기록
 - Jetson이 센서 읽기용으로 보내는 32바이트 `0x00` Dummy 프레임 허용
-- 센서 프레임 준비 시 `DRDY` High, 트랜잭션 완료 시 Low
-- `HAL_SPI_TransmitReceive(..., HAL_MAX_DELAY)`를 사용한 블로킹 처리
+- 릴레이 OFF일 때 18개 관절을 0도로 전송하고 Jetson 좌표용 선택 관절 부호 변환
+- SPI2 RX/TX DMA를 먼저 Arm한 뒤 `DRDY` High, 완료·오류 콜백에서 Low
+- DMA 완료 프레임을 Main Loop에서 파싱하여 5 ms 제어가 Jetson 클록을 기다리지 않음
+- 최종 `HexapodApp_BoardInit()` 경로에서 SPI2 통신 활성화
 
 추가로 필요한 작업은 다음과 같다.
 
 1. Jetson에서 보낼 `COMMAND` Payload의 24바이트 세부 배치를 정의한다.
 2. 정상 `COMMAND` 패킷을 프로젝트의 자율주행 명령과 안전 우선순위에 연결한다.
-3. 메인 제어 처리 전체가 Jetson의 SPI 클록을 무한 대기하지 않도록 인터럽트 또는 DMA 방식과 통신 Timeout을 검토한다.
-4. Jetson 명령이 일정 시간 들어오지 않으면 자율주행 명령을 해제하고 프로젝트의 안전 상태로 전환한다.
-5. 현재 `main.c`는 `MeasurementStage3` 측정 모드로 실행되므로 실제 로봇 앱 운용 단계에서 `HexapodApp_Init()`, `HexapodApp_Process()`와 `HexapodApp_RunControlIfDue()` 실행 경로로 전환한다.
+3. Jetson 명령이 일정 시간 들어오지 않으면 자율주행 명령을 해제하고 프로젝트의 안전 상태로 전환한다.
+4. 실제 Jetson에서 DRDY 대기, 32바이트 전이중 전송, CRC·순번과 DMA 오류 복구를 통합 검증한다.
 
 ## 15. 향후 확장 원칙
 

@@ -1,8 +1,8 @@
 # 6족 로봇 보행 제어기 상세 설계
 
-[Controller_Architecture.md](Controller_Architecture.md)의 제어 구조를 수식과 이산시간 규칙으로 정의한다. 조종기 채널·시험 입력은 [드론 조종기 입력 README](드론%20조종기%20입력/README.md), 좌표 부호와 기본 자세는 [좌표축 README](좌표축/README.md)를 따른다.
+[Controller_Architecture.md](Controller_Architecture.md)의 STM32 구현을 수식과 이산시간 규칙으로 정의한다. 조종기 채널·시험 입력은 [드론 조종기 입력 README](드론%20조종기%20입력/README.md), 좌표 부호와 기본 자세는 [좌표축 README](좌표축/README.md)를 따른다. 수식의 상수는 `SW/STM32/workspace/Hexapod/Core/Inc/common/robot_config.h`와 각 제어 모듈의 현재 값을 기준으로 한다.
 
-이 문서는 현재 제어 모델의 동작 기준이다. 블록 배치나 선 연결 방법은 다루지 않는다.
+이 문서는 STM32 펌웨어의 동작 기준이다. 블록 배치나 선 연결 방법은 다루지 않는다.
 
 ## 1. 공통 정의
 
@@ -127,7 +127,7 @@ STANDING
 READY
 \]
 
-READY 안에서 MANUAL 또는 CORRECTION을 선택한다. ARM과 AUTONOMOUS는 조종기 배치만 유지하며 현재 제어 계산에는 포함하지 않는다.
+READY 안에서 MANUAL, CORRECTION 또는 ARM을 선택한다. ARM에서는 본체 18개 관절 명령을 유지하고 조종기 값을 매니퓰레이터 UART 패킷으로만 전달한다. AUTONOMOUS 자료형과 Jetson `COMMAND` 수신 저장소는 있지만 보행 명령원 연결은 구현하지 않았다.
 
 ### 3.2 서기와 착지
 
@@ -160,7 +160,7 @@ READY가 아니면 Motion Armed를 즉시 해제한다. CRSF 100 ms Timeout과 �
 ### 4.1 조종 모드
 
 \[
-v_{x,user}=0.28u_{T,f}
+v_{x,user}=0.10u_{T,f}
 \]
 
 \[
@@ -174,13 +174,13 @@ S1 왼쪽에서는 다음을 사용한다.
 \[
 v_{y,user}=0,
 \qquad
-\omega_{z,user}=45^\circ/\mathrm{s}\;u_{Y,f}
+\omega_{z,user}=-18^\circ/\mathrm{s}\;u_{Y,f}
 \]
 
 S1 오른쪽에서는 다음을 사용한다.
 
 \[
-v_{y,user}=0.28u_{Y,f},
+v_{y,user}=-0.07u_{Y,f},
 \qquad
 \omega_{z,user}=0
 \]
@@ -211,18 +211,20 @@ S1 오른쪽에서는 사용자 Yaw 각속도를 0으로 두고 Heading PI의 �
 ### 4.3 보정 모드
 
 \[
-v_{x,corr}=0.05u_{P,f},
+v_{x,corr}=0.10u_{P,f},
 \qquad
-v_{y,corr}=0.05u_{R,f},
+v_{y,corr}=-0.10u_{R,f},
 \qquad
-v_{z,corr}=0.05u_{T,f}
+v_{z,corr}=0.10u_{T,f}
 \]
 
 \[
-\psi_{corr,ref}=10^\circ u_{Y,f}
+\psi_{corr,ref}=-30^\circ u_{Y,f}
 \]
 
 보정 Yaw는 각속도가 아니라 상대 목표각이다. Yaw 입력이 중립으로 돌아오면 목표각도 0 deg로 복귀한다.
+
+`DroneController`는 세 이동축 요청을 0.10 m/s 배율로 만들지만 `GaitPoseController`의 최종 축 제한 때문에 실제 적용 범위는 x·z ±0.10 m/s, y ±0.07 m/s이다.
 
 ## 5. 몸체 위치 추정
 
@@ -312,8 +314,8 @@ p_{B,ref}^{xy}[k-1]
 \sin\psi_{ref} & \cos\psi_{ref}
 \end{bmatrix}
 \begin{bmatrix}
-v_{x,applied}\\
-v_{y,applied}
+v_{x,user}\\
+v_{y,user}
 \end{bmatrix}
 T_s
 \]
@@ -326,7 +328,7 @@ p_{B,ref}^{xy}
 {}^W\hat p_B^{xy}
 \]
 
-요청 속도가 아니라 작업공간 검사를 통과한 적용 속도를 적분한다.
+필터를 통과해 `DroneController`가 만든 사용자 속도를 적분한다. 현재 `GaitPoseController`는 이후 작업공간 검사에서 채택된 속도를 Position Reference에 되먹임하지 않는다.
 
 ### 6.2 Position PI
 
@@ -393,7 +395,7 @@ K_{P,\psi}e_\psi+K_{I,\psi}I_\psi,
 
 현재 \(K_{P,\psi}=2.0\), \(K_{I,\psi}=0\), 적분 제한은 ±0.50이다.
 
-PI 출력이 포화되거나 작업공간에서 거부된 방향으로 명령이 계속되면 적분을 중단한다. 비활성 모드에서는 출력과 적분항을 0으로 만든다.
+Position과 Heading 적분 상태에는 각각 ±0.20, ±0.50의 고정 제한을 적용한다. 작업공간 거부에 연동한 Anti-Windup은 없으며 현재 두 \(K_I\)가 모두 0이므로 적분 상태는 출력에 기여하지 않는다. 비활성 모드에서는 출력과 적분항을 0으로 만든다.
 
 ## 7. 몸체 자세 PI와 오버레이
 
@@ -451,7 +453,7 @@ I_R[k-1]+e_{posture}[k]T_s,
 \operatorname{sat}
 \left(
 K_{P,R}e_{posture}+K_{I,R}I_R,
-\pm15^\circ/\mathrm{s}
+\pm30^\circ/\mathrm{s}
 \right)
 \]
 
@@ -470,7 +472,7 @@ K_{P,R}e_{posture}+K_{I,R}I_R,
 \right)
 \]
 
-Roll·Pitch 범위는 ±45 deg, 보정 Yaw 범위는 ±10 deg이다.
+Roll·Pitch 범위는 ±45 deg, 보정 Yaw 범위는 ±30 deg이다.
 
 ### 7.3 자세 오버레이
 
@@ -540,18 +542,18 @@ Roll·Pitch와 보정 Yaw 자세 PI는 Body Twist에 합하지 않는다.
 | 5 ms당 선속도 변화 | 0.0025 m/s |
 | 5 ms당 Yaw 속도 변화 | 0.45 deg/s |
 
-최종 크기는 x·y 각각 0.28 m/s, z 0.05 m/s, Yaw 45 deg/s로 제한한다.
+최종 크기는 x 0.10 m/s, y 0.07 m/s, z 0.10 m/s, Yaw 18 deg/s로 제한한다.
 
 ## 9. Tripod Gait Manager
 
-Tripod A는 Leg 1·3·5, Tripod B는 Leg 2·4·6이다. 정상 보행에서는 두 그룹이 0.5 s마다 STANCE와 SWING을 교대한다.
+Tripod A는 Leg 1·3·5, Tripod B는 Leg 2·4·6이다. 정상 보행에서는 두 그룹이 1.0 s마다 STANCE와 SWING을 교대한다.
 
 \[
 s_{phase}
 =
 \operatorname{clamp}
 \left(
-\frac{t-t_0}{0.5},
+\frac{t-t_0}{1.0},
 0,
 1
 \right)
@@ -571,9 +573,9 @@ s_{phase}
 |\omega_z|\ge1^\circ/\mathrm{s}
 \]
 
-보행 명령이 중립으로 돌아오면 진행 중인 Swing 다리를 착지시킨 뒤 Phase를 정지한다. 6개 발의 마지막 안전 STANCE 목표를 유지하며 0이나 기본 위치로 순간 변경하지 않는다.
+보행 시작 조건은 20 제어 주기, 즉 100 ms 동안 유지되어야 한다. 한 번 채택한 사용자 x·y·Yaw 명령은 서로 반대인 두 Tripod 걸음에 공통 적용하고, Heading Feedback만 매 주기 최신값을 합한다. 명령이 중립으로 돌아오면 두 걸음 묶음과 Swing 착지를 마친 뒤 Phase를 정지한다. 6개 발의 마지막 안전 STANCE 목표를 유지하며 0이나 기본 위치로 순간 변경하지 않는다.
 
-Late Landing 중에는 시간 진행률이 1이어도 모든 Swing 발이 접촉하기 전까지 다음 Phase로 전환하지 않는다.
+Late Landing 중에는 시간 진행률이 1이어도 여섯 발 접촉이 모두 확정되기 전까지 다음 Phase로 전환하지 않는다. 현재 지지발 접촉이 사라지면 Phase 시간을 멈추고 접촉이 없는 지지발만 다시 내린다.
 
 ## 10. 발끝 궤적
 
@@ -614,35 +616,9 @@ v_B+\omega_B\times p_{0,i}
 
 착지점과 전체 Swing 중간 궤적은 IK와 관절 범위를 만족해야 한다.
 
-### 10.3 Bezier Curve
+### 10.3 Cubic Smoothstep과 높이 곡선
 
-Swing 시작점 \(P_0\), 착지점 \(P_3\), Swing Height \(h\)에 대해 다음 제어점을 사용한다.
-
-\[
-P_1=P_0+
-\begin{bmatrix}
-0\\0\\\frac{4}{3}h
-\end{bmatrix},
-\qquad
-P_2=P_3+
-\begin{bmatrix}
-0\\0\\\frac{4}{3}h
-\end{bmatrix}
-\]
-
-\[
-B(s)
-=
-(1-s)^3P_0
-+
-3(1-s)^2sP_1
-+
-3(1-s)s^2P_2
-+
-s^3P_3
-\]
-
-시간 진행률 \(\tau\)에는 Quintic Time Scaling을 적용한다.
+시간 진행률 \(\tau\)를 0~1로 제한하고 Cubic Smoothstep을 적용한다.
 
 \[
 \tau
@@ -656,12 +632,19 @@ s^3P_3
 \]
 
 \[
-s(\tau)
-=
-10\tau^3-15\tau^4+6\tau^5
+s(\tau)=\tau^2(3-2\tau)
 \]
 
-시작과 종료에서 속도와 가속도가 0이 되어 궤적 전환을 부드럽게 한다.
+Swing 시작점 \(P_0\), 착지점 \(P_1\), Swing Height \(h\)에 대한 발 위치는 다음과 같다.
+
+\[
+p(s)=P_0+(P_1-P_0)s+
+\begin{bmatrix}
+0\\0\\4hs(1-s)
+\end{bmatrix}
+\]
+
+시작과 종료에서 보간 속도가 0이고, \(s=0.5\)에서 높이 항이 \(h\)가 된다.
 
 ### 10.4 방사 오프셋
 
@@ -695,7 +678,7 @@ r_{swing}=0.07\ \mathrm{m}
 \[
 p_i^{ref}
 =
-B(s)+r(s)e_{r,i}
+p(s)+r(s)e_{r,i}
 \]
 
 시작점과 착지점에서는 오프셋이 0이고 Swing 중간에서 0.07 m가 된다.
@@ -714,7 +697,7 @@ h
 \ \mathrm{m}
 \]
 
-\(\Delta z_B\)는 몸체 기준점에 대한 몸체 원점의 z Offset이다. 현재 기본값은 0.20 m이며 0.25 m가 아니다.
+\(\Delta z_B\)는 몸체 기준점에 대한 몸체 원점의 z Offset이다. 현재 기본값은 0.20 m이며 0.25 m가 아니다. 진행률 50% 이후 발이 착지 목표보다 0.03 m 이내에 있고 하강 중이면 한 주기의 Z 감소를 0.0006 m 이하로 제한하므로 최대 하강 속도는 0.12 m/s이다.
 
 ## 11. 발 접촉과 착지 적응
 
@@ -726,9 +709,9 @@ h
 F_{release}<F_{contact}
 \]
 
-1 ms 압력 표본에서 \(F_i>F_{contact}\)이면 CONTACT로 전환하고, \(F_i<F_{release}\)이면 CONTACT를 해제한다. 새 CONTACT는 다음 전체 제어가 소비할 때까지 Latch한다.
+1 ms 압력 표본에서 \(F_i\)가 접촉 진입 임계값을 넘으면 10 ms 검사 창을 시작한다. 창 안에서 \(F_i\)가 해제 임계값보다 접촉 쪽인 표본이 8개 이상이면 CONTACT로 확정한다. 이미 확정된 CONTACT는 해제 임계값을 10 ms 연속 넘을 때 해제한다. 반전 센서는 부등호 방향만 반대로 적용한다. 새 접촉 후보는 다음 전체 제어가 소비할 때까지 Latch한다.
 
-임계값과 Sample 수는 실측 후 발별 설정 테이블에 기록한다.
+임계값과 센서 방향은 실측 후 발별 설정 테이블에 기록한다.
 
 ### 11.2 Early Landing
 
@@ -740,18 +723,18 @@ F_{release}<F_{contact}
 
 해당 주기의 현재 발끝 위치를 Stance 시작점으로 저장하고 즉시 STANCE로 전환한다. 다른 Swing 다리는 기존 궤적을 계속 수행한다.
 
-접촉 순간 현재 출력 중인 PWM 명령각으로 FK를 계산하고 자세 보정 전 궤적 좌표로 변환해 발 메모리를 같은 위치에 고정한다. 관절 ADC를 다시 읽거나 PWM을 다시 출력하지 않는다. 20 ms 후 PWM 명령 FK와 정상 착지 Z의 차이를 수집하고, 0.5 mm 데드밴드 초과분의 80%만 복구 후보로 사용한다. 착지당 최대 5 mm만 기존 잔량과 비교해 큰 값으로 유지한다. STANCE에서는 0.25초 Smoothstep S-curve로 진행해 시작과 끝의 적용량을 줄이고 중간 적용량을 높이며, Swing 중에는 진행률과 잔량을 유지한다.
+접촉 순간 관절 ADC 절대각과 PWM 예측을 결합한 추정 관절각으로 FK를 계산하고 자세 보정 전 궤적 좌표로 변환해 발 메모리를 같은 위치에 고정한다. Tripod의 확정 접촉 발에서 공통 Z 오차를 구하고, 0.5 mm 데드밴드보다 큰 하강 오차의 100%를 최대 0.10 m까지 복구 후보로 사용한다. STANCE에서는 0.25초 Smoothstep S-curve로 적용하며 Swing 중에는 진행률과 잔량을 유지한다.
 
 ### 11.3 Late Landing
 
 Swing 종료 시 CONTACT가 없으면 Late Landing으로 전환한다. 발을 -Z 방향으로 내리면서 다리 안쪽으로 이동한다.
 
 \[
-v_{search}=0.20\ \mathrm{m/s}
+v_{search}=0.12\ \mathrm{m/s}
 \]
 
 \[
-v_{in}=0.8v_{search}=0.16\ \mathrm{m/s}
+v_{in}=0.048\ \mathrm{m/s}
 \]
 
 \[
@@ -764,7 +747,7 @@ v_{in}=0.8v_{search}=0.16\ \mathrm{m/s}
 \end{bmatrix}
 \]
 
-CONTACT가 검출되면 STANCE로 전환한다. 최대 하강 거리는 0.05 m이고 현재 탐색 속도에서 최대 탐색 시간은 0.25 s이다. 한계에 도달하면 발 목표를 유지하고 `Late Landing` 원인의 Controller Fault를 Latch한다.
+CONTACT가 확정되면 STANCE로 전환한다. 최대 하강 거리는 0.10 m이고 현재 탐색 속도에서 최대 탐색 시간은 \(0.10/0.12\approx0.833\) s이다. 한계에 도달하면 발 목표와 서보 전원을 유지하고 보행만 정지한다. 이 상태는 현재 Controller Fault가 아니다.
 
 ## 12. 좌표 변환과 IK
 
@@ -874,7 +857,7 @@ IK 유효성은 거리, Cosine Law와 관절 범위를 함께 검사한다.
 
 이번 주기의 Roll·Pitch·Yaw 후보를 6개 발에 함께 적용한다.
 
-1. 자세 PI와 15 deg/s Rate Limit로 후보각을 만든다.
+1. 자세 PI와 30 deg/s Rate Limit로 후보각을 만든다.
 2. 후보 자세의 6개 발끝 위치를 계산한다.
 3. 모든 다리가 유효하면 세 축 후보를 함께 적용한다.
 4. 한 다리라도 유효하지 않으면 세 축을 모두 직전 적용값으로 유지한다.
@@ -884,17 +867,17 @@ IK 유효성은 거리, Cosine Law와 관절 범위를 함께 검사한다.
 
 ### 13.3 보행 속도와 회전
 
-한 Phase가 0.5 s이므로 한 축 0.28 m/s는 0.14 m의 발 이동량에 해당한다.
+한 Phase가 1.0 s이므로 전진 최대 0.10 m/s는 0.10 m, 횡이동 최대 0.07 m/s는 0.07 m의 발 이동량에 해당한다.
 
 \[
 l_{phase}
 =
-\sqrt{v_x^2+v_y^2}\times0.5
+\sqrt{v_x^2+v_y^2}\times1.0
 \]
 
-x·y·Yaw가 동시에 입력되면 합성 방향과 회전 반경을 유지하도록 같은 비율과 공통 적용 여부를 사용한다. 새 후보는 대기 상태로 저장하고 현재 위상 이후의 다음 5 ms, 남은 구간 중간과 위상 끝을 제어 주기마다 하나씩 검사한다. 각 지점에서 실제 Tripod 역할의 여섯 발 IK만 계산하므로 미래 검사는 총 18회이며 한 주기에는 6회만 추가된다. 세 지점이 모두 유효할 때 후보를 적용하고, 위험하면 직전 유효 명령을 유지한다. 이 거부는 IK Invalid Fault를 발생시키지 않는다.
+x·y·Yaw가 동시에 입력되면 합성 방향과 회전 반경을 유지한다. 다음 위상 직전에 시작·중앙·끝 세 지점을 한 5 ms 제어 안에서 검사한다. 각 지점에서 실제 Tripod 역할의 여섯 발 IK를 계산하므로 미래 검사는 총 18회이다. 세 지점이 모두 유효할 때 사용자 명령을 두 걸음 묶음에 적용하고, 위험하면 다음 위상 진입을 거부한다. 이 거부는 IK Invalid Fault를 발생시키지 않는다. 사용자 Yaw 명령은 두 걸음 동안 고정하지만 Heading Feedback은 별도로 매 주기 갱신한다.
 
-x·y를 각각 0.28 m/s로 동시에 고정하면 합성 속도가 한 축 제한을 넘을 수 있다. 실제 적용값은 합성 작업공간 검사를 통과한 범위로 제한하며 최대값 시험도 축별로 수행한다.
+x와 y를 각각 0.10 m/s, 0.07 m/s로 동시에 고정하면 합성 속도와 회전 때문에 작업공간을 넘을 수 있다. 실제 적용값은 합성 작업공간 검사를 통과해야 하며 최대값 시험도 축별로 수행한다.
 
 ### 13.4 보정 위치
 
@@ -910,7 +893,7 @@ v_{request}[k]T_s
 
 ### 13.5 최종 발끝 보호
 
-동적 제한 이후 각 IK 입력에도 0.001 m 링크 작업공간 여유와 0.5 deg 관절 여유를 적용한다. 링크 경계 제한 후에도 관절 범위를 벗어나면 기본 발 위치와 입력 사이를 이분 탐색해 유효한 가장 가까운 지점을 선택한다. 최종 제한 결과는 같은 IK 함수로 다시 확인하므로 유한한 입력은 관절 범위 안의 발 목표로 변환된다.
+동적 제한 이후 각 IK 입력에도 0.001 m 링크 작업공간 여유를 적용한다. 링크 경계 제한 후에도 관절 범위를 벗어나면 기본 발 위치와 입력 사이를 이분 탐색해 유효한 가장 가까운 지점을 선택한다. 최종 제한 결과는 같은 IK 함수로 다시 확인하므로 유한한 입력은 관절 범위 안의 발 목표로 변환된다.
 
 ## 14. 전환 연속성
 
@@ -945,12 +928,10 @@ Controller\_Fault
 =
 IMU\_Invalid
 \lor
-IK\_Invalid
-\lor
-LateLanding\_Limit
+IK\_Invalid_{3\ consecutive\ samples}
 \]
 
-IK Invalid는 6개 다리 중 하나라도 최종 제한 이후 IK Valid가 0이면 참이다. 최초 제어기 Fault는 원인, 다리 번호, 제어 주기, 제한 전·후 발 좌표와 제한 여부를 전원 재인가 전까지 별도로 보존한다.
+IK Invalid는 6개 다리 중 하나라도 최종 제한 이후 IK Valid가 0인 상태가 3회 연속일 때 Latch한다. 중간에 모두 유효해지면 연속 횟수를 0으로 되돌린다. 최초 IK 제어기 Fault는 원인, 다리 번호, 제어 주기, 제한 전·후 발 좌표와 제한 여부를 전원 재인가 전까지 별도로 보존한다. Late Landing 한계는 전원을 유지한 보행 정지이며 Safety Fault가 아니다.
 
 두 Fault는 한 번 발생하면 영구 Latch한다. Safety Reset은 없으며 자동 Recovery도 수행하지 않는다. Fault가 Latch되면 FAULT 상태를 거쳐 Kill을 활성화하고 6개 서보 전원 릴레이를 모두 끈다.
 
@@ -960,8 +941,7 @@ IK Invalid는 6개 다리 중 하나라도 최종 제한 이후 IK Valid가 0이
 
 - 발끝 작업공간
 - 관절각 -135~135 deg
-- 관절 명령 속도 315.8 deg/s
-- PWM 500~2500 us
+- 관절별 실측 PWM 최소·최대 Pulse
 
 ### 15.3 후속 후보
 
@@ -974,43 +954,19 @@ IK Invalid는 6개 다리 중 하나라도 최종 제한 이후 IK Valid가 0이
 
 ## 16. Servo Output
 
-관절각을 -135~135 deg에서 500~2500 us로 선형 변환한다.
+관절각을 -135~135 deg로 제한한 뒤 관절별 실측 보정표로 PWM Pulse를 계산한다.
 
 \[
 PWM_{ij}
 =
-1500
+PWM_{neutral,ij}
 +
-\frac{1000}{135}
-\theta_{ij}^{cmd}
+s_{ij}(\theta_{ij}^{cmd}-\theta_{zero,ij})k_{ij}
 \]
 
-최종 PWM은 500~2500 us로 제한한다.
+\(s_{ij}\)는 ±1 방향, \(k_{ij}\)는 pulse/rad 계수이다. 계산 결과는 각 관절의 실측 최소·최대 Pulse로 제한한다. 보정 전 기본 범위는 500~2500 us지만 최종 운용은 `robot_calibration.c`의 관절별 값을 사용한다.
 
-IK와 관절 범위 제한 뒤에 관절별 Rate Limiter를 적용한다.
-
-\[
-\Delta\theta_{max}
-=
-315.8^\circ/\mathrm{s}\times0.005\ \mathrm{s}
-=
-1.579^\circ
-\]
-
-\[
-\theta_{ij}^{cmd}[k]
-=
-\theta_{ij}^{cmd}[k-1]
-+
-\operatorname{clamp}
-\left(
-\theta_{ij}^{ref}[k]-\theta_{ij}^{cmd}[k-1],
--1.579^\circ,
-1.579^\circ
-\right)
-\]
-
-Rate Limit 뒤에 관절별 방향·중립점 보정과 PWM 변환을 수행한다. 실기에서는 관절 ADC로 실제 추종 속도를 측정해 필요하면 제한값을 낮춘다.
+현재 운용 출력 함수에는 관절 명령 Rate Limiter가 없다. 다만 서기 전 초기화에서는 측정 관절각을 평균낸 뒤 30 deg/s로 0 deg까지 이동하고, 관절 추정기의 PWM 예측 변화는 300 deg/s로 제한한다.
 
 ## 17. 5 ms 실행 순서
 
@@ -1029,7 +985,7 @@ TIM6 매 1 ms마다 압력센서 6채널을 갱신하고 새 접촉을 Latch한�
 11. Early/Late Landing을 적용한다.
 12. 몸체 자세 오버레이와 다리 좌표 변환을 수행한다.
 13. 6개 다리 IK와 유효성을 계산한다.
-14. 관절 범위와 Rate Limit를 적용한다.
+14. 관절 범위와 관절별 PWM 보정을 적용한다.
 15. Fault가 없으면 PWM을 갱신하고, Fault 또는 Kill이면 릴레이를 끈다.
 16. 남은 시간 동안 다음 5 ms Tick을 기다린다.
 
@@ -1049,7 +1005,7 @@ GPS, LoRa와 Jetson SPI는 필요한 주기에 따라 백그라운드에서 처�
 8. Early/Late Landing과 Stance Foot Slip을 검증한다.
 9. 동적 작업공간 제한과 모드 전환 연속성을 검증한다.
 10. IK Invalid와 80 deg 전복 입력에서 Safety Latch와 릴레이 차단을 확인한다.
-11. 실기 속도를 단계적으로 0.28 m/s까지 올린다.
+11. 실기 속도를 단계적으로 x 0.10 m/s, y 0.07 m/s와 Yaw 18 deg/s까지 올린다.
 
 ## 19. 현재 파라미터 요약
 
@@ -1060,30 +1016,36 @@ GPS, LoRa와 Jetson SPI는 필요한 주기에 따라 백그라운드에서 처�
 | RC | Stick Dead Zone | ±50 raw |
 | RC | LPF Cutoff | 5 Hz |
 | RC | 시험·RL 변화율 | 5000 raw/s |
-| 조종 | x·y 최대 속도 | 각 ±0.28 m/s |
-| 조종 | Yaw 최대 속도 | ±45 deg/s |
+| 조종 | x 최대 속도 | ±0.10 m/s |
+| 조종 | y 최대 속도 | ±0.07 m/s |
+| 조종 | Yaw 최대 속도 | ±18 deg/s |
 | 조종 | Roll·Pitch 최대각 | ±45 deg |
-| 보정 | x·y·z 최대 속도 | 각 ±0.05 m/s |
-| 보정 | Yaw 최대각 | ±10 deg |
+| 보정 | x·z 최대 속도 | 각 ±0.10 m/s |
+| 보정 | y 최대 속도 | ±0.07 m/s |
+| 보정 | Yaw 최대각 | ±30 deg |
 | PI | Position \(K_P,K_I\) | 1.0, 0 |
 | PI | Heading \(K_P,K_I\) | 2.0, 0 |
 | PI | Posture \(K_P,K_I\) | 2.0, 0 |
 | Feedback | Position 최대 | ±0.05 m/s |
 | Feedback | Heading 최대 | ±15 deg/s |
-| Posture | 명령 속도 제한 | ±15 deg/s |
-| Gait | Phase 시간 | 0.5 s |
+| Posture | 명령 속도 제한 | ±30 deg/s |
+| Gait | Phase 시간 | 1.0 s |
+| Gait | 시작 입력 확인 | 100 ms |
 | Swing | 기본 높이 | 0.20 m |
 | Swing | 높이 범위 | 0.05~0.25 m |
 | Swing | 방사 오프셋 | 0.07 m |
 | Early | 판정 시작 | Swing 50% |
-| Late | 하강 속도 | 0.20 m/s |
-| Late | 안쪽 속도 | 0.16 m/s |
-| Late | 최대 탐색 | 0.05 m, 0.25 s |
+| Swing | 착지 접근 하강 제한 | 0.03 m 이내, 0.12 m/s |
+| Late | 하강 속도 | 0.12 m/s |
+| Late | 안쪽 속도 | 0.048 m/s |
+| Late | 최대 탐색 | 0.10 m, 약 0.833 s |
 | Estimator | Slip 거리 | 0.05 m |
 | Estimator | Slip 확정 | 5 Sample, 25 ms |
 | Workspace | 링크 여유 | 0.001 m |
-| Workspace | 관절 여유 | 0.5 deg |
 | Joint | 범위 | -135~135 deg |
-| Joint | 명령 속도 | 315.8 deg/s |
-| Joint | 5 ms 변화량 | 1.579 deg |
+| Joint | 시작 영점 정렬 | 30 deg/s |
+| Joint | PWM 예측 한계 | 300 deg/s |
+| Pressure | 접촉 확정 | 10 ms 중 8 Sample |
+| Pressure | 접촉 해제 | 10 ms 연속 |
 | Safety | 전복 기준 | Roll 또는 Pitch 80 deg |
+| Safety | IK Fault 확정 | 3회 연속 Invalid |

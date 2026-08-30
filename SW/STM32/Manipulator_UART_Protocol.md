@@ -36,7 +36,7 @@
 |---:|---|---|
 | 0 | Controller connected | STM32가 정상 CRSF 패킷을 받고 있다. |
 | 1 | Motion armed | 조종기 연결 후 중립 재허가가 완료되었다. |
-| 2 | ARM mode | SA 활성화와 조종 안전 조건이 모두 만족되어 조작이 허가되었다. |
+| 2 | ARM mode | STM32 본체 모드가 SC 가운데의 `ROBOT_MODE_ARM`이다. |
 | 3~7 | Reserved | 현재 사용하지 않으며 무시한다. |
 
 매니퓰레이터는 Flags의 bit 0, bit 1, bit 2가 **모두 1일 때만** Roll, Pitch, Throttle, Yaw 명령을 적용한다.
@@ -46,7 +46,7 @@ SD Kill이 활성화되면 ARM mode flag는 즉시 0으로 전송한다.
 
 | Bit | 스위치 | 형식 |
 |---:|---|---|
-| 0 | SA | `0`: ARM 해제, `1`: ARM 활성화 |
+| 0 | SA | `0`: SA 해제, `1`: SA 활성화 |
 | 1~2 | SB | `0~2`: 3단 위치 |
 | 3~4 | SC | `0~2`: 3단 위치 |
 | 5 | SD | `0`: 해제, `1`: 활성화 |
@@ -79,7 +79,7 @@ SB는 `(switches >> 1) & 0x03`, SC는 `(switches >> 3) & 0x03`으로 해제한�
 
 다음 조건 중 하나라도 해당하면 매니퓰레이터는 **현재 자세를 유지**해야 한다.
 
-- SA가 꺼져 ARM mode flag가 0이다.
+- SC가 ARM 위치가 아니어서 ARM mode flag가 0이다.
 - Controller connected flag가 0이다.
 - Motion armed flag가 0이다.
 - CRC가 맞지 않는다.
@@ -90,9 +90,9 @@ SB는 `(switches >> 1) & 0x03`, SC는 `(switches >> 3) & 0x03`으로 해제한�
 
 ## 8. 6족 본체 동작
 
-- SA가 켜지고 ARM 모드가 선택되면 6족 본체는 ARM 진입 직전의 18개 관절 명령을 유지한다.
+- SC를 가운데 `1`에 두어 ARM 모드가 선택되면 6족 본체는 ARM 진입 직전의 18개 관절 명령을 유지한다.
 - ARM 모드 중 Roll, Pitch, Throttle, Yaw 입력은 6족 보행에 적용하지 않고 매니퓰레이터 패킷으로만 전달한다.
-- SA를 끄면 ARM 모드를 해제하고 기존 6족 모드 선택 로직으로 돌아간다.
+- SC를 `0` 또는 `2`로 옮기면 ARM 모드를 해제하고 각각 조종 또는 보정 모드로 돌아간다.
 - Kill 또는 Safety Fault는 ARM 모드보다 우선하며 기존 릴레이 차단 동작을 유지한다.
 
 ## 9. 구현 참고 코드
