@@ -6,8 +6,8 @@
 ../Core/Src/test/gait_test.c:313:13:GaitTest_CheckPhaseTwistLatch	9
 ../Core/Src/test/gait_test.c:385:25:GaitTest_StartNormal	2
 ../Core/Src/test/gait_test.c:406:13:GaitTest_CheckPreviewTransition	18
-../Core/Src/test/gait_test.c:471:13:GaitTest_CheckResumeTripod	10
-../Core/Src/test/gait_test.c:513:25:GaitTest_StartConfirmedNormal	2
-../Core/Src/test/gait_test.c:537:13:GaitTest_CheckTouchdownConfirmation	7
-../Core/Src/test/gait_test.c:586:13:GaitTest_CheckSupportRecovery	12
-../Core/Src/test/gait_test.c:641:6:GaitTest_Run	14
+../Core/Src/test/gait_test.c:471:13:GaitTest_CheckTwoStepCommandLatch	17
+../Core/Src/test/gait_test.c:536:25:GaitTest_StartConfirmedNormal	2
+../Core/Src/test/gait_test.c:560:13:GaitTest_CheckTouchdownConfirmation	7
+../Core/Src/test/gait_test.c:609:13:GaitTest_CheckSupportRecovery	12
+../Core/Src/test/gait_test.c:664:6:GaitTest_Run	14

@@ -68,7 +68,7 @@ void FootPressureMeasurement_AddLoaded(FootPressureMeasurement_t *measurement,
     g_measurement_debug.pressure_loaded_count = measurement->loaded_count;  // 디버거 표본 수를 갱신한다.
 }
 
-/* 두 평균 사이의 40%·60% 지점으로 접촉 Hysteresis를 만든다. */
+/* 두 평균 사이의 10%·5% 지점으로 접촉 Hysteresis를 만든다. */
 bool FootPressureMeasurement_Build(const FootPressureMeasurement_t *measurement,
                                    FootPressure_Calibration_t table[ROBOT_PRESSURE_COUNT])
 {
@@ -96,13 +96,13 @@ bool FootPressureMeasurement_Build(const FootPressureMeasurement_t *measurement,
         table[leg].active_high = (difference > 0);  // 접촉 시 raw 증가 여부를 저장한다.
         if (difference > 0)
         {
-            table[leg].release_threshold = (uint16_t)((int32_t)unloaded + difference * 2 / 5);  // 해제 임계값을 만든다.
-            table[leg].contact_threshold = (uint16_t)((int32_t)unloaded + difference * 3 / 5);  // 접촉 임계값을 만든다.
+            table[leg].release_threshold = (uint16_t)((int32_t)unloaded + difference / 20); // 5% 해제 임계값을 만든다.
+            table[leg].contact_threshold = (uint16_t)((int32_t)unloaded + difference / 10); // 10% 접촉 임계값을 만든다.
         }
         else
         {
-            table[leg].contact_threshold = (uint16_t)((int32_t)unloaded + difference * 3 / 5);  // 반전 접촉 임계값을 만든다.
-            table[leg].release_threshold = (uint16_t)((int32_t)unloaded + difference * 2 / 5);  // 반전 해제 임계값을 만든다.
+            table[leg].contact_threshold = (uint16_t)((int32_t)unloaded + difference / 10); // 반전 10% 접촉값을 만든다.
+            table[leg].release_threshold = (uint16_t)((int32_t)unloaded + difference / 20); // 반전 5% 해제값을 만든다.
         }
         table[leg].calibrated = true;  // 실측 완료를 표시한다.
         g_measurement_debug.calibration.pressure[leg] = table[leg];  // 디버거 최종 임계값을 갱신한다.

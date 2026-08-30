@@ -4,6 +4,7 @@
 #include "high_control/drone_controller.h"
 #include "high_control/foot_trajectory.h"
 #include "high_control/gait_manager.h"
+#include "high_control/gait_pose_controller.h"
 #include "high_control/leg_kinematics.h"
 
 #include <math.h>
@@ -16,6 +17,7 @@ bool ControllerTest_Run(void)
     FootTrajectory_Handle_t trajectory;                // 발 궤적 기억을 저장한다.
     BodyPostureController_Handle_t posture_controller; // 자세 제어 상태를 저장한다.
     DroneController_Handle_t drone_controller;         // 조종 속도 변환 상태를 저장한다.
+    GaitPoseController_Handle_t gait_pose_controller;  // Heading 보정 상태를 저장한다.
     LegKinematics_Handle_t kinematics;                 // IK 상태를 저장한다.
     RobotPriorityOutput_t priority;                    // 최대 조종 입력을 저장한다.
     RobotDroneOutput_t drone;                          // 명시적인 READY 제어 입력을 저장한다.
@@ -23,7 +25,9 @@ bool ControllerTest_Run(void)
     RobotGaitPhase_t gait;                             // Tripod 결과를 저장한다.
     RobotFootTargets_t feet;                           // 발 궤적 결과를 저장한다.
     BodyPostureController_Output_t posture;            // 자세 적용 결과를 저장한다.
+    GaitPoseController_Output_t gait_pose;             // Heading 보정 결과를 저장한다.
     RobotEuler_t measured;                             // 명시적인 수평 IMU 자세를 저장한다.
+    RobotVec3_t body_position = {0};                    // 고정된 몸체 위치를 저장한다.
     bool contact[ROBOT_LEG_COUNT];                     // 명시적인 전체 접촉을 저장한다.
     uint32_t cycle;                                    // LPF 안정 주기를 계산한다.
     uint32_t leg;                                      // IK를 검사할 다리 번호를 저장한다.
@@ -74,6 +78,33 @@ bool ControllerTest_Run(void)
                                      &priority,
                                      contact,
                                      0.0f);  // 1초 동안 최대 입력 LPF를 안정시킨다.
+    }
+
+    GaitPoseController_Init(&gait_pose_controller);                 // Heading 보정 상태를 초기화한다.
+    drone.manual_enable = true;                                     // 수동 보행을 활성화한다.
+    drone.wz_user_radps = 0.0f;                                     // 사용자 회전을 제거한다.
+    drone.posture_reference_rad.yaw = 10.0f * ROBOT_DEG_TO_RAD_F;   // 충분한 Heading 오차를 만든다.
+    gait_pose = GaitPoseController_Step(&gait_pose_controller,
+                                        false,
+                                        &drone,
+                                        &body_position,
+                                        0U,
+                                        0.0f);  // 첫 주기의 Heading 보정 변화량을 계산한다.
+    if (fabsf(gait_pose.yaw_feedback_radps -
+              0.45f * ROBOT_DEG_TO_RAD_F) > 0.00001f)
+    {
+        return false;
+    }
+    gait_pose = GaitPoseController_Step(&gait_pose_controller,
+                                        false,
+                                        &drone,
+                                        &body_position,
+                                        0U,
+                                        0.0f);  // 다음 주기의 연속 Heading 보정을 계산한다.
+    if (fabsf(gait_pose.yaw_feedback_radps -
+              0.90f * ROBOT_DEG_TO_RAD_F) > 0.00001f)
+    {
+        return false;
     }
 
     return (fabsf(drone.vx_user_mps - ROBOT_MAX_LINEAR_SPEED_MPS) <= 0.00001f) &&

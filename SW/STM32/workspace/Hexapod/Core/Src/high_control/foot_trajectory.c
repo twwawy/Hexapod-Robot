@@ -362,6 +362,16 @@ static RobotVec3_t FootTrajectory_AdaptiveLeg(FootTrajectory_Handle_t *handle,
                                            swing_height,
                                            ROBOT_SWING_RADIAL_OFFSET_M,
                                            foot_leg_angle[leg]);  // 정상 Swing 궤적을 계산한다.
+        if ((progress >= ROBOT_EARLY_LANDING_PROGRESS) &&
+            (output.z <= (handle->landing_target_z[leg] +
+                          ROBOT_SWING_LANDING_APPROACH_M)) &&
+            (output.z < handle->memory[leg].z))
+        {
+            const float minimum_z = handle->memory[leg].z -
+                ROBOT_SWING_LANDING_SPEED_MPS * ROBOT_CONTROL_PERIOD_S;  // 한 주기의 최대 하강 위치를 계산한다.
+
+            output.z = fmaxf(output.z, minimum_z);  // 지면 접근 중 하강 충격을 제한한다.
+        }
         handle->memory[leg] = output;  // 연속 발 위치를 갱신한다.
     }
     else if (state == ROBOT_LEG_STANCE)

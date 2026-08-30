@@ -23,6 +23,11 @@
 #define CONTROL_TIMING_REASON_CRSF_OVERFLOW  0x40U  // CRSF 버퍼 초과를 표시한다.
 #define CONTROL_TIMING_REASON_MANUAL_CAPTURE 0x80U  // 강제 기록 요청을 표시한다.
 
+#define CONTROL_YAW_FAULT_FEEDBACK     0x01U  // 직진 중 Heading 보정을 표시한다.
+#define CONTROL_YAW_FAULT_APPLIED_JUMP 0x02U  // 적용 Yaw속도 급변을 표시한다.
+#define CONTROL_YAW_FAULT_IMU_JUMP     0x04U  // IMU Yaw 순간 변화를 표시한다.
+#define CONTROL_YAW_FAULT_S1_CHANGE    0x08U  // 직진 중 S1 전환을 표시한다.
+
 typedef struct
 {
     uint32_t timestamp_ms;            // 이상 동작 시각을 저장한다.
@@ -37,10 +42,20 @@ typedef struct
     uint32_t crsf_age_ms;             // 마지막 조종기 명령 나이를 저장한다.
     uint32_t crsf_overflow_count;     // CRSF 버퍼 초과 횟수를 저장한다.
     uint16_t crsf_buffer_used;        // CRSF 버퍼 사용량을 저장한다.
-    uint8_t reason_flags;             // 기록 원인 비트를 저장한다.
+    uint8_t reason_flags;             // 시간 이상 원인 비트를 저장한다.
+    uint8_t yaw_fault_flags;          // 자동 Yaw 이상 원인을 저장한다.
     uint8_t active_mode;              // 현재 운용 모드를 저장한다.
+    uint8_t s1;                       // 현재 이동 방식을 저장한다.
+    uint8_t gait_applied_step_count;  // 적용 명령의 걸음 수를 저장한다.
+    bool imu_valid;                   // IMU Yaw 유효성을 저장한다.
     int16_t throttle;                 // 현재 전후 입력을 저장한다.
     int16_t yaw;                      // 현재 회전 입력을 저장한다.
+    uint32_t imu_age_ms;              // IMU 데이터 나이를 저장한다.
+    float yaw_measured_rad;           // 측정 Heading을 저장한다.
+    float yaw_reference_rad;          // 기준 Heading을 저장한다.
+    float yaw_error_rad;              // 기준과 측정 Heading 차이를 저장한다.
+    float yaw_delta_rad;              // 직전 제어 대비 IMU Yaw 변화를 저장한다.
+    float wz_accepted_delta_radps;    // 직전 제어 대비 적용 Yaw속도 변화를 저장한다.
     float vx_user_mps;                // 조종기 변환 X속도를 저장한다.
     float vy_user_mps;                // 조종기 변환 Y속도를 저장한다.
     float wz_user_radps;              // 조종기 변환 회전속도를 저장한다.
@@ -103,11 +118,36 @@ typedef struct
     float wz_candidate_radps;            // 최근 PI 이후 회전속도를 저장한다.
     float vx_accepted_mps;               // 최근 작업공간 적용 X속도를 저장한다.
     float vy_accepted_mps;               // 최근 작업공간 적용 Y속도를 저장한다.
-    float wz_accepted_radps;             // 최근 작업공간 적용 회전속도를 저장한다.
+    float wz_accepted_radps;              // 최근 작업공간 적용 회전속도를 저장한다.
+    float yaw_measured_rad;               // 최근 측정 Heading을 저장한다.
+    float yaw_reference_rad;              // 최근 기준 Heading을 저장한다.
+    float yaw_error_rad;                  // 최근 Heading 오차를 저장한다.
+    float yaw_delta_rad;                  // 최근 IMU Yaw 변화를 저장한다.
+    float wz_accepted_delta_radps;        // 최근 적용 Yaw속도 변화를 저장한다.
+    float previous_yaw_measured_rad;      // 직전 측정 Heading을 저장한다.
+    float previous_wz_accepted_radps;     // 직전 적용 Yaw속도를 저장한다.
+    uint32_t imu_timestamp_ms;            // 최근 IMU 수신 시각을 저장한다.
+    uint32_t imu_age_ms;                  // 최근 IMU 데이터 나이를 저장한다.
+    uint32_t yaw_feedback_fault_count;    // 직진 중 Heading 보정 횟수를 저장한다.
+    uint32_t yaw_applied_jump_count;      // 적용 Yaw속도 급변 횟수를 저장한다.
+    uint32_t imu_yaw_jump_count;          // IMU Yaw 순간 변화 횟수를 저장한다.
+    uint32_t s1_change_fault_count;       // 직진 중 S1 전환 횟수를 저장한다.
+    uint32_t yaw_fault_event_count;       // 전체 자동 Yaw 이상 횟수를 저장한다.
     uint32_t event_write_index;           // 다음 이상 기록 위치를 저장한다.
     uint32_t event_count;                 // 유효 이상 기록 수를 저장한다.
     uint32_t latest_event_index;          // 가장 최근 이상 기록 위치를 저장한다.
-    uint8_t latest_reason_flags;          // 가장 최근 기록 원인을 저장한다.
+    uint32_t latest_yaw_fault_event_index; // 최근 Yaw 이상 기록 위치를 저장한다.
+    uint8_t latest_reason_flags;          // 가장 최근 시간 이상 원인을 저장한다.
+    uint8_t latest_yaw_fault_flags;       // 최근 자동 Yaw 이상 원인을 저장한다.
+    uint8_t s1;                           // 최근 이동 방식을 저장한다.
+    uint8_t previous_s1;                  // 직전 이동 방식을 저장한다.
+    uint8_t gait_applied_step_count;      // 현재 명령을 적용한 걸음 수를 저장한다.
+    bool imu_valid;                       // 최근 IMU Yaw 유효성을 저장한다.
+    bool yaw_history_valid;               // 직전 Yaw 비교 가능 여부를 저장한다.
+    bool command_history_valid;           // 직전 적용 명령 비교 가능 여부를 저장한다.
+    bool s1_history_valid;                // 직전 S1 비교 가능 여부를 저장한다.
+    bool yaw_feedback_fault_active;       // 지속 중인 Heading 보정 이상을 저장한다.
+    ControlTimingEvent_t latest_yaw_fault_event;  // 최근 Yaw 이상 상태를 별도로 보존한다.
     ControlTimingEvent_t event[CONTROL_TIMING_EVENT_COUNT];  // 최근 이상 제어를 순환 저장한다.
 } ControlTimingDebug_t;
 
@@ -133,6 +173,13 @@ void ControlTimingDebug_RecordBreakdown(uint32_t sensor_cycles,
 
 void ControlTimingDebug_RecordSignals(const RobotBodyTwist_t *candidate,
                                       const RobotBodyTwist_t *accepted);  // PI 전후 속도 명령을 기록한다.
+
+void ControlTimingDebug_RecordYawContext(float yaw_measured_rad,
+                                         float yaw_reference_rad,
+                                         uint32_t imu_timestamp_ms,
+                                         bool imu_valid,
+                                         uint8_t s1,
+                                         uint8_t gait_applied_step_count);  // 자동 Yaw 검출용 상태를 기록한다.
 
 void ControlTimingDebug_EndControl(uint32_t start_cycle,
                                    uint32_t end_cycle,

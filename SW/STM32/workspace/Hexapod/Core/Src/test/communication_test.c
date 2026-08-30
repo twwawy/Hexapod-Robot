@@ -99,7 +99,7 @@ bool CommunicationTest_Run(void)
     }
     jetson_tx.spi = (SPI_HandleTypeDef *)&jetson_tx;  // 프레임 생성 조건만 만족하는 시험 포인터를 지정한다.
     jetson_tx.protocol_ready = true;                  // 송신 프로토콜 준비 상태를 지정한다.
-    if (!JetsonSpi_PrepareSensorFrame(&jetson_tx, &sensor, 0U))
+    if (!JetsonSpi_PrepareSensorFrame(&jetson_tx, &sensor, true, 0U))
     {
         return false;
     }
@@ -116,6 +116,20 @@ bool CommunicationTest_Run(void)
             (sensor.joint_angle_rad[joint] != 1.0f))
         {
             return false;  // 송신값만 반전되고 센서 원본은 유지되는지 확인한다.
+        }
+    }
+
+    jetson_tx.tx_frame_ready = false;  // 릴레이 OFF 프레임 생성을 허가한다.
+    if (!JetsonSpi_PrepareSensorFrame(&jetson_tx, &sensor, false, 1U))
+    {
+        return false;
+    }
+    for (joint = 0U; joint < ROBOT_JOINT_COUNT; ++joint)
+    {
+        if ((jetson_tx.tx_frame[JETSON_SPI_OFFSET_JOINTS + joint] != 128U) ||
+            (sensor.joint_angle_rad[joint] != 1.0f))
+        {
+            return false;  // 릴레이 OFF 시 송신각만 0도로 바뀌는지 확인한다.
         }
     }
 

@@ -5,13 +5,14 @@
 
 typedef struct
 {
-    float x_reference_m;       // World X 기준값을 저장한다.
-    float y_reference_m;       // World Y 기준값을 저장한다.
-    float x_integral;          // X 위치 적분값을 저장한다.
-    float y_integral;          // Y 위치 적분값을 저장한다.
-    float yaw_integral;        // Yaw 적분값을 저장한다.
-    RobotBodyTwist_t previous; // Rate Limit 이전 명령을 저장한다.
-    bool previous_manual;      // 이전 수동 모드 상태를 저장한다.
+    float x_reference_m;                  // World X 기준값을 저장한다.
+    float y_reference_m;                  // World Y 기준값을 저장한다.
+    float x_integral;                     // X 위치 적분값을 저장한다.
+    float y_integral;                     // Y 위치 적분값을 저장한다.
+    float yaw_integral;                   // Yaw 적분값을 저장한다.
+    float previous_yaw_feedback_radps;  // 직전 Heading 보정을 저장한다.
+    RobotBodyTwist_t previous;            // Rate Limit 이전 명령을 저장한다.
+    bool previous_manual;                 // 이전 수동 모드 상태를 저장한다.
 } GaitPoseController_Handle_t;
 
 typedef struct

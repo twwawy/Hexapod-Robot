@@ -228,6 +228,7 @@ bool JetsonSpi_ParseCommandFrame(const uint8_t frame[JETSON_SPI_FRAME_SIZE],
 
 bool JetsonSpi_PrepareSensorFrame(JetsonSpi_Handle_t *handle,
                                   const RobotSensorSnapshot_t *snapshot,
+                                  bool relay_enabled,
                                   uint32_t now_ms)
 {
     uint32_t elapsed_ms;
@@ -269,9 +270,12 @@ bool JetsonSpi_PrepareSensorFrame(JetsonSpi_Handle_t *handle,
 
     for (joint = 0U; joint < ROBOT_JOINT_COUNT; ++joint)
     {
+        const float angle_rad = relay_enabled ?
+            snapshot->joint_angle_rad[joint] : 0.0f;  // 릴레이 OFF 시 ADC 대신 0도를 선택한다.
+
         handle->tx_frame[JETSON_SPI_OFFSET_JOINTS + joint] =
             JetsonSpi_EncodeJoint(JetsonSpi_GetTransmitJointAngle(
-                joint, snapshot->joint_angle_rad[joint]));  // Jetson 송신 좌표계로만 변환해 인코딩한다.
+                joint, angle_rad));  // Jetson 송신 좌표계로만 변환해 인코딩한다.
     }
 
     for (leg = 0U; leg < ROBOT_LEG_COUNT; ++leg)

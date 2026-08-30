@@ -11,9 +11,9 @@
 ../Core/Src/communication/jetson_spi.c:166:6:JetsonSpi_ParseFrame	24	static
 ../Core/Src/communication/jetson_spi.c:211:6:JetsonSpi_ParseCommandFrame	56	static
 ../Core/Src/communication/jetson_spi.c:229:6:JetsonSpi_PrepareSensorFrame	56	static
-../Core/Src/communication/jetson_spi.c:305:13:JetsonSpi_FinalizeTransfer	56	static
-../Core/Src/communication/jetson_spi.c:364:6:JetsonSpi_Process	24	static
-../Core/Src/communication/jetson_spi.c:406:6:HAL_SPI_TxRxCpltCallback	16	static
-../Core/Src/communication/jetson_spi.c:419:6:HAL_SPI_ErrorCallback	16	static
-../Core/Src/communication/jetson_spi.c:433:6:JetsonSpi_GetLastRxPacket	24	static
-../Core/Src/communication/jetson_spi.c:445:6:JetsonSpi_TakeCommand	24	static
+../Core/Src/communication/jetson_spi.c:309:13:JetsonSpi_FinalizeTransfer	56	static
+../Core/Src/communication/jetson_spi.c:368:6:JetsonSpi_Process	24	static
+../Core/Src/communication/jetson_spi.c:410:6:HAL_SPI_TxRxCpltCallback	16	static
+../Core/Src/communication/jetson_spi.c:423:6:HAL_SPI_ErrorCallback	16	static
+../Core/Src/communication/jetson_spi.c:437:6:JetsonSpi_GetLastRxPacket	24	static
+../Core/Src/communication/jetson_spi.c:449:6:JetsonSpi_TakeCommand	24	static

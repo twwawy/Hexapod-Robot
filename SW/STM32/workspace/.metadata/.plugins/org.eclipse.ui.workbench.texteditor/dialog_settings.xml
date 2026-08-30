@@ -3,6 +3,7 @@
 	<section name="java.lang.Class">
 		<item key="replaceBarOpen" value="false"/>
 		<list key="findhistory">
+			<item value="HAL_UART_Transmit_IT"/>
 			<item value="imu_axis_confirmed"/>
 			<item value="imu_axis_confirmed[0]"/>
 			<item value="stage0_relay_enable"/>

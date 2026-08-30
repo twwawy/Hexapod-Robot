@@ -8,6 +8,8 @@
 #include <stddef.h>
 #include <string.h>
 
+#define WORKSPACE_GAIT_COMMAND_HOLD_STEPS 2U  // 한 조종 명령을 유지할 걸음 수를 정의한다.
+
 static const float workspace_leg_angle_rad[ROBOT_LEG_COUNT] =
 {
     -45.0f * ROBOT_DEG_TO_RAD_F,   // 1번 다리 장착각을 저장한다.
@@ -55,12 +57,28 @@ static bool WorkspaceLimiter_TwistEqual(const RobotBodyTwist_t *first,
            (first->wz == second->wz);  // 네 축 명령을 함께 비교한다.
 }
 
+/* 사용자 회전 명령에 최신 Heading 보정을 합친다. */
+static RobotBodyTwist_t WorkspaceLimiter_ComposeYaw(const RobotBodyTwist_t *user_command,
+                                                     float yaw_feedback_radps)
+{
+    RobotBodyTwist_t output = *user_command;  // 두 걸음용 사용자 명령을 복사한다.
+
+    output.wz = fminf(fmaxf(user_command->wz + yaw_feedback_radps,
+                            -ROBOT_MAX_YAW_RATE_RADPS),
+                      ROBOT_MAX_YAW_RATE_RADPS);  // 최신 Heading 보정을 제한해 합친다.
+    return output;
+}
+
 /* 새 보행 명령의 세 지점 검사를 시작한다. */
 static void WorkspaceLimiter_StartPreview(WorkspaceLimiter_Handle_t *handle,
-                                          const RobotBodyTwist_t *candidate,
-                                          const RobotGaitPhase_t *gait)
+                                           const RobotBodyTwist_t *user_candidate,
+                                           float yaw_feedback_radps,
+                                           const RobotGaitPhase_t *gait)
 {
-    handle->gait_pending = *candidate;                         // 착륙 시점의 후보를 고정한다.
+    handle->gait_pending = *user_candidate;                    // 사용자 후보를 검사 동안 고정한다.
+    handle->gait_preview = WorkspaceLimiter_ComposeYaw(
+        user_candidate,
+        yaw_feedback_radps);                                   // 현재 Heading 보정을 검사값에 합친다.
     handle->preview_sample = 0U;                               // 첫 경로 지점부터 시작한다.
     handle->preview_swing_mask = gait->next_phase_swing_mask;  // 다음 Tripod 역할을 고정한다.
     handle->preview_startup_phase = gait->next_phase_startup;  // 첫 위상 여부를 저장한다.
@@ -91,13 +109,13 @@ static bool WorkspaceLimiter_PreviewPoint(const WorkspaceLimiter_Handle_t *handl
                             (uint8_t)(1U << leg)) != 0U;  // 현재 다리 역할을 선택한다.
 
         displacement.x = ROBOT_GAIT_PHASE_TIME_S *
-                         (-handle->gait_pending.vx +
-                          handle->gait_pending.wz * base[leg].y);  // Stance X 이동량을 계산한다.
+                         (-handle->gait_preview.vx +
+                          handle->gait_preview.wz * base[leg].y);  // Stance X 이동량을 계산한다.
         displacement.y = ROBOT_GAIT_PHASE_TIME_S *
-                         (-handle->gait_pending.vy -
-                          handle->gait_pending.wz * base[leg].x);  // Stance Y 이동량을 계산한다.
+                         (-handle->gait_preview.vy -
+                          handle->gait_preview.wz * base[leg].x);  // Stance Y 이동량을 계산한다.
         displacement.z = ROBOT_GAIT_PHASE_TIME_S *
-                         (-handle->gait_pending.vz);               // Stance Z 이동량을 계산한다.
+                         (-handle->gait_preview.vz);               // Stance Z 이동량을 계산한다.
         front.x = base[leg].x - 0.5f * displacement.x;             // 앞쪽 X 끝점을 계산한다.
         front.y = base[leg].y - 0.5f * displacement.y;             // 앞쪽 Y 끝점을 계산한다.
         front.z = base[leg].z - 0.5f * displacement.z;             // 앞쪽 Z 끝점을 계산한다.
@@ -169,34 +187,52 @@ bool WorkspaceLimiter_AllFeetValid(const RobotVec3_t feet_body[ROBOT_LEG_COUNT],
 
 /* 다음 위상 후보의 세 지점을 한 제어 주기에 검사한다. */
 RobotBodyTwist_t WorkspaceLimiter_Gait(WorkspaceLimiter_Handle_t *handle,
-                                       const RobotBodyTwist_t *candidate,
+                                       const RobotBodyTwist_t *user_candidate,
+                                       float yaw_feedback_radps,
                                        bool manual_enable,
                                        const RobotGaitPhase_t *gait,
                                        const RobotEuler_t *posture_rad,
                                        bool reset_command,
                                        bool *accepted)
 {
+    RobotBodyTwist_t output;                            // 최종 보행 명령을 저장한다.
     RobotBodyTwist_t zero = {0.0f, 0.0f, 0.0f, 0.0f};  // 오류 시 0 명령을 준비한다.
 
-    if ((handle == NULL) || (candidate == NULL) || (gait == NULL) ||
+    if ((handle == NULL) || (user_candidate == NULL) || (gait == NULL) ||
         (posture_rad == NULL) || (accepted == NULL))
     {
         return zero;
     }
 
-    *accepted = WorkspaceLimiter_TwistEqual(candidate,
-                                             &handle->gait_applied);  // 현재 입력의 적용 여부를 표시한다.
+    *accepted = WorkspaceLimiter_TwistEqual(user_candidate,
+                                              &handle->gait_applied);  // 현재 입력의 적용 여부를 표시한다.
 
     if (reset_command)
     {
         memset(handle, 0, sizeof(*handle));  // Reset에서 보행 검사 상태를 제거한다.
+        *accepted = true;                    // 0 명령 적용을 완료 상태로 표시한다.
+        return zero;
     }
     else if (manual_enable)
     {
+        if (!gait->enabled_internal && !gait->next_phase_preview &&
+            !handle->preview_active)
+        {
+            handle->gait_applied_step_count = 0U;  // 정지 뒤 새 입력을 첫 걸음부터 받는다.
+        }
+
         if (gait->next_phase_preview)
         {
-            WorkspaceLimiter_StartPreview(handle, candidate, gait);  // 착륙 시점의 후보를 검사에 고정한다.
-            *accepted = false;                                       // 세 지점 통과 전까지 적용을 보류한다.
+            handle->preview_reuses_applied =
+                (handle->gait_applied_step_count > 0U) &&
+                (handle->gait_applied_step_count <
+                 WORKSPACE_GAIT_COMMAND_HOLD_STEPS);  // 둘째 걸음의 기존 속도 사용 여부를 결정한다.
+            WorkspaceLimiter_StartPreview(
+                handle,
+                handle->preview_reuses_applied ? &handle->gait_applied : user_candidate,
+                yaw_feedback_radps,
+                gait);  // 두 걸음 사용자 속도와 최신 Heading 보정을 검사한다.
+            *accepted = false;  // 세 지점 통과 전까지 적용을 보류한다.
         }
 
         while (handle->preview_active &&
@@ -219,22 +255,35 @@ RobotBodyTwist_t WorkspaceLimiter_Gait(WorkspaceLimiter_Handle_t *handle,
         if (handle->preview_active &&
             (handle->preview_sample >= ROBOT_GAIT_PREVIEW_SAMPLE_COUNT))
         {
-            handle->gait_applied = handle->gait_pending;  // 세 지점을 통과한 후보를 예약한다.
+            if (handle->preview_reuses_applied)
+            {
+                handle->gait_applied_step_count++;  // 반대 Tripod의 둘째 걸음을 기록한다.
+            }
+            else
+            {
+                handle->gait_applied = handle->gait_pending;  // 새 두 걸음의 속도를 적용한다.
+                handle->gait_applied_step_count = 1U;          // 새 속도의 첫 걸음을 기록한다.
+            }
             handle->preview_active = false;               // 한 주기 검사를 완료한다.
+            handle->preview_reuses_applied = false;        // 완료한 재사용 결정을 제거한다.
             handle->phase_result_valid = true;            // 검사 완료 결과를 확정한다.
             handle->phase_result_accepted = true;         // 다음 위상 진입을 허용한다.
-            *accepted = WorkspaceLimiter_TwistEqual(candidate,
-                                                    &handle->gait_applied);  // 현재 후보 채택 여부를 표시한다.
+            *accepted = WorkspaceLimiter_TwistEqual(user_candidate,
+                                                     &handle->gait_applied);  // 현재 후보 채택 여부를 표시한다.
         }
     }
     else
     {
-        handle->gait_applied = *candidate;      // 보정 모드는 발 Offset 단계에서 검사한다.
+        handle->gait_applied = *user_candidate;  // 보정 모드는 발 Offset 단계에서 검사한다.
+        handle->gait_applied_step_count = 0U;   // 정상 보행의 두 걸음 기억을 제거한다.
         handle->preview_active = false;         // 수동 보행 검사를 중단한다.
+        handle->preview_reuses_applied = false; // 진행 중인 재사용 결정을 제거한다.
         handle->phase_result_valid = false;     // 수동 위상 검사 결과를 제거한다.
         handle->phase_result_accepted = false;  // 수동 위상 허가를 제거한다.
         *accepted = true;                       // 보정 명령은 발 Offset 단계에서 검사한다.
     }
 
-    return handle->gait_applied;
+    output = WorkspaceLimiter_ComposeYaw(&handle->gait_applied,
+                                         yaw_feedback_radps);  // 걸음 중에도 최신 Heading 보정을 적용한다.
+    return output;
 }

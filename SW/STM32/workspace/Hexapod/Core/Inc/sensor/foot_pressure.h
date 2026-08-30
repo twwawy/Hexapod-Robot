@@ -17,9 +17,10 @@ typedef struct
 typedef struct
 {
     FootPressure_Calibration_t table[ROBOT_PRESSURE_COUNT];  // 센서별 보정 테이블을 저장한다.
-    uint8_t contact_count[ROBOT_PRESSURE_COUNT];             // 접촉 연속 표본 수를 저장한다.
+    uint8_t contact_count[ROBOT_PRESSURE_COUNT];             // 검사 창의 접촉 표본 수를 저장한다.
+    uint8_t contact_window_count[ROBOT_PRESSURE_COUNT];      // 접촉 검사 경과 표본 수를 저장한다.
     uint8_t release_count[ROBOT_PRESSURE_COUNT];             // 해제 연속 표본 수를 저장한다.
-    bool raw_contact[ROBOT_PRESSURE_COUNT];                  // Hysteresis 직후 상태를 저장한다.
+    bool raw_contact[ROBOT_PRESSURE_COUNT];                  // 접촉 검사 중 고정 상태를 저장한다.
     bool contact[ROBOT_PRESSURE_COUNT];                      // 시간 확인을 마친 상태를 저장한다.
 } FootPressure_Handle_t;
 

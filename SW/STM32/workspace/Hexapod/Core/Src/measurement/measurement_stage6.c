@@ -151,9 +151,9 @@ static bool MeasurementStage6_BuildTable(void)
 
         measurement_table[leg].active_high = (difference > 0);  // 누를 때 raw 증가 여부를 저장한다.
         measurement_table[leg].release_threshold =
-            (uint16_t)((int32_t)unloaded + difference * 2 / 5);  // 무부하에서 40% 지점을 해제값으로 만든다.
+            (uint16_t)((int32_t)unloaded + difference / 20);     // 무부하에서 5% 지점을 해제값으로 만든다.
         measurement_table[leg].contact_threshold =
-            (uint16_t)((int32_t)unloaded + difference * 3 / 5);  // 무부하에서 60% 지점을 접촉값으로 만든다.
+            (uint16_t)((int32_t)unloaded + difference / 10);     // 무부하에서 10% 지점을 접촉값으로 만든다.
         measurement_table[leg].calibrated = true;                // 실측 완료를 표시한다.
         g_measurement_debug.calibration.pressure[leg] =
             measurement_table[leg];                              // 중앙 표 복사용 임계값을 갱신한다.

@@ -9,8 +9,8 @@
 #define PRESSURE_LOAD_SETTLE_LOADED_MS       500U  // 완전 기립 후 진동 안정화 시간을 정의한다.
 #define PRESSURE_LOAD_CAPTURE_LOADED_MS     1000U  // 체중 부하 평균 측정 시간을 정의한다.
 #define PRESSURE_LOAD_MINIMUM_DIFFERENCE      15   // 보정에 필요한 최소 raw 변화량을 정의한다.
-#define PRESSURE_LOAD_RELEASE_PERCENT          10   // 해제 임계값의 부하 비율을 정의한다.
-#define PRESSURE_LOAD_CONTACT_PERCENT          30   // 접촉 임계값의 부하 비율을 정의한다.
+#define PRESSURE_LOAD_RELEASE_PERCENT           5   // 해제 임계값의 부하 비율을 정의한다.
+#define PRESSURE_LOAD_CONTACT_PERCENT          10   // 접촉 임계값의 부하 비율을 정의한다.
 
 volatile PressureLoadCalibrationDebug_t g_pressure_load_calibration;  // 자동 압력 보정 결과를 저장한다.
 
@@ -106,7 +106,7 @@ static bool PressureLoadCalibration_BuildAndApply(
 
     for (sample = 0U; sample < ROBOT_PRESSURE_CONTACT_CONFIRM_SAMPLES; ++sample)
     {
-        FootPressure_Update(pressure, raw, contact);  // 현재 기립값을 5 ms 연속 접촉으로 확인한다.
+        FootPressure_Update(pressure, raw, contact);  // 현재 기립값을 10 ms 연속 접촉으로 확인한다.
     }
     for (leg = 0U; leg < ROBOT_PRESSURE_COUNT; ++leg)
     {

@@ -194,26 +194,45 @@ bool CalibrationAlgorithmTest_Run(void)
         {
             return false;  // 순간 접촉이 확정 상태로 올라오면 실패한다.
         }
-        pressure_raw[leg] = g_robot_calibration.pressure[leg].release_threshold;  // 후보 취소값을 입력한다.
+        pressure_raw[leg] = g_robot_calibration.pressure[leg].release_threshold;  // 비접촉 표본을 입력한다.
     }
-    FootPressure_Update(&pressure, pressure_raw, contact);  // 1 ms 접촉 후보를 취소한다.
+    for (sample = 1U; sample < ROBOT_PRESSURE_CONTACT_CONFIRM_SAMPLES; ++sample)
+    {
+        FootPressure_Update(&pressure, pressure_raw, contact);  // 남은 검사 창을 비접촉으로 채운다.
+        if (sample < (ROBOT_PRESSURE_CONTACT_CONFIRM_SAMPLES - 1U))
+        {
+            for (leg = 0U; leg < ROBOT_PRESSURE_COUNT; ++leg)
+            {
+                if (!pressure.raw_contact[leg] || contact[leg])
+                {
+                    return false;  // 10 ms 전에 후보 고정이 풀리면 실패한다.
+                }
+            }
+        }
+    }
     for (leg = 0U; leg < ROBOT_PRESSURE_COUNT; ++leg)
     {
         if (pressure.raw_contact[leg] || contact[leg])
         {
-            return false;
+            return false;  // 접촉 표본 부족이 착륙으로 확정되면 실패한다.
         }
-        pressure_raw[leg] = g_robot_calibration.pressure[leg].contact_threshold;  // 연속 접촉값을 다시 입력한다.
     }
+
     for (sample = 0U; sample < ROBOT_PRESSURE_CONTACT_CONFIRM_SAMPLES; ++sample)
     {
-        FootPressure_Update(&pressure, pressure_raw, contact);  // 5 ms 연속 접촉을 입력한다.
+        for (leg = 0U; leg < ROBOT_PRESSURE_COUNT; ++leg)
+        {
+            pressure_raw[leg] = (sample < ROBOT_PRESSURE_CONTACT_ACCEPT_SAMPLES) ?
+                g_robot_calibration.pressure[leg].contact_threshold :
+                g_robot_calibration.pressure[leg].release_threshold;  // 8개 접촉과 2개 충격 이탈을 입력한다.
+        }
+        FootPressure_Update(&pressure, pressure_raw, contact);  // 10 ms 다수결 검사를 진행한다.
     }
     for (leg = 0U; leg < ROBOT_PRESSURE_COUNT; ++leg)
     {
-        if (!contact[leg])
+        if (!pressure.raw_contact[leg] || !contact[leg])
         {
-            return false;
+            return false;  // 8개 접촉 표본이 착륙으로 확정되지 않으면 실패한다.
         }
         pressure_raw[leg] = g_robot_calibration.pressure[leg].release_threshold;  // 접촉 해제값을 입력한다.
     }

@@ -11,10 +11,11 @@
 #define ROBOT_CONTROL_PERIOD_MS         5U          // 제어 주기를 밀리초 단위로 정의한다.
 
 #define ROBOT_PRESSURE_PERIOD_MS        1U          // 압력센서 읽기 주기를 정의한다.
-#define ROBOT_PRESSURE_CONTACT_CONFIRM_MS 5U        // 접촉 확정 연속 시간을 정의한다.
+#define ROBOT_PRESSURE_CONTACT_CONFIRM_MS 10U       // 접촉 확정 연속 시간을 정의한다.
 #define ROBOT_PRESSURE_RELEASE_CONFIRM_MS 10U       // 접촉 해제 확정 연속 시간을 정의한다.
 #define ROBOT_PRESSURE_CONTACT_CONFIRM_SAMPLES \
     (ROBOT_PRESSURE_CONTACT_CONFIRM_MS / ROBOT_PRESSURE_PERIOD_MS)  // 접촉 확정 표본 수를 계산한다.
+#define ROBOT_PRESSURE_CONTACT_ACCEPT_SAMPLES 8U        // 10 ms 검사에서 필요한 접촉 표본 수를 정의한다.
 #define ROBOT_PRESSURE_RELEASE_CONFIRM_SAMPLES \
     (ROBOT_PRESSURE_RELEASE_CONFIRM_MS / ROBOT_PRESSURE_PERIOD_MS)  // 접촉 해제 표본 수를 계산한다.
 #define ROBOT_PI_F                      3.14159265358979323846f
@@ -62,8 +63,10 @@
 #define ROBOT_SWING_HEIGHT_MAX_M        0.25f       // 최대 Swing 높이를 정의한다.
 #define ROBOT_SWING_RADIAL_OFFSET_M     0.07f       // Swing 방사 오프셋을 정의한다.
 #define ROBOT_EARLY_LANDING_PROGRESS    0.50f       // Early Landing 시작점을 정의한다.
-#define ROBOT_LATE_LANDING_SPEED_MPS    0.20f       // Late Landing 하강 속도를 정의한다.
-#define ROBOT_LATE_INWARD_SPEED_MPS     0.16f       // Late Landing 안쪽 속도를 정의한다.
+#define ROBOT_SWING_LANDING_APPROACH_M  0.03f       // 착지 감속을 시작할 지면 접근 거리를 정의한다.
+#define ROBOT_SWING_LANDING_SPEED_MPS   0.12f       // 지면 접근 구간의 최대 하강 속도를 정의한다.
+#define ROBOT_LATE_LANDING_SPEED_MPS    0.12f       // Late Landing 하강 속도를 정의한다.
+#define ROBOT_LATE_INWARD_SPEED_MPS     0.048f      // Late Landing 안쪽 속도를 절반으로 제한한다.
 #define ROBOT_LATE_LANDING_MAX_DISTANCE_M 0.10f     // Late Landing 최대 하강 거리를 정의한다.
 #define ROBOT_LATE_LANDING_MAX_TIME_S   \
     (ROBOT_LATE_LANDING_MAX_DISTANCE_M / ROBOT_LATE_LANDING_SPEED_MPS)  // 최대 탐색 시간을 계산한다.

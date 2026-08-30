@@ -1,9 +1,4 @@
-g_hexapod_app
-g_hexapod_app.sensor_snapshot.pressure_raw
-g_hexapod_app.imu_level_calibration.state-
-g_hexapod_app.imu_level_calibration.measured_offset_deg[0]
--
-g_hexapod_app.imu_level_calibration.measured_offset_deg[1]
--
-g_hexapod_app.sensor_snapshot.imu.attitude_rad.roll
-g_hexapod_app.sensor_snapshot.imu.attitude_rad.pitch
+g_control_timing_debug.yaw_fault_event_count
+g_control_timing_debug.latest_yaw_fault_flags
+g_control_timing_debug.latest_yaw_fault_event
+g_control_timing_debug.reset_request = true

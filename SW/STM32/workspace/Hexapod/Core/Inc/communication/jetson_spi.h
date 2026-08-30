@@ -97,7 +97,8 @@ bool JetsonSpi_ParseCommandFrame(const uint8_t frame[JETSON_SPI_FRAME_SIZE],
 
 bool JetsonSpi_PrepareSensorFrame(JetsonSpi_Handle_t *handle,
                                   const RobotSensorSnapshot_t *snapshot,
-                                  uint32_t now_ms);  // 관절각, 발 접촉 상태와 IMU 자세로 송신 프레임을 만든다.
+                                  bool relay_enabled,
+                                  uint32_t now_ms);  // 릴레이 OFF 관절각을 0도로 만들어 송신한다.
 
 /*
  * 준비된 32바이트를 SPI2 Slave DMA 방식으로 동시 송수신한다.

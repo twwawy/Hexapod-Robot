@@ -80,6 +80,7 @@ GaitPoseController_Output_t GaitPoseController_Step(
         handle->x_integral = 0.0f;                       // X 적분을 초기화한다.
         handle->y_integral = 0.0f;                       // Y 적분을 초기화한다.
         handle->yaw_integral = 0.0f;                     // Yaw 적분을 초기화한다.
+        handle->previous_yaw_feedback_radps = 0.0f;      // Heading 보정을 0부터 시작한다.
     }
 
     if (manual)
@@ -183,6 +184,24 @@ GaitPoseController_Output_t GaitPoseController_Step(
 
     if (manual || correction)
     {
+        if (manual)
+        {
+            output.yaw_feedback_radps = GaitPoseController_RateLimit(
+                output.yaw_feedback_radps,
+                handle->previous_yaw_feedback_radps,
+                GAIT_YAW_STEP_MAX);  // Heading 보정만 제어 주기마다 연속 제한한다.
+            output.twist.wz = GaitPoseController_Clamp(
+                drone->wz_user_radps + output.yaw_feedback_radps,
+                -ROBOT_MAX_YAW_RATE_RADPS,
+                ROBOT_MAX_YAW_RATE_RADPS);  // 사용자 회전과 제한한 Heading 보정을 다시 합친다.
+            handle->previous_yaw_feedback_radps =
+                output.yaw_feedback_radps;  // 다음 주기 Heading 보정 기준을 저장한다.
+        }
+        else
+        {
+            handle->previous_yaw_feedback_radps = 0.0f;  // 보정 모드에서 Heading 기억을 제거한다.
+        }
+
         output.twist.vx = GaitPoseController_RateLimit(output.twist.vx,
                                                         handle->previous.vx,
                                                         GAIT_LINEAR_STEP_MAX);  // X속도 변화를 제한한다.
@@ -192,14 +211,12 @@ GaitPoseController_Output_t GaitPoseController_Step(
         output.twist.vz = GaitPoseController_RateLimit(output.twist.vz,
                                                         handle->previous.vz,
                                                         GAIT_LINEAR_STEP_MAX);  // Z속도 변화를 제한한다.
-        output.twist.wz = GaitPoseController_RateLimit(output.twist.wz,
-                                                        handle->previous.wz,
-                                                        GAIT_YAW_STEP_MAX);  // Yaw속도 변화를 제한한다.
         handle->previous = output.twist;  // 다음 주기 Rate Limit 상태를 저장한다.
     }
     else
     {
         memset(&handle->previous, 0, sizeof(handle->previous));  // 비활성 명령을 즉시 0으로 만든다.
+        handle->previous_yaw_feedback_radps = 0.0f;              // 비활성 Heading 보정을 제거한다.
     }
 
     output.x_reference_m = handle->x_reference_m;  // 현재 X 기준을 반환한다.

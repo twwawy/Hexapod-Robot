@@ -138,6 +138,7 @@ RobotGaitPhase_t GaitManager_StepContacts(
                 handle->phase_time_s = 0.0f;       // 위상 시간을 초기화한다.
                 handle->next_phase_enable = false; // 확정 전 Enable을 초기화한다.
                 handle->next_phase_locked = false; // 첫 속도 확정을 준비한다.
+                handle->command_pair_step_count = 0U;     // 새 명령의 첫 걸음을 준비한다.
                 handle->support_recovery_mask = 0U;       // 이전 재착지 대상을 제거한다.
                 handle->support_recovery_active = false;  // 새 보행의 재착지를 준비한다.
                 memset(handle->airborne_seen, 0, sizeof(handle->airborne_seen));  // 비접촉 이력을 제거한다.
@@ -146,20 +147,9 @@ RobotGaitPhase_t GaitManager_StepContacts(
 
             handle->stop_pending = false;  // 활성 명령에서 정지 요청을 해제한다.
         }
-        else if (handle->run_enable && !handle->initialized &&
-                 !handle->next_phase_locked)
-        {
-            handle->run_enable = false;        // 확정 전 해제된 첫 보행을 취소한다.
-            handle->start_wait_count = 0U;     // 다음 시작 대기를 초기화한다.
-            handle->phase_cycle_count = 0U;    // 사용하지 않은 위상 주기를 제거한다.
-            handle->phase_time_s = 0.0f;       // 사용하지 않은 위상 시간을 제거한다.
-            handle->stop_pending = false;      // 실행되지 않은 정지 예약을 제거한다.
-            handle->support_recovery_mask = 0U;       // 취소한 재착지 대상을 제거한다.
-            handle->support_recovery_active = false;  // 취소한 재착지 상태를 제거한다.
-        }
         else if (handle->run_enable)
         {
-            handle->stop_pending = true;   // 현재 Swing 착지 후 정지를 예약한다.
+            handle->stop_pending = true;  // 두 걸음 완료 뒤 정지를 예약한다.
         }
         else
         {
@@ -210,7 +200,7 @@ RobotGaitPhase_t GaitManager_StepContacts(
         }
         else if (!handle->initialized && !handle->next_phase_locked)
         {
-            handle->next_phase_enable = tripod_enable;  // 현재 보행 Enable을 시작 명령으로 고정한다.
+            handle->next_phase_enable = true;            // 한 번 받은 시작 명령으로 첫 걸음을 보장한다.
             handle->next_phase_locked = true;            // 첫 위상 검사 요청을 표시한다.
             output.next_phase_preview = true;            // 첫 위상 세 지점 검사를 요청한다.
             output.next_phase_startup = !handle->resume_phase;  // 최초 반 보폭 여부를 전달한다.
@@ -326,7 +316,7 @@ RobotGaitPhase_t GaitManager_StepContacts(
                     if ((handle->airborne_seen[leg] || handle->stop_pending) &&
                         contact[leg] && (progress >= ROBOT_EARLY_LANDING_PROGRESS))
                     {
-                        handle->landed[leg] = true;  // 5 ms 연속 접촉에서 착지를 확정한다.
+                        handle->landed[leg] = true;  // 10 ms 연속 접촉에서 착지를 확정한다.
                     }
 
                     if (!handle->landed[leg])
@@ -339,11 +329,14 @@ RobotGaitPhase_t GaitManager_StepContacts(
                     GaitManager_AllMaskContact(
                         (uint8_t)((1U << ROBOT_LEG_COUNT) - 1U), contact))
                 {
-                    bool preview_started = false;  // 이번 주기의 새 검사 요청 여부를 저장한다.
+                    const bool pair_incomplete =
+                        (handle->command_pair_step_count == 0U);  // 반대 Tripod 걸음 필요 여부를 계산한다.
+                    bool preview_started = false;                 // 이번 주기의 새 검사 요청 여부를 저장한다.
 
                     if (!handle->next_phase_locked)
                     {
-                        handle->next_phase_enable = tripod_enable;  // 여섯 발 착륙 시점의 Enable을 고정한다.
+                        handle->next_phase_enable = pair_incomplete ||
+                                                    tripod_enable;  // 첫 걸음 뒤에는 정지 입력과 무관하게 반대 걸음을 허가한다.
                         handle->next_phase_locked = true;            // 다음 위상 결정을 고정한다.
                         preview_started = handle->next_phase_enable; // 활성 명령에서 새 검사를 표시한다.
                         if (preview_started)
@@ -366,6 +359,7 @@ RobotGaitPhase_t GaitManager_StepContacts(
                         handle->start_wait_count = 0U;      // 재시작 입력 대기를 준비한다.
                         handle->phase_cycle_count = 0U;     // 완료한 위상 주기를 제거한다.
                         handle->phase_time_s = 0.0f;        // 완료한 위상 시간을 제거한다.
+                        handle->command_pair_step_count = 0U;  // 완료한 두 걸음 묶음을 초기화한다.
                         handle->resume_phase = true;        // 정지 자세에서 다음 그룹 재개를 준비한다.
                         handle->next_phase_enable = false;  // 완료한 Enable 결정을 제거한다.
                         handle->next_phase_locked = false;  // 다음 위상 결정을 준비한다.
@@ -376,6 +370,7 @@ RobotGaitPhase_t GaitManager_StepContacts(
                         handle->phase_index++;              // 다음 Tripod 그룹으로 전환한다.
                         handle->phase_cycle_count = 0U;     // 새 위상 주기를 초기화한다.
                         handle->phase_time_s = 0.0f;        // 새 위상 시간을 초기화한다.
+                        handle->command_pair_step_count = pair_incomplete ? 1U : 0U;  // 첫 걸음 완료 또는 새 묶음 시작을 기록한다.
                         handle->next_phase_enable = false;  // 다음 위상 Enable을 준비한다.
                         handle->next_phase_locked = false;  // 다음 착륙 검사를 준비한다.
                         progress = 0.0f;                    // 새 위상 진행률을 0으로 둔다.

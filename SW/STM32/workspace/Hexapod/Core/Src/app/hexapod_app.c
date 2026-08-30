@@ -561,6 +561,7 @@ void HexapodApp_Process(HexapodApp_Handle_t *handle)
     uint32_t crsf_age_ms;                                // 최신 조종기 명령 나이를 저장한다.
     uint16_t crsf_buffer_used;                           // 현재 CRSF 버퍼 사용량을 저장한다.
     uint32_t frame_count;                                // 새 CRSF 프레임 수를 저장한다.
+    uint8_t relay_state_mask;                            // Jetson·관제에 반영할 릴레이 상태를 저장한다.
 
     if ((handle == NULL) || !handle->initialized)
     {
@@ -589,6 +590,7 @@ void HexapodApp_Process(HexapodApp_Handle_t *handle)
                                   &handle->user,
                                   handle->priority.active_mode,
                                   now_ms);  // 최신 조종값을 200 Hz 유선 패킷으로 전송한다.
+    relay_state_mask = Relay_GetStateMask();  // 현재 실제 출력 상태를 통신에 고정한다.
 
     if ((handle->hardware.lora_uart != NULL) &&
         RobotTelemetry_BuildNext(&handle->telemetry,
@@ -596,7 +598,7 @@ void HexapodApp_Process(HexapodApp_Handle_t *handle)
                                  handle->priority.active_mode,
                                  &handle->safety,
                                  &handle->sensor_snapshot,
-                                 Relay_GetStateMask(),
+                                 relay_state_mask,
                                  telemetry_text,
                                  sizeof(telemetry_text)))
     {
@@ -611,6 +613,7 @@ void HexapodApp_Process(HexapodApp_Handle_t *handle)
         {
             (void)JetsonSpi_PrepareSensorFrame(&handle->jetson,
                                                &handle->sensor_snapshot,
+                                               relay_state_mask != 0U,
                                                now_ms);  // DMA가 비어 있을 때만 다음 센서 패킷을 만든다.
         }
         (void)JetsonSpi_Process(&handle->jetson);  // DMA 완료 처리 또는 다음 전송 Arm을 수행한다.
@@ -688,6 +691,7 @@ static void HexapodApp_ControlStep(HexapodApp_Handle_t *handle)
     GaitPoseController_Output_t gait_pose;    // 제한 전 보행 명령을 저장한다.
     BodyPostureController_Output_t posture;   // 자세가 적용된 발 위치를 저장한다.
     RobotFootTargets_t feet;                  // 자세 적용 전 발 위치를 저장한다.
+    RobotBodyTwist_t gait_user_command;       // 두 걸음에 고정할 사용자 보행 명령을 저장한다.
     RobotBodyTwist_t twist;                   // 작업공간이 허용한 보행 명령을 저장한다.
     RobotVec3_t stand_delta[ROBOT_LEG_COUNT]; // 서기·착지 발 변화량을 저장한다.
     bool gait_accepted;                       // 보행 명령 채택 여부를 저장한다.
@@ -802,8 +806,11 @@ static void HexapodApp_ControlStep(HexapodApp_Handle_t *handle)
         handle->drone.manual_enable &&
         (handle->drone.tripod_mode == ROBOT_TRIPOD_NORMAL));  // 활성 시 확정 접촉의 공통 Z 오차를 수집한다.
     handle->touchdown_control_mask = 0U;  // Gait가 소비한 접촉 Latch를 비운다.
+    gait_user_command = gait_pose.twist;                  // 위치 보정을 포함한 보행 후보를 복사한다.
+    gait_user_command.wz = handle->drone.wz_user_radps;   // Heading 보정을 두 걸음 기억에서 분리한다.
     twist = WorkspaceLimiter_Gait(&handle->workspace_limiter,
-                                  &gait_pose.twist,
+                                  &gait_user_command,
+                                  gait_pose.yaw_feedback_radps,
                                   handle->drone.manual_enable,
                                   &handle->gait,
                                   &handle->posture_control.command_rad,
@@ -835,6 +842,12 @@ static void HexapodApp_ControlStep(HexapodApp_Handle_t *handle)
 
     algorithm_end_cycle = ControlTimingDebug_ReadCycle();  // 제어 알고리즘 종료 시각을 읽는다.
     ControlTimingDebug_RecordSignals(&gait_pose.twist, &twist);  // PI 후보와 작업공간 채택값을 기록한다.
+    ControlTimingDebug_RecordYawContext(handle->sensor_snapshot.imu.attitude_rad.yaw,
+                                        handle->drone_control.yaw_reference_memory,
+                                        handle->sensor_snapshot.imu.timestamp_ms,
+                                        handle->sensor_snapshot.imu.valid,
+                                        handle->priority.s1,
+                                        handle->workspace_limiter.gait_applied_step_count);  // 자동 Yaw 검출 상태를 기록한다.
 
     for (leg = 0U; leg < ROBOT_LEG_COUNT; ++leg)
     {

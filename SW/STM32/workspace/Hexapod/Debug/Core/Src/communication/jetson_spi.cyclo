@@ -10,10 +10,10 @@
 ../Core/Src/communication/jetson_spi.c:134:10:JetsonSpi_Crc16CcittFalse	5
 ../Core/Src/communication/jetson_spi.c:166:6:JetsonSpi_ParseFrame	6
 ../Core/Src/communication/jetson_spi.c:211:6:JetsonSpi_ParseCommandFrame	4
-../Core/Src/communication/jetson_spi.c:229:6:JetsonSpi_PrepareSensorFrame	12
-../Core/Src/communication/jetson_spi.c:305:13:JetsonSpi_FinalizeTransfer	7
-../Core/Src/communication/jetson_spi.c:364:6:JetsonSpi_Process	8
-../Core/Src/communication/jetson_spi.c:406:6:HAL_SPI_TxRxCpltCallback	3
-../Core/Src/communication/jetson_spi.c:419:6:HAL_SPI_ErrorCallback	3
-../Core/Src/communication/jetson_spi.c:433:6:JetsonSpi_GetLastRxPacket	4
-../Core/Src/communication/jetson_spi.c:445:6:JetsonSpi_TakeCommand	4
+../Core/Src/communication/jetson_spi.c:229:6:JetsonSpi_PrepareSensorFrame	13
+../Core/Src/communication/jetson_spi.c:309:13:JetsonSpi_FinalizeTransfer	7
+../Core/Src/communication/jetson_spi.c:368:6:JetsonSpi_Process	8
+../Core/Src/communication/jetson_spi.c:410:6:HAL_SPI_TxRxCpltCallback	3
+../Core/Src/communication/jetson_spi.c:423:6:HAL_SPI_ErrorCallback	3
+../Core/Src/communication/jetson_spi.c:437:6:JetsonSpi_GetLastRxPacket	4
+../Core/Src/communication/jetson_spi.c:449:6:JetsonSpi_TakeCommand	4

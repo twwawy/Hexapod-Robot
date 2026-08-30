@@ -189,6 +189,7 @@ int main(void)
     {
       (void)JetsonSpi_PrepareSensorFrame(&g_jetson_spi_test,
                                          &g_jetson_sensor_test,
+                                         true,
                                          HAL_GetTick());
     }
     (void)JetsonSpi_Process(&g_jetson_spi_test);
