@@ -43,6 +43,7 @@
 #define ROBOT_GAIT_START_DELAY_CYCLES   \
     (ROBOT_GAIT_START_DELAY_MS / ROBOT_CONTROL_PERIOD_MS)  // 첫 보행 대기 주기 수를 계산한다.
 #define ROBOT_GAIT_PREVIEW_SAMPLE_COUNT 3U          // 시작·중앙·끝 검사 지점 수를 정의한다.
+#define ROBOT_GAIT_YAW_FEEDBACK_ENABLE  0U          // IMU Heading 자동 보정을 비활성화한다.
 #define ROBOT_STAND_TIME_S              5.6f        // 서기 시간을 정의한다.
 #define ROBOT_LANDING_TIME_S            5.6f        // 착지 하강 시간을 정의한다.
 #define ROBOT_SETTLING_TIME_S           0.5f        // 자세 안정 시간을 정의한다.
@@ -66,7 +67,7 @@
 #define ROBOT_SWING_LANDING_APPROACH_M  0.03f       // 착지 감속을 시작할 지면 접근 거리를 정의한다.
 #define ROBOT_SWING_LANDING_SPEED_MPS   0.12f       // 지면 접근 구간의 최대 하강 속도를 정의한다.
 #define ROBOT_LATE_LANDING_SPEED_MPS    0.12f       // Late Landing 하강 속도를 정의한다.
-#define ROBOT_LATE_INWARD_SPEED_MPS     0.048f      // Late Landing 안쪽 속도를 절반으로 제한한다.
+#define ROBOT_LATE_INWARD_SPEED_MPS     0.096f      // Late Landing 안쪽 속도를 두 배로 높인다.
 #define ROBOT_LATE_LANDING_MAX_DISTANCE_M 0.10f     // Late Landing 최대 하강 거리를 정의한다.
 #define ROBOT_LATE_LANDING_MAX_TIME_S   \
     (ROBOT_LATE_LANDING_MAX_DISTANCE_M / ROBOT_LATE_LANDING_SPEED_MPS)  // 최대 탐색 시간을 계산한다.

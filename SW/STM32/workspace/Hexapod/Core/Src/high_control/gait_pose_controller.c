@@ -136,14 +136,22 @@ GaitPoseController_Output_t GaitPoseController_Step(
             const float yaw_error = GaitPoseController_WrapPi(
                 drone->posture_reference_rad.yaw - yaw_measured_rad);  // Heading 오차를 계산한다.
 
-            handle->yaw_integral = GaitPoseController_Clamp(
-                handle->yaw_integral + yaw_error * ROBOT_CONTROL_PERIOD_S,
-                -GAIT_YAW_INTEGRAL_MAX,
-                GAIT_YAW_INTEGRAL_MAX);  // Heading 적분을 제한한다.
-            output.yaw_feedback_radps = GaitPoseController_Clamp(
-                GAIT_YAW_KP * yaw_error + GAIT_YAW_KI * handle->yaw_integral,
-                -GAIT_YAW_FEEDBACK_MAX,
-                GAIT_YAW_FEEDBACK_MAX);  // Heading Feedback을 계산한다.
+            if (ROBOT_GAIT_YAW_FEEDBACK_ENABLE != 0U)
+            {
+                handle->yaw_integral = GaitPoseController_Clamp(
+                    handle->yaw_integral + yaw_error * ROBOT_CONTROL_PERIOD_S,
+                    -GAIT_YAW_INTEGRAL_MAX,
+                    GAIT_YAW_INTEGRAL_MAX);  // Heading 적분을 제한한다.
+                output.yaw_feedback_radps = GaitPoseController_Clamp(
+                    GAIT_YAW_KP * yaw_error + GAIT_YAW_KI * handle->yaw_integral,
+                    -GAIT_YAW_FEEDBACK_MAX,
+                    GAIT_YAW_FEEDBACK_MAX);  // Heading Feedback을 계산한다.
+            }
+            else
+            {
+                handle->yaw_integral = 0.0f;        // 비활성 Heading 적분을 제거한다.
+                output.yaw_feedback_radps = 0.0f;   // 자동 Yaw 보정을 차단한다.
+            }
             output.twist.vx = GaitPoseController_Clamp(
                 drone->vx_user_mps + feedback_x_body,
                 -ROBOT_MAX_LINEAR_SPEED_MPS,
@@ -186,10 +194,18 @@ GaitPoseController_Output_t GaitPoseController_Step(
     {
         if (manual)
         {
-            output.yaw_feedback_radps = GaitPoseController_RateLimit(
-                output.yaw_feedback_radps,
-                handle->previous_yaw_feedback_radps,
-                GAIT_YAW_STEP_MAX);  // Heading 보정만 제어 주기마다 연속 제한한다.
+            if (ROBOT_GAIT_YAW_FEEDBACK_ENABLE != 0U)
+            {
+                output.yaw_feedback_radps = GaitPoseController_RateLimit(
+                    output.yaw_feedback_radps,
+                    handle->previous_yaw_feedback_radps,
+                    GAIT_YAW_STEP_MAX);  // Heading 보정만 제어 주기마다 연속 제한한다.
+            }
+            else
+            {
+                output.yaw_feedback_radps = 0.0f;           // 자동 Yaw 보정을 즉시 제거한다.
+                handle->previous_yaw_feedback_radps = 0.0f; // 이전 Heading 보정을 제거한다.
+            }
             output.twist.wz = GaitPoseController_Clamp(
                 drone->wz_user_radps + output.yaw_feedback_radps,
                 -ROBOT_MAX_YAW_RATE_RADPS,

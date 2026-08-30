@@ -83,15 +83,15 @@ bool ControllerTest_Run(void)
     GaitPoseController_Init(&gait_pose_controller);                 // Heading 보정 상태를 초기화한다.
     drone.manual_enable = true;                                     // 수동 보행을 활성화한다.
     drone.wz_user_radps = 0.0f;                                     // 사용자 회전을 제거한다.
-    drone.posture_reference_rad.yaw = 10.0f * ROBOT_DEG_TO_RAD_F;   // 충분한 Heading 오차를 만든다.
+    drone.posture_reference_rad.yaw = 10.0f * ROBOT_DEG_TO_RAD_F;   // 비활성 자동 보정에 Heading 오차를 넣는다.
     gait_pose = GaitPoseController_Step(&gait_pose_controller,
                                         false,
                                         &drone,
                                         &body_position,
                                         0U,
-                                        0.0f);  // 첫 주기의 Heading 보정 변화량을 계산한다.
-    if (fabsf(gait_pose.yaw_feedback_radps -
-              0.45f * ROBOT_DEG_TO_RAD_F) > 0.00001f)
+                                        0.0f);  // 첫 주기의 자동 Yaw 보정 차단을 확인한다.
+    if ((fabsf(gait_pose.yaw_feedback_radps) > 0.00001f) ||
+        (fabsf(gait_pose.twist.wz) > 0.00001f))
     {
         return false;
     }
@@ -100,9 +100,9 @@ bool ControllerTest_Run(void)
                                         &drone,
                                         &body_position,
                                         0U,
-                                        0.0f);  // 다음 주기의 연속 Heading 보정을 계산한다.
-    if (fabsf(gait_pose.yaw_feedback_radps -
-              0.90f * ROBOT_DEG_TO_RAD_F) > 0.00001f)
+                                        0.0f);  // 다음 주기에도 자동 Yaw 보정 차단을 확인한다.
+    if ((fabsf(gait_pose.yaw_feedback_radps) > 0.00001f) ||
+        (fabsf(gait_pose.twist.wz) > 0.00001f))
     {
         return false;
     }
