@@ -1,0 +1,3 @@
+Robot,RollRMSE_deg,PitchRMSE_deg,Evidence,Source
+Our Classical - VirtualIMU,0,0,"Command-derived virtual signal; not physical stability",simulation_raw.mat; 7 <= t < 10 s
+HexWalker II - Tripod,0.39,0.366,"Physical robot experiment; Zhang et al. 2021, Table 5",https://www.mdpi.com/2076-3417/11/8/3714

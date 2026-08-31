@@ -1,0 +1,110 @@
+26.1.0.3276743 (R2026a) Update 3
+SOLVER VariableStepAuto STOP 81
+plant/BaseFootPosition IN=0 OUT=18
+plant/Body2Leg_IK IN=18 OUT=24
+plant/BodyPositionEstimator IN=33 OUT=5
+plant/BodyPosturePIOverlay IN=28 OUT=22
+plant/Constant1 IN=0 OUT=1
+plant/Constant2 IN=0 OUT=1
+plant/ControlPriorityManager IN=13 OUT=7
+plant/Digital Clock IN=0 OUT=1
+plant/Digital Clock1 IN=0 OUT=1
+plant/DroneController IN=14 OUT=23
+plant/FK_Leg2Body IN=18 OUT=18
+plant/From IN=0 OUT=1
+plant/From1 IN=0 OUT=1
+plant/From10 IN=0 OUT=1
+plant/From11 IN=0 OUT=1
+plant/From12 IN=0 OUT=1
+plant/From13 IN=0 OUT=1
+plant/From14 IN=0 OUT=1
+plant/From15 IN=0 OUT=1
+plant/From16 IN=0 OUT=1
+plant/From17 IN=0 OUT=1
+plant/From18 IN=0 OUT=1
+plant/From19 IN=0 OUT=1
+plant/From2 IN=0 OUT=1
+plant/From20 IN=0 OUT=1
+plant/From21 IN=0 OUT=1
+plant/From22 IN=0 OUT=1
+plant/From23 IN=0 OUT=1
+plant/From24 IN=0 OUT=1
+plant/From25 IN=0 OUT=1
+plant/From26 IN=0 OUT=1
+plant/From27 IN=0 OUT=1
+plant/From28 IN=0 OUT=1
+plant/From29 IN=0 OUT=1
+plant/From3 IN=0 OUT=1
+plant/From30 IN=0 OUT=1
+plant/From31 IN=0 OUT=1
+plant/From32 IN=0 OUT=1
+plant/From33 IN=0 OUT=1
+plant/From34 IN=0 OUT=1
+plant/From35 IN=0 OUT=1
+plant/From36 IN=0 OUT=1
+plant/From37 IN=0 OUT=1
+plant/From38 IN=0 OUT=1
+plant/From39 IN=0 OUT=1
+plant/From4 IN=0 OUT=1
+plant/From40 IN=0 OUT=1
+plant/From5 IN=0 OUT=1
+plant/From6 IN=0 OUT=1
+plant/From7 IN=0 OUT=1
+plant/From8 IN=0 OUT=1
+plant/From9 IN=0 OUT=1
+plant/GaitPosePI IN=13 OUT=9
+plant/Goto IN=1 OUT=0
+plant/Goto1 IN=1 OUT=0
+plant/Goto10 IN=1 OUT=0
+plant/Goto11 IN=1 OUT=0
+plant/Goto12 IN=1 OUT=0
+plant/Goto13 IN=1 OUT=0
+plant/Goto14 IN=1 OUT=0
+plant/Goto15 IN=1 OUT=0
+plant/Goto16 IN=1 OUT=0
+plant/Goto17 IN=1 OUT=0
+plant/Goto18 IN=1 OUT=0
+plant/Goto19 IN=1 OUT=0
+plant/Goto2 IN=1 OUT=0
+plant/Goto20 IN=1 OUT=0
+plant/Goto21 IN=1 OUT=0
+plant/Goto22 IN=1 OUT=0
+plant/Goto23 IN=1 OUT=0
+plant/Goto3 IN=1 OUT=0
+plant/Goto4 IN=1 OUT=0
+plant/Goto5 IN=1 OUT=0
+plant/Goto6 IN=1 OUT=0
+plant/Goto7 IN=1 OUT=0
+plant/Goto8 IN=1 OUT=0
+plant/Goto9 IN=1 OUT=0
+plant/JointRateLimiter IN=19 OUT=18
+plant/MATLAB Function IN=9 OUT=5
+plant/MATLAB Function1 IN=2 OUT=1
+plant/Plant IN=25 OUT=27
+plant/SUM IN=54 OUT=18
+plant/SafetyEvaluator IN=8 OUT=2
+plant/Scope IN=4 OUT=0
+plant/Scope1 IN=5 OUT=0
+plant/Scope2 IN=1 OUT=0
+plant/Scope3 IN=1 OUT=0
+plant/Scope4 IN=1 OUT=0
+plant/Scope5 IN=1 OUT=0
+plant/Scope6 IN=1 OUT=0
+plant/StandLandingFootDelta IN=3 OUT=18
+plant/TripodFootTrajectory IN=25 OUT=19
+plant/TripodGaitManager IN=10 OUT=14
+plant/USER IN=1 OUT=9
+plant/Unit Delay IN=1 OUT=1
+plant/Unit Delay1 IN=1 OUT=1
+plant/Unit Delay2 IN=1 OUT=1
+plant/Unit Delay3 IN=1 OUT=1
+plant/Unit Delay4 IN=1 OUT=1
+plant/Unit Delay5 IN=1 OUT=1
+plant/Unit Delay6 IN=1 OUT=1
+  다음 필드를 포함한 1×8 struct 배열:
+
+    Name
+    Version
+    Release
+    Date
+

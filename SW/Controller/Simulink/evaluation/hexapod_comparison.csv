@@ -1,0 +1,5 @@
+Robot,ActualMaxSpeed_mps,FootRMS_mm,JointRMS_deg,Evidence,Source
+현재 Classical,NaN,3.3850151355282,0.400397256179661,"Simulation: body fixed, 7 <= t < 10 s",metrics.json
+RHex [1],0.55,NaN,NaN,"RHex (2001), Table 1",https://www.ri.cmu.edu/pub_files/pub4/saranli_uluc_2001_1/saranli_uluc_2001_1.pdf
+PhantomX AX [2],0.29,NaN,NaN,"Cizek et al. (2021), Table 1",https://comrob.fel.cvut.cz/papers/access21hantr.pdf
+HAntR [2],0.43,NaN,NaN,"Cizek et al. (2021), Table 1",https://comrob.fel.cvut.cz/papers/access21hantr.pdf

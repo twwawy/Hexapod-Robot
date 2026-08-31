@@ -1,0 +1,4736 @@
+function [xL, yL, zL] = legFK(q1, q2, q3)
+% 현재 관절각으로 발끝 위치를 계산한다.
+
+L1 = 0.074;   % 링크1 에서 링크1 까지 거리 (m)
+L2 = 0.121;   % 링크2 에서 링크3 까지 거리 (m)
+L3 = 0.230;   % 링크3 에서 발 끝 까지 거리 (m)
+
+r = L1 + L2*cos(q2) + L3*cos(q2 + q3);    % 수평 도달 거리를 계산한다.
+
+xL = r*cos(q1);                            % 다리 좌표계 x 위치를 계산한다.
+yL = r*sin(q1);                            % 다리 좌표계 y 위치를 계산한다.
+zL = -L2*sin(q2) - L3*sin(q2 + q3);        % 다리 좌표계 z 위치를 계산한다.
+end
+function [xL, yL, zL] = legFK(q1, q2, q3)
+% 현재 관절각으로 발끝 위치를 계산한다.
+
+L1 = 0.074;   % 링크1 에서 링크1 까지 거리 (m)
+L2 = 0.121;   % 링크2 에서 링크3 까지 거리 (m)
+L3 = 0.230;   % 링크3 에서 발 끝 까지 거리 (m)
+
+r = L1 + L2*cos(q2) + L3*cos(q2 + q3);    % 수평 도달 거리를 계산한다.
+
+xL = r*cos(q1);                            % 다리 좌표계 x 위치를 계산한다.
+yL = r*sin(q1);                            % 다리 좌표계 y 위치를 계산한다.
+zL = -L2*sin(q2) - L3*sin(q2 + q3);        % 다리 좌표계 z 위치를 계산한다.
+end
+function [xL, yL, zL] = legFK(q1, q2, q3)
+% 현재 관절각으로 발끝 위치를 계산한다.
+
+L1 = 0.074;   % 링크1 에서 링크1 까지 거리 (m)
+L2 = 0.121;   % 링크2 에서 링크3 까지 거리 (m)
+L3 = 0.230;   % 링크3 에서 발 끝 까지 거리 (m)
+
+r = L1 + L2*cos(q2) + L3*cos(q2 + q3);    % 수평 도달 거리를 계산한다.
+
+xL = r*cos(q1);                            % 다리 좌표계 x 위치를 계산한다.
+yL = r*sin(q1);                            % 다리 좌표계 y 위치를 계산한다.
+zL = -L2*sin(q2) - L3*sin(q2 + q3);        % 다리 좌표계 z 위치를 계산한다.
+end
+function [xL, yL, zL] = legFK(q1, q2, q3)
+% 현재 관절각으로 발끝 위치를 계산한다.
+
+L1 = 0.074;   % 링크1 에서 링크1 까지 거리 (m)
+L2 = 0.121;   % 링크2 에서 링크3 까지 거리 (m)
+L3 = 0.230;   % 링크3 에서 발 끝 까지 거리 (m)
+
+r = L1 + L2*cos(q2) + L3*cos(q2 + q3);    % 수평 도달 거리를 계산한다.
+
+xL = r*cos(q1);                            % 다리 좌표계 x 위치를 계산한다.
+yL = r*sin(q1);                            % 다리 좌표계 y 위치를 계산한다.
+zL = -L2*sin(q2) - L3*sin(q2 + q3);        % 다리 좌표계 z 위치를 계산한다.
+end
+function [xL, yL, zL] = legFK(q1, q2, q3)
+% 현재 관절각으로 발끝 위치를 계산한다.
+
+L1 = 0.074;   % 링크1 에서 링크1 까지 거리 (m)
+L2 = 0.121;   % 링크2 에서 링크3 까지 거리 (m)
+L3 = 0.230;   % 링크3 에서 발 끝 까지 거리 (m)
+
+r = L1 + L2*cos(q2) + L3*cos(q2 + q3);    % 수평 도달 거리를 계산한다.
+
+xL = r*cos(q1);                            % 다리 좌표계 x 위치를 계산한다.
+yL = r*sin(q1);                            % 다리 좌표계 y 위치를 계산한다.
+zL = -L2*sin(q2) - L3*sin(q2 + q3);        % 다리 좌표계 z 위치를 계산한다.
+end
+function [xB, yB, zB] = legToBody(xL, yL, zL)
+% 다리 좌표의 발 위치를 Body 좌표로 변환한다.
+
+% 몸체의 원점에서 링크1 까지 거리 (m)
+d = 0.1845;
+dd = d / sqrt(2);
+
+ox = dd;
+oy = -dd;
+alpha = -pi/4;
+
+xB = ox + xL*cos(alpha) - yL*sin(alpha);    % Body x 위치를 계산한다.
+yB = oy + xL*sin(alpha) + yL*cos(alpha);    % Body y 위치를 계산한다.
+zB = zL;                                    % Body z 위치를 전달한다.
+end
+function [xB, yB, zB] = legToBody(xL, yL, zL)
+% 다리 좌표의 발 위치를 Body 좌표로 변환한다.
+
+% 몸체의 원점에서 링크1 까지 거리 (m)
+d = 0.1845;
+dd = d / sqrt(2);
+
+ox = 0;
+oy = -d;
+alpha = -pi/2;
+
+xB = ox + xL*cos(alpha) - yL*sin(alpha);    % Body x 위치를 계산한다.
+yB = oy + xL*sin(alpha) + yL*cos(alpha);    % Body y 위치를 계산한다.
+zB = zL;                                    % Body z 위치를 전달한다.
+end
+function [xB, yB, zB] = legToBody(xL, yL, zL)
+% 다리 좌표의 발 위치를 Body 좌표로 변환한다.
+
+% 몸체의 원점에서 링크1 까지 거리 (m)
+d = 0.1845;
+dd = d / sqrt(2);
+
+ox = -dd;
+oy = -dd;
+alpha = -3*pi/4;
+
+xB = ox + xL*cos(alpha) - yL*sin(alpha);    % Body x 위치를 계산한다.
+yB = oy + xL*sin(alpha) + yL*cos(alpha);    % Body y 위치를 계산한다.
+zB = zL;                                    % Body z 위치를 전달한다.
+end
+function [xB, yB, zB] = legToBody(xL, yL, zL)
+% 다리 좌표의 발 위치를 Body 좌표로 변환한다.
+
+% 몸체의 원점에서 링크1 까지 거리 (m)
+d = 0.1845;
+dd = d / sqrt(2);
+
+ox = dd;
+oy = dd;
+alpha = pi/4;
+
+xB = ox + xL*cos(alpha) - yL*sin(alpha);    % Body x 위치를 계산한다.
+yB = oy + xL*sin(alpha) + yL*cos(alpha);    % Body y 위치를 계산한다.
+zB = zL;                                    % Body z 위치를 전달한다.
+end
+function [xB, yB, zB] = legToBody(xL, yL, zL)
+% 다리 좌표의 발 위치를 Body 좌표로 변환한다.
+
+% 몸체의 원점에서 링크1 까지 거리 (m)
+d = 0.1845;
+dd = d / sqrt(2);
+
+ox = 0;
+oy = d;
+alpha = pi/2;
+
+xB = ox + xL*cos(alpha) - yL*sin(alpha);    % Body x 위치를 계산한다.
+yB = oy + xL*sin(alpha) + yL*cos(alpha);    % Body y 위치를 계산한다.
+zB = zL;                                    % Body z 위치를 전달한다.
+end
+function [xB, yB, zB] = legToBody(xL, yL, zL)
+% 다리 좌표의 발 위치를 Body 좌표로 변환한다.
+
+% 몸체의 원점에서 링크1 까지 거리 (m)
+d = 0.1845;
+dd = d / sqrt(2);
+
+ox = -dd;
+oy = dd;
+alpha = 3*pi/4;
+
+xB = ox + xL*cos(alpha) - yL*sin(alpha);    % Body x 위치를 계산한다.
+yB = oy + xL*sin(alpha) + yL*cos(alpha);    % Body y 위치를 계산한다.
+zB = zL;                                    % Body z 위치를 전달한다.
+end
+function [xL, yL, zL] = bodyToLeg(xB, yB, zB)
+% Body 좌표의 발 목표를 다리 좌표로 변환한다.
+
+% 몸체의 원점에서 링크1 까지 거리 (m)
+d = 0.1845;
+dd = d / sqrt(2);
+
+ox = dd;
+oy = -dd;
+alpha = -pi/4;
+
+dx = xB - ox;                               % 다리 원점 기준 x 거리를 계산한다.
+dy = yB - oy;                               % 다리 원점 기준 y 거리를 계산한다.
+
+xL =  dx*cos(alpha) + dy*sin(alpha);         % 다리 x 위치를 계산한다.
+yL = -dx*sin(alpha) + dy*cos(alpha);         % 다리 y 위치를 계산한다.
+zL =  zB;                                    % 다리 z 위치를 전달한다.
+end
+function [xL, yL, zL] = bodyToLeg(xB, yB, zB)
+% Body 좌표의 발 목표를 다리 좌표로 변환한다.
+
+% 몸체의 원점에서 링크1 까지 거리 (m)
+d = 0.1845;
+dd = d / sqrt(2);
+
+ox = 0;
+oy = -d;
+alpha = -pi/2;
+
+dx = xB - ox;                               % 다리 원점 기준 x 거리를 계산한다.
+dy = yB - oy;                               % 다리 원점 기준 y 거리를 계산한다.
+
+xL =  dx*cos(alpha) + dy*sin(alpha);         % 다리 x 위치를 계산한다.
+yL = -dx*sin(alpha) + dy*cos(alpha);         % 다리 y 위치를 계산한다.
+zL =  zB;                                    % 다리 z 위치를 전달한다.
+end
+function [xL, yL, zL] = bodyToLeg(xB, yB, zB)
+% Body 좌표의 발 목표를 다리 좌표로 변환한다.
+
+% 몸체의 원점에서 링크1 까지 거리 (m)
+d = 0.1845;
+dd = d / sqrt(2);
+
+ox = -dd;
+oy = -dd;
+alpha = -3*pi/4;
+
+dx = xB - ox;                               % 다리 원점 기준 x 거리를 계산한다.
+dy = yB - oy;                               % 다리 원점 기준 y 거리를 계산한다.
+
+xL =  dx*cos(alpha) + dy*sin(alpha);         % 다리 x 위치를 계산한다.
+yL = -dx*sin(alpha) + dy*cos(alpha);         % 다리 y 위치를 계산한다.
+zL =  zB;                                    % 다리 z 위치를 전달한다.
+end
+function [xL, yL, zL] = bodyToLeg(xB, yB, zB)
+% Body 좌표의 발 목표를 다리 좌표로 변환한다.
+
+% 몸체의 원점에서 링크1 까지 거리 (m)
+d = 0.1845;
+dd = d / sqrt(2);
+
+ox = dd;
+oy = dd;
+alpha = pi/4;
+
+dx = xB - ox;                               % 다리 원점 기준 x 거리를 계산한다.
+dy = yB - oy;                               % 다리 원점 기준 y 거리를 계산한다.
+
+xL =  dx*cos(alpha) + dy*sin(alpha);         % 다리 x 위치를 계산한다.
+yL = -dx*sin(alpha) + dy*cos(alpha);         % 다리 y 위치를 계산한다.
+zL =  zB;                                    % 다리 z 위치를 전달한다.
+end
+function [xL, yL, zL] = bodyToLeg(xB, yB, zB)
+% Body 좌표의 발 목표를 다리 좌표로 변환한다.
+
+% 몸체의 원점에서 링크1 까지 거리 (m)
+d = 0.1845;
+dd = d / sqrt(2);
+
+ox = 0;
+oy = d;
+alpha = pi/2;
+
+dx = xB - ox;                               % 다리 원점 기준 x 거리를 계산한다.
+dy = yB - oy;                               % 다리 원점 기준 y 거리를 계산한다.
+
+xL =  dx*cos(alpha) + dy*sin(alpha);         % 다리 x 위치를 계산한다.
+yL = -dx*sin(alpha) + dy*cos(alpha);         % 다리 y 위치를 계산한다.
+zL =  zB;                                    % 다리 z 위치를 전달한다.
+end
+function [xL, yL, zL] = bodyToLeg(xB, yB, zB)
+% Body 좌표의 발 목표를 다리 좌표로 변환한다.
+
+% 몸체의 원점에서 링크1 까지 거리 (m)
+d = 0.1845;
+dd = d / sqrt(2);
+
+ox = -dd;
+oy = dd;
+alpha = 3*pi/4;
+
+dx = xB - ox;                               % 다리 원점 기준 x 거리를 계산한다.
+dy = yB - oy;                               % 다리 원점 기준 y 거리를 계산한다.
+
+xL =  dx*cos(alpha) + dy*sin(alpha);         % 다리 x 위치를 계산한다.
+yL = -dx*sin(alpha) + dy*cos(alpha);         % 다리 y 위치를 계산한다.
+zL =  zB;                                    % 다리 z 위치를 전달한다.
+end
+function [q1, q2, q3, IK_Valid] = legIK(x, y, z)
+% 발끝 목표의 IK와 유효성을 계산한다.
+
+L1 = 0.074;                          % 1번 링크 길이를 설정한다.
+L2 = 0.121;                          % 2번 링크 길이를 설정한다.
+L3 = 0.230;                          % 3번 링크 길이를 설정한다.
+
+Joint_Limit = 135*pi/180;            % 관절 허용각을 설정한다.
+C3_Tolerance = 1.0e-6;               % 수치 오차 허용값을 설정한다.
+
+persistent Initialized
+persistent Last_q1 Last_q2 Last_q3
+
+if isempty(Initialized)
+    Initialized = 1.0;
+    Last_q1 = 0;
+    Last_q2 = 0;
+    Last_q3 = 0;
+end
+
+q1 = Last_q1;                        % 실패 시 직전 정상값을 유지한다.
+q2 = Last_q2;
+q3 = Last_q3;
+IK_Valid = 0.0;
+
+if ~isfinite(x) || ~isfinite(y) || ~isfinite(z)
+    return
+end
+
+r_xy = sqrt(x*x + y*y);              % 수평 거리를 계산한다.
+u = r_xy - L1;                       % 2링크 평면 거리를 계산한다.
+
+c3 = (u*u + z*z - L2*L2 - L3*L3) ...
+   / (2*L2*L3);                      % 코사인 법칙 값을 계산한다.
+
+if c3 < (-1-C3_Tolerance) || c3 > (1+C3_Tolerance)
+    return
+end
+
+c3 = min(max(c3, -1), 1);            % 수치 오차를 제한한다.
+s3 = sqrt(max(0, 1-c3*c3));          % 무릎 관절 사인값을 계산한다.
+
+Candidate_q1 = atan2(y, x);           % 관절 후보각을 계산한다.
+Candidate_q3 = atan2(s3, c3);
+Candidate_q2 = atan2(-z, u) ...
+             - atan2(L3*s3, L2+L3*c3);
+
+if ~isfinite(Candidate_q1) || ...
+   ~isfinite(Candidate_q2) || ...
+   ~isfinite(Candidate_q3)
+    return
+end
+
+if abs(Candidate_q1) > Joint_Limit || ...
+   abs(Candidate_q2) > Joint_Limit || ...
+   abs(Candidate_q3) > Joint_Limit
+    return
+end
+
+q1 = Candidate_q1;                   % 정상 후보각을 출력한다.
+q2 = Candidate_q2;
+q3 = Candidate_q3;
+
+Last_q1 = q1;                        % 다음 실패에 대비해 저장한다.
+Last_q2 = q2;
+Last_q3 = q3;
+
+IK_Valid = 1.0;
+end
+function [q1, q2, q3, IK_Valid] = legIK(x, y, z)
+% 발끝 목표의 IK와 유효성을 계산한다.
+
+L1 = 0.074;                          % 1번 링크 길이를 설정한다.
+L2 = 0.121;                          % 2번 링크 길이를 설정한다.
+L3 = 0.230;                          % 3번 링크 길이를 설정한다.
+
+Joint_Limit = 135*pi/180;            % 관절 허용각을 설정한다.
+C3_Tolerance = 1.0e-6;               % 수치 오차 허용값을 설정한다.
+
+persistent Initialized
+persistent Last_q1 Last_q2 Last_q3
+
+if isempty(Initialized)
+    Initialized = 1.0;
+    Last_q1 = 0;
+    Last_q2 = 0;
+    Last_q3 = 0;
+end
+
+q1 = Last_q1;                        % 실패 시 직전 정상값을 유지한다.
+q2 = Last_q2;
+q3 = Last_q3;
+IK_Valid = 0.0;
+
+if ~isfinite(x) || ~isfinite(y) || ~isfinite(z)
+    return
+end
+
+r_xy = sqrt(x*x + y*y);              % 수평 거리를 계산한다.
+u = r_xy - L1;                       % 2링크 평면 거리를 계산한다.
+
+c3 = (u*u + z*z - L2*L2 - L3*L3) ...
+   / (2*L2*L3);                      % 코사인 법칙 값을 계산한다.
+
+if c3 < (-1-C3_Tolerance) || c3 > (1+C3_Tolerance)
+    return
+end
+
+c3 = min(max(c3, -1), 1);            % 수치 오차를 제한한다.
+s3 = sqrt(max(0, 1-c3*c3));          % 무릎 관절 사인값을 계산한다.
+
+Candidate_q1 = atan2(y, x);           % 관절 후보각을 계산한다.
+Candidate_q3 = atan2(s3, c3);
+Candidate_q2 = atan2(-z, u) ...
+             - atan2(L3*s3, L2+L3*c3);
+
+if ~isfinite(Candidate_q1) || ...
+   ~isfinite(Candidate_q2) || ...
+   ~isfinite(Candidate_q3)
+    return
+end
+
+if abs(Candidate_q1) > Joint_Limit || ...
+   abs(Candidate_q2) > Joint_Limit || ...
+   abs(Candidate_q3) > Joint_Limit
+    return
+end
+
+q1 = Candidate_q1;                   % 정상 후보각을 출력한다.
+q2 = Candidate_q2;
+q3 = Candidate_q3;
+
+Last_q1 = q1;                        % 다음 실패에 대비해 저장한다.
+Last_q2 = q2;
+Last_q3 = q3;
+
+IK_Valid = 1.0;
+end
+function [x_out, y_out, z_out, Foot_Target_Limited] = ...
+    FootWorkspaceLimiter(x_in, y_in, z_in)
+% 발 목표를 IK 작업공간 안으로 제한한다.
+
+L1 = 0.074;
+L2 = 0.121;
+L3 = 0.230;
+
+Workspace_Margin = 0.0001;
+Small_Value      = 1.0e-9;
+
+x_out = x_in;
+y_out = y_in;
+z_out = z_in;
+
+Foot_Target_Limited = 0;
+
+if ~isfinite(x_in) || ~isfinite(y_in) || ~isfinite(z_in)
+    return
+end
+
+r_xy = sqrt(x_in*x_in+y_in*y_in);
+u    = r_xy-L1;
+rho  = sqrt(u*u+z_in*z_in);
+
+rho_min = abs(L2-L3)+Workspace_Margin;
+rho_max = L2+L3-Workspace_Margin;
+
+rho_limited = min(max(rho, rho_min), rho_max);
+
+if abs(rho_limited-rho) <= Small_Value
+    return
+end
+
+if rho > Small_Value
+    scale = rho_limited/rho;
+else
+    scale = 1;
+end
+
+u_limited = u*scale;
+z_out     = z_in*scale;
+r_limited = L1+u_limited;
+
+if r_xy > Small_Value
+    xy_scale = r_limited/r_xy;
+
+    x_out = x_in*xy_scale;
+    y_out = y_in*xy_scale;
+end
+
+Foot_Target_Limited = 1;
+
+end
+function [q1, q2, q3, IK_Valid] = legIK(x, y, z)
+% 발끝 목표의 IK와 유효성을 계산한다.
+
+L1 = 0.074;                          % 1번 링크 길이를 설정한다.
+L2 = 0.121;                          % 2번 링크 길이를 설정한다.
+L3 = 0.230;                          % 3번 링크 길이를 설정한다.
+
+Joint_Limit = 135*pi/180;            % 관절 허용각을 설정한다.
+C3_Tolerance = 1.0e-6;               % 수치 오차 허용값을 설정한다.
+
+persistent Initialized
+persistent Last_q1 Last_q2 Last_q3
+
+if isempty(Initialized)
+    Initialized = 1.0;
+    Last_q1 = 0;
+    Last_q2 = 0;
+    Last_q3 = 0;
+end
+
+q1 = Last_q1;                        % 실패 시 직전 정상값을 유지한다.
+q2 = Last_q2;
+q3 = Last_q3;
+IK_Valid = 0.0;
+
+if ~isfinite(x) || ~isfinite(y) || ~isfinite(z)
+    return
+end
+
+r_xy = sqrt(x*x + y*y);              % 수평 거리를 계산한다.
+u = r_xy - L1;                       % 2링크 평면 거리를 계산한다.
+
+c3 = (u*u + z*z - L2*L2 - L3*L3) ...
+   / (2*L2*L3);                      % 코사인 법칙 값을 계산한다.
+
+if c3 < (-1-C3_Tolerance) || c3 > (1+C3_Tolerance)
+    return
+end
+
+c3 = min(max(c3, -1), 1);            % 수치 오차를 제한한다.
+s3 = sqrt(max(0, 1-c3*c3));          % 무릎 관절 사인값을 계산한다.
+
+Candidate_q1 = atan2(y, x);           % 관절 후보각을 계산한다.
+Candidate_q3 = atan2(s3, c3);
+Candidate_q2 = atan2(-z, u) ...
+             - atan2(L3*s3, L2+L3*c3);
+
+if ~isfinite(Candidate_q1) || ...
+   ~isfinite(Candidate_q2) || ...
+   ~isfinite(Candidate_q3)
+    return
+end
+
+if abs(Candidate_q1) > Joint_Limit || ...
+   abs(Candidate_q2) > Joint_Limit || ...
+   abs(Candidate_q3) > Joint_Limit
+    return
+end
+
+q1 = Candidate_q1;                   % 정상 후보각을 출력한다.
+q2 = Candidate_q2;
+q3 = Candidate_q3;
+
+Last_q1 = q1;                        % 다음 실패에 대비해 저장한다.
+Last_q2 = q2;
+Last_q3 = q3;
+
+IK_Valid = 1.0;
+end
+function [q1, q2, q3, IK_Valid] = legIK(x, y, z)
+% 발끝 목표의 IK와 유효성을 계산한다.
+
+L1 = 0.074;                          % 1번 링크 길이를 설정한다.
+L2 = 0.121;                          % 2번 링크 길이를 설정한다.
+L3 = 0.230;                          % 3번 링크 길이를 설정한다.
+
+Joint_Limit = 135*pi/180;            % 관절 허용각을 설정한다.
+C3_Tolerance = 1.0e-6;               % 수치 오차 허용값을 설정한다.
+
+persistent Initialized
+persistent Last_q1 Last_q2 Last_q3
+
+if isempty(Initialized)
+    Initialized = 1.0;
+    Last_q1 = 0;
+    Last_q2 = 0;
+    Last_q3 = 0;
+end
+
+q1 = Last_q1;                        % 실패 시 직전 정상값을 유지한다.
+q2 = Last_q2;
+q3 = Last_q3;
+IK_Valid = 0.0;
+
+if ~isfinite(x) || ~isfinite(y) || ~isfinite(z)
+    return
+end
+
+r_xy = sqrt(x*x + y*y);              % 수평 거리를 계산한다.
+u = r_xy - L1;                       % 2링크 평면 거리를 계산한다.
+
+c3 = (u*u + z*z - L2*L2 - L3*L3) ...
+   / (2*L2*L3);                      % 코사인 법칙 값을 계산한다.
+
+if c3 < (-1-C3_Tolerance) || c3 > (1+C3_Tolerance)
+    return
+end
+
+c3 = min(max(c3, -1), 1);            % 수치 오차를 제한한다.
+s3 = sqrt(max(0, 1-c3*c3));          % 무릎 관절 사인값을 계산한다.
+
+Candidate_q1 = atan2(y, x);           % 관절 후보각을 계산한다.
+Candidate_q3 = atan2(s3, c3);
+Candidate_q2 = atan2(-z, u) ...
+             - atan2(L3*s3, L2+L3*c3);
+
+if ~isfinite(Candidate_q1) || ...
+   ~isfinite(Candidate_q2) || ...
+   ~isfinite(Candidate_q3)
+    return
+end
+
+if abs(Candidate_q1) > Joint_Limit || ...
+   abs(Candidate_q2) > Joint_Limit || ...
+   abs(Candidate_q3) > Joint_Limit
+    return
+end
+
+q1 = Candidate_q1;                   % 정상 후보각을 출력한다.
+q2 = Candidate_q2;
+q3 = Candidate_q3;
+
+Last_q1 = q1;                        % 다음 실패에 대비해 저장한다.
+Last_q2 = q2;
+Last_q3 = q3;
+
+IK_Valid = 1.0;
+end
+function [x_out, y_out, z_out, Foot_Target_Limited] = ...
+    FootWorkspaceLimiter(x_in, y_in, z_in)
+% 발 목표를 IK 작업공간 안으로 제한한다.
+
+L1 = 0.074;
+L2 = 0.121;
+L3 = 0.230;
+
+Workspace_Margin = 0.0001;
+Small_Value      = 1.0e-9;
+
+x_out = x_in;
+y_out = y_in;
+z_out = z_in;
+
+Foot_Target_Limited = 0;
+
+if ~isfinite(x_in) || ~isfinite(y_in) || ~isfinite(z_in)
+    return
+end
+
+r_xy = sqrt(x_in*x_in+y_in*y_in);
+u    = r_xy-L1;
+rho  = sqrt(u*u+z_in*z_in);
+
+rho_min = abs(L2-L3)+Workspace_Margin;
+rho_max = L2+L3-Workspace_Margin;
+
+rho_limited = min(max(rho, rho_min), rho_max);
+
+if abs(rho_limited-rho) <= Small_Value
+    return
+end
+
+if rho > Small_Value
+    scale = rho_limited/rho;
+else
+    scale = 1;
+end
+
+u_limited = u*scale;
+z_out     = z_in*scale;
+r_limited = L1+u_limited;
+
+if r_xy > Small_Value
+    xy_scale = r_limited/r_xy;
+
+    x_out = x_in*xy_scale;
+    y_out = y_in*xy_scale;
+end
+
+Foot_Target_Limited = 1;
+
+end
+function [Active_Mode, ...
+          Throttle_Command, Yaw_Command, ...
+          Roll_Command, Pitch_Command, SA_Command, ...
+          Reset_Command] = ControlPriorityManager( ...
+          Throttle, Yaw, Roll, Pitch, ...
+          SA, SB, SC, SD, SE, ...
+          Stand_Done, Landing_Done, ...
+          Rollover_Fault, Controller_Fault)
+
+SUP_LANDED   = 0;
+SUP_STANDING = 1;
+SUP_READY    = 2;
+SUP_LANDING  = 3;
+SUP_FAULT    = 4;
+SUP_KILL     = 5;
+
+MODE_LANDING    = 0;
+MODE_STAND      = 1;
+MODE_READY      = 2;
+MODE_MANUAL     = 3;
+MODE_CORRECTION = 4;
+MODE_FAULT      = 5;
+MODE_KILL       = 6;
+
+Sampling_Time     = 0.005;
+Neutral_Hold_Time = 0.20;
+
+Throttle_Deadband = 20;
+Stick_Deadband    = 50;
+
+persistent Initialized Supervisor_Mode
+persistent Stand_Command_Armed Motion_Armed_Memory Neutral_Time
+
+if isempty(Initialized)
+    Initialized         = true;
+    Supervisor_Mode     = SUP_LANDED;
+    Stand_Command_Armed = false;
+    Motion_Armed_Memory = false;
+    Neutral_Time        = 0;
+end
+
+SA_State = double(SA >= 0.5);
+SB_State = round(min(max(SB, 0), 2));
+SC_State = round(min(max(SC, 0), 2));
+SD_State = double(SD >= 0.5);
+SE_State = double(SE >= 0.5);
+
+stand_request      = SB_State == 1;
+manual_request     = SC_State == 0;
+correction_request = SC_State == 2;
+
+stick_neutral = ...
+    abs(Throttle) <= Throttle_Deadband && ...
+    abs(Yaw)   <= Stick_Deadband && ...
+    abs(Roll)  <= Stick_Deadband && ...
+    abs(Pitch) <= Stick_Deadband;
+
+stand_done   = Stand_Done ~= 0;
+landing_done = Landing_Done ~= 0;
+
+rollover_fault   = Rollover_Fault ~= 0;
+controller_fault = Controller_Fault ~= 0;
+kill_request     = SD_State ~= 0;
+
+% 안전 상태를 가장 먼저 처리한다.
+if kill_request
+    Supervisor_Mode     = SUP_KILL;
+    Stand_Command_Armed = false;
+
+elseif rollover_fault
+    Supervisor_Mode     = SUP_FAULT;
+    Stand_Command_Armed = false;
+
+elseif controller_fault
+    Supervisor_Mode     = SUP_FAULT;
+    Stand_Command_Armed = false;
+
+else
+    switch Supervisor_Mode
+        case SUP_KILL
+            Supervisor_Mode = SUP_LANDING;
+
+        case SUP_FAULT
+            Supervisor_Mode = SUP_LANDING;
+
+        case SUP_LANDED
+            if ~stand_request
+                Stand_Command_Armed = true;
+
+            elseif Stand_Command_Armed
+                Supervisor_Mode     = SUP_STANDING;
+                Stand_Command_Armed = false;
+            end
+
+        case SUP_STANDING
+            if ~stand_request
+                Supervisor_Mode = SUP_LANDING;
+
+            elseif stand_done
+                Supervisor_Mode = SUP_READY;
+            end
+
+        case SUP_READY
+            if ~stand_request
+                Supervisor_Mode     = SUP_LANDING;
+                Stand_Command_Armed = false;
+            end
+
+        case SUP_LANDING
+            if landing_done
+                Supervisor_Mode = SUP_LANDED;
+            end
+
+        otherwise
+            Supervisor_Mode     = SUP_LANDING;
+            Stand_Command_Armed = false;
+    end
+end
+
+% READY가 아니면 조종 명령을 잠근다.
+if Supervisor_Mode ~= SUP_READY
+    Motion_Armed_Memory = false;
+    Neutral_Time        = 0;
+
+% READY에서 중립 입력을 확인한 다음 명령을 허용한다.
+elseif ~Motion_Armed_Memory
+    if stick_neutral
+        Neutral_Time = min( ...
+            Neutral_Time + Sampling_Time, ...
+            Neutral_Hold_Time);
+
+        if Neutral_Time >= Neutral_Hold_Time
+            Motion_Armed_Memory = true;
+        end
+    else
+        Neutral_Time = 0;
+    end
+end
+
+Active_Mode      = MODE_LANDING;
+Throttle_Command = 0;
+Yaw_Command      = 0;
+Roll_Command     = 0;
+Pitch_Command    = 0;
+SA_Command       = 0;
+Reset_Command    = 0;
+
+% 선택된 상위 상태를 최종 동작 모드로 변환한다.
+switch Supervisor_Mode
+    case SUP_LANDED
+        Active_Mode = MODE_LANDING;
+
+    case SUP_STANDING
+        Active_Mode = MODE_STAND;
+
+    case SUP_READY
+        Active_Mode = MODE_READY;
+
+        if Motion_Armed_Memory
+            if correction_request
+                Active_Mode = MODE_CORRECTION;
+
+            elseif manual_request
+                Active_Mode = MODE_MANUAL;
+            end
+
+            Reset_Command = SE_State;
+        end
+
+    case SUP_LANDING
+        Active_Mode = MODE_LANDING;
+
+    case SUP_FAULT
+        Active_Mode = MODE_FAULT;
+
+    case SUP_KILL
+        Active_Mode = MODE_KILL;
+end
+
+% 허용된 조종 모드에서만 USER 입력을 전달한다.
+if Active_Mode == MODE_MANUAL || ...
+        Active_Mode == MODE_CORRECTION
+
+    Throttle_Command = Throttle;
+    Yaw_Command      = Yaw;
+    Roll_Command     = Roll;
+    Pitch_Command    = Pitch;
+    SA_Command       = SA_State;
+end
+
+end
+
+% 보행 정지 요청 시 현재 스윙 다리가 착지한 뒤 보행을 종료한다.
+function [Leg1_State, Leg1_Progress, ...
+          Leg2_State, Leg2_Progress, ...
+          Leg3_State, Leg3_Progress, ...
+          Leg4_State, Leg4_Progress, ...
+          Leg5_State, Leg5_Progress, ...
+          Leg6_State, Leg6_Progress, ...
+          Startup_Phase, Tripod_Enable_Internal] = TripodGaitManager( ...
+          t, Tripod_Enable, Tripod_Mode, Recovery_Progress, ...
+          Contact1, Contact2, Contact3, ...
+          Contact4, Contact5, Contact6)
+
+STANCE         = 0;
+SWING          = 1;
+LATE_LANDING   = 2;
+RECOVERY_SWING = 3;
+
+TRIPOD_NORMAL       = 0;
+TRIPOD_LAND_ALL     = 1;
+TRIPOD_RECOVERY_135 = 2;
+TRIPOD_RECOVERY_246 = 3;
+
+Phase_Time         = 0.5;
+Early_Min_Progress = 0.5;
+
+persistent Initialized Phase_Index Phase_Start_Time
+persistent Airborne_Seen Landed
+persistent Run_Enable Stop_Pending
+
+if isempty(Initialized)
+    Initialized      = false;
+    Phase_Index      = 0;
+    Phase_Start_Time = 0;
+    Airborne_Seen    = false(1, 6);
+    Landed           = false(1, 6);
+    Run_Enable       = false;
+    Stop_Pending     = false;
+end
+
+contacts = [Contact1 ~= 0, Contact2 ~= 0, Contact3 ~= 0, ...
+            Contact4 ~= 0, Contact5 ~= 0, Contact6 ~= 0];
+
+states        = zeros(1, 6);
+progresses    = zeros(1, 6);
+Startup_Phase = 1;
+
+% 일반 보행의 시작과 정지 요청을 처리한다.
+if Tripod_Mode == TRIPOD_NORMAL
+    if Tripod_Enable ~= 0
+        if ~Run_Enable
+            Run_Enable       = true;
+            Initialized      = false;
+            Phase_Index      = 0;
+            Phase_Start_Time = t;
+            Airborne_Seen(:) = false;
+            Landed(:)        = false;
+        end
+
+        Stop_Pending = false;
+
+    elseif Run_Enable
+        Stop_Pending = true;
+
+    else
+        Initialized      = false;
+        Phase_Index      = 0;
+        Phase_Start_Time = t;
+        Airborne_Seen(:) = false;
+        Landed(:)        = false;
+        Stop_Pending     = false;
+    end
+
+else
+    % 특수 보행 모드에서는 일반 보행 상태를 초기화한다.
+    Initialized      = false;
+    Phase_Index      = 0;
+    Phase_Start_Time = t;
+    Airborne_Seen(:) = false;
+    Landed(:)        = false;
+    Run_Enable       = false;
+    Stop_Pending     = false;
+end
+
+% 일반 Tripod 보행을 수행한다.
+if Tripod_Mode == TRIPOD_NORMAL && Run_Enable
+    if ~Initialized
+        Initialized      = true;
+        Phase_Index      = 0;
+        Phase_Start_Time = t;
+        Airborne_Seen(:) = false;
+        Landed(:)        = false;
+    end
+
+    phase_progress = (t - Phase_Start_Time) / Phase_Time;
+    phase_progress = min(max(phase_progress, 0), 1);
+
+    if mod(Phase_Index, 2) == 0
+        swing_mask = [true, false, true, false, true, false];
+    else
+        swing_mask = [false, true, false, true, false, true];
+    end
+
+    % 스윙 다리가 지면에서 떨어졌다가 다시 접촉했는지 확인한다.
+    for i = 1:6
+        if swing_mask(i)
+            if ~contacts(i)
+                Airborne_Seen(i) = true;
+            end
+
+            landing_confirmed = Airborne_Seen(i) || Stop_Pending;
+
+            if landing_confirmed && contacts(i) && ...
+                    phase_progress >= Early_Min_Progress
+                Landed(i) = true;
+            end
+        end
+    end
+
+    all_swing_landed = true;
+
+    for i = 1:6
+        if swing_mask(i) && ~Landed(i)
+            all_swing_landed = false;
+        end
+    end
+
+    % 현재 스윙 다리가 착지하면 다음 위상으로 진행하거나 정지한다.
+    if phase_progress >= 1 && all_swing_landed
+        if Stop_Pending
+            Run_Enable       = false;
+            Stop_Pending     = false;
+            Initialized      = false;
+            Phase_Index      = 0;
+            Phase_Start_Time = t;
+            Airborne_Seen(:) = false;
+            Landed(:)        = false;
+
+            states(:)     = STANCE;
+            progresses(:) = 1;
+
+        else
+            Phase_Index      = Phase_Index + 1;
+            Phase_Start_Time = t;
+            Airborne_Seen(:) = false;
+            Landed(:)        = false;
+            phase_progress   = 0;
+
+            if mod(Phase_Index, 2) == 0
+                swing_mask = [true, false, true, false, true, false];
+            else
+                swing_mask = [false, true, false, true, false, true];
+            end
+        end
+    end
+
+    % 보행이 계속 실행 중일 때 다리 상태를 출력한다.
+    if Run_Enable
+        for i = 1:6
+            if ~swing_mask(i)
+                states(i) = STANCE;
+            elseif Landed(i)
+                states(i) = STANCE;
+            elseif phase_progress >= 1
+                states(i) = LATE_LANDING;
+            else
+                states(i) = SWING;
+            end
+
+            progresses(i) = phase_progress;
+        end
+
+        Startup_Phase = double(Phase_Index == 0);
+    end
+
+% 모든 다리 착지 모드를 수행한다.
+elseif Tripod_Enable ~= 0 && Tripod_Mode == TRIPOD_LAND_ALL
+    for i = 1:6
+        if contacts(i)
+            states(i) = STANCE;
+        else
+            states(i) = LATE_LANDING;
+        end
+
+        progresses(i) = 1;
+    end
+
+% 1·3·5번 다리 복구 동작을 수행한다.
+elseif Tripod_Enable ~= 0 && Tripod_Mode == TRIPOD_RECOVERY_135
+    states([1, 3, 5])      = RECOVERY_SWING;
+    progresses([1, 3, 5]) = Recovery_Progress;
+
+% 2·4·6번 다리 복구 동작을 수행한다.
+elseif Tripod_Enable ~= 0 && Tripod_Mode == TRIPOD_RECOVERY_246
+    states([2, 4, 6])      = RECOVERY_SWING;
+    progresses([2, 4, 6]) = Recovery_Progress;
+end
+
+Leg1_State = states(1);
+Leg2_State = states(2);
+Leg3_State = states(3);
+Leg4_State = states(4);
+Leg5_State = states(5);
+Leg6_State = states(6);
+
+Leg1_Progress = progresses(1);
+Leg2_Progress = progresses(2);
+Leg3_Progress = progresses(3);
+Leg4_Progress = progresses(4);
+Leg5_Progress = progresses(5);
+Leg6_Progress = progresses(6);
+
+% 실제 궤적 생성에 사용할 내부 Enable을 출력한다.
+if Tripod_Mode == TRIPOD_NORMAL
+    Tripod_Enable_Internal = double(Run_Enable);
+else
+    Tripod_Enable_Internal = double(Tripod_Enable ~= 0);
+end
+
+end
+% Stance Contact 발의 FK 위치로 몸체 위치를 추정한다.
+function [Body_X_Est, Body_Y_Est, Body_Z_Est, ...
+          Valid_Leg_Count, Slip_Leg_Mask] = BodyPositionEstimator( ...
+          xB_1, yB_1, zB_1, ...
+          xB_2, yB_2, zB_2, ...
+          xB_3, yB_3, zB_3, ...
+          xB_4, yB_4, zB_4, ...
+          xB_5, yB_5, zB_5, ...
+          xB_6, yB_6, zB_6, ...
+          Leg1_State, Leg2_State, Leg3_State, ...
+          Leg4_State, Leg5_State, Leg6_State, ...
+          Contact6, Contact5, Contact4, ...
+          Contact3, Contact2, Contact1, ...
+          Roll_Meas, Pitch_Meas, Yaw_Meas)
+
+STANCE = 0;  % Stance 상태 번호를 정의한다.
+
+persistent Initialized
+persistent Body_X_Memory Body_Y_Memory Body_Z_Memory
+persistent Slip_Suspect_Count Slip_Latched
+
+persistent Anchor_X_1 Anchor_Y_1 Anchor_Z_1 Was_Valid_1
+persistent Anchor_X_2 Anchor_Y_2 Anchor_Z_2 Was_Valid_2
+persistent Anchor_X_3 Anchor_Y_3 Anchor_Z_3 Was_Valid_3
+persistent Anchor_X_4 Anchor_Y_4 Anchor_Z_4 Was_Valid_4
+persistent Anchor_X_5 Anchor_Y_5 Anchor_Z_5 Was_Valid_5
+persistent Anchor_X_6 Anchor_Y_6 Anchor_Z_6 Was_Valid_6
+
+% 최초 실행 시 추정 위치와 Anchor를 초기화한다.
+if isempty(Initialized)
+    Initialized = true;
+
+    Body_X_Memory = 0;
+    Body_Y_Memory = 0;
+    Body_Z_Memory = 0;
+
+    Slip_Suspect_Count = zeros(1, 6);
+    Slip_Latched       = false(1, 6);
+
+    Anchor_X_1 = 0;
+    Anchor_Y_1 = 0;
+    Anchor_Z_1 = 0;
+    Was_Valid_1 = false;
+
+    Anchor_X_2 = 0;
+    Anchor_Y_2 = 0;
+    Anchor_Z_2 = 0;
+    Was_Valid_2 = false;
+
+    Anchor_X_3 = 0;
+    Anchor_Y_3 = 0;
+    Anchor_Z_3 = 0;
+    Was_Valid_3 = false;
+
+    Anchor_X_4 = 0;
+    Anchor_Y_4 = 0;
+    Anchor_Z_4 = 0;
+    Was_Valid_4 = false;
+
+    Anchor_X_5 = 0;
+    Anchor_Y_5 = 0;
+    Anchor_Z_5 = 0;
+    Was_Valid_5 = false;
+
+    Anchor_X_6 = 0;
+    Anchor_Y_6 = 0;
+    Anchor_Z_6 = 0;
+    Was_Valid_6 = false;
+end
+
+% Body 좌표의 FK 발 위치를 절대좌표계로 회전한다.
+[xW_1, yW_1, zW_1] = RotateBodyToWorld( ...
+    xB_1, yB_1, zB_1, Roll_Meas, Pitch_Meas, Yaw_Meas);
+[xW_2, yW_2, zW_2] = RotateBodyToWorld( ...
+    xB_2, yB_2, zB_2, Roll_Meas, Pitch_Meas, Yaw_Meas);
+[xW_3, yW_3, zW_3] = RotateBodyToWorld( ...
+    xB_3, yB_3, zB_3, Roll_Meas, Pitch_Meas, Yaw_Meas);
+[xW_4, yW_4, zW_4] = RotateBodyToWorld( ...
+    xB_4, yB_4, zB_4, Roll_Meas, Pitch_Meas, Yaw_Meas);
+[xW_5, yW_5, zW_5] = RotateBodyToWorld( ...
+    xB_5, yB_5, zB_5, Roll_Meas, Pitch_Meas, Yaw_Meas);
+[xW_6, yW_6, zW_6] = RotateBodyToWorld( ...
+    xB_6, yB_6, zB_6, Roll_Meas, Pitch_Meas, Yaw_Meas);
+
+% 1번 다리의 Anchor와 몸체 위치 후보를 계산한다.
+[Anchor_X_1, Anchor_Y_1, Anchor_Z_1, Was_Valid_1, ...
+ Valid_1, Body_X_1, Body_Y_1, Body_Z_1] = UpdateLegEstimate( ...
+    xW_1, yW_1, zW_1, Leg1_State, Contact1, ...
+    Anchor_X_1, Anchor_Y_1, Anchor_Z_1, Was_Valid_1, ...
+    Body_X_Memory, Body_Y_Memory, Body_Z_Memory, STANCE);
+
+% 2번 다리의 Anchor와 몸체 위치 후보를 계산한다.
+[Anchor_X_2, Anchor_Y_2, Anchor_Z_2, Was_Valid_2, ...
+ Valid_2, Body_X_2, Body_Y_2, Body_Z_2] = UpdateLegEstimate( ...
+    xW_2, yW_2, zW_2, Leg2_State, Contact2, ...
+    Anchor_X_2, Anchor_Y_2, Anchor_Z_2, Was_Valid_2, ...
+    Body_X_Memory, Body_Y_Memory, Body_Z_Memory, STANCE);
+
+% 3번 다리의 Anchor와 몸체 위치 후보를 계산한다.
+[Anchor_X_3, Anchor_Y_3, Anchor_Z_3, Was_Valid_3, ...
+ Valid_3, Body_X_3, Body_Y_3, Body_Z_3] = UpdateLegEstimate( ...
+    xW_3, yW_3, zW_3, Leg3_State, Contact3, ...
+    Anchor_X_3, Anchor_Y_3, Anchor_Z_3, Was_Valid_3, ...
+    Body_X_Memory, Body_Y_Memory, Body_Z_Memory, STANCE);
+
+% 4번 다리의 Anchor와 몸체 위치 후보를 계산한다.
+[Anchor_X_4, Anchor_Y_4, Anchor_Z_4, Was_Valid_4, ...
+ Valid_4, Body_X_4, Body_Y_4, Body_Z_4] = UpdateLegEstimate( ...
+    xW_4, yW_4, zW_4, Leg4_State, Contact4, ...
+    Anchor_X_4, Anchor_Y_4, Anchor_Z_4, Was_Valid_4, ...
+    Body_X_Memory, Body_Y_Memory, Body_Z_Memory, STANCE);
+
+% 5번 다리의 Anchor와 몸체 위치 후보를 계산한다.
+[Anchor_X_5, Anchor_Y_5, Anchor_Z_5, Was_Valid_5, ...
+ Valid_5, Body_X_5, Body_Y_5, Body_Z_5] = UpdateLegEstimate( ...
+    xW_5, yW_5, zW_5, Leg5_State, Contact5, ...
+    Anchor_X_5, Anchor_Y_5, Anchor_Z_5, Was_Valid_5, ...
+    Body_X_Memory, Body_Y_Memory, Body_Z_Memory, STANCE);
+
+% 6번 다리의 Anchor와 몸체 위치 후보를 계산한다.
+[Anchor_X_6, Anchor_Y_6, Anchor_Z_6, Was_Valid_6, ...
+ Valid_6, Body_X_6, Body_Y_6, Body_Z_6] = UpdateLegEstimate( ...
+    xW_6, yW_6, zW_6, Leg6_State, Contact6, ...
+    Anchor_X_6, Anchor_Y_6, Anchor_Z_6, Was_Valid_6, ...
+    Body_X_Memory, Body_Y_Memory, Body_Z_Memory, STANCE);
+
+% 현재 유효한 다리 수를 계산한다.
+Candidate_X = [Body_X_1, Body_X_2, Body_X_3, ...
+               Body_X_4, Body_X_5, Body_X_6];
+Candidate_Y = [Body_Y_1, Body_Y_2, Body_Y_3, ...
+               Body_Y_4, Body_Y_5, Body_Y_6];
+Candidate_Z = [Body_Z_1, Body_Z_2, Body_Z_3, ...
+               Body_Z_4, Body_Z_5, Body_Z_6];
+Raw_Valid = [Valid_1, Valid_2, Valid_3, ...
+             Valid_4, Valid_5, Valid_6];
+
+Slip_Distance_Threshold = 0.05;
+Slip_Confirm_Samples    = 5;
+Accepted                = false(1, 6);
+Raw_Valid_Count         = sum(double(Raw_Valid));
+
+% 다른 Stance 후보와 3 cm 이내로 일치하는 다리만 사용한다.
+for i = 1:6
+    if ~Raw_Valid(i)
+        Slip_Suspect_Count(i) = 0;
+        Slip_Latched(i)       = false;
+        continue;
+    end
+
+    if Slip_Latched(i)
+        continue;
+    end
+
+    if Raw_Valid_Count < 2
+        Accepted(i)            = true;
+        Slip_Suspect_Count(i) = 0;
+        continue;
+    end
+
+    Has_Neighbor = false;
+
+    for j = 1:6
+        if i == j || ~Raw_Valid(j) || Slip_Latched(j)
+            continue;
+        end
+
+        dx = Candidate_X(i) - Candidate_X(j);
+        dy = Candidate_Y(i) - Candidate_Y(j);
+        dz = Candidate_Z(i) - Candidate_Z(j);
+        Candidate_Distance = sqrt(dx*dx + dy*dy + dz*dz);
+
+        if Candidate_Distance <= Slip_Distance_Threshold
+            Has_Neighbor = true;
+            break;
+        end
+    end
+
+    if Has_Neighbor
+        Accepted(i)            = true;
+        Slip_Suspect_Count(i) = 0;
+    else
+        Slip_Suspect_Count(i) = min( ...
+            Slip_Suspect_Count(i) + 1, Slip_Confirm_Samples);
+
+        if Slip_Suspect_Count(i) >= Slip_Confirm_Samples
+            Slip_Latched(i) = true;
+        end
+    end
+end
+
+% 미끄러진 다리를 제외한 후보만 단순 평균한다.
+Valid_Leg_Count = sum(double(Accepted));
+
+if Valid_Leg_Count > 0
+    Body_X_Memory = sum(Candidate_X .* double(Accepted)) ...
+                  / Valid_Leg_Count;
+    Body_Y_Memory = sum(Candidate_Y .* double(Accepted)) ...
+                  / Valid_Leg_Count;
+    Body_Z_Memory = sum(Candidate_Z .* double(Accepted)) ...
+                  / Valid_Leg_Count;
+end
+
+% 현재 Stance Foot Slip 상태를 6비트 마스크로 출력한다.
+Slip_Leg_Mask = 0;
+
+for i = 1:6
+    if Slip_Latched(i)
+        Slip_Leg_Mask = Slip_Leg_Mask + 2^(i-1);
+    end
+end
+
+Body_X_Est = Body_X_Memory;
+Body_Y_Est = Body_Y_Memory;
+Body_Z_Est = Body_Z_Memory;
+
+end
+
+
+% 한 다리의 Anchor와 몸체 위치 후보를 계산한다.
+function [Anchor_X, Anchor_Y, Anchor_Z, Was_Valid, ...
+          Valid, Body_X, Body_Y, Body_Z] = UpdateLegEstimate( ...
+          Foot_X, Foot_Y, Foot_Z, Leg_State, Contact, ...
+          Anchor_X, Anchor_Y, Anchor_Z, Was_Valid, ...
+          Body_X_Previous, Body_Y_Previous, Body_Z_Previous, ...
+          Stance_State)
+
+% Stance이면서 접촉 중인 다리만 유효하게 사용한다.
+Valid = (Leg_State == Stance_State) && (Contact ~= 0);
+
+% 새로 유효해진 순간에 발의 기준 좌표계 Anchor를 저장한다.
+if Valid && ~Was_Valid
+    Anchor_X = Body_X_Previous + Foot_X;
+    Anchor_Y = Body_Y_Previous + Foot_Y;
+    Anchor_Z = Body_Z_Previous + Foot_Z;
+end
+
+% 유효 다리는 Anchor와 현재 FK 위치로 몸체 위치를 계산한다.
+if Valid
+    Body_X = Anchor_X - Foot_X;
+    Body_Y = Anchor_Y - Foot_Y;
+    Body_Z = Anchor_Z - Foot_Z;
+else
+    Body_X = 0;
+    Body_Y = 0;
+    Body_Z = 0;
+end
+
+Was_Valid = Valid;
+
+end
+
+
+% ZYX 자세 회전으로 Body 벡터를 절대좌표계 벡터로 변환한다.
+function [xW, yW, zW] = RotateBodyToWorld( ...
+          xB, yB, zB, roll, pitch, yaw)
+
+cr = cos(roll);
+sr = sin(roll);
+cp = cos(pitch);
+sp = sin(pitch);
+cy = cos(yaw);
+sy = sin(yaw);
+
+xW = cy*cp*xB ...
+   + (cy*sp*sr - sy*cr)*yB ...
+   + (cy*sp*cr + sy*sr)*zB;
+
+yW = sy*cp*xB ...
+   + (sy*sp*sr + cy*cr)*yB ...
+   + (sy*sp*cr - cy*sr)*zB;
+
+zW = -sp*xB ...
+   + cp*sr*yB ...
+   + cp*cr*zB;
+
+end
+
+% 실제 보행 실행 시점에 맞춰 가상 접촉 신호를 생성한다.
+function [Contact1, Contact2, Contact3, ...
+          Contact4, Contact5, Contact6] = TestContact( ...
+          t, Tripod_Enable_Delayed, Tripod_Mode_Delayed)
+
+TRIPOD_NORMAL = 0;
+
+Phase_Time   = 0.50;
+Landing_Time = 0.40;
+
+persistent Previous_Enable Gait_Start_Time
+
+if isempty(Previous_Enable)
+    Previous_Enable = false;
+    Gait_Start_Time = 0;
+end
+
+gait_enable = ...
+    Tripod_Enable_Delayed ~= 0 && ...
+    Tripod_Mode_Delayed == TRIPOD_NORMAL;
+
+Contact1 = 1;
+Contact2 = 1;
+Contact3 = 1;
+Contact4 = 1;
+Contact5 = 1;
+Contact6 = 1;
+
+% 보행이 시작된 실제 시점을 저장한다.
+if gait_enable && ~Previous_Enable
+    Gait_Start_Time = t;
+end
+
+if gait_enable
+    elapsed_time = max(t-Gait_Start_Time, 0);
+
+    phase_count = floor(elapsed_time/Phase_Time);
+    phase_time  = elapsed_time-phase_count*Phase_Time;
+
+    landed = double(phase_time >= Landing_Time);
+
+    if mod(phase_count, 2) == 0
+        Contact1 = landed;
+        Contact3 = landed;
+        Contact5 = landed;
+    else
+        Contact2 = landed;
+        Contact4 = landed;
+        Contact6 = landed;
+    end
+end
+
+Previous_Enable = gait_enable;
+
+end
+function [Throttle, Yaw, Roll, Pitch, ...                               
+         SA, SB, SC, SD, SE] = USER(t)                                 
+% 실제 짐벌 조작을 모사한 시험 입력을 생성한다.                                            
+                                                                       
+Gimbal_Raw_Rate = 5000;                                                 
+Sampling_Time   = 0.005;                                                
+                                                                       
+Throttle_Target = 0;                                                    
+Yaw_Target      = 0;                                                    
+Roll_Target     = 0;                                                    
+Pitch_Target    = 0;                                                    
+                                                                       
+SA = 0;                                                                 
+SB = 0;                                                                 
+SC = 0;                                                                 
+SD = 0;                                                                 
+SE = 0;                                                                 
+                                                                       
+% 0.5초부터 모든 시험이 끝날 때까지 서기 상태를 유지한다.                                     
+if t >= 0.5 && t < 73.0                                                 
+   SB = 1;                                                             
+end                                                                     
+                                                                       
+% 6~10초에 한 걸음 동안 최대 전진 명령을 시험한다.                                       
+if t >= 7.0 && t < 10                                                  
+   Throttle_Target = 1000;                                             
+end                                                                     
+                                                                       
+% 11~14초에 한 걸음 동안 최대 후진 명령을 시험한다.                                     
+if t >= 11.0 && t < 14                                                
+   Throttle_Target = -1000;                                            
+end                                                                     
+                                                                       
+% 15~21초에 X Offset을 최대 입력으로 양방향 시험한다.                                   
+if t >= 15.0 && t < 21.0                                                
+   SC = 2;                                                             
+                                                                       
+   if t < 16.0                                                         
+       Pitch_Target = 1000;                                            
+   elseif t >= 18.0 && t < 19.0                                        
+       Pitch_Target = -1000;                                           
+   end                                                                 
+end                                                                     
+                                                                       
+% 21~27초에 Y Offset을 최대 입력으로 양방향 시험한다.                                   
+if t >= 21.0 && t < 27.0                                                
+   SC = 2;                                                             
+                                                                       
+   if t < 22.0                                                         
+       Roll_Target = 1000;                                             
+   elseif t >= 24.0 && t < 25.0                                        
+       Roll_Target = -1000;                                            
+   end                                                                 
+end                                                                     
+                                                                       
+% 27~33초에 Z Offset을 최대 입력으로 양방향 시험한다.                                   
+if t >= 27.0 && t < 33.0                                                
+   SC = 2;                                                             
+                                                                       
+   if t < 28.0                                                         
+       Throttle_Target = 1000;                                         
+   elseif t >= 30.0 && t < 31.0                                        
+       Throttle_Target = -1000;                                        
+   end                                                                 
+end                                                                     
+                                                                       
+% 33~39초에 Roll 자세를 최대 입력으로 양방향 시험한다.                                    
+if t >= 33.0 && t < 36.0                                                
+   Roll_Target = 1000;                                                 
+elseif t >= 36.0 && t < 37.0                                            
+   Roll_Target = -1000;                                                
+end                                                                     
+                                                                       
+% 39~45초에 Pitch 자세를 최대 입력으로 양방향 시험한다.                                   
+if t >= 39.0 && t < 42.0                                                
+   Pitch_Target = 1000;                                                
+elseif t >= 42.0 && t < 43.0                                            
+   Pitch_Target = -1000;                                               
+end                                                                     
+                                                                       
+% 45~51초에 보정 Yaw 자세를 최대 입력으로 양방향 시험한다.                                  
+if t >= 45.0 && t < 51.0                                                
+   SC = 2;                                                             
+                                                                       
+   if t < 46.0                                                         
+       Yaw_Target = 1000;                                              
+   elseif t >= 48.0 && t < 49.0                                        
+       Yaw_Target = -1000;                                             
+   end                                                                 
+end                                                                     
+                                                                       
+% 51~51.5초에 한 걸음 동안 최대 전진과 최대 좌회전을 시험한다.                                
+if t >= 51.0 && t < 54.0                                              
+   Throttle_Target = 500;                                             
+   Yaw_Target      = 1000;                                             
+end                                                                     
+                                                                       
+% 55~55.5초에 최대 전진과 최대 우회전을 짧게 시험한다.                                     
+if t >= 55.0 && t < 58.0                                               
+   Throttle_Target = 500;                                             
+   Yaw_Target      = -1000;                                            
+end                                                                     
+                                                                       
+% 59~71초에 SA 횡이동 모드의 x축과 y축을 각각 양방향 시험한다.                               
+if t >= 59.0 && t < 71.0                                                
+   SA = 1;                                                             
+                                                                       
+   if t < 59.5                                                         
+       Throttle_Target = 500;                                         
+   elseif t >= 62.0 && t < 64.0                                        
+       Throttle_Target = -500;                                        
+   elseif t >= 65.0 && t < 67.0                                        
+       Yaw_Target = 1000;                                              
+   elseif t >= 68.0 && t < 70.0                                        
+       Yaw_Target      = -1000;                                        
+   end                                                                 
+end                                                                     
+                                                                       
+persistent Previous_Throttle Previous_Yaw Previous_Roll Previous_Pitch  
+                                                                       
+if isempty(Previous_Throttle)                                           
+   Previous_Throttle = 0;                                              
+   Previous_Yaw      = 0;                                              
+   Previous_Roll     = 0;                                              
+   Previous_Pitch    = 0;                                              
+end                                                                     
+                                                                       
+Previous_Throttle = SlewToTarget( ...                                   
+   Previous_Throttle, Throttle_Target, Gimbal_Raw_Rate, Sampling_Time);
+Previous_Yaw = SlewToTarget( ...                                        
+   Previous_Yaw, Yaw_Target, Gimbal_Raw_Rate, Sampling_Time);          
+Previous_Roll = SlewToTarget( ...                                       
+   Previous_Roll, Roll_Target, Gimbal_Raw_Rate, Sampling_Time);        
+Previous_Pitch = SlewToTarget( ...                                      
+   Previous_Pitch, Pitch_Target, Gimbal_Raw_Rate, Sampling_Time);      
+                                                                       
+Throttle = Previous_Throttle;                                           
+Yaw      = Previous_Yaw;                                                
+Roll     = Previous_Roll;                                               
+Pitch    = Previous_Pitch;                                              
+                                                                       
+end                                                                     
+                                                                       
+% 짐벌 raw 명령을 지정 속도로 목표값에 접근시킨다.                                         
+function output = SlewToTarget(previous, target, rate, delta_time)      
+maximum_change = rate*delta_time;                                       
+difference = target-previous;                                           
+difference = min(max(difference, -maximum_change), maximum_change);     
+output = previous+difference;                                           
+end                                                                     
+function [Kill_Enable, Reset_Command, ...
+          Stand_Enable, Landing_Enable, Posture_Progress, ...
+          Tripod_Enable, Tripod_Mode, Recovery_Progress, ...
+          Posture_Enable, Correction_Yaw_Reference, ...
+          Manual_Enable, Correction_Enable, ...
+          vx_user, wz_user, ...
+          Roll_Reference, Pitch_Reference, Yaw_Reference, ...
+          Correction_Vx, Correction_Vy, Correction_Vz, ...
+          Body_Control_Enable, ...
+          Stand_Done, Landing_Done] = DroneController( ...
+          Active_Mode, ...
+          Throttle_Command, Yaw_Command, ...
+          Roll_Command, Pitch_Command, SA_Command, ...
+          Reset_Command_In, ...
+          Contact1, Contact2, Contact3, ...
+          Contact4, Contact5, Contact6, ...
+          Yaw_Meas)
+
+MODE_LANDING    = 0;
+MODE_STAND      = 1;
+MODE_READY      = 2;
+MODE_MANUAL     = 3;
+MODE_CORRECTION = 4;
+MODE_FAULT      = 5;
+MODE_KILL       = 6;
+
+LANDING_LANDED       = 0;
+LANDING_ALL_FEET     = 1;
+LANDING_RECOVERY_135 = 2;
+LANDING_RECOVERY_246 = 3;
+LANDING_LOWERING     = 4;
+LANDING_SETTLING     = 5;
+
+TRIPOD_NORMAL       = 0;
+TRIPOD_LAND_ALL     = 1;
+TRIPOD_RECOVERY_135 = 2;
+TRIPOD_RECOVERY_246 = 3;
+
+Sampling_Time = 0.005;
+
+Stick_Deadband    = 50;
+Throttle_Deadband = 20;
+Cutoff_Hz         = 5.0;
+
+Stand_Time    = 5.6;
+Settling_Time = 0.5;
+Recovery_Time = 0.5;
+Lowering_Time = 5.6;
+
+Vx_Max                      = 0.28;
+Vy_Max                      = 0.28;
+Gait_Vx_Threshold           = 0.005;
+Gait_Vy_Threshold           = 0.005;
+Gait_Wz_Threshold           = 1*pi/180;
+Correction_Speed_Max        = 0.05;
+Correction_Yaw_Max          = 10*pi/180;
+
+Yaw_Rate_Max = 45*pi/180;
+Roll_Max     = 45*pi/180;
+Pitch_Max    = 45*pi/180;
+
+persistent Initialized Previous_Active_Mode
+persistent Posture_Memory Stand_Settle_Time Stand_Complete
+persistent Landing_State Landing_State_Time
+persistent Throttle_Filter Yaw_Filter Roll_Filter Pitch_Filter
+persistent Yaw_Reference_Memory
+persistent Gait_Was_Active
+persistent Previous_SA_State
+
+if isempty(Initialized)
+    Initialized          = true;
+    Previous_Active_Mode = MODE_LANDING;
+    Posture_Memory       = 0;
+    Stand_Settle_Time    = 0;
+    Stand_Complete       = false;
+    Landing_State        = LANDING_LANDED;
+    Landing_State_Time   = 0;
+    Throttle_Filter      = 0;
+    Yaw_Filter           = 0;
+    Roll_Filter          = 0;
+    Pitch_Filter         = 0;
+    Yaw_Reference_Memory = 0;
+    Gait_Was_Active      = false;
+    Previous_SA_State    = false;
+end
+
+active_mode = round(min(max(Active_Mode, 0), 6));
+
+all_contacts = Contact1 ~= 0 && Contact2 ~= 0 && ...
+               Contact3 ~= 0 && Contact4 ~= 0 && ...
+               Contact5 ~= 0 && Contact6 ~= 0;
+
+contact_135 = Contact1 ~= 0 && Contact3 ~= 0 && Contact5 ~= 0;
+contact_246 = Contact2 ~= 0 && Contact4 ~= 0 && Contact6 ~= 0;
+
+Kill_Enable       = 0;
+Reset_Command     = double(Reset_Command_In ~= 0);
+Landing_Enable    = 0;
+Stand_Enable      = 0;
+Tripod_Enable     = 0;
+Tripod_Mode       = TRIPOD_NORMAL;
+Correction_Enable = 0;
+Manual_Enable     = 0;
+Recovery_Progress = 0;
+Stand_Done        = 0;
+Landing_Done      = 0;
+
+vx_user = 0;
+wz_user = 0;
+Roll_Reference  = 0;
+Pitch_Reference = 0;
+
+Correction_Vx = 0;
+Correction_Vy = 0;
+Correction_Vz = 0;
+Body_Control_Enable      = 0;
+Posture_Enable           = 0;
+Correction_Yaw_Reference = 0;
+
+% 선택되지 않은 조종 모드에서는 입력 필터를 초기화한다.
+lateral_mode = SA_Command >= 0.5;
+
+mode_changed = active_mode ~= Previous_Active_Mode;
+sa_mode_changed = active_mode == MODE_MANUAL && ...
+                  lateral_mode ~= Previous_SA_State;
+
+if mode_changed
+    Throttle_Filter = 0;
+    Yaw_Filter      = 0;
+    Roll_Filter     = 0;
+    Pitch_Filter    = 0;
+elseif sa_mode_changed
+    Yaw_Filter = 0;
+end
+
+if active_mode == MODE_MANUAL || active_mode == MODE_CORRECTION
+    Throttle_Normalized = NormalizeThrottle(Throttle_Command, Throttle_Deadband);
+    Yaw_Normalized = NormalizeCenteredStick(Yaw_Command, Stick_Deadband);
+    Roll_Normalized = NormalizeCenteredStick(Roll_Command, Stick_Deadband);
+    Pitch_Normalized = NormalizeCenteredStick(Pitch_Command, Stick_Deadband);
+
+    alpha = exp(-2*pi*Cutoff_Hz*Sampling_Time);
+    Throttle_Filter = alpha*Throttle_Filter + (1-alpha)*Throttle_Normalized;
+    Yaw_Filter = alpha*Yaw_Filter + (1-alpha)*Yaw_Normalized;
+    Roll_Filter = alpha*Roll_Filter + (1-alpha)*Roll_Normalized;
+    Pitch_Filter = alpha*Pitch_Filter + (1-alpha)*Pitch_Normalized;
+else
+    Throttle_Filter = 0;
+    Yaw_Filter      = 0;
+    Roll_Filter     = 0;
+    Pitch_Filter    = 0;
+end
+
+% 상위 모드에서 허용한 동작만 진행한다.
+if active_mode == MODE_STAND
+    Stand_Enable = 1;
+
+    if Previous_Active_Mode ~= MODE_STAND
+        Stand_Settle_Time = 0;
+        Stand_Complete    = false;
+    end
+
+    if Posture_Memory < 1
+        Posture_Memory = min(Posture_Memory + Sampling_Time/Stand_Time, 1);
+        Stand_Settle_Time = 0;
+    else
+        Stand_Settle_Time = min(Stand_Settle_Time + Sampling_Time, Settling_Time);
+
+        if Stand_Settle_Time >= Settling_Time
+            Stand_Complete = true;
+        end
+    end
+
+    Stand_Done = double(Stand_Complete);
+
+elseif active_mode == MODE_LANDING
+    Landing_Enable = 1;
+    Stand_Complete = false;
+
+    if Previous_Active_Mode ~= MODE_LANDING
+        Landing_State_Time = 0;
+
+        if Posture_Memory <= 0
+            Landing_State = LANDING_LANDED;
+        elseif Gait_Was_Active
+            Landing_State = LANDING_ALL_FEET;
+        else
+            Landing_State = LANDING_LOWERING;
+        end
+    end
+
+    switch Landing_State
+        case LANDING_LANDED
+            Posture_Memory     = 0;
+            Landing_Done       = 1;
+            Landing_State_Time = 0;
+            Gait_Was_Active    = false;
+
+        case LANDING_ALL_FEET
+            Tripod_Enable = 1;
+            Tripod_Mode   = TRIPOD_LAND_ALL;
+
+            if all_contacts
+                Landing_State      = LANDING_RECOVERY_135;
+                Landing_State_Time = 0;
+            end
+
+        case LANDING_RECOVERY_135
+            Tripod_Enable = 1;
+            Tripod_Mode   = TRIPOD_RECOVERY_135;
+            Landing_State_Time = min(Landing_State_Time + Sampling_Time, Recovery_Time);
+            Recovery_Progress = min(Landing_State_Time/Recovery_Time, 1);
+
+            if Landing_State_Time >= Recovery_Time && contact_135
+                Landing_State      = LANDING_RECOVERY_246;
+                Landing_State_Time = 0;
+            end
+
+        case LANDING_RECOVERY_246
+            Tripod_Enable = 1;
+            Tripod_Mode   = TRIPOD_RECOVERY_246;
+            Landing_State_Time = min(Landing_State_Time + Sampling_Time, Recovery_Time);
+            Recovery_Progress = min(Landing_State_Time/Recovery_Time, 1);
+
+            if Landing_State_Time >= Recovery_Time && contact_246
+                Landing_State      = LANDING_LOWERING;
+                Landing_State_Time = 0;
+            end
+
+        case LANDING_LOWERING
+            Posture_Memory = max(Posture_Memory - Sampling_Time/Lowering_Time, 0);
+
+            if Posture_Memory <= 0
+                Landing_State      = LANDING_SETTLING;
+                Landing_State_Time = 0;
+            end
+
+        case LANDING_SETTLING
+            Landing_State_Time = min(Landing_State_Time + Sampling_Time, Settling_Time);
+
+            if Landing_State_Time >= Settling_Time
+                Landing_State      = LANDING_LANDED;
+                Landing_State_Time = 0;
+                Landing_Done       = 1;
+            end
+
+        otherwise
+            Landing_State      = LANDING_LANDED;
+            Landing_State_Time = 0;
+    end
+
+elseif active_mode == MODE_READY || ...
+        active_mode == MODE_MANUAL || ...
+        active_mode == MODE_CORRECTION
+
+    Posture_Memory = 1;
+    Stand_Done     = 1;
+
+elseif active_mode == MODE_FAULT || active_mode == MODE_KILL
+    Kill_Enable   = 1;
+    Reset_Command = 0;
+end
+
+% SA 스위치로 수동 이동 방향을 선택한다.
+
+
+% 수동 조종 모드의 이동 명령을 생성한다.
+if active_mode == MODE_MANUAL
+    Manual_Enable      = 1;
+    Body_Control_Enable = 1;
+    Posture_Enable      = 1;
+    vx_user = Vx_Max*Throttle_Filter;
+
+    if lateral_mode
+        Correction_Vy = Vy_Max*Yaw_Filter;
+        wz_user      = 0;
+    else
+        Correction_Vy = 0;
+        wz_user      = Yaw_Rate_Max*Yaw_Filter;
+    end
+
+    Roll_Reference  = Roll_Max*Roll_Filter;
+    Pitch_Reference = Pitch_Max*Pitch_Filter;
+
+    motion_request = ...
+        abs(vx_user)      >= Gait_Vx_Threshold || ...
+        abs(Correction_Vy) >= Gait_Vy_Threshold || ...
+        abs(wz_user)      >= Gait_Wz_Threshold;
+
+    if motion_request
+        Tripod_Enable   = 1;
+        Tripod_Mode     = TRIPOD_NORMAL;
+        Gait_Was_Active = true;
+    end
+end
+
+% 보정 모드의 몸체 이동 명령을 생성한다.
+if active_mode == MODE_CORRECTION
+    Correction_Enable        = 1;
+    Body_Control_Enable      = 1;
+    Posture_Enable           = 1;
+    Correction_Vx            = Correction_Speed_Max*Pitch_Filter;
+    Correction_Vy            = Correction_Speed_Max*Roll_Filter;
+    Correction_Vz            = Correction_Speed_Max*Throttle_Filter;
+    Correction_Yaw_Reference = Correction_Yaw_Max*Yaw_Filter;
+end
+
+% Reset과 yaw 입력으로 Heading Reference를 관리한다.
+if Reset_Command ~= 0
+    Yaw_Reference_Memory = WrapPi(Yaw_Meas);
+    Gait_Was_Active      = false;
+elseif active_mode == MODE_MANUAL
+    if Previous_Active_Mode ~= MODE_MANUAL || lateral_mode ~= Previous_SA_State
+        Yaw_Reference_Memory = WrapPi(Yaw_Meas);
+    else
+        Yaw_Reference_Memory = WrapPi( ...
+            Yaw_Reference_Memory + wz_user*Sampling_Time);
+    end
+end
+
+Yaw_Reference        = Yaw_Reference_Memory;
+Posture_Progress     = Posture_Memory;
+Previous_Active_Mode = active_mode;
+Previous_SA_State    = lateral_mode;
+
+end
+
+
+% -1000~1000 스로틀 입력을 -1~1로 정규화한다.
+function output = NormalizeThrottle(input, deadband)
+
+input = min(max(input, -1000), 1000);
+
+if abs(input) <= deadband
+    output = 0;
+else
+    output = sign(input)*(abs(input)-deadband)/(1000-deadband);
+end
+
+end
+
+
+% -1000~1000 스틱 입력을 -1~1로 정규화한다.
+function output = NormalizeCenteredStick(input, deadband)
+
+input = min(max(input, -1000), 1000);
+
+if abs(input) <= deadband
+    output = 0;
+else
+    output = sign(input)*(abs(input)-deadband)/(1000-deadband);
+end
+
+end
+
+
+% 각도를 -pi~pi 범위로 제한한다.
+function angle = WrapPi(angle)
+
+angle = mod(angle + pi, 2*pi) - pi;
+
+end
+
+% 여섯 다리의 기본 발 위치를 생성한다.
+function [xB_1, yB_1, zB_1, ...
+          xB_2, yB_2, zB_2, ...
+          xB_3, yB_3, zB_3, ...
+          xB_4, yB_4, zB_4, ...
+          xB_5, yB_5, zB_5, ...
+          xB_6, yB_6, zB_6] = BaseFootPosition()
+
+d  = 0.1845;
+dd = d/sqrt(2);
+
+L1 = 0.074;
+L2 = 0.121;
+L3 = 0.230;
+
+q2_init = 30*pi/180;
+q3_init = 50*pi/180;
+
+xL0 = L1 + L2*cos(q2_init) ...
+    + L3*cos(q2_init + q3_init);
+
+zL0 = -L2*sin(q2_init) ...
+    - L3*sin(q2_init + q3_init);
+
+c45 = cos(pi/4);
+
+xB_1 =  dd + c45*xL0;
+yB_1 = -dd - c45*xL0;
+zB_1 =  zL0;
+
+xB_2 = 0;
+yB_2 = -d - xL0;
+zB_2 = zL0;
+
+xB_3 = -dd - c45*xL0;
+yB_3 = -dd - c45*xL0;
+zB_3 = zL0;
+
+xB_4 = dd + c45*xL0;
+yB_4 = dd + c45*xL0;
+zB_4 = zL0;
+
+xB_5 = 0;
+yB_5 = d + xL0;
+zB_5 = zL0;
+
+xB_6 = -dd - c45*xL0;
+yB_6 =  dd + c45*xL0;
+zB_6 = zL0;
+
+end
+% 무미끄럼 지면에서 가능한 다단계 서기·착지 발 궤적을 생성한다.
+function [dxB_1, dyB_1, dzB_1, ...
+          dxB_2, dyB_2, dzB_2, ...
+          dxB_3, dyB_3, dzB_3, ...
+          dxB_4, dyB_4, dzB_4, ...
+          dxB_5, dyB_5, dzB_5, ...
+          dxB_6, dyB_6, dzB_6] = ...
+    StandLandingFootDelta( ...
+        Stand_Enable, Landing_Enable, Posture_Progress)
+
+L1 = 0.074;
+L2 = 0.121;
+L3 = 0.230;
+
+q2_init = 30*pi/180;
+q3_init = 50*pi/180;
+q3_mid  = 100*pi/180;
+
+Foot_Lift           = 0.06;
+Partial_Body_Height = 0.20;
+
+xL_nominal = L1 + L2*cos(q2_init) ...
+           + L3*cos(q2_init + q3_init);
+zL_nominal = -L2*sin(q2_init) ...
+           - L3*sin(q2_init + q3_init);
+
+xL_landed = L1 + L2 + L3;
+zL_landed = 0;
+
+u_mid  = sqrt(L2^2 + L3^2 + 2*L2*L3*cos(q3_mid));
+xL_mid = L1 + u_mid;
+zL_mid = -Partial_Body_Height;
+
+p = min(max(Posture_Progress, 0), 1);
+
+% 1·3·5번 다리를 착지점에서 중간점으로 옮긴다.
+s135_first = QuinticInterval(p, 0, 1/7);
+
+% 2·4·6번 다리를 착지점에서 중간점으로 옮긴다.
+s246_first = QuinticInterval(p, 1/7, 2/7);
+
+% 여섯 발을 고정한 채 몸체를 1차 상승시킨다.
+s_raise_first = QuinticInterval(p, 2/7, 3.5/7);
+
+% 1·3·5번 다리를 중간점에서 기본점으로 옮긴다.
+s135_second = QuinticInterval(p, 3.5/7, 4.5/7);
+
+% 2·4·6번 다리를 중간점에서 기본점으로 옮긴다.
+s246_second = QuinticInterval(p, 4.5/7, 5.5/7);
+
+% 여섯 발을 고정한 채 몸체를 최종 높이까지 올린다.
+s_raise_second = QuinticInterval(p, 5.5/7, 1);
+
+radial_135 = xL_landed ...
+           + s135_first*(xL_mid - xL_landed) ...
+           + s135_second*(xL_nominal - xL_mid);
+
+radial_246 = xL_landed ...
+           + s246_first*(xL_mid - xL_landed) ...
+           + s246_second*(xL_nominal - xL_mid);
+
+support_z = zL_landed ...
+          + s_raise_first*(zL_mid - zL_landed) ...
+          + s_raise_second*(zL_nominal - zL_mid);
+
+lift_135 = Foot_Lift*( ...
+    4*s135_first*(1-s135_first) ...
+  + 4*s135_second*(1-s135_second));
+
+lift_246 = Foot_Lift*( ...
+    4*s246_first*(1-s246_first) ...
+  + 4*s246_second*(1-s246_second));
+
+active = Stand_Enable ~= 0 || Landing_Enable ~= 0;
+
+if active
+    radial_delta_135   = radial_135 - xL_nominal;
+    radial_delta_246   = radial_246 - xL_nominal;
+    vertical_delta_135 = support_z + lift_135 - zL_nominal;
+    vertical_delta_246 = support_z + lift_246 - zL_nominal;
+else
+    radial_delta_135   = 0;
+    radial_delta_246   = 0;
+    vertical_delta_135 = 0;
+    vertical_delta_246 = 0;
+end
+
+alpha_1 = -pi/4;
+alpha_2 = -pi/2;
+alpha_3 = -3*pi/4;
+alpha_4 =  pi/4;
+alpha_5 =  pi/2;
+alpha_6 =  3*pi/4;
+
+[dxB_1, dyB_1, dzB_1] = LegDelta( ...
+    radial_delta_135, vertical_delta_135, alpha_1);
+
+[dxB_2, dyB_2, dzB_2] = LegDelta( ...
+    radial_delta_246, vertical_delta_246, alpha_2);
+
+[dxB_3, dyB_3, dzB_3] = LegDelta( ...
+    radial_delta_135, vertical_delta_135, alpha_3);
+
+[dxB_4, dyB_4, dzB_4] = LegDelta( ...
+    radial_delta_246, vertical_delta_246, alpha_4);
+
+[dxB_5, dyB_5, dzB_5] = LegDelta( ...
+    radial_delta_135, vertical_delta_135, alpha_5);
+
+[dxB_6, dyB_6, dzB_6] = LegDelta( ...
+    radial_delta_246, vertical_delta_246, alpha_6);
+
+end
+
+
+% 지정 구간의 진행률에 Quintic Time Scaling을 적용한다.
+function output = QuinticInterval(input, start_value, end_value)
+
+progress = (input - start_value)/(end_value - start_value);
+progress = min(max(progress, 0), 1);
+output = 10*progress^3 - 15*progress^4 + 6*progress^5;
+
+end
+
+
+% 다리 방사 방향 변화량을 Body 좌표 변화량으로 변환한다.
+function [dx, dy, dz] = LegDelta(radial_delta, vertical_delta, alpha)
+
+dx = radial_delta*cos(alpha);
+dy = radial_delta*sin(alpha);
+dz = vertical_delta;
+
+end
+
+function [vx_cmd, vy_cmd, vz_cmd, wz_cmd, ...
+          X_Reference, Y_Reference, ...
+          Vx_Feedback_W, Vy_Feedback_W, ...
+          Wz_Feedback] = GaitPosePI( ...
+          Reset_Command, Manual_Enable, Correction_Enable, ...
+          vx_user, wz_user, Yaw_Reference, ...
+          Correction_Vx, Correction_Vy, Correction_Vz, ...
+          Body_X_Est, Body_Y_Est, Valid_Leg_Count, ...
+          Yaw_Meas)
+
+Sampling_Time = 0.005;
+
+% 초기에는 P 제어만 사용한다.
+Kp_Position = 1.0;
+Ki_Position = 0.0;
+
+Kp_Yaw = 2.0;
+Ki_Yaw = 0.0;
+
+Position_Feedback_Max = 0.05;
+Yaw_Feedback_Max      = 15*pi/180;
+
+Vx_Command_Max = 0.28;
+Vy_Command_Max = 0.28;
+Vz_Command_Max = 0.05;
+Wz_Command_Max = 45*pi/180;
+
+Linear_Acceleration_Max = 0.5;
+Yaw_Acceleration_Max    = 90*pi/180;
+
+Linear_Command_Step_Max = Linear_Acceleration_Max*Sampling_Time;
+Yaw_Command_Step_Max    = Yaw_Acceleration_Max*Sampling_Time;
+
+Integral_Limit_Position = 0.20;
+Integral_Limit_Yaw      = 0.50;
+
+persistent Initialized
+persistent X_Reference_Memory Y_Reference_Memory
+persistent X_Integral Y_Integral Yaw_Integral
+persistent Previous_Manual_Enable
+persistent Vx_Command_Memory Vy_Command_Memory
+persistent Vz_Command_Memory Wz_Command_Memory
+
+if isempty(Initialized)
+    Initialized            = true;
+    X_Reference_Memory     = 0;
+    Y_Reference_Memory     = 0;
+    X_Integral             = 0;
+    Y_Integral             = 0;
+    Yaw_Integral           = 0;
+    Previous_Manual_Enable = false;
+    Vx_Command_Memory      = 0;
+    Vy_Command_Memory      = 0;
+    Vz_Command_Memory      = 0;
+    Wz_Command_Memory      = 0;
+end
+
+manual_enable     = Manual_Enable ~= 0;
+correction_enable = Correction_Enable ~= 0;
+reset_command     = Reset_Command ~= 0;
+position_valid    = Valid_Leg_Count > 0;
+
+vx_cmd = 0;
+vy_cmd = 0;
+vz_cmd = 0;
+wz_cmd = 0;
+
+Vx_Feedback_W = 0;
+Vy_Feedback_W = 0;
+Wz_Feedback   = 0;
+
+% Reset 또는 조종 모드 진입 시 현재 위치에서 Reference를 시작한다.
+if reset_command || ...
+        (manual_enable && ~Previous_Manual_Enable)
+
+    X_Reference_Memory = Body_X_Est;
+    Y_Reference_Memory = Body_Y_Est;
+
+    X_Integral   = 0;
+    Y_Integral   = 0;
+    Yaw_Integral = 0;
+end
+
+if manual_enable
+    vy_user = Correction_Vy;
+
+    if position_valid
+        % 사용자가 명령한 속도로 목표 위치를 갱신한다.% 사용자 속도를 절대좌표계 위치 목표로 적분한다.
+        X_Reference_Memory = X_Reference_Memory ...
+            + (cos(Yaw_Reference)*vx_user ...
+            -  sin(Yaw_Reference)*vy_user)*Sampling_Time;
+
+        Y_Reference_Memory = Y_Reference_Memory ...
+            + (sin(Yaw_Reference)*vx_user ...
+            +  cos(Yaw_Reference)*vy_user)*Sampling_Time;
+
+        error_x = X_Reference_Memory - Body_X_Est;
+        error_y = Y_Reference_Memory - Body_Y_Est;
+
+        X_Integral = Clamp( ...
+            X_Integral + error_x*Sampling_Time, ...
+            -Integral_Limit_Position, Integral_Limit_Position);
+
+        Y_Integral = Clamp( ...
+            Y_Integral + error_y*Sampling_Time, ...
+            -Integral_Limit_Position, Integral_Limit_Position);
+
+        Vx_Feedback_W = Clamp( ...
+            Kp_Position*error_x + Ki_Position*X_Integral, ...
+            -Position_Feedback_Max, Position_Feedback_Max);
+
+        Vy_Feedback_W = Clamp( ...
+            Kp_Position*error_y + Ki_Position*Y_Integral, ...
+            -Position_Feedback_Max, Position_Feedback_Max);
+    else
+        % 추정값이 없으면 Position PI를 정지한다.
+        X_Reference_Memory = Body_X_Est;
+        Y_Reference_Memory = Body_Y_Est;
+
+        X_Integral = 0;
+        Y_Integral = 0;
+    end
+
+    % 절대좌표계 Feedback을 몸체 좌표계로 변환한다.
+    c_yaw = cos(Yaw_Meas);
+    s_yaw = sin(Yaw_Meas);
+
+    vx_feedback_body = ...
+        c_yaw*Vx_Feedback_W + s_yaw*Vy_Feedback_W;
+
+    vy_feedback_body = ...
+       -s_yaw*Vx_Feedback_W + c_yaw*Vy_Feedback_W;
+
+    % IMU Yaw로 Heading 오차를 계산한다.
+    yaw_error = WrapPi(Yaw_Reference - Yaw_Meas);
+
+    Yaw_Integral = Clamp( ...
+        Yaw_Integral + yaw_error*Sampling_Time, ...
+        -Integral_Limit_Yaw, Integral_Limit_Yaw);
+
+    Wz_Feedback = Clamp( ...
+        Kp_Yaw*yaw_error + Ki_Yaw*Yaw_Integral, ...
+        -Yaw_Feedback_Max, Yaw_Feedback_Max);
+
+    vx_cmd = Clamp( ...
+        vx_user + vx_feedback_body, ...
+        -Vx_Command_Max, Vx_Command_Max);
+
+    vy_cmd = Clamp( ...
+        vy_user + vy_feedback_body, ...
+        -Vy_Command_Max, Vy_Command_Max);
+
+    vz_cmd = 0;
+
+    wz_cmd = Clamp( ...
+        wz_user + Wz_Feedback, ...
+        -Wz_Command_Max, Wz_Command_Max);
+
+elseif correction_enable
+    % 보정 모드의 병진속도에는 PI를 적용하지 않는다.
+    vx_cmd = Clamp( ...
+        Correction_Vx, -Vx_Command_Max, Vx_Command_Max);
+
+    vy_cmd = Clamp( ...
+        Correction_Vy, -Vy_Command_Max, Vy_Command_Max);
+
+    vz_cmd = Clamp( ...
+        Correction_Vz, -Vz_Command_Max, Vz_Command_Max);
+
+    % 보정 모드 Yaw는 자세 오버레이에서 처리한다.
+    wz_cmd = 0;
+
+    X_Integral   = 0;
+    Y_Integral   = 0;
+    Yaw_Integral = 0;
+
+else
+    X_Reference_Memory = Body_X_Est;
+    Y_Reference_Memory = Body_Y_Est;
+
+    X_Integral   = 0;
+    Y_Integral   = 0;
+    Yaw_Integral = 0;
+end
+
+% 활성 조종 모드에서는 최종 속도 명령의 변화율을 제한한다.
+if manual_enable || correction_enable
+    vx_cmd = RateLimit( ...
+        vx_cmd, Vx_Command_Memory, Linear_Command_Step_Max);
+    vy_cmd = RateLimit( ...
+        vy_cmd, Vy_Command_Memory, Linear_Command_Step_Max);
+    vz_cmd = RateLimit( ...
+        vz_cmd, Vz_Command_Memory, Linear_Command_Step_Max);
+    wz_cmd = RateLimit( ...
+        wz_cmd, Wz_Command_Memory, Yaw_Command_Step_Max);
+
+    Vx_Command_Memory = vx_cmd;
+    Vy_Command_Memory = vy_cmd;
+    Vz_Command_Memory = vz_cmd;
+    Wz_Command_Memory = wz_cmd;
+
+% 비활성, 착지, 서기 상태에서는 이동 명령을 즉시 차단한다.
+else
+    vx_cmd = 0;
+    vy_cmd = 0;
+    vz_cmd = 0;
+    wz_cmd = 0;
+
+    Vx_Command_Memory = 0;
+    Vy_Command_Memory = 0;
+    Vz_Command_Memory = 0;
+    Wz_Command_Memory = 0;
+end
+
+X_Reference = X_Reference_Memory;
+Y_Reference = Y_Reference_Memory;
+
+Previous_Manual_Enable = manual_enable;
+
+end
+
+
+% 이전 출력에서 허용된 최대 변화량만 적용한다.
+function output = RateLimit(target, previous, maximum_step)
+
+delta = Clamp(target - previous, -maximum_step, maximum_step);
+output = previous + delta;
+
+end
+
+
+function output = Clamp(input, minimum, maximum)
+
+output = min(max(input, minimum), maximum);
+
+end
+
+
+function angle = WrapPi(angle)
+
+angle = mod(angle + pi, 2*pi) - pi;
+
+end
+
+function [xo1, yo1, zo1, ...
+          xo2, yo2, zo2, ...
+          xo3, yo3, zo3, ...
+          xo4, yo4, zo4, ...
+          xo5, yo5, zo5, ...
+          xo6, yo6, zo6, ...
+          Roll_Posture_Command, ...
+          Pitch_Posture_Command, ...
+          Yaw_Posture_Command, ...
+          Posture_Command_Accepted] = BodyPosturePIOverlay( ...
+          x1, y1, z1, ...
+          x2, y2, z2, ...
+          x3, y3, z3, ...
+          x4, y4, z4, ...
+          x5, y5, z5, ...
+          x6, y6, z6, ...
+          Posture_Enable, Manual_Enable, Correction_Enable, ...
+          Roll_Reference, Pitch_Reference, ...
+          Correction_Yaw_Reference, ...
+          Roll_Meas, Pitch_Meas, Yaw_Meas, ...
+          Reset_Command)
+% 자세 PI와 작업공간 제한을 적용한다.
+
+Sampling_Time = 0.005;                % 제어 주기를 설정한다.
+
+Kp_Roll  = 2.0;                       % 자세 P 게인을 설정한다.
+Kp_Pitch = 2.0;
+Kp_Yaw   = 2.0;
+
+Ki_Roll  = 0.0;                       % 자세 I 게인을 설정한다.
+Ki_Pitch = 0.0;
+Ki_Yaw   = 0.0;
+
+Roll_Rate_Max  = 15*pi/180;           % 자세 명령 각속도를 제한한다.
+Pitch_Rate_Max = 15*pi/180;
+Yaw_Rate_Max   = 15*pi/180;
+
+Roll_Limit  = 45*pi/180;              % 자세 명령각을 제한한다.
+Pitch_Limit = 45*pi/180;
+Yaw_Limit   = 10*pi/180;
+
+Integral_Limit = 0.50;                % PI 적분 상태를 제한한다.
+
+persistent Initialized
+persistent Roll_Command Pitch_Command Yaw_Command
+persistent Roll_Integral Pitch_Integral Yaw_Integral
+persistent Correction_Yaw_Base
+persistent Previous_Manual Previous_Correction
+
+if isempty(Initialized)
+    Initialized         = true;
+    Roll_Command        = 0;
+    Pitch_Command       = 0;
+    Yaw_Command         = 0;
+    Roll_Integral       = 0;
+    Pitch_Integral      = 0;
+    Yaw_Integral        = 0;
+    Correction_Yaw_Base = 0;
+    Previous_Manual     = false;
+    Previous_Correction = false;
+end
+
+posture_enable    = Posture_Enable ~= 0;
+manual_enable     = Manual_Enable ~= 0;
+correction_enable = Correction_Enable ~= 0;
+reset_command     = Reset_Command ~= 0;
+
+Posture_Command_Accepted = 1.0;       % 기본적으로 자세 후보를 채택한다.
+
+if reset_command || ~posture_enable
+    Roll_Command  = 0;
+    Pitch_Command = 0;
+    Yaw_Command   = 0;
+
+    Roll_Integral  = 0;
+    Pitch_Integral = 0;
+    Yaw_Integral   = 0;
+
+    Correction_Yaw_Base = Yaw_Meas;
+
+elseif manual_enable
+    if ~Previous_Manual
+        Roll_Integral  = 0;
+        Pitch_Integral = 0;
+        Yaw_Integral   = 0;
+    end
+
+    roll_error  = WrapPi(Roll_Reference-Roll_Meas);
+    pitch_error = WrapPi(Pitch_Reference-Pitch_Meas);
+
+    Roll_Integral_Candidate = Clamp( ...
+        Roll_Integral+roll_error*Sampling_Time, ...
+        -Integral_Limit, Integral_Limit);
+
+    Pitch_Integral_Candidate = Clamp( ...
+        Pitch_Integral+pitch_error*Sampling_Time, ...
+        -Integral_Limit, Integral_Limit);
+
+    roll_rate = Clamp( ...
+        Kp_Roll*roll_error+Ki_Roll*Roll_Integral_Candidate, ...
+        -Roll_Rate_Max, Roll_Rate_Max);
+
+    pitch_rate = Clamp( ...
+        Kp_Pitch*pitch_error+Ki_Pitch*Pitch_Integral_Candidate, ...
+        -Pitch_Rate_Max, Pitch_Rate_Max);
+
+    Roll_Candidate = Clamp( ...
+        Roll_Command+roll_rate*Sampling_Time, ...
+        -Roll_Limit, Roll_Limit);
+
+    Pitch_Candidate = Clamp( ...
+        Pitch_Command+pitch_rate*Sampling_Time, ...
+        -Pitch_Limit, Pitch_Limit);
+
+    Yaw_Candidate = MoveToward( ...
+        Yaw_Command, 0, Yaw_Rate_Max*Sampling_Time);
+
+    candidate_valid = AllBodyFeetValid( ...
+        x1, y1, z1, x2, y2, z2, x3, y3, z3, ...
+        x4, y4, z4, x5, y5, z5, x6, y6, z6, ...
+        Roll_Candidate, Pitch_Candidate, Yaw_Candidate);
+
+    if candidate_valid
+        Roll_Command  = Roll_Candidate;
+        Pitch_Command = Pitch_Candidate;
+        Yaw_Command   = Yaw_Candidate;
+
+        Roll_Integral  = Roll_Integral_Candidate;
+        Pitch_Integral = Pitch_Integral_Candidate;
+    else
+        Posture_Command_Accepted = 0.0;
+    end
+
+    Yaw_Integral = 0;
+
+elseif correction_enable
+    if ~Previous_Correction
+        Correction_Yaw_Base = Yaw_Meas;
+
+        Roll_Integral  = 0;
+        Pitch_Integral = 0;
+        Yaw_Integral   = 0;
+    end
+
+    yaw_target = WrapPi( ...
+        Correction_Yaw_Base+Correction_Yaw_Reference);
+
+    yaw_error = WrapPi(yaw_target-Yaw_Meas);
+
+    Yaw_Integral_Candidate = Clamp( ...
+        Yaw_Integral+yaw_error*Sampling_Time, ...
+        -Integral_Limit, Integral_Limit);
+
+    yaw_rate = Clamp( ...
+        Kp_Yaw*yaw_error+Ki_Yaw*Yaw_Integral_Candidate, ...
+        -Yaw_Rate_Max, Yaw_Rate_Max);
+
+    Yaw_Candidate = Clamp( ...
+        Yaw_Command+yaw_rate*Sampling_Time, ...
+        -Yaw_Limit, Yaw_Limit);
+
+    Roll_Candidate = MoveToward( ...
+        Roll_Command, 0, Roll_Rate_Max*Sampling_Time);
+
+    Pitch_Candidate = MoveToward( ...
+        Pitch_Command, 0, Pitch_Rate_Max*Sampling_Time);
+
+    candidate_valid = AllBodyFeetValid( ...
+        x1, y1, z1, x2, y2, z2, x3, y3, z3, ...
+        x4, y4, z4, x5, y5, z5, x6, y6, z6, ...
+        Roll_Candidate, Pitch_Candidate, Yaw_Candidate);
+
+    if candidate_valid
+        Roll_Command  = Roll_Candidate;
+        Pitch_Command = Pitch_Candidate;
+        Yaw_Command   = Yaw_Candidate;
+        Yaw_Integral  = Yaw_Integral_Candidate;
+    else
+        Posture_Command_Accepted = 0.0;
+    end
+
+    Roll_Integral  = 0;
+    Pitch_Integral = 0;
+end
+
+[xo1, yo1, zo1] = RotateInverse( ...
+    x1, y1, z1, Roll_Command, Pitch_Command, Yaw_Command);
+
+[xo2, yo2, zo2] = RotateInverse( ...
+    x2, y2, z2, Roll_Command, Pitch_Command, Yaw_Command);
+
+[xo3, yo3, zo3] = RotateInverse( ...
+    x3, y3, z3, Roll_Command, Pitch_Command, Yaw_Command);
+
+[xo4, yo4, zo4] = RotateInverse( ...
+    x4, y4, z4, Roll_Command, Pitch_Command, Yaw_Command);
+
+[xo5, yo5, zo5] = RotateInverse( ...
+    x5, y5, z5, Roll_Command, Pitch_Command, Yaw_Command);
+
+[xo6, yo6, zo6] = RotateInverse( ...
+    x6, y6, z6, Roll_Command, Pitch_Command, Yaw_Command);
+
+Roll_Posture_Command  = Roll_Command;
+Pitch_Posture_Command = Pitch_Command;
+Yaw_Posture_Command   = Yaw_Command;
+
+Previous_Manual     = manual_enable;
+Previous_Correction = correction_enable;
+
+end
+
+
+% 6개 발의 자세 후보를 검사한다.
+function valid = AllBodyFeetValid( ...
+    x1, y1, z1, x2, y2, z2, x3, y3, z3, ...
+    x4, y4, z4, x5, y5, z5, x6, y6, z6, ...
+    roll, pitch, yaw)
+
+valid1 = BodyFootValid(x1, y1, z1, roll, pitch, yaw, 1);
+valid2 = BodyFootValid(x2, y2, z2, roll, pitch, yaw, 2);
+valid3 = BodyFootValid(x3, y3, z3, roll, pitch, yaw, 3);
+valid4 = BodyFootValid(x4, y4, z4, roll, pitch, yaw, 4);
+valid5 = BodyFootValid(x5, y5, z5, roll, pitch, yaw, 5);
+valid6 = BodyFootValid(x6, y6, z6, roll, pitch, yaw, 6);
+
+valid = valid1 && valid2 && valid3 ...
+     && valid4 && valid5 && valid6;
+
+end
+
+
+% 몸체 좌표의 발을 해당 다리 좌표로 변환한다.
+function valid = BodyFootValid( ...
+    xB, yB, zB, roll, pitch, yaw, leg_id)
+
+[xR, yR, zR] = RotateInverse( ...
+    xB, yB, zB, roll, pitch, yaw);
+
+d  = 0.1845;
+dd = d/sqrt(2);
+
+if leg_id == 1
+    ox = dd;  oy = -dd; alpha = -pi/4;
+elseif leg_id == 2
+    ox = 0;   oy = -d;  alpha = -pi/2;
+elseif leg_id == 3
+    ox = -dd; oy = -dd; alpha = -3*pi/4;
+elseif leg_id == 4
+    ox = dd;  oy = dd;  alpha = pi/4;
+elseif leg_id == 5
+    ox = 0;   oy = d;   alpha = pi/2;
+else
+    ox = -dd; oy = dd;  alpha = 3*pi/4;
+end
+
+dx = xR-ox;
+dy = yR-oy;
+
+xL =  dx*cos(alpha)+dy*sin(alpha);
+yL = -dx*sin(alpha)+dy*cos(alpha);
+zL = zR;
+
+valid = LegPointValid(xL, yL, zL);
+
+end
+
+
+% 다리 로컬 발 위치의 IK 유효성을 검사한다.
+function valid = LegPointValid(x, y, z)
+
+L1 = 0.074;
+L2 = 0.121;
+L3 = 0.230;
+
+Workspace_Margin = 0.0001;
+Joint_Limit      = 135*pi/180;
+
+valid = false;
+
+if ~isfinite(x) || ~isfinite(y) || ~isfinite(z)
+    return
+end
+
+r_xy = sqrt(x*x+y*y);
+u    = r_xy-L1;
+rho  = sqrt(u*u+z*z);
+
+rho_min = abs(L2-L3)+Workspace_Margin;
+rho_max = L2+L3-Workspace_Margin;
+
+if rho < rho_min || rho > rho_max
+    return
+end
+
+c3 = (u*u+z*z-L2*L2-L3*L3)/(2*L2*L3);
+
+if c3 < -1 || c3 > 1
+    return
+end
+
+s3 = sqrt(max(0, 1-c3*c3));
+
+q1 = atan2(y, x);
+q3 = atan2(s3, c3);
+q2 = atan2(-z, u)-atan2(L3*s3, L2+L3*c3);
+
+valid = isfinite(q1) ...
+     && isfinite(q2) ...
+     && isfinite(q3) ...
+     && abs(q1) <= Joint_Limit ...
+     && abs(q2) <= Joint_Limit ...
+     && abs(q3) <= Joint_Limit;
+
+end
+
+
+% 몸체 자세의 역회전을 적용한다.
+function [xo, yo, zo] = RotateInverse( ...
+    x, y, z, roll, pitch, yaw)
+
+cr = cos(roll);
+sr = sin(roll);
+cp = cos(pitch);
+sp = sin(pitch);
+cy = cos(yaw);
+sy = sin(yaw);
+
+r11 = cy*cp;
+r12 = cy*sp*sr-sy*cr;
+r13 = cy*sp*cr+sy*sr;
+
+r21 = sy*cp;
+r22 = sy*sp*sr+cy*cr;
+r23 = sy*sp*cr-cy*sr;
+
+r31 = -sp;
+r32 = cp*sr;
+r33 = cp*cr;
+
+xo = r11*x+r21*y+r31*z;
+yo = r12*x+r22*y+r32*z;
+zo = r13*x+r23*y+r33*z;
+
+end
+
+
+% 현재값을 목표값으로 제한 이동한다.
+function output = MoveToward(current, target, maximum_step)
+
+difference = target-current;
+difference = min(max( ...
+    difference, -maximum_step), maximum_step);
+
+output = current+difference;
+
+end
+
+
+% 값을 범위 안으로 제한한다.
+function output = Clamp(input, minimum, maximum)
+
+output = min(max(input, minimum), maximum);
+
+end
+
+
+% 각도를 -pi부터 pi 범위로 변환한다.
+function angle = WrapPi(angle)
+
+angle = mod(angle+pi, 2*pi)-pi;
+
+end
+function [Roll_Meas, Pitch_Meas, Yaw_Meas] = VirtualIMU( ...
+    Wz_Gait_Delayed, ...
+    Roll_Posture_Delayed, ...
+    Pitch_Posture_Delayed, ...
+    Yaw_Posture_Delayed, ...
+    Reset_Command)
+
+Sampling_Time = 0.005;
+
+persistent Initialized Yaw_Gait_Memory
+
+if isempty(Initialized)
+    Initialized     = true;
+    Yaw_Gait_Memory = 0;
+end
+
+if Reset_Command ~= 0
+    Yaw_Gait_Memory = 0;
+else
+    Yaw_Gait_Memory = WrapPi( ...
+        Yaw_Gait_Memory + Wz_Gait_Delayed*Sampling_Time);
+end
+
+Roll_Meas  = Roll_Posture_Delayed;
+Pitch_Meas = Pitch_Posture_Delayed;
+
+Yaw_Meas = WrapPi( ...
+    Yaw_Gait_Memory + Yaw_Posture_Delayed);
+
+end
+
+
+function angle = WrapPi(angle)
+
+angle = mod(angle + pi, 2*pi) - pi;
+
+end
+function [Rollover_Fault, Controller_Fault] = ...
+    SafetyEvaluator(Roll_Meas, Pitch_Meas, ...
+                    IK_Valid1, IK_Valid2, IK_Valid3, ...
+                    IK_Valid4, IK_Valid5, IK_Valid6)
+% 자세와 IK 이상을 검출하여 Fault를 영구 유지한다.
+
+Rollover_Limit = 80*pi/180;                  % 전복 판단각을 설정한다.
+
+persistent Initialized
+persistent Rollover_Latched
+persistent Controller_Latched
+
+if isempty(Initialized)
+    Initialized = true;
+    Rollover_Latched = false;
+    Controller_Latched = false;
+end
+
+IMU_Invalid = ...
+    ~isfinite(Roll_Meas) || ...
+    ~isfinite(Pitch_Meas);                   % 자세 데이터 오류를 검사한다.
+
+Rollover_Now = ...
+    ~IMU_Invalid && ...
+    (abs(Roll_Meas) >= Rollover_Limit || ...
+     abs(Pitch_Meas) >= Rollover_Limit);     % 전복 조건을 검사한다.
+
+IK_Invalid = ...
+    IK_Valid1 == 0 || ...
+    IK_Valid2 == 0 || ...
+    IK_Valid3 == 0 || ...
+    IK_Valid4 == 0 || ...
+    IK_Valid5 == 0 || ...
+    IK_Valid6 == 0;                          % 전체 IK 상태를 검사한다.
+
+Controller_Now = ...
+    IMU_Invalid || IK_Invalid;               % 제어기 이상을 통합한다.
+
+if Rollover_Now
+    Rollover_Latched = true;                 % 전복 Fault를 영구 유지한다.
+end
+
+if Controller_Now
+    Controller_Latched = true;               % 제어기 Fault를 영구 유지한다.
+end
+
+Rollover_Fault = double(Rollover_Latched);   % Priority Manager로 전달한다.
+Controller_Fault = double(Controller_Latched);
+end
+function [vx_applied, vy_applied, vz_applied, wz_applied, ... 
+          Gait_Command_Accepted] = GaitWorkspaceGuard( ... 
+          vx_cmd, vy_cmd, vz_cmd, wz_cmd, ... 
+          Manual_Enable, ... 
+          Roll_Posture_Delayed, ... 
+          Pitch_Posture_Delayed, ... 
+          Yaw_Posture_Delayed, ... 
+          Reset_Command) 
+% 보행 명령으로 생성되는 한 주기의 발 궤적을 검사한다. 
+ 
+persistent Vx_Applied Vy_Applied Vz_Applied Wz_Applied 
+ 
+if isempty(Vx_Applied) 
+    Vx_Applied = 0; 
+    Vy_Applied = 0; 
+    Vz_Applied = 0; 
+    Wz_Applied = 0; 
+end 
+ 
+manual_enable = Manual_Enable ~= 0; 
+reset_command = Reset_Command ~= 0; 
+ 
+Gait_Command_Accepted = 1.0; 
+ 
+if reset_command 
+    Vx_Applied = 0; 
+    Vy_Applied = 0; 
+    Vz_Applied = 0; 
+    Wz_Applied = 0; 
+ 
+elseif manual_enable 
+    candidate_valid = PreviewGaitValid( ... 
+        vx_cmd, vy_cmd, vz_cmd, wz_cmd, ... 
+        Roll_Posture_Delayed, ... 
+        Pitch_Posture_Delayed, ... 
+        Yaw_Posture_Delayed); 
+ 
+    if candidate_valid 
+        Vx_Applied = vx_cmd; 
+        Vy_Applied = vy_cmd; 
+        Vz_Applied = vz_cmd; 
+        Wz_Applied = wz_cmd; 
+    else 
+        Gait_Command_Accepted = 0.0; 
+    end 
+ 
+else 
+    % 보정 모드 명령은 다음 블록에서 별도로 검사한다. 
+    Vx_Applied = vx_cmd; 
+    Vy_Applied = vy_cmd; 
+    Vz_Applied = vz_cmd; 
+    Wz_Applied = wz_cmd; 
+end 
+ 
+vx_applied = Vx_Applied; 
+vy_applied = Vy_Applied; 
+vz_applied = Vz_Applied; 
+wz_applied = Wz_Applied; 
+ 
+end 
+ 
+ 
+% 명령된 보행의 Stance와 Swing 전체를 검사한다. 
+function valid = PreviewGaitValid( ... 
+    vx, vy, vz, wz, roll, pitch, yaw) 
+ 
+Phase_Time    = 0.5; 
+Swing_Height  = 0.20; 
+Radial_Offset = 0.07; 
+ 
+valid = true; 
+ 
+for leg_id = 1:6 
+    [x0, y0, z0, alpha] = BaseFootData(leg_id); 
+ 
+    dx = Phase_Time*(-vx+wz*y0); 
+    dy = Phase_Time*(-vy-wz*x0); 
+    dz = Phase_Time*(-vz); 
+ 
+    x_front = x0-0.5*dx; 
+    y_front = y0-0.5*dy; 
+    z_front = z0-0.5*dz; 
+ 
+    x_rear = x0+0.5*dx; 
+    y_rear = y0+0.5*dy; 
+    z_rear = z0+0.5*dz; 
+ 
+    for sample_index = 0:20 
+        progress = sample_index/20; 
+ 
+        x_stance = x_front+progress*(x_rear-x_front); 
+        y_stance = y_front+progress*(y_rear-y_front); 
+        z_stance = z_front+progress*(z_rear-z_front); 
+ 
+        [x_swing, y_swing, z_swing] = SwingPoint( ... 
+            progress, ... 
+            x_rear, y_rear, z_rear, ... 
+            x_front, y_front, z_front, ... 
+            Swing_Height, Radial_Offset, alpha); 
+ 
+        stance_valid = BodyFootValid( ... 
+            x_stance, y_stance, z_stance, ... 
+            roll, pitch, yaw, leg_id); 
+ 
+        swing_valid = BodyFootValid( ... 
+            x_swing, y_swing, z_swing, ... 
+            roll, pitch, yaw, leg_id); 
+ 
+        if ~stance_valid || ~swing_valid 
+            valid = false; 
+            return 
+        end 
+    end 
+end 
+ 
+end 
+ 
+ 
+% 다리별 기본 발 위치와 장착각을 반환한다. 
+function [x0, y0, z0, alpha] = BaseFootData(leg_id) 
+ 
+d  = 0.1845; 
+dd = d/sqrt(2); 
+ 
+L1 = 0.074; 
+L2 = 0.121; 
+L3 = 0.230; 
+ 
+q2 = 30*pi/180; 
+q3 = 50*pi/180; 
+ 
+xL0 = L1+L2*cos(q2)+L3*cos(q2+q3); 
+zL0 = -L2*sin(q2)-L3*sin(q2+q3); 
+ 
+c45 = cos(pi/4); 
+ 
+if leg_id == 1 
+    x0 = dd+c45*xL0; 
+    y0 = -dd-c45*xL0; 
+    alpha = -pi/4; 
+ 
+elseif leg_id == 2 
+    x0 = 0; 
+    y0 = -d-xL0; 
+    alpha = -pi/2; 
+ 
+elseif leg_id == 3 
+    x0 = -dd-c45*xL0; 
+    y0 = -dd-c45*xL0; 
+    alpha = -3*pi/4; 
+ 
+elseif leg_id == 4 
+    x0 = dd+c45*xL0; 
+    y0 = dd+c45*xL0; 
+    alpha = pi/4; 
+ 
+elseif leg_id == 5 
+    x0 = 0; 
+    y0 = d+xL0; 
+    alpha = pi/2; 
+ 
+else 
+    x0 = -dd-c45*xL0; 
+    y0 = dd+c45*xL0; 
+    alpha = 3*pi/4; 
+end 
+ 
+z0 = zL0; 
+ 
+end 
+ 
+ 
+% Swing 궤적의 한 점을 계산한다. 
+function [x, y, z] = SwingPoint( ... 
+    progress, ... 
+    x_start, y_start, z_start, ... 
+    x_end, y_end, z_end, ... 
+    height, radial_offset, leg_angle) 
+ 
+s = 10*progress^3-15*progress^4+6*progress^5; 
+ 
+bezier_height = (4/3)*height; 
+ 
+z_control_1 = z_start+bezier_height; 
+z_control_2 = z_end+bezier_height; 
+ 
+one_minus_s = 1-s; 
+ 
+b0 = one_minus_s^3; 
+b1 = 3*one_minus_s^2*s; 
+b2 = 3*one_minus_s*s^2; 
+b3 = s^3; 
+ 
+x = b0*x_start+b1*x_start+b2*x_end+b3*x_end; 
+y = b0*y_start+b1*y_start+b2*y_end+b3*y_end; 
+z = b0*z_start+b1*z_control_1+b2*z_control_2+b3*z_end; 
+ 
+radial_bulge = radial_offset*4*s*(1-s); 
+ 
+x = x+radial_bulge*cos(leg_angle); 
+y = y+radial_bulge*sin(leg_angle); 
+ 
+end
+
+function valid = BodyFootValid( ...
+    xB, yB, zB, roll, pitch, yaw, leg_id)
+
+[xR, yR, zR] = RotateInverse( ...
+    xB, yB, zB, roll, pitch, yaw);
+
+d  = 0.1845;
+dd = d/sqrt(2);
+
+if leg_id == 1
+    ox = dd;  oy = -dd; alpha = -pi/4;
+elseif leg_id == 2
+    ox = 0;   oy = -d;  alpha = -pi/2;
+elseif leg_id == 3
+    ox = -dd; oy = -dd; alpha = -3*pi/4;
+elseif leg_id == 4
+    ox = dd;  oy = dd;  alpha = pi/4;
+elseif leg_id == 5
+    ox = 0;   oy = d;   alpha = pi/2;
+else
+    ox = -dd; oy = dd;  alpha = 3*pi/4;
+end
+
+dx = xR-ox;
+dy = yR-oy;
+
+xL =  dx*cos(alpha)+dy*sin(alpha);
+yL = -dx*sin(alpha)+dy*cos(alpha);
+zL = zR;
+
+valid = LegPointValid(xL, yL, zL);
+
+end
+
+
+% 다리 로컬 발 위치의 IK 유효성을 검사한다.
+function valid = LegPointValid(x, y, z)
+
+L1 = 0.074;
+L2 = 0.121;
+L3 = 0.230;
+
+Workspace_Margin = 0.0001;
+Joint_Limit      = 135*pi/180;
+
+valid = false;
+
+if ~isfinite(x) || ~isfinite(y) || ~isfinite(z)
+    return
+end
+
+r_xy = sqrt(x*x+y*y);
+u    = r_xy-L1;
+rho  = sqrt(u*u+z*z);
+
+rho_min = abs(L2-L3)+Workspace_Margin;
+rho_max = L2+L3-Workspace_Margin;
+
+if rho < rho_min || rho > rho_max
+    return
+end
+
+c3 = (u*u+z*z-L2*L2-L3*L3)/(2*L2*L3);
+
+if c3 < -1 || c3 > 1
+    return
+end
+
+s3 = sqrt(max(0, 1-c3*c3));
+
+q1 = atan2(y, x);
+q3 = atan2(s3, c3);
+q2 = atan2(-z, u)-atan2(L3*s3, L2+L3*c3);
+
+valid = isfinite(q1) ...
+     && isfinite(q2) ...
+     && isfinite(q3) ...
+     && abs(q1) <= Joint_Limit ...
+     && abs(q2) <= Joint_Limit ...
+     && abs(q3) <= Joint_Limit;
+
+end
+
+
+% 몸체 자세의 역회전을 적용한다.
+function [xo, yo, zo] = RotateInverse( ...
+    x, y, z, roll, pitch, yaw)
+
+cr = cos(roll);
+sr = sin(roll);
+cp = cos(pitch);
+sp = sin(pitch);
+cy = cos(yaw);
+sy = sin(yaw);
+
+r11 = cy*cp;
+r12 = cy*sp*sr-sy*cr;
+r13 = cy*sp*cr+sy*sr;
+
+r21 = sy*cp;
+r22 = sy*sp*sr+cy*cr;
+r23 = sy*sp*cr-cy*sr;
+
+r31 = -sp;
+r32 = cp*sr;
+r33 = cp*cr;
+
+xo = r11*x+r21*y+r31*z;
+yo = r12*x+r22*y+r32*z;
+zo = r13*x+r23*y+r33*z;
+
+end
+
+
+% 현재값을 목표값으로 제한 이동한다.
+
+function Relay_Output = RelaySafetyGate( ...
+    Relay_Command, Kill_Enable)
+% Kill 상태에서 모든 릴레이를 차단한다.
+
+Relay_Output = double(Relay_Command ~= 0);   % 정상 릴레이 명령을 전달한다.
+
+if Kill_Enable ~= 0
+    Relay_Output = zeros(6, 1);              % 서보 전원을 모두 차단한다.
+end
+end
+function [x_out, y_out, z_out, Foot_Target_Limited] = ...
+    FootWorkspaceLimiter(x_in, y_in, z_in)
+% 발 목표를 IK 작업공간 안으로 제한한다.
+
+L1 = 0.074;
+L2 = 0.121;
+L3 = 0.230;
+
+Workspace_Margin = 0.0001;
+Small_Value      = 1.0e-9;
+
+x_out = x_in;
+y_out = y_in;
+z_out = z_in;
+
+Foot_Target_Limited = 0;
+
+if ~isfinite(x_in) || ~isfinite(y_in) || ~isfinite(z_in)
+    return
+end
+
+r_xy = sqrt(x_in*x_in+y_in*y_in);
+u    = r_xy-L1;
+rho  = sqrt(u*u+z_in*z_in);
+
+rho_min = abs(L2-L3)+Workspace_Margin;
+rho_max = L2+L3-Workspace_Margin;
+
+rho_limited = min(max(rho, rho_min), rho_max);
+
+if abs(rho_limited-rho) <= Small_Value
+    return
+end
+
+if rho > Small_Value
+    scale = rho_limited/rho;
+else
+    scale = 1;
+end
+
+u_limited = u*scale;
+z_out     = z_in*scale;
+r_limited = L1+u_limited;
+
+if r_xy > Small_Value
+    xy_scale = r_limited/r_xy;
+
+    x_out = x_in*xy_scale;
+    y_out = y_in*xy_scale;
+end
+
+Foot_Target_Limited = 1;
+
+end
+function [x_out, y_out, z_out, Foot_Target_Limited] = ...
+    FootWorkspaceLimiter(x_in, y_in, z_in)
+% 발 목표를 IK 작업공간 안으로 제한한다.
+
+L1 = 0.074;
+L2 = 0.121;
+L3 = 0.230;
+
+Workspace_Margin = 0.0001;
+Small_Value      = 1.0e-9;
+
+x_out = x_in;
+y_out = y_in;
+z_out = z_in;
+
+Foot_Target_Limited = 0;
+
+if ~isfinite(x_in) || ~isfinite(y_in) || ~isfinite(z_in)
+    return
+end
+
+r_xy = sqrt(x_in*x_in+y_in*y_in);
+u    = r_xy-L1;
+rho  = sqrt(u*u+z_in*z_in);
+
+rho_min = abs(L2-L3)+Workspace_Margin;
+rho_max = L2+L3-Workspace_Margin;
+
+rho_limited = min(max(rho, rho_min), rho_max);
+
+if abs(rho_limited-rho) <= Small_Value
+    return
+end
+
+if rho > Small_Value
+    scale = rho_limited/rho;
+else
+    scale = 1;
+end
+
+u_limited = u*scale;
+z_out     = z_in*scale;
+r_limited = L1+u_limited;
+
+if r_xy > Small_Value
+    xy_scale = r_limited/r_xy;
+
+    x_out = x_in*xy_scale;
+    y_out = y_in*xy_scale;
+end
+
+Foot_Target_Limited = 1;
+
+end
+function [x_out, y_out, z_out, Foot_Target_Limited] = ...
+    FootWorkspaceLimiter(x_in, y_in, z_in)
+% 발 목표를 IK 작업공간 안으로 제한한다.
+
+L1 = 0.074;
+L2 = 0.121;
+L3 = 0.230;
+
+Workspace_Margin = 0.0001;
+Small_Value      = 1.0e-9;
+
+x_out = x_in;
+y_out = y_in;
+z_out = z_in;
+
+Foot_Target_Limited = 0;
+
+if ~isfinite(x_in) || ~isfinite(y_in) || ~isfinite(z_in)
+    return
+end
+
+r_xy = sqrt(x_in*x_in+y_in*y_in);
+u    = r_xy-L1;
+rho  = sqrt(u*u+z_in*z_in);
+
+rho_min = abs(L2-L3)+Workspace_Margin;
+rho_max = L2+L3-Workspace_Margin;
+
+rho_limited = min(max(rho, rho_min), rho_max);
+
+if abs(rho_limited-rho) <= Small_Value
+    return
+end
+
+if rho > Small_Value
+    scale = rho_limited/rho;
+else
+    scale = 1;
+end
+
+u_limited = u*scale;
+z_out     = z_in*scale;
+r_limited = L1+u_limited;
+
+if r_xy > Small_Value
+    xy_scale = r_limited/r_xy;
+
+    x_out = x_in*xy_scale;
+    y_out = y_in*xy_scale;
+end
+
+Foot_Target_Limited = 1;
+
+end
+function [q1, q2, q3, IK_Valid] = legIK(x, y, z)
+% 발끝 목표의 IK와 유효성을 계산한다.
+
+L1 = 0.074;                          % 1번 링크 길이를 설정한다.
+L2 = 0.121;                          % 2번 링크 길이를 설정한다.
+L3 = 0.230;                          % 3번 링크 길이를 설정한다.
+
+Joint_Limit = 135*pi/180;            % 관절 허용각을 설정한다.
+C3_Tolerance = 1.0e-6;               % 수치 오차 허용값을 설정한다.
+
+persistent Initialized
+persistent Last_q1 Last_q2 Last_q3
+
+if isempty(Initialized)
+    Initialized = 1.0;
+    Last_q1 = 0;
+    Last_q2 = 0;
+    Last_q3 = 0;
+end
+
+q1 = Last_q1;                        % 실패 시 직전 정상값을 유지한다.
+q2 = Last_q2;
+q3 = Last_q3;
+IK_Valid = 0.0;
+
+if ~isfinite(x) || ~isfinite(y) || ~isfinite(z)
+    return
+end
+
+r_xy = sqrt(x*x + y*y);              % 수평 거리를 계산한다.
+u = r_xy - L1;                       % 2링크 평면 거리를 계산한다.
+
+c3 = (u*u + z*z - L2*L2 - L3*L3) ...
+   / (2*L2*L3);                      % 코사인 법칙 값을 계산한다.
+
+if c3 < (-1-C3_Tolerance) || c3 > (1+C3_Tolerance)
+    return
+end
+
+c3 = min(max(c3, -1), 1);            % 수치 오차를 제한한다.
+s3 = sqrt(max(0, 1-c3*c3));          % 무릎 관절 사인값을 계산한다.
+
+Candidate_q1 = atan2(y, x);           % 관절 후보각을 계산한다.
+Candidate_q3 = atan2(s3, c3);
+Candidate_q2 = atan2(-z, u) ...
+             - atan2(L3*s3, L2+L3*c3);
+
+if ~isfinite(Candidate_q1) || ...
+   ~isfinite(Candidate_q2) || ...
+   ~isfinite(Candidate_q3)
+    return
+end
+
+if abs(Candidate_q1) > Joint_Limit || ...
+   abs(Candidate_q2) > Joint_Limit || ...
+   abs(Candidate_q3) > Joint_Limit
+    return
+end
+
+q1 = Candidate_q1;                   % 정상 후보각을 출력한다.
+q2 = Candidate_q2;
+q3 = Candidate_q3;
+
+Last_q1 = q1;                        % 다음 실패에 대비해 저장한다.
+Last_q2 = q2;
+Last_q3 = q3;
+
+IK_Valid = 1.0;
+end
+function [x_out, y_out, z_out, Foot_Target_Limited] = ...
+    FootWorkspaceLimiter(x_in, y_in, z_in)
+% 발 목표를 IK 작업공간 안으로 제한한다.
+
+L1 = 0.074;
+L2 = 0.121;
+L3 = 0.230;
+
+Workspace_Margin = 0.0001;
+Small_Value      = 1.0e-9;
+
+x_out = x_in;
+y_out = y_in;
+z_out = z_in;
+
+Foot_Target_Limited = 0;
+
+if ~isfinite(x_in) || ~isfinite(y_in) || ~isfinite(z_in)
+    return
+end
+
+r_xy = sqrt(x_in*x_in+y_in*y_in);
+u    = r_xy-L1;
+rho  = sqrt(u*u+z_in*z_in);
+
+rho_min = abs(L2-L3)+Workspace_Margin;
+rho_max = L2+L3-Workspace_Margin;
+
+rho_limited = min(max(rho, rho_min), rho_max);
+
+if abs(rho_limited-rho) <= Small_Value
+    return
+end
+
+if rho > Small_Value
+    scale = rho_limited/rho;
+else
+    scale = 1;
+end
+
+u_limited = u*scale;
+z_out     = z_in*scale;
+r_limited = L1+u_limited;
+
+if r_xy > Small_Value
+    xy_scale = r_limited/r_xy;
+
+    x_out = x_in*xy_scale;
+    y_out = y_in*xy_scale;
+end
+
+Foot_Target_Limited = 1;
+
+end
+function [q1, q2, q3, IK_Valid] = legIK(x, y, z)
+% 발끝 목표의 IK와 유효성을 계산한다.
+
+L1 = 0.074;                          % 1번 링크 길이를 설정한다.
+L2 = 0.121;                          % 2번 링크 길이를 설정한다.
+L3 = 0.230;                          % 3번 링크 길이를 설정한다.
+
+Joint_Limit = 135*pi/180;            % 관절 허용각을 설정한다.
+C3_Tolerance = 1.0e-6;               % 수치 오차 허용값을 설정한다.
+
+persistent Initialized
+persistent Last_q1 Last_q2 Last_q3
+
+if isempty(Initialized)
+    Initialized = 1.0;
+    Last_q1 = 0;
+    Last_q2 = 0;
+    Last_q3 = 0;
+end
+
+q1 = Last_q1;                        % 실패 시 직전 정상값을 유지한다.
+q2 = Last_q2;
+q3 = Last_q3;
+IK_Valid = 0.0;
+
+if ~isfinite(x) || ~isfinite(y) || ~isfinite(z)
+    return
+end
+
+r_xy = sqrt(x*x + y*y);              % 수평 거리를 계산한다.
+u = r_xy - L1;                       % 2링크 평면 거리를 계산한다.
+
+c3 = (u*u + z*z - L2*L2 - L3*L3) ...
+   / (2*L2*L3);                      % 코사인 법칙 값을 계산한다.
+
+if c3 < (-1-C3_Tolerance) || c3 > (1+C3_Tolerance)
+    return
+end
+
+c3 = min(max(c3, -1), 1);            % 수치 오차를 제한한다.
+s3 = sqrt(max(0, 1-c3*c3));          % 무릎 관절 사인값을 계산한다.
+
+Candidate_q1 = atan2(y, x);           % 관절 후보각을 계산한다.
+Candidate_q3 = atan2(s3, c3);
+Candidate_q2 = atan2(-z, u) ...
+             - atan2(L3*s3, L2+L3*c3);
+
+if ~isfinite(Candidate_q1) || ...
+   ~isfinite(Candidate_q2) || ...
+   ~isfinite(Candidate_q3)
+    return
+end
+
+if abs(Candidate_q1) > Joint_Limit || ...
+   abs(Candidate_q2) > Joint_Limit || ...
+   abs(Candidate_q3) > Joint_Limit
+    return
+end
+
+q1 = Candidate_q1;                   % 정상 후보각을 출력한다.
+q2 = Candidate_q2;
+q3 = Candidate_q3;
+
+Last_q1 = q1;                        % 다음 실패에 대비해 저장한다.
+Last_q2 = q2;
+Last_q3 = q3;
+
+IK_Valid = 1.0;
+end
+function Angle_Output = JointRateLimiter( ...
+    Angle_Request, Reset_Command, Initial_Angle)
+% 관절 명령의 주기당 변화량을 제한한다.
+
+Sampling_Time  = 0.005;
+Rate_Limit     = 315.8*pi/180;
+Maximum_Change = Rate_Limit*Sampling_Time;
+
+persistent Previous_Angle
+
+if isempty(Previous_Angle)
+    Previous_Angle = Initial_Angle;
+end
+
+if Reset_Command ~= 0
+    Previous_Angle = Initial_Angle;
+else
+    difference = Angle_Request-Previous_Angle;
+
+    difference = min(max( ...
+        difference, -Maximum_Change), Maximum_Change);
+
+    Previous_Angle = Previous_Angle+difference;
+end
+
+Angle_Output = Previous_Angle;
+
+end
+function Angle_Output = JointRateLimiter( ...
+    Angle_Request, Reset_Command, Initial_Angle)
+% 관절 명령의 주기당 변화량을 제한한다.
+
+Sampling_Time  = 0.005;
+Rate_Limit     = 315.8*pi/180;
+Maximum_Change = Rate_Limit*Sampling_Time;
+
+persistent Previous_Angle
+
+if isempty(Previous_Angle)
+    Previous_Angle = Initial_Angle;
+end
+
+if Reset_Command ~= 0
+    Previous_Angle = Initial_Angle;
+else
+    difference = Angle_Request-Previous_Angle;
+
+    difference = min(max( ...
+        difference, -Maximum_Change), Maximum_Change);
+
+    Previous_Angle = Previous_Angle+difference;
+end
+
+Angle_Output = Previous_Angle;
+
+end
+function Angle_Output = JointRateLimiter( ...
+    Angle_Request, Reset_Command, Initial_Angle)
+% 관절 명령의 주기당 변화량을 제한한다.
+
+Sampling_Time  = 0.005;
+Rate_Limit     = 315.8*pi/180;
+Maximum_Change = Rate_Limit*Sampling_Time;
+
+persistent Previous_Angle
+
+if isempty(Previous_Angle)
+    Previous_Angle = Initial_Angle;
+end
+
+if Reset_Command ~= 0
+    Previous_Angle = Initial_Angle;
+else
+    difference = Angle_Request-Previous_Angle;
+
+    difference = min(max( ...
+        difference, -Maximum_Change), Maximum_Change);
+
+    Previous_Angle = Previous_Angle+difference;
+end
+
+Angle_Output = Previous_Angle;
+
+end
+function Angle_Output = JointRateLimiter( ...
+    Angle_Request, Reset_Command, Initial_Angle)
+% 관절 명령의 주기당 변화량을 제한한다.
+
+Sampling_Time  = 0.005;
+Rate_Limit     = 315.8*pi/180;
+Maximum_Change = Rate_Limit*Sampling_Time;
+
+persistent Previous_Angle
+
+if isempty(Previous_Angle)
+    Previous_Angle = Initial_Angle;
+end
+
+if Reset_Command ~= 0
+    Previous_Angle = Initial_Angle;
+else
+    difference = Angle_Request-Previous_Angle;
+
+    difference = min(max( ...
+        difference, -Maximum_Change), Maximum_Change);
+
+    Previous_Angle = Previous_Angle+difference;
+end
+
+Angle_Output = Previous_Angle;
+
+end
+function Angle_Output = JointRateLimiter( ...
+    Angle_Request, Reset_Command, Initial_Angle)
+% 관절 명령의 주기당 변화량을 제한한다.
+
+Sampling_Time  = 0.005;
+Rate_Limit     = 315.8*pi/180;
+Maximum_Change = Rate_Limit*Sampling_Time;
+
+persistent Previous_Angle
+
+if isempty(Previous_Angle)
+    Previous_Angle = Initial_Angle;
+end
+
+if Reset_Command ~= 0
+    Previous_Angle = Initial_Angle;
+else
+    difference = Angle_Request-Previous_Angle;
+
+    difference = min(max( ...
+        difference, -Maximum_Change), Maximum_Change);
+
+    Previous_Angle = Previous_Angle+difference;
+end
+
+Angle_Output = Previous_Angle;
+
+end
+function [xL, yL, zL] = legFK(q1, q2, q3)
+% 현재 관절각으로 발끝 위치를 계산한다.
+
+L1 = 0.074;   % 링크1 에서 링크1 까지 거리 (m)
+L2 = 0.121;   % 링크2 에서 링크3 까지 거리 (m)
+L3 = 0.230;   % 링크3 에서 발 끝 까지 거리 (m)
+
+r = L1 + L2*cos(q2) + L3*cos(q2 + q3);    % 수평 도달 거리를 계산한다.
+
+xL = r*cos(q1);                            % 다리 좌표계 x 위치를 계산한다.
+yL = r*sin(q1);                            % 다리 좌표계 y 위치를 계산한다.
+zL = -L2*sin(q2) - L3*sin(q2 + q3);        % 다리 좌표계 z 위치를 계산한다.
+end
+function Angle_Output = JointRateLimiter( ...
+    Angle_Request, Reset_Command, Initial_Angle)
+% 관절 명령의 주기당 변화량을 제한한다.
+
+Sampling_Time  = 0.005;
+Rate_Limit     = 315.8*pi/180;
+Maximum_Change = Rate_Limit*Sampling_Time;
+
+persistent Previous_Angle
+
+if isempty(Previous_Angle)
+    Previous_Angle = Initial_Angle;
+end
+
+if Reset_Command ~= 0
+    Previous_Angle = Initial_Angle;
+else
+    difference = Angle_Request-Previous_Angle;
+
+    difference = min(max( ...
+        difference, -Maximum_Change), Maximum_Change);
+
+    Previous_Angle = Previous_Angle+difference;
+end
+
+Angle_Output = Previous_Angle;
+
+end
+function Angle_Output = JointRateLimiter( ...
+    Angle_Request, Reset_Command, Initial_Angle)
+% 관절 명령의 주기당 변화량을 제한한다.
+
+Sampling_Time  = 0.005;
+Rate_Limit     = 315.8*pi/180;
+Maximum_Change = Rate_Limit*Sampling_Time;
+
+persistent Previous_Angle
+
+if isempty(Previous_Angle)
+    Previous_Angle = Initial_Angle;
+end
+
+if Reset_Command ~= 0
+    Previous_Angle = Initial_Angle;
+else
+    difference = Angle_Request-Previous_Angle;
+
+    difference = min(max( ...
+        difference, -Maximum_Change), Maximum_Change);
+
+    Previous_Angle = Previous_Angle+difference;
+end
+
+Angle_Output = Previous_Angle;
+
+end
+function Angle_Output = JointRateLimiter( ...
+    Angle_Request, Reset_Command, Initial_Angle)
+% 관절 명령의 주기당 변화량을 제한한다.
+
+Sampling_Time  = 0.005;
+Rate_Limit     = 315.8*pi/180;
+Maximum_Change = Rate_Limit*Sampling_Time;
+
+persistent Previous_Angle
+
+if isempty(Previous_Angle)
+    Previous_Angle = Initial_Angle;
+end
+
+if Reset_Command ~= 0
+    Previous_Angle = Initial_Angle;
+else
+    difference = Angle_Request-Previous_Angle;
+
+    difference = min(max( ...
+        difference, -Maximum_Change), Maximum_Change);
+
+    Previous_Angle = Previous_Angle+difference;
+end
+
+Angle_Output = Previous_Angle;
+
+end
+function Angle_Output = JointRateLimiter( ...
+    Angle_Request, Reset_Command, Initial_Angle)
+% 관절 명령의 주기당 변화량을 제한한다.
+
+Sampling_Time  = 0.005;
+Rate_Limit     = 315.8*pi/180;
+Maximum_Change = Rate_Limit*Sampling_Time;
+
+persistent Previous_Angle
+
+if isempty(Previous_Angle)
+    Previous_Angle = Initial_Angle;
+end
+
+if Reset_Command ~= 0
+    Previous_Angle = Initial_Angle;
+else
+    difference = Angle_Request-Previous_Angle;
+
+    difference = min(max( ...
+        difference, -Maximum_Change), Maximum_Change);
+
+    Previous_Angle = Previous_Angle+difference;
+end
+
+Angle_Output = Previous_Angle;
+
+end
+function Angle_Output = JointRateLimiter( ...
+    Angle_Request, Reset_Command, Initial_Angle)
+% 관절 명령의 주기당 변화량을 제한한다.
+
+Sampling_Time  = 0.005;
+Rate_Limit     = 315.8*pi/180;
+Maximum_Change = Rate_Limit*Sampling_Time;
+
+persistent Previous_Angle
+
+if isempty(Previous_Angle)
+    Previous_Angle = Initial_Angle;
+end
+
+if Reset_Command ~= 0
+    Previous_Angle = Initial_Angle;
+else
+    difference = Angle_Request-Previous_Angle;
+
+    difference = min(max( ...
+        difference, -Maximum_Change), Maximum_Change);
+
+    Previous_Angle = Previous_Angle+difference;
+end
+
+Angle_Output = Previous_Angle;
+
+end
+function Angle_Output = JointRateLimiter( ...
+    Angle_Request, Reset_Command, Initial_Angle)
+% 관절 명령의 주기당 변화량을 제한한다.
+
+Sampling_Time  = 0.005;
+Rate_Limit     = 315.8*pi/180;
+Maximum_Change = Rate_Limit*Sampling_Time;
+
+persistent Previous_Angle
+
+if isempty(Previous_Angle)
+    Previous_Angle = Initial_Angle;
+end
+
+if Reset_Command ~= 0
+    Previous_Angle = Initial_Angle;
+else
+    difference = Angle_Request-Previous_Angle;
+
+    difference = min(max( ...
+        difference, -Maximum_Change), Maximum_Change);
+
+    Previous_Angle = Previous_Angle+difference;
+end
+
+Angle_Output = Previous_Angle;
+
+end
+function Angle_Output = JointRateLimiter( ...
+    Angle_Request, Reset_Command, Initial_Angle)
+% 관절 명령의 주기당 변화량을 제한한다.
+
+Sampling_Time  = 0.005;
+Rate_Limit     = 315.8*pi/180;
+Maximum_Change = Rate_Limit*Sampling_Time;
+
+persistent Previous_Angle
+
+if isempty(Previous_Angle)
+    Previous_Angle = Initial_Angle;
+end
+
+if Reset_Command ~= 0
+    Previous_Angle = Initial_Angle;
+else
+    difference = Angle_Request-Previous_Angle;
+
+    difference = min(max( ...
+        difference, -Maximum_Change), Maximum_Change);
+
+    Previous_Angle = Previous_Angle+difference;
+end
+
+Angle_Output = Previous_Angle;
+
+end
+function Angle_Output = JointRateLimiter( ...
+    Angle_Request, Reset_Command, Initial_Angle)
+% 관절 명령의 주기당 변화량을 제한한다.
+
+Sampling_Time  = 0.005;
+Rate_Limit     = 315.8*pi/180;
+Maximum_Change = Rate_Limit*Sampling_Time;
+
+persistent Previous_Angle
+
+if isempty(Previous_Angle)
+    Previous_Angle = Initial_Angle;
+end
+
+if Reset_Command ~= 0
+    Previous_Angle = Initial_Angle;
+else
+    difference = Angle_Request-Previous_Angle;
+
+    difference = min(max( ...
+        difference, -Maximum_Change), Maximum_Change);
+
+    Previous_Angle = Previous_Angle+difference;
+end
+
+Angle_Output = Previous_Angle;
+
+end
+function Angle_Output = JointRateLimiter( ...
+    Angle_Request, Reset_Command, Initial_Angle)
+% 관절 명령의 주기당 변화량을 제한한다.
+
+Sampling_Time  = 0.005;
+Rate_Limit     = 315.8*pi/180;
+Maximum_Change = Rate_Limit*Sampling_Time;
+
+persistent Previous_Angle
+
+if isempty(Previous_Angle)
+    Previous_Angle = Initial_Angle;
+end
+
+if Reset_Command ~= 0
+    Previous_Angle = Initial_Angle;
+else
+    difference = Angle_Request-Previous_Angle;
+
+    difference = min(max( ...
+        difference, -Maximum_Change), Maximum_Change);
+
+    Previous_Angle = Previous_Angle+difference;
+end
+
+Angle_Output = Previous_Angle;
+
+end
+function Angle_Output = JointRateLimiter( ...
+    Angle_Request, Reset_Command, Initial_Angle)
+% 관절 명령의 주기당 변화량을 제한한다.
+
+Sampling_Time  = 0.005;
+Rate_Limit     = 315.8*pi/180;
+Maximum_Change = Rate_Limit*Sampling_Time;
+
+persistent Previous_Angle
+
+if isempty(Previous_Angle)
+    Previous_Angle = Initial_Angle;
+end
+
+if Reset_Command ~= 0
+    Previous_Angle = Initial_Angle;
+else
+    difference = Angle_Request-Previous_Angle;
+
+    difference = min(max( ...
+        difference, -Maximum_Change), Maximum_Change);
+
+    Previous_Angle = Previous_Angle+difference;
+end
+
+Angle_Output = Previous_Angle;
+
+end
+function Angle_Output = JointRateLimiter( ...
+    Angle_Request, Reset_Command, Initial_Angle)
+% 관절 명령의 주기당 변화량을 제한한다.
+
+Sampling_Time  = 0.005;
+Rate_Limit     = 315.8*pi/180;
+Maximum_Change = Rate_Limit*Sampling_Time;
+
+persistent Previous_Angle
+
+if isempty(Previous_Angle)
+    Previous_Angle = Initial_Angle;
+end
+
+if Reset_Command ~= 0
+    Previous_Angle = Initial_Angle;
+else
+    difference = Angle_Request-Previous_Angle;
+
+    difference = min(max( ...
+        difference, -Maximum_Change), Maximum_Change);
+
+    Previous_Angle = Previous_Angle+difference;
+end
+
+Angle_Output = Previous_Angle;
+
+end
+function Angle_Output = JointRateLimiter( ...
+    Angle_Request, Reset_Command, Initial_Angle)
+% 관절 명령의 주기당 변화량을 제한한다.
+
+Sampling_Time  = 0.005;
+Rate_Limit     = 315.8*pi/180;
+Maximum_Change = Rate_Limit*Sampling_Time;
+
+persistent Previous_Angle
+
+if isempty(Previous_Angle)
+    Previous_Angle = Initial_Angle;
+end
+
+if Reset_Command ~= 0
+    Previous_Angle = Initial_Angle;
+else
+    difference = Angle_Request-Previous_Angle;
+
+    difference = min(max( ...
+        difference, -Maximum_Change), Maximum_Change);
+
+    Previous_Angle = Previous_Angle+difference;
+end
+
+Angle_Output = Previous_Angle;
+
+end
+% 다리별 보행 상태와 Body Twist로 6개 발 목표를 생성한다.
+function [xB_1, yB_1, zB_1, ...
+          xB_2, yB_2, zB_2, ...
+          xB_3, yB_3, zB_3, ...
+          xB_4, yB_4, zB_4, ...
+          xB_5, yB_5, zB_5, ...
+          xB_6, yB_6, zB_6, ...
+          Correction_Command_Accepted] = ...
+    TripodFootTrajectory( ...
+          vx, vy, vz, wx, wy, wz, ...
+          Tripod_Enable, Tripod_Mode, ...
+          Leg1_State, Leg1_Progress, ...
+          Leg2_State, Leg2_Progress, ...
+          Leg3_State, Leg3_Progress, ...
+          Leg4_State, Leg4_Progress, ...
+          Leg5_State, Leg5_Progress, ...
+          Leg6_State, Leg6_Progress, ...
+          Startup_Phase, Body_Control_Enable, ...
+          Roll_Posture_Delayed, ...
+          Pitch_Posture_Delayed, ...
+          Yaw_Posture_Delayed)
+
+STANCE       = 0;  % Stance 상태 번호를 정의한다.
+SWING        = 1;  % Swing 상태 번호를 정의한다.
+LATE_LANDING = 2;  % Late Landing 상태 번호를 정의한다.
+
+Sampling_Time       = 0.005; % 제어 주기를 정의한다.
+Phase_Time          = 0.5;   % 한 Tripod Phase 시간을 정의한다.
+Swing_Height_Nominal = 0.20; % 기본 Swing 상승 높이를 정의한다.
+Swing_Height_Min     = 0.15; % 최소 Swing 상승 높이를 정의한다.
+Swing_Height_Max     = 0.25; % 최대 Swing 상승 높이를 정의한다.
+Swing_Radial_Offset = 0.07;  % Swing 중간점의 바깥쪽 이동량을 정의한다.
+Search_Speed        = 0.2;  % Late Landing 하강 속도를 정의한다.
+Early_Min_Progress  = 0.5;   % Early Landing 판정 시작점을 정의한다.
+
+% 다리별 장착 방향을 정의한다.
+alpha_1 = -pi/4;
+alpha_2 = -pi/2;
+alpha_3 = -3*pi/4;
+alpha_4 =  pi/4;
+alpha_5 =  pi/2;
+alpha_6 =  3*pi/4;
+
+% 로봇 형상값을 정의한다.
+d  = 0.1845;
+dd = d/sqrt(2);
+
+L1 = 0.074;
+L2 = 0.121;
+L3 = 0.230;
+
+% 초기 관절각을 정의한다.
+q2_init = 30*pi/180;
+q3_init = 50*pi/180;
+
+% 초기 Leg 좌표를 계산한다.
+xL0 = L1 + L2*cos(q2_init) + L3*cos(q2_init + q3_init);
+zL0 = -L2*sin(q2_init) - L3*sin(q2_init + q3_init);
+c45 = cos(pi/4);
+
+% 1번 다리 초기 Body 좌표를 계산한다.
+x0_1 =  dd + c45*xL0;
+y0_1 = -dd - c45*xL0;
+z0_1 =  zL0;
+
+% 2번 다리 초기 Body 좌표를 계산한다.
+x0_2 = 0;
+y0_2 = -d - xL0;
+z0_2 = zL0;
+
+% 3번 다리 초기 Body 좌표를 계산한다.
+x0_3 = -dd - c45*xL0;
+y0_3 = -dd - c45*xL0;
+z0_3 =  zL0;
+
+% 4번 다리 초기 Body 좌표를 계산한다.
+x0_4 = dd + c45*xL0;
+y0_4 = dd + c45*xL0;
+z0_4 = zL0;
+
+% 5번 다리 초기 Body 좌표를 계산한다.
+x0_5 = 0;
+y0_5 = d + xL0;
+z0_5 = zL0;
+
+% 6번 다리 초기 Body 좌표를 계산한다.
+x0_6 = -dd - c45*xL0;
+y0_6 =  dd + c45*xL0;
+z0_6 =  zL0;
+
+RECOVERY_SWING = 3;
+
+TRIPOD_NORMAL = 0;
+
+Recovery_Height = 0.10;
+Hold_Stance = Tripod_Mode ~= TRIPOD_NORMAL;
+Trajectory_Enable = Body_Control_Enable ~= 0 || Tripod_Enable ~= 0;
+All_Stance_Mode = Body_Control_Enable ~= 0 && ...
+                  Tripod_Enable == 0 && ...
+                  Tripod_Mode == TRIPOD_NORMAL;
+
+persistent Body_X_Offset Body_Y_Offset Body_Z_Offset
+
+if isempty(Body_X_Offset)
+    Body_X_Offset = 0;
+    Body_Y_Offset = 0;
+    Body_Z_Offset = 0;
+end
+
+% 6발 Stance 중 몸체 기준 병진 위치를 적분한다.
+Correction_Command_Accepted = 1.0;
+
+if Body_Control_Enable == 0
+    Body_X_Offset = 0;
+    Body_Y_Offset = 0;
+    Body_Z_Offset = 0;
+
+elseif All_Stance_Mode
+    Body_X_Candidate = Body_X_Offset+vx*Sampling_Time;
+    Body_Y_Candidate = Body_Y_Offset+vy*Sampling_Time;
+    Body_Z_Candidate = Body_Z_Offset+vz*Sampling_Time;
+
+    candidate_valid = AllBodyFeetValid( ...
+        x0_1-Body_X_Candidate, ...
+        y0_1-Body_Y_Candidate, ...
+        z0_1-Body_Z_Candidate, ...
+        x0_2-Body_X_Candidate, ...
+        y0_2-Body_Y_Candidate, ...
+        z0_2-Body_Z_Candidate, ...
+        x0_3-Body_X_Candidate, ...
+        y0_3-Body_Y_Candidate, ...
+        z0_3-Body_Z_Candidate, ...
+        x0_4-Body_X_Candidate, ...
+        y0_4-Body_Y_Candidate, ...
+        z0_4-Body_Z_Candidate, ...
+        x0_5-Body_X_Candidate, ...
+        y0_5-Body_Y_Candidate, ...
+        z0_5-Body_Z_Candidate, ...
+        x0_6-Body_X_Candidate, ...
+        y0_6-Body_Y_Candidate, ...
+        z0_6-Body_Z_Candidate, ...
+        Roll_Posture_Delayed, ...
+        Pitch_Posture_Delayed, ...
+        Yaw_Posture_Delayed);
+
+    if candidate_valid
+        Body_X_Offset = Body_X_Candidate;
+        Body_Y_Offset = Body_Y_Candidate;
+        Body_Z_Offset = Body_Z_Candidate;
+    else
+        Correction_Command_Accepted = 0.0;
+
+        vx = 0;
+        vy = 0;
+        vz = 0;
+    end
+end
+
+% 몸체 높이 Offset에 비례해 Swing 상승 높이를 조정한다.
+Swing_Height = min(max( ...
+    Swing_Height_Nominal + Body_Z_Offset, ...
+    Swing_Height_Min), Swing_Height_Max);
+
+% 몸체 이동의 반대 방향으로 6개 발 기준점을 이동한다.
+xC_1 = x0_1 - Body_X_Offset;
+yC_1 = y0_1 - Body_Y_Offset;
+zC_1 = z0_1 - Body_Z_Offset;
+
+xC_2 = x0_2 - Body_X_Offset;
+yC_2 = y0_2 - Body_Y_Offset;
+zC_2 = z0_2 - Body_Z_Offset;
+
+xC_3 = x0_3 - Body_X_Offset;
+yC_3 = y0_3 - Body_Y_Offset;
+zC_3 = z0_3 - Body_Z_Offset;
+
+xC_4 = x0_4 - Body_X_Offset;
+yC_4 = y0_4 - Body_Y_Offset;
+zC_4 = z0_4 - Body_Z_Offset;
+
+xC_5 = x0_5 - Body_X_Offset;
+yC_5 = y0_5 - Body_Y_Offset;
+zC_5 = z0_5 - Body_Z_Offset;
+
+xC_6 = x0_6 - Body_X_Offset;
+yC_6 = y0_6 - Body_Y_Offset;
+zC_6 = z0_6 - Body_Z_Offset;
+
+% 일반 보행 이외에는 Body Twist를 정지한다.
+if Body_Control_Enable == 0 || Tripod_Mode ~= TRIPOD_NORMAL
+    vx = 0;
+    vy = 0;
+    vz = 0;
+    wx = 0;
+    wy = 0;
+    wz = 0;
+end
+
+% 1번 다리의 한 Phase 동안 Stance 이동량을 계산한다.
+dx_1 = Phase_Time*(-vx - wy*zC_1 + wz*yC_1);
+dy_1 = Phase_Time*(-vy - wz*xC_1 + wx*zC_1);
+dz_1 = Phase_Time*(-vz - wx*yC_1 + wy*xC_1);
+
+% 2번 다리의 한 Phase 동안 Stance 이동량을 계산한다.
+dx_2 = Phase_Time*(-vx - wy*zC_2 + wz*yC_2);
+dy_2 = Phase_Time*(-vy - wz*xC_2 + wx*zC_2);
+dz_2 = Phase_Time*(-vz - wx*yC_2 + wy*xC_2);
+
+% 3번 다리의 한 Phase 동안 Stance 이동량을 계산한다.
+dx_3 = Phase_Time*(-vx - wy*zC_3 + wz*yC_3);
+dy_3 = Phase_Time*(-vy - wz*xC_3 + wx*zC_3);
+dz_3 = Phase_Time*(-vz - wx*yC_3 + wy*xC_3);
+
+% 4번 다리의 한 Phase 동안 Stance 이동량을 계산한다.
+dx_4 = Phase_Time*(-vx - wy*zC_4 + wz*yC_4);
+dy_4 = Phase_Time*(-vy - wz*xC_4 + wx*zC_4);
+dz_4 = Phase_Time*(-vz - wx*yC_4 + wy*xC_4);
+
+% 5번 다리의 한 Phase 동안 Stance 이동량을 계산한다.
+dx_5 = Phase_Time*(-vx - wy*zC_5 + wz*yC_5);
+dy_5 = Phase_Time*(-vy - wz*xC_5 + wx*zC_5);
+dz_5 = Phase_Time*(-vz - wx*yC_5 + wy*xC_5);
+
+% 6번 다리의 한 Phase 동안 Stance 이동량을 계산한다.
+dx_6 = Phase_Time*(-vx - wy*zC_6 + wz*yC_6);
+dy_6 = Phase_Time*(-vy - wz*xC_6 + wx*zC_6);
+dz_6 = Phase_Time*(-vz - wx*yC_6 + wy*xC_6);
+
+% 1번 다리의 최종 발 목표를 계산한다.
+[xB_1, yB_1, zB_1] = AdaptiveFootTarget( ...
+    1, Leg1_State, Leg1_Progress, Startup_Phase, ...
+    xC_1, yC_1, zC_1, dx_1, dy_1, dz_1, alpha_1, ...
+    vx, vy, vz, wx, wy, wz, Sampling_Time, ...
+    Swing_Height, Swing_Radial_Offset, Search_Speed, ...
+    Early_Min_Progress, STANCE, SWING, LATE_LANDING, ...
+    Trajectory_Enable, RECOVERY_SWING, Hold_Stance, Recovery_Height, ...
+    All_Stance_Mode);
+
+% 2번 다리의 최종 발 목표를 계산한다.
+[xB_2, yB_2, zB_2] = AdaptiveFootTarget( ...
+    2, Leg2_State, Leg2_Progress, Startup_Phase, ...
+    xC_2, yC_2, zC_2, dx_2, dy_2, dz_2, alpha_2, ...
+    vx, vy, vz, wx, wy, wz, Sampling_Time, ...
+    Swing_Height, Swing_Radial_Offset, Search_Speed, ...
+    Early_Min_Progress, STANCE, SWING, LATE_LANDING, ...
+    Trajectory_Enable, RECOVERY_SWING, Hold_Stance, Recovery_Height, ...
+    All_Stance_Mode);
+
+% 3번 다리의 최종 발 목표를 계산한다.
+[xB_3, yB_3, zB_3] = AdaptiveFootTarget( ...
+    3, Leg3_State, Leg3_Progress, Startup_Phase, ...
+    xC_3, yC_3, zC_3, dx_3, dy_3, dz_3, alpha_3, ...
+    vx, vy, vz, wx, wy, wz, Sampling_Time, ...
+    Swing_Height, Swing_Radial_Offset, Search_Speed, ...
+    Early_Min_Progress, STANCE, SWING, LATE_LANDING, ...
+    Trajectory_Enable, RECOVERY_SWING, Hold_Stance, Recovery_Height, ...
+    All_Stance_Mode);
+
+% 4번 다리의 최종 발 목표를 계산한다.
+[xB_4, yB_4, zB_4] = AdaptiveFootTarget( ...
+    4, Leg4_State, Leg4_Progress, Startup_Phase, ...
+    xC_4, yC_4, zC_4, dx_4, dy_4, dz_4, alpha_4, ...
+    vx, vy, vz, wx, wy, wz, Sampling_Time, ...
+    Swing_Height, Swing_Radial_Offset, Search_Speed, ...
+    Early_Min_Progress, STANCE, SWING, LATE_LANDING, ...
+    Trajectory_Enable, RECOVERY_SWING, Hold_Stance, Recovery_Height, ...
+    All_Stance_Mode);
+
+% 5번 다리의 최종 발 목표를 계산한다.
+[xB_5, yB_5, zB_5] = AdaptiveFootTarget( ...
+    5, Leg5_State, Leg5_Progress, Startup_Phase, ...
+    xC_5, yC_5, zC_5, dx_5, dy_5, dz_5, alpha_5, ...
+    vx, vy, vz, wx, wy, wz, Sampling_Time, ...
+    Swing_Height, Swing_Radial_Offset, Search_Speed, ...
+    Early_Min_Progress, STANCE, SWING, LATE_LANDING, ...
+    Trajectory_Enable, RECOVERY_SWING, Hold_Stance, Recovery_Height, ...
+    All_Stance_Mode);
+
+% 6번 다리의 최종 발 목표를 계산한다.
+[xB_6, yB_6, zB_6] = AdaptiveFootTarget( ...
+    6, Leg6_State, Leg6_Progress, Startup_Phase, ...
+    xC_6, yC_6, zC_6, dx_6, dy_6, dz_6, alpha_6, ...
+    vx, vy, vz, wx, wy, wz, Sampling_Time, ...
+    Swing_Height, Swing_Radial_Offset, Search_Speed, ...
+    Early_Min_Progress, STANCE, SWING, LATE_LANDING, ...
+    Trajectory_Enable, RECOVERY_SWING, Hold_Stance, Recovery_Height, ...
+    All_Stance_Mode);
+
+    % 절대 발 위치를 기본 발 위치에 대한 변화량으로 변환한다.
+    xB_1 = xB_1 - x0_1;
+    yB_1 = yB_1 - y0_1;
+    zB_1 = zB_1 - z0_1;
+    
+    xB_2 = xB_2 - x0_2;
+    yB_2 = yB_2 - y0_2;
+    zB_2 = zB_2 - z0_2;
+    
+    xB_3 = xB_3 - x0_3;
+    yB_3 = yB_3 - y0_3;
+    zB_3 = zB_3 - z0_3;
+    
+    xB_4 = xB_4 - x0_4;
+    yB_4 = yB_4 - y0_4;
+    zB_4 = zB_4 - z0_4;
+    
+    xB_5 = xB_5 - x0_5;
+    yB_5 = yB_5 - y0_5;
+    zB_5 = zB_5 - z0_5;
+    
+    xB_6 = xB_6 - x0_6;
+    yB_6 = yB_6 - y0_6;
+    zB_6 = zB_6 - z0_6;
+
+end
+
+
+% Enable과 다리 상태에 따라 발 목표를 생성한다.
+function [x, y, z] = AdaptiveFootTarget( ...
+    leg_id, leg_state, progress, startup_phase, ...
+    x0, y0, z0, dx, dy, dz, leg_angle, ...
+    vx, vy, vz, wx, wy, wz, sampling_time, ...
+    swing_height, radial_offset, search_speed, ...
+    early_min_progress, stance_state, swing_state, late_state, ...
+    trajectory_enable, recovery_state, hold_stance, recovery_height, ...
+    all_stance_mode)
+
+persistent Initialized X_Memory Y_Memory Z_Memory Previous_State
+persistent Adapted_Stance Custom_Swing
+persistent Swing_Start_X Swing_Start_Y Swing_Start_Z
+persistent Recovery_Start_X Recovery_Start_Y Recovery_Start_Z
+
+if isempty(Initialized)
+    Initialized      = true;
+    X_Memory         = zeros(1, 6);
+    Y_Memory         = zeros(1, 6);
+    Z_Memory         = zeros(1, 6);
+    Previous_State   = zeros(1, 6);
+    Adapted_Stance   = false(1, 6);
+    Custom_Swing     = false(1, 6);
+    Swing_Start_X    = zeros(1, 6);
+    Swing_Start_Y    = zeros(1, 6);
+    Swing_Start_Z    = zeros(1, 6);
+    Recovery_Start_X = zeros(1, 6);
+    Recovery_Start_Y = zeros(1, 6);
+    Recovery_Start_Z = zeros(1, 6);
+end
+
+i = leg_id;
+
+% 비활성 상태에서는 기본 발 위치로 초기화한다.
+if trajectory_enable == 0
+    X_Memory(i)       = x0;
+    Y_Memory(i)       = y0;
+    Z_Memory(i)       = z0;
+    Previous_State(i) = stance_state;
+    Adapted_Stance(i) = false;
+    Custom_Swing(i)   = false;
+
+    x = x0;
+    y = y0;
+    z = z0;
+    return;
+end
+
+x_front = x0 - 0.5*dx;
+y_front = y0 - 0.5*dy;
+z_front = z0 - 0.5*dz;
+
+x_rear = x0 + 0.5*dx;
+y_rear = y0 + 0.5*dy;
+z_rear = z0 + 0.5*dz;
+
+if startup_phase
+    x_swing_start = x0;
+    y_swing_start = y0;
+    z_swing_start = z0;
+else
+    x_swing_start = x_rear;
+    y_swing_start = y_rear;
+    z_swing_start = z_rear;
+end
+
+if leg_state == recovery_state
+    if Previous_State(i) ~= recovery_state
+        Recovery_Start_X(i) = X_Memory(i);
+        Recovery_Start_Y(i) = Y_Memory(i);
+        Recovery_Start_Z(i) = Z_Memory(i);
+    end
+
+    [x, y, z] = SwingTarget( ...
+        progress, ...
+        Recovery_Start_X(i), Recovery_Start_Y(i), Recovery_Start_Z(i), ...
+        x0, y0, z0, recovery_height, 0, leg_angle);
+
+    X_Memory(i) = x;
+    Y_Memory(i) = y;
+    Z_Memory(i) = z;
+
+    Adapted_Stance(i) = true;
+    Custom_Swing(i)   = false;
+
+elseif leg_state == late_state
+    if Previous_State(i) == late_state
+        Search_Inward_Ratio = 0.8;
+        inward_speed = Search_Inward_Ratio*search_speed;
+
+        X_Memory(i) = X_Memory(i) ...
+                    - inward_speed*cos(leg_angle)*sampling_time;
+
+        Y_Memory(i) = Y_Memory(i) ...
+                    - inward_speed*sin(leg_angle)*sampling_time;
+
+        Z_Memory(i) = Z_Memory(i) ...
+                    - search_speed*sampling_time;
+    end
+
+    Adapted_Stance(i) = true;
+
+    x = X_Memory(i);
+    y = Y_Memory(i);
+    z = Z_Memory(i);
+
+elseif leg_state == swing_state
+    if Previous_State(i) ~= swing_state
+        if Adapted_Stance(i)
+            Swing_Start_X(i) = X_Memory(i);
+            Swing_Start_Y(i) = Y_Memory(i);
+            Swing_Start_Z(i) = Z_Memory(i);
+            Custom_Swing(i)  = true;
+        else
+            Swing_Start_X(i) = x_swing_start;
+            Swing_Start_Y(i) = y_swing_start;
+            Swing_Start_Z(i) = z_swing_start;
+            Custom_Swing(i)  = false;
+        end
+
+        Adapted_Stance(i) = false;
+    end
+
+    if Custom_Swing(i)
+        x_swing_start = Swing_Start_X(i);
+        y_swing_start = Swing_Start_Y(i);
+        z_swing_start = Swing_Start_Z(i);
+    end
+
+    [x, y, z] = SwingTarget( ...
+        progress, ...
+        x_swing_start, y_swing_start, z_swing_start, ...
+        x_front, y_front, z_front, ...
+        swing_height, radial_offset, leg_angle);
+
+    X_Memory(i) = x;
+    Y_Memory(i) = y;
+    Z_Memory(i) = z;
+
+elseif leg_state == stance_state
+    if all_stance_mode
+        x_dot = -vx-wy*Z_Memory(i)+wz*Y_Memory(i);
+        y_dot = -vy-wz*X_Memory(i)+wx*Z_Memory(i);
+        z_dot = -vz-wx*Y_Memory(i)+wy*X_Memory(i);
+    
+        X_Memory(i) = X_Memory(i)+x_dot*sampling_time;
+        Y_Memory(i) = Y_Memory(i)+y_dot*sampling_time;
+        Z_Memory(i) = Z_Memory(i)+z_dot*sampling_time;
+    
+        x = X_Memory(i);
+        y = Y_Memory(i);
+        z = Z_Memory(i);
+
+    elseif hold_stance
+        x = X_Memory(i);
+        y = Y_Memory(i);
+        z = Z_Memory(i);
+
+    else
+        if Previous_State(i) == late_state
+            Adapted_Stance(i) = true;
+
+        elseif Previous_State(i) == swing_state && ...
+                progress >= early_min_progress
+
+            if Custom_Swing(i)
+                x_swing_start = Swing_Start_X(i);
+                y_swing_start = Swing_Start_Y(i);
+                z_swing_start = Swing_Start_Z(i);
+            end
+
+            [X_Memory(i), Y_Memory(i), Z_Memory(i)] = SwingTarget( ...
+                progress, ...
+                x_swing_start, y_swing_start, z_swing_start, ...
+                x_front, y_front, z_front, ...
+                swing_height, radial_offset, leg_angle);
+
+            Adapted_Stance(i) = true;
+
+        elseif Adapted_Stance(i)
+            x_dot = -vx - wy*Z_Memory(i) + wz*Y_Memory(i);
+            y_dot = -vy - wz*X_Memory(i) + wx*Z_Memory(i);
+            z_dot = -vz - wx*Y_Memory(i) + wy*X_Memory(i);
+
+            X_Memory(i) = X_Memory(i) + x_dot*sampling_time;
+            Y_Memory(i) = Y_Memory(i) + y_dot*sampling_time;
+            Z_Memory(i) = Z_Memory(i) + z_dot*sampling_time;
+
+        elseif startup_phase
+            [X_Memory(i), Y_Memory(i), Z_Memory(i)] = StanceTarget( ...
+                progress, x0, y0, z0, x_rear, y_rear, z_rear);
+
+        else
+            [X_Memory(i), Y_Memory(i), Z_Memory(i)] = StanceTarget( ...
+                progress, ...
+                x_front, y_front, z_front, ...
+                x_rear, y_rear, z_rear);
+        end
+
+        x = X_Memory(i);
+        y = Y_Memory(i);
+        z = Z_Memory(i);
+    end
+
+else
+    x = X_Memory(i);
+    y = Y_Memory(i);
+    z = Z_Memory(i);
+end
+
+Previous_State(i) = leg_state;
+
+end
+
+
+% Quintic과 Cubic Bezier로 Swing 발 목표를 계산한다.
+function [x, y, z] = SwingTarget( ...
+    progress, ...
+    x_start, y_start, z_start, ...
+    x_end, y_end, z_end, ...
+    swing_height, radial_offset, leg_angle)
+
+% 진행률을 0~1 범위로 제한한다.
+if progress < 0
+    progress = 0;
+elseif progress > 1
+    progress = 1;
+end
+
+% Quintic Time Scaling을 계산한다.
+s = 10*progress^3 ...
+  - 15*progress^4 ...
+  + 6*progress^5;
+
+% 최고 높이가 설정값과 일치하도록 제어점을 계산한다.
+bezier_height = (4/3)*swing_height;
+
+z_control_1 = z_start + bezier_height;
+z_control_2 = z_end   + bezier_height;
+
+% Cubic Bezier 계수를 계산한다.
+one_minus_s = 1 - s;
+
+b0 = one_minus_s^3;
+b1 = 3*one_minus_s^2*s;
+b2 = 3*one_minus_s*s^2;
+b3 = s^3;
+
+% Swing 발 목표를 계산한다.
+x = b0*x_start ...
+  + b1*x_start ...
+  + b2*x_end ...
+  + b3*x_end;
+
+y = b0*y_start ...
+  + b1*y_start ...
+  + b2*y_end ...
+  + b3*y_end;
+
+z = b0*z_start ...
+  + b1*z_control_1 ...
+  + b2*z_control_2 ...
+  + b3*z_end;
+
+% Swing 중간점에서 발을 다리 바깥쪽으로 이동한다.
+radial_bulge = radial_offset*4*s*(1-s);
+
+x = x + radial_bulge*cos(leg_angle);
+y = y + radial_bulge*sin(leg_angle);
+
+end
+
+
+% 선형 보간으로 Stance 발 목표를 계산한다.
+function [x, y, z] = StanceTarget( ...
+    progress, ...
+    x_start, y_start, z_start, ...
+    x_end, y_end, z_end)
+
+% 진행률을 0~1 범위로 제한한다.
+if progress < 0
+    progress = 0;
+elseif progress > 1
+    progress = 1;
+end
+
+% Stance 발 목표를 계산한다.
+x = x_start + progress*(x_end - x_start);
+y = y_start + progress*(y_end - y_start);
+z = z_start + progress*(z_end - z_start);
+
+end
+
+function valid = AllBodyFeetValid( ...
+    x1, y1, z1, x2, y2, z2, x3, y3, z3, ...
+    x4, y4, z4, x5, y5, z5, x6, y6, z6, ...
+    roll, pitch, yaw)
+
+valid1 = BodyFootValid(x1, y1, z1, roll, pitch, yaw, 1);
+valid2 = BodyFootValid(x2, y2, z2, roll, pitch, yaw, 2);
+valid3 = BodyFootValid(x3, y3, z3, roll, pitch, yaw, 3);
+valid4 = BodyFootValid(x4, y4, z4, roll, pitch, yaw, 4);
+valid5 = BodyFootValid(x5, y5, z5, roll, pitch, yaw, 5);
+valid6 = BodyFootValid(x6, y6, z6, roll, pitch, yaw, 6);
+
+valid = valid1 && valid2 && valid3 ...
+     && valid4 && valid5 && valid6;
+
+end
+
+
+% 몸체 좌표의 발을 해당 다리 좌표로 변환한다.
+function valid = BodyFootValid( ...
+    xB, yB, zB, roll, pitch, yaw, leg_id)
+
+[xR, yR, zR] = RotateInverse( ...
+    xB, yB, zB, roll, pitch, yaw);
+
+d  = 0.1845;
+dd = d/sqrt(2);
+
+if leg_id == 1
+    ox = dd;  oy = -dd; alpha = -pi/4;
+elseif leg_id == 2
+    ox = 0;   oy = -d;  alpha = -pi/2;
+elseif leg_id == 3
+    ox = -dd; oy = -dd; alpha = -3*pi/4;
+elseif leg_id == 4
+    ox = dd;  oy = dd;  alpha = pi/4;
+elseif leg_id == 5
+    ox = 0;   oy = d;   alpha = pi/2;
+else
+    ox = -dd; oy = dd;  alpha = 3*pi/4;
+end
+
+dx = xR-ox;
+dy = yR-oy;
+
+xL =  dx*cos(alpha)+dy*sin(alpha);
+yL = -dx*sin(alpha)+dy*cos(alpha);
+zL = zR;
+
+valid = LegPointValid(xL, yL, zL);
+
+end
+
+
+% 다리 로컬 발 위치의 IK 유효성을 검사한다.
+function valid = LegPointValid(x, y, z)
+
+L1 = 0.074;
+L2 = 0.121;
+L3 = 0.230;
+
+Workspace_Margin = 0.0001;
+Joint_Limit      = 135*pi/180;
+
+valid = false;
+
+if ~isfinite(x) || ~isfinite(y) || ~isfinite(z)
+    return
+end
+
+r_xy = sqrt(x*x+y*y);
+u    = r_xy-L1;
+rho  = sqrt(u*u+z*z);
+
+rho_min = abs(L2-L3)+Workspace_Margin;
+rho_max = L2+L3-Workspace_Margin;
+
+if rho < rho_min || rho > rho_max
+    return
+end
+
+c3 = (u*u+z*z-L2*L2-L3*L3)/(2*L2*L3);
+
+if c3 < -1 || c3 > 1
+    return
+end
+
+s3 = sqrt(max(0, 1-c3*c3));
+
+q1 = atan2(y, x);
+q3 = atan2(s3, c3);
+q2 = atan2(-z, u)-atan2(L3*s3, L2+L3*c3);
+
+valid = isfinite(q1) ...
+     && isfinite(q2) ...
+     && isfinite(q3) ...
+     && abs(q1) <= Joint_Limit ...
+     && abs(q2) <= Joint_Limit ...
+     && abs(q3) <= Joint_Limit;
+
+end
+
+
+% 몸체 자세의 역회전을 적용한다.
+function [xo, yo, zo] = RotateInverse( ...
+    x, y, z, roll, pitch, yaw)
+
+cr = cos(roll);
+sr = sin(roll);
+cp = cos(pitch);
+sp = sin(pitch);
+cy = cos(yaw);
+sy = sin(yaw);
+
+r11 = cy*cp;
+r12 = cy*sp*sr-sy*cr;
+r13 = cy*sp*cr+sy*sr;
+
+r21 = sy*cp;
+r22 = sy*sp*sr+cy*cr;
+r23 = sy*sp*cr-cy*sr;
+
+r31 = -sp;
+r32 = cp*sr;
+r33 = cp*cr;
+
+xo = r11*x+r21*y+r31*z;
+yo = r12*x+r22*y+r32*z;
+zo = r13*x+r23*y+r33*z;
+
+end
+
+
+% 현재값을 목표값으로 제한 이동한다.
+
+function Angle_Output = JointRateLimiter( ...
+    Angle_Request, Reset_Command, Initial_Angle)
+% 관절 명령의 주기당 변화량을 제한한다.
+
+Sampling_Time  = 0.005;
+Rate_Limit     = 315.8*pi/180;
+Maximum_Change = Rate_Limit*Sampling_Time;
+
+persistent Previous_Angle
+
+if isempty(Previous_Angle)
+    Previous_Angle = Initial_Angle;
+end
+
+if Reset_Command ~= 0
+    Previous_Angle = Initial_Angle;
+else
+    difference = Angle_Request-Previous_Angle;
+
+    difference = min(max( ...
+        difference, -Maximum_Change), Maximum_Change);
+
+    Previous_Angle = Previous_Angle+difference;
+end
+
+Angle_Output = Previous_Angle;
+
+end

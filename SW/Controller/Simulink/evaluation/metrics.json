@@ -1,0 +1,21 @@
+{
+  "simulation_stop_s": 81,
+  "wall_time_s": 105.629373,
+  "logged_signals": 202,
+  "forward_window_s": [
+    7,
+    10
+  ],
+  "foot_rmse_all_legs_mm": 3.3850151355282003,
+  "joint_rmse_all_joints_deg": 0.4003972561796611,
+  "max_abs_virtual_roll_deg": 18.078899915903126,
+  "max_abs_virtual_pitch_deg": 27.835395110777593,
+  "virtual_roll_peak_to_peak_deg": 33.677389449630063,
+  "virtual_pitch_peak_to_peak_deg": 34.965097648186067,
+  "forward_estimated_x_speed_mps": 0.23489411793563236,
+  "mean_internal_xy_error_forward_m": 0.010035109906358057,
+  "max_rollover_fault": 0,
+  "max_controller_fault": 0,
+  "all_legs_ik_valid_sample_pct": 100,
+  "scope": "Body fixed to world; synthetic contact and VirtualIMU; no terrain or Residual-RL validation."
+}

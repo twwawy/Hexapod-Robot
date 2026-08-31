@@ -1,4 +1,1 @@
-g_control_timing_debug.yaw_fault_event_count
-g_control_timing_debug.latest_yaw_fault_flags
-g_control_timing_debug.latest_yaw_fault_event
-g_control_timing_debug.reset_request = true
+g_hexapod_app

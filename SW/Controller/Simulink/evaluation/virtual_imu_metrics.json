@@ -1,0 +1,29 @@
+{
+  "data_kind": "Command-derived VirtualIMU, not physical body motion",
+  "source": "simulation_raw.mat, original plant.slx, 0-81 s",
+  "window_s": [
+    7,
+    10
+  ],
+  "sample_count": 600,
+  "sample_interval_s": 0.005,
+  "virtual_roll_rmse_deg": 0,
+  "virtual_pitch_rmse_deg": 0,
+  "virtual_forward_max_abs_deg": [
+    0,
+    0
+  ],
+  "virtual_forward_peak_to_peak_deg": [
+    0,
+    0
+  ],
+  "virtual_full_run_max_abs_deg": [
+    18.078899915903126,
+    27.835395110777593
+  ],
+  "virtual_full_run_peak_to_peak_deg": [
+    33.67738944963007,
+    34.965097648186067
+  ],
+  "limit": "Not a walking stability validation; no ranking or improvement claim."
+}

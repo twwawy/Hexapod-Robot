@@ -1,0 +1,2 @@
+START 2026-08-31 13:35:03 | MATLAB 26.1.0.3276743 (R2026a) Update 3 | original input | 0..81 s
+DONE 105.6 wall seconds | 202 signals | final time 81.000000
