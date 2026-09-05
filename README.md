@@ -19,8 +19,8 @@ foothold correction → RL residual → Safety / IK**다. D435IF RGB는 후속 �
 방향키로 넓은 장애물 코스를 이동하면서 MID-360 점군, 누적 높이 지도와 여섯 다리의
 착지 후보를 확인하는 **기구학 미리보기**다. 이동 명령을 주면
 `RF/RB/LM ↔ RM/LF/LB` 순서로 연속 swing한다. 다리 번호를 누를 필요는 없다.
-로봇은 기본적으로 **메시를 숨기고 skeleton만 표시**한다. 몸체 윤곽과 각 다리의
-관절 3개·발끝을 선과 점으로 연결해 swing과 착지 목표를 보기 쉽게 했다.
+로봇은 기본적으로 **예전 MJX 학습용 링크 모델**을 사용한다. 박스 몸체, 다리별
+coxa/femur/tibia 캡슐과 구형 발로 구성되며, CAD 메시를 런타임 모델에서 제거한다.
 
 ### 시작
 
@@ -46,8 +46,10 @@ bash scripts/view_foothold_planner.sh --terrain steps
 사용하려면 `HEXAPOD_PYTHON=/path/to/python`을 지정한다. 평지 비교는 `--terrain flat`이다.
 모델은 **로컬 `origin/main`**의 URDF·메시 snapshot을 읽는다. 새 URDF를 올렸다면
 `git fetch origin main` 후 다시 실행한다. `--revision d67abc1`처럼 커밋을 고정할 수도 있다.
-기본 `--robot-display skeleton`은 화면 표시 설정이다. LiDAR의 몸체 가림 계산과 발끝
-위치 추출에는 CAD 메시를 계속 사용한다. CAD 외형을 다시 보려면 `--robot-display mesh`를 붙인다.
+기본 `--robot-model skeleton`은 `mjx/prepare_rl_scene.py`의 기존 학습용 primitive
+형상을 재사용한다. URDF 변환 중에는 CAD를 읽고, 최종 모델의 화면·LiDAR 가림 계산에는
+링크 형상을 사용한다. 발 접지점은 반지름 32 mm인 발 구의 밑면이다.
+CAD 모델 비교는 `--robot-model mesh`이며, 이전 `--robot-display` 옵션도 별칭으로 받는다.
 
 ### 조작법
 
@@ -87,6 +89,10 @@ bash scripts/view_foothold_planner.sh --terrain steps \
 
 지지 발은 odom에 고정하고, swing 목표는 시작 시 결정해 착지까지 유지한다. 유효한
 후보가 없으면 미관측 영역에서 nominal을 사용하되, 관측된 장애물·IK 실패는 무시하지 않는다.
+각 swing 시작 전에 **몸체 이동을 포함한 지지 다리 3개와 swing 다리 3개의 전체 경로**를
+샘플 IK로 검사한다. 회전 이동을 포함해 한 tripod의 이동량을 최대 4 cm로 제한하고,
+도달 범위가 부족하면 보폭을 더 줄인다. 입력 속도·높이 변경은 다음 tripod부터 적용하며
+Space는 몸체를 즉시 멈춘다. 화면의 `Applied`와 `completed swings`로 적용 속도와 반복 횟수를 확인한다.
 지형 검사나 IK에 실패하면 몸체와 swing을 hold하므로 이 경우에는 R로 재시도하거나 H로 초기화한다.
 
 **현재 범위:** `mj_step` 없는 기구학 제어이며 실제 STM32 접촉 제어기, LIO, 동역학 보행,

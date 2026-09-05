@@ -1,4 +1,4 @@
-"""Build an isolated, full-CAD scene from a committed URDF snapshot."""
+"""Build an isolated training-link or CAD scene from a committed URDF snapshot."""
 from __future__ import annotations
 
 import json
@@ -14,6 +14,7 @@ from prepare_scene import _add_scene_elements, _standing_angle, ROOT_QUATERNION,
 from prepare_urdf import _has_positive_inertia
 from tripod_controller import LEG_PREFIXES
 from mid360_profile import metadata as mid360_metadata
+from foothold_link_model import replace_with_training_links, FOOT_RADIUS
 from lidar_extrinsics import (
     SENSOR_FRAME, add_sensor_frames, measured_transform, measurement_metadata,
 )
@@ -117,7 +118,9 @@ def add_obstacle_course(world, terrain):
 
 
 def build_scene(output: Path, revision: str, terrain: str, lidar_frame: str,
-                lidar_tf_source: str = 'measured'):
+                lidar_tf_source: str = 'measured', robot_model: str = 'skeleton'):
+    if robot_model not in ('skeleton', 'mesh'):
+        raise ValueError(f'Unknown robot model: {robot_model}')
     output = output.resolve()
     output.mkdir(parents=True, exist_ok=True)
     (output / '.gitignore').write_text('*\n')
@@ -197,6 +200,11 @@ def build_scene(output: Path, revision: str, terrain: str, lidar_frame: str,
     obstacles = add_obstacle_course(world, terrain)
     tree.write(scene_path, encoding='utf-8', xml_declaration=True)
     model = mujoco.MjModel.from_xml_path(str(scene_path))
+    if robot_model == 'skeleton':
+        # Reuse compiled kinematics with the former MJX training primitives.
+        replace_with_training_links(root, model)
+        tree.write(scene_path, encoding='utf-8', xml_declaration=True)
+        model = mujoco.MjModel.from_xml_path(str(scene_path))
     data = mujoco.MjData(model)
     data.qpos[2] = STAND_HEIGHT
     data.qpos[3:7] = ROOT_QUATERNION
@@ -206,6 +214,11 @@ def build_scene(output: Path, revision: str, terrain: str, lidar_frame: str,
     mujoco.mj_forward(model, data)
     tips = []
     for leg in LEG_PREFIXES:
+        if robot_model == 'skeleton':
+            tip = data.site_xpos[model.site(f'{leg}_sole').id].copy()
+            tip[2] -= FOOT_RADIUS
+            tips.append(tip)
+            continue
         distal = model.body(f'{leg}_motor_horn_3_1').id
         points = []
         for geom_id in range(model.ngeom):
@@ -236,6 +249,12 @@ def build_scene(output: Path, revision: str, terrain: str, lidar_frame: str,
     tree.write(scene_path, encoding='utf-8', xml_declaration=True)
     metadata = {
         'commit': commit, 'urdf': str(source), 'terrain': terrain,
+        'robot_model': robot_model,
+        'geometry_source': ('mjx/prepare_rl_scene.py@3a817c4 training primitives'
+                            if robot_model == 'skeleton' else 'URDF CAD meshes'),
+        'lidar_occlusion': 'active robot model geometry',
+        'foot_contact': ('sphere centre minus 0.032 m along world Z'
+                         if robot_model == 'skeleton' else 'CAD sole site'),
         'lidar_frame': active_lidar_frame, 'T_base_lidar': sensor_transform.tolist(),
         'lidar_tf_source': lidar_tf_source,
         'sensor_extrinsic_source': extrinsic_source,

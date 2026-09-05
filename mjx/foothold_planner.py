@@ -159,7 +159,8 @@ def swing_path(start, end, clearance, samples=41):
 
 def plan_foothold(grid: ElevationMap, start, nominal, now: float,
                   reachable: Callable[[np.ndarray], bool],
-                  cfg: PlannerConfig = PlannerConfig(), allow_unknown_path=False) -> Plan:
+                  cfg: PlannerConfig = PlannerConfig(), allow_unknown_path=False,
+                  path_reachable: Callable[[np.ndarray], bool] | None = None) -> Plan:
     """Rank geometric patches, then validate sampled paths with caller's IK.
 
     No simulator geometry or ground-truth height is accessible from this module.
@@ -236,7 +237,9 @@ def plan_foothold(grid: ElevationMap, start, nominal, now: float,
             reasons[index], status = 'clearance_limit', 'clearance_limit'
             continue
         trial = swing_path(start, end, clearance)
-        if not all(reachable(point) for point in trial):
+        path_ok = (path_reachable(trial) if path_reachable is not None
+                   else all(reachable(point) for point in trial))
+        if not path_ok:
             reasons[index], status = 'path_ik', 'path_ik'
             continue
         path = trial
@@ -250,14 +253,15 @@ def plan_foothold(grid: ElevationMap, start, nominal, now: float,
 
 
 def plan_with_nominal_fallback(grid, start, nominal, now, reachable,
-                               cfg=PlannerConfig(), allow_unknown=True):
+                               cfg=PlannerConfig(), allow_unknown=True, path_reachable=None):
     """Unknown terrain may use nominal motion; observed hazards still veto it.
 
     This preview supplies a lift/transfer/lower nominal path. A walking adapter
     must supply its existing controller trajectory at the same handoff boundary.
     The returned nominal mode explicitly does NOT mean terrain-verified safe.
     """
-    plan = plan_foothold(grid, start, nominal, now, reachable, cfg, allow_unknown_path=allow_unknown)
+    plan = plan_foothold(grid, start, nominal, now, reachable, cfg,
+                        allow_unknown_path=allow_unknown, path_reachable=path_reachable)
     if plan.path is not None or not allow_unknown:
         return plan
     nominal_path = swing_path(start, nominal, cfg.min_clearance)
@@ -272,7 +276,9 @@ def plan_with_nominal_fallback(grid, start, nominal, now, reachable,
         plan.selected, plan.path, plan.mode = None, None, 'hold'
         plan.status = 'hold_known_hazard'
         return plan
-    if not all(reachable(point) for point in nominal_path):
+    path_ok = (path_reachable(nominal_path) if path_reachable is not None
+               else all(reachable(point) for point in nominal_path))
+    if not path_ok:
         plan.selected, plan.path, plan.mode = None, None, 'hold'
         plan.status = 'hold_nominal_ik'
         return plan

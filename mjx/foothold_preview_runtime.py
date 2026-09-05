@@ -19,6 +19,17 @@ class SiteIK:
         self.jacobian = np.zeros((3, model.nv))
         self.site_ids = [model.site(f'{leg}_sole').id for leg in LEG_PREFIXES]
         self.joints = [[model.joint(f'{leg}_{j}').id for j in (1, 2, 3)] for leg in LEG_PREFIXES]
+        self.foot_radii = np.zeros(len(LEG_PREFIXES))
+        for index, leg in enumerate(LEG_PREFIXES):
+            foot = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_GEOM, f'{leg}_foot_collision')
+            if foot >= 0:
+                self.foot_radii[index] = model.geom_size[foot, 0]
+
+    def positions(self, data):
+        """World contact points, including the legacy training foot sphere radius."""
+        points = data.site_xpos[self.site_ids].copy()
+        points[:, 2] -= self.foot_radii
+        return points
 
     def solve(self, leg, target, seed=None):
         ids = self.joints[leg]
@@ -31,7 +42,7 @@ class SiteIK:
             # Only position kinematics / Jacobian preparation are required here.
             mujoco.mj_kinematics(self.model, self.data)
             mujoco.mj_comPos(self.model, self.data)
-            error = target - self.data.site_xpos[self.site_ids[leg]]
+            error = np.asarray(target) + (0, 0, self.foot_radii[leg]) - self.data.site_xpos[self.site_ids[leg]]
             if np.linalg.norm(error) < 0.001:
                 return self.data.qpos[qids].copy()
             mujoco.mj_jacSite(self.model, self.data, self.jacobian, None, self.site_ids[leg])
@@ -112,11 +123,11 @@ class PerceptionWorker:
         self.data.qpos[:] = qpos
         mujoco.mj_forward(self.model, self.data)
         self.ik.home = qpos.copy()
-        starts = self.data.site_xpos[self.ik.site_ids].copy()
+        starts = self.ik.positions(self.data)
         self.reference_data.qpos[:] = self.neutral_qpos
         self.reference_data.qpos[:7] = qpos[:7]
         mujoco.mj_kinematics(self.model, self.reference_data)
-        neutral_feet = self.reference_data.site_xpos[self.ik.site_ids].copy()
+        neutral_feet = self.ik.positions(self.reference_data)
         root_rotation = self.data.xmat[self.model.body('hexapod').id].reshape(3, 3)
         forward, left = -root_rotation[:, 1], root_rotation[:, 0]
         vx, vy, wz = command
@@ -178,28 +189,6 @@ def add_line(scene, start, end, color, width=0.002):
     mujoco.mjv_connector(geom, mujoco.mjtGeom.mjGEOM_CAPSULE, width,
                          np.asarray(start, dtype=float), np.asarray(end, dtype=float))
     scene.ngeom += 1
-
-
-def draw_robot_skeleton(scene, data, joint_ids, sole_ids):
-    """Connect actual world-space joint anchors and sole sites, with no CAD rendering.
-
-    Overlay geometry is purely visual and cannot create phantom LiDAR returns.
-    Joint order and foot locations are shared with IK, including CAD-derived soles.
-    """
-    hips = np.array([data.xanchor[ids[0]] for ids in joint_ids])
-    body_color = (0.65, 0.73, 0.82, 1)
-    # RF -> RM -> RB -> LB -> LM -> LF closes the chassis outline.
-    perimeter = (0, 1, 2, 5, 4, 3, 0)
-    for a, b in zip(perimeter[:-1], perimeter[1:]):
-        add_line(scene, hips[a], hips[b], body_color, 0.005)
-    for leg, ids in enumerate(joint_ids):
-        chain = np.vstack((data.xanchor[ids], data.site_xpos[sole_ids[leg]]))
-        for start, end in zip(chain[:-1], chain[1:]):
-            if np.linalg.norm(end - start) > 1e-8:
-                add_line(scene, start, end, (0.9, 0.93, 0.97, 1), 0.006)
-        for anchor in chain[:-1]:
-            add_sphere(scene, anchor, 0.010, body_color)
-        add_sphere(scene, chain[-1], 0.008, (1, 1, 1, 1))
 
 
 def add_height_cell(scene, point, resolution, color):

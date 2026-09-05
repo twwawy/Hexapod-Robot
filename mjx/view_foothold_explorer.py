@@ -19,7 +19,7 @@ import mujoco
 import numpy as np
 
 from foothold_preview_runtime import PerceptionWorker, add_sphere, add_line, add_height_cell
-from foothold_preview_runtime import draw_mid360_fov, draw_robot_skeleton
+from foothold_preview_runtime import draw_mid360_fov
 from foothold_preview_scene import build_scene
 from tripod_controller import LEG_PREFIXES
 from continuous_foothold_gait import ContinuousFootholdGait
@@ -29,7 +29,7 @@ class Preview:
     def __init__(self, args):
         self.args = args
         scene, self.manifest = build_scene(args.output, args.revision, args.terrain,
-                                          args.lidar_frame, args.lidar_tf_source)
+                                          args.lidar_frame, args.lidar_tf_source, args.robot_display)
         self.model = mujoco.MjModel.from_xml_path(str(scene))
         self.data = mujoco.MjData(self.model)
         mujoco.mj_resetDataKeyframe(self.model, self.data, self.model.key('home').id)
@@ -75,6 +75,7 @@ class Preview:
             elif key == glfw.KEY_SPACE:
                 self.command[:] = 0
                 self.in_place = False
+                self.gait.stop_body()
                 self.status = 'Stop requested: finish the current swing, then hold stance'
                 self.last_submit = -np.inf
             elif key == glfw.KEY_ENTER:
@@ -102,6 +103,7 @@ class Preview:
             elif key == ord('C'):
                 self.command[:] = 0
                 self.in_place = False
+                self.gait.stop_body()
                 self.generation += 1
                 self.result = None
                 self.last_submit = -np.inf
@@ -165,11 +167,19 @@ class Preview:
 
     def save_result(self, now, save_map=False):
         result = self.result
-        summary = dict(pose=result['pose'][:7].tolist(), stats=result['stats'],
+        summary = dict(pose=self.rest[:7].tolist(), qpos=self.rest.tolist(),
+                       robot_model=self.args.robot_display, stats=result['stats'],
                        scan_ms=result['scan_ms'], plan_ms=result['plan_ms'],
                        near_valid_fraction=result['near_valid_fraction'],
                        snapshot_age_s=now - result['stamp'], physics_stepped=False, rl_residual=0,
-                       gait_status=self.gait.status, active_tripod=list(self.gait.plans), legs={})
+                       gait_status=self.gait.status, active_tripod=list(self.gait.plans),
+                       completed_swings=self.gait.completed_swings,
+                       phase_progress=self.gait.elapsed/self.gait.duration,
+                       phase_stride_scale=self.gait.phase_scale,
+                       command_requested=self.command.tolist(),
+                       command_applied=self.gait.applied_command.tolist(),
+                       feet_odom=self.gait.ik.positions(self.data).tolist(),
+                       stance_anchors_odom=self.gait.anchors.tolist(), legs={})
         for index, (leg, draft) in enumerate(zip(LEG_PREFIXES, result['plans'])):
             plan = self.gait.plans.get(index, draft)
             summary['legs'][leg] = dict(mode=plan.mode, status=plan.status, nominal=plan.nominal.tolist(),
@@ -189,8 +199,6 @@ class Preview:
     def draw(self, viewer, now):
         scene = viewer.user_scn
         scene.ngeom = 0
-        if self.args.robot_display == 'skeleton':
-            draw_robot_skeleton(scene, self.data, self.gait.ik.joints, self.gait.ik.site_ids)
         sensor = self.model.site('lidar_origin').id
         origin = self.data.site_xpos[sensor]
         rotation = self.data.site_xmat[sensor].reshape(3, 3)
@@ -260,10 +268,13 @@ class Preview:
             diagnostics = (f'Ground hits {stats["ground_hits"]} / rays {stats["rays"]} | body hits {stats["body_hits"]}\n'
                            f'Near-foot coverage {result["near_valid_fraction"]:.0%} | snapshot age {now-result["stamp"]:.1f}s\n'
                            f'Scan {result["scan_ms"]:.0f} ms | six-leg plan {result["plan_ms"]:.0f} ms')
+        applied = self.gait.applied_command
         text = (f'FOOTHOLD EXPLORER | {self.manifest["commit"][:7]} | KINEMATIC / RL=0 | {self.args.robot_display.upper()}\n'
                 f'{self.status}\n'
                 f'x={self.rest[0]:.2f} y={self.rest[1]:.2f} yaw={np.rad2deg(self.yaw):.0f}deg '
                 f'| vx={self.command[0]:+.2f} vy={self.command[1]:+.2f} wz={self.command[2]:+.2f}\n'
+                f'Applied vx={applied[0]:+.2f} vy={applied[1]:+.2f} wz={applied[2]:+.2f} '
+                f'| completed swings={self.gait.completed_swings}\n'
                 f'{diagnostics}\n' + '\n'.join(rows) + '\n'
                 'Arrows: forward/back + turn | A/D strafe | SPACE STOP | PgUp/PgDn height\n'
                 'Continuous tripod | 1..6 detail only | Enter in-place toggle | R retry | P save | H home | C clear map\n'
@@ -278,8 +289,9 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--revision', default='origin/main')
     parser.add_argument('--terrain', choices=('flat', 'steps'), default='steps')
-    parser.add_argument('--robot-display', choices=('skeleton', 'mesh'), default='skeleton',
-                        help='robot rendering only; CAD geometry is retained for LiDAR occlusion')
+    parser.add_argument('--robot-model', '--robot-display', dest='robot_display',
+                        choices=('skeleton', 'mesh'), default='skeleton',
+                        help='legacy MJX training primitives (default) or full CAD model')
     parser.add_argument('--lidar-frame', default='livox_mid_360_2')
     parser.add_argument('--lidar-tf-source', choices=('measured', 'urdf'), default='measured')
     parser.add_argument('--step-length', type=float, default=0.08)
@@ -314,9 +326,7 @@ def main():
         with mujoco.viewer.launch_passive(preview.model, preview.data,
                                           key_callback=preview.keys.put) as viewer:
             with viewer.lock():
-                # Hide CAD in the renderer only. The worker keeps its own ray group mask,
-                # so invisible chassis/legs still occlude LiDAR as before.
-                viewer.opt.geomgroup[1] = int(args.robot_display == 'mesh')
+                viewer.opt.geomgroup[1] = 1
                 viewer.opt.geomgroup[5] = int(args.robot_display == 'mesh')
                 viewer.cam.distance, viewer.cam.azimuth, viewer.cam.elevation = 3.2, 135, -50
             print('Arrow keys start continuous tripod motion; SPACE finishes swing and stops. No physics / hardware control.', flush=True)

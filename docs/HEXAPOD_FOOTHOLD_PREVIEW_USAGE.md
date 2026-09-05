@@ -23,18 +23,23 @@ bash scripts/view_foothold_planner.sh --terrain steps
 `--revision d67abc1`을 붙인다. GitHub에 새 URDF를 올린 경우 먼저 `git fetch origin main`을
 실행한다. 기존 로컬 URDF 변경사항을 덮어쓰지 않고 별도 asset snapshot을 만든다.
 
-기본 화면은 **skeleton 표시**다. 로봇 CAD 메시를 숨기고, 몸체의 다리 부착점 둘레와
-각 다리의 실제 관절 중심 3개·발끝을 선과 점으로 그린다. 발끝은 IK에서 쓰는 sole site와
-같은 좌표이며, 연속 swing 중에도 현재 관절 자세를 따라간다. 착지 목표는 이보다 큰
-색상 마커로 구분한다. 바닥·장애물·LiDAR FOV·지도는 함께 표시한다.
+기본 `--robot-model skeleton`은 **예전 MJX 학습용 링크 모델**이다.
+`mjx/prepare_rl_scene.py@3a817c4`의 `_add_robot_colliders`와 같은 형상을
+`mjx/foothold_link_model.py`에서 재사용한다. 박스 몸체(반치수 0.17/0.15/0.045 m),
+coxa/femur/tibia 캡슐(반지름 28/26/23 mm), tibia 끝까지 길이 230 mm,
+반지름 32 mm인 구형 발로 구성한다. 관절 위치·축·범위는 지정한 URDF에서 가져온다.
 
-`--robot-display skeleton`은 렌더링만 바꾼다. 메시를 로드하는 과정과 LiDAR의 몸체
-가림 계산은 유지하므로, 메시 제거로 scan이 몸체를 통과하게 만들지는 않는다.
-skeleton 선·점은 화면 overlay이며 LiDAR 반환점에 포함되지 않는다.
-이전 CAD 외형을 보고 싶으면 다음과 같이 실행한다.
+URDF 변환 중 CAD 메시를 읽어 관절·관성을 확보한 뒤 최종 scene에서는 메시를 제거한다.
+화면과 LiDAR의 몸체 가림 계산에 같은 primitive 형상을 사용한다. 발 목표와 지지 발
+좌표는 구 중심에서 world Z로 32 mm 아래인 접지점이다. 따라서 구 중심을 바닥에 놓거나
+다리 회전으로 가상의 sole offset이 돌아가는 문제가 없도록 구성했다.
+LiDAR TF/FOV·지도·지형·착지 마커도 함께 사용한다.
+
+CAD 메시 모델과 비교하려면 다음처럼 실행한다. `--robot-display`는 `--robot-model`의
+호환 별칭이며, 이전 선·점 overlay 모드는 제거했다.
 
 ```bash
-bash scripts/view_foothold_planner.sh --terrain steps --robot-display mesh
+bash scripts/view_foothold_planner.sh --terrain steps --robot-model mesh
 ```
 
 ## 이동과 화면 조작
@@ -86,6 +91,18 @@ bash scripts/view_foothold_planner.sh --terrain steps --robot-display mesh
 각 tripod의 기본 swing 시간은 0.8초이며, 지지 중인 발은 odom 위치를 유지한다.
 다음 swing 시작 시 nominal 주변의 지형 후보를 선택하고, 진행 중인 착지점은 고정한다.
 nominal은 현재 발 위치에 offset을 계속 더하지 않고, 몸체의 기준 stance와 예측 이동량에서 만든다.
+착지 목표를 다음 지지 구간의 절반만큼 앞에 두어, 지지 발이 몸체 뒤로만 밀리지 않게 한다.
+
+각 tripod를 들기 전에 예측한 몸체 경로와 함께 **여섯 다리의 전체 41개 경로 샘플**을
+IK로 검사한다. 지지 다리는 고정된 접지점을, swing 다리는 lift/transfer/lower 경로를 검사한다.
+회전으로 인한 발 주변 이동까지 포함해 한 tripod당 최대 4 cm로 명령을 제한하고,
+필요하면 1/2, 1/4, 1/8, 제자리 순서로 줄여 가능한 경로를 찾는다. 알려진 지형 위험을
+무시해서 통과시키지는 않는다. 제자리 경로도 불가능하면 발을 들기 전에 원인을 표시한다.
+
+속도와 높이는 계획을 통과한 값을 해당 swing 동안 유지한다. 방향키/PageUp/PageDown
+변경은 다음 tripod에서 적용하고, Space는 현재 몸체 위치에서 즉시 정지한 뒤 착지를 마친다.
+HUD의 입력 `vx/vy/wz`와 실제 `Applied`는 보폭·관절 속도 제한 때문에 다를 수 있다.
+`completed swings`가 착지 때마다 증가하고 tripod가 번갈아 바뀌는지 확인한다.
 
 발 IK와 관절 속도 제한을 통과한 경우에만 몸체와 여섯 다리 목표를 함께 반영한다.
 실행 가능한 swing 계획이 없으면 몸체를 계속 끌고 가지 않고 기다린다. 진행 중 IK 또는
@@ -121,7 +138,8 @@ Space로 정상 정지를 요청하면 몸체 이동은 멈추고 현재 swing�
 지면 방향 ray를 늘리기 위해 기존 FOV 안에서 하단 각도의 sampling을 조밀하게 했다.
 이는 관측 가능한 지면의 점밀도를 위한 시뮬레이션 proxy이며 실제 Livox 패턴 재현은 아니다.
 sensor TF를 아래로 뒤집거나 가상의 지면 높이를 주입하지 않는다.
-몸체에 맞은 ray는 지면까지 통과시키지 않는다. 센서 housing/FOV helper는 self-ray 대상에서 제외한다.
+몸체에 맞은 ray는 지면까지 통과시키지 않는다. 기본 링크 모델에서는 primitive가 ray를 가린다.
+CAD 비교 모드에서는 센서 housing/FOV helper를 self-ray 대상에서 제외한다.
 
 높이 지도는 완전한 terrain 정답이 아니다. 위를 향한 센서에서는 가까운 발밑이 보이지 않을 수
 있으며, 처음에 주황색 nominal만 보이는 상황이 가능하다. 멀리 보인 셀은 전진 후에도 odom
@@ -208,7 +226,9 @@ base_link → lidar: xyz = (0, -0.013529, 0.1642) m
    1~6으로 각 다리의 거부 사유와 후보 분포를 본다.
 5. 장애물 위로 기준 pose를 옮길 때 **PageUp**으로 몸체 높이를 조정한다.
    이 환경은 자동으로 지형 높이를 읽어 몸을 들지 않는다.
-6. 방향키 이동 중 두 tripod가 번갈아 들리고 지지 발은 지면 좌표를 유지하는지 본다.
+6. Enter로 제자리에서 `completed swings`가 1, 2, 3… 증가하고 두 tripod가 번갈아 드는지 본다.
+   이어서 ↑를 한 번 눌러 이동하며 반복되는지, 지지 발이 지면 좌표를 유지하는지 본다.
+   `Applied`가 0이면 보폭을 제자리로 줄였거나 hold 중인지 HUD 상태를 확인한다.
    **Space**로 현재 swing을 마치며 멈추는지, **Enter**로 제자리에서 반복 swing하는지 확인한다.
 7. map이 이상하면 **P**로 저장한다. **C**로 관측 이력을 지우면 누적 오차인지 현재 raycast
    위치 문제인지 구분할 수 있다. **K**는 scan을 끄므로 map은 유지시간 뒤 만료된다.

@@ -26,27 +26,37 @@ class ContinuousFootholdGait:
         self.neutral_qpos = data.qpos.copy()
         root = data.xpos[model.body('hexapod').id]
         rotation = data.xmat[model.body('hexapod').id].reshape(3, 3)
-        self.neutral_feet_body = (data.site_xpos[self.ik.site_ids] - root) @ rotation
+        self.neutral_feet_body = (self.ik.positions(data) - root) @ rotation
         self.reset()
 
     def reset(self):
         mujoco.mj_forward(self.model, self.data)
-        self.anchors = self.data.site_xpos[self.ik.site_ids].copy()
+        self.anchors = self.ik.positions(self.data)
         self.group_index = 0
         self.plans = {}
         self.elapsed = 0.0
         self.last_attempt = -np.inf
         self.blocked = False
         self.rate_scale = 1.0
+        self.phase_command = np.zeros(3)
+        self.phase_scale = 1.0
+        self.phase_origin = self.data.qpos.copy()
+        self.phase_height = float(self.data.qpos[2])
+        self.stopped_root = None
+        self.completed_swings = 0
         self.status = 'Ready: arrows start alternating tripod swing'
 
-    def root_pose(self, command, dt, target_height):
-        pose = self.data.qpos.copy()
+    def root_pose(self, command, dt, target_height, seed=None):
+        pose = self.data.qpos.copy() if seed is None else seed.copy()
         w, x, y, z = pose[3:7]
         yaw = np.arctan2(2 * (w*z+x*y), 1 - 2 * (y*y+z*z)) - np.pi / 2
-        yaw += command[2] * dt
-        c, s = np.cos(yaw), np.sin(yaw)
-        pose[:2] += dt * np.array((c*command[0]-s*command[1], s*command[0]+c*command[1]))
+        delta = command[2] * dt
+        c, s = np.cos(yaw + delta/2), np.sin(yaw + delta/2)
+        # Integrate a constant body twist exactly, matching the preflight poses
+        # even when rendering or joint-rate limiting splits time differently.
+        pose[:2] += dt * np.sinc(delta/(2*np.pi)) * np.array(
+            (c*command[0]-s*command[1], s*command[0]+c*command[1]))
+        yaw += delta
         pose[:2] = np.clip(pose[:2], -5.5, 5.5)
         pose[2] += np.clip(target_height-pose[2], -0.04*dt, 0.04*dt)
         angle = yaw + np.pi/2
@@ -58,28 +68,70 @@ class ContinuousFootholdGait:
             self.status = 'Waiting for a recent map; body held'
             return False
         self.last_attempt = now
-        # Nominal positions are around the neutral stance, not accumulated offsets
-        # from the previous touchdown. Predict the root at the end of this swing.
-        future = self.root_pose(command, self.duration, target_height)
-        a = 2 * np.arctan2(future[6], future[3])
-        rotation = np.array(((np.cos(a), -np.sin(a), 0),
-                             (np.sin(a), np.cos(a), 0), (0, 0, 1)))
-        nominal = self.neutral_feet_body @ rotation.T + future[:3]
-        nominal[:, 2] = self.anchors[:, 2]  # unknown terrain continues support height
-        planned = {}
-        self.ik.home = self.data.qpos.copy()
-        for leg in self.GROUPS[self.group_index]:
-            plan = plan_with_nominal_fallback(
-                result['grid'], self.anchors[leg], nominal[leg], now,
-                lambda point, leg=leg: self.ik.solve(leg, point) is not None,
-                self.cfg, allow_unknown=self.allow_unknown)
-            if plan.path is None:
-                self.status = f'Body held: {LEG_PREFIXES[leg]} {plan.status}'
-                return False
-            planned[leg] = plan
-        self.plans = planned
-        self.elapsed, self.blocked = 0.0, False
-        return True
+        origin = self.data.qpos.copy()
+        swing_legs = self.GROUPS[self.group_index]
+        stance_legs = self.GROUPS[1-self.group_index]
+        # Bound motion per tripod, including the displacement induced by yaw.
+        # The previous implementation allowed 12.8 cm at the highest key speed,
+        # stranding the stance legs before the next tripod could lift.
+        radius = float(np.max(np.linalg.norm(self.neutral_feet_body[:, :2], axis=1)))
+        travel = (np.linalg.norm(command[:2]) + radius*abs(command[2])) * self.duration
+        limit = min(1.0, 0.04/max(travel, 1e-9))
+        failure = 'no reachable phase'
+        for reduction in (1.0, 0.5, 0.25, 0.125, 0.0):
+            phase_command = np.asarray(command) * limit * reduction
+            poses = [self.root_pose(phase_command, t, target_height, origin)
+                     for t in np.linspace(0, self.duration, 41)]
+
+            def path_reachable(leg, path):
+                seed = origin[self.model.jnt_qposadr[self.ik.joints[leg]]].copy()
+                for pose, point in zip(poses, path):
+                    self.ik.home = pose
+                    solution = self.ik.solve(leg, point, seed)
+                    if solution is None:
+                        return False
+                    seed = solution
+                return True
+
+            # Check anchored support legs across the WHOLE phase before lifting.
+            bad_stance = next((leg for leg in stance_legs if not path_reachable(
+                leg, np.tile(self.anchors[leg], (len(poses), 1)))), None)
+            if bad_stance is not None:
+                failure = f'{LEG_PREFIXES[bad_stance]} stance IK'
+                continue
+            # Land half a stance ahead of neutral so the following support phase
+            # traverses the workspace symmetrically instead of always trailing.
+            future = self.root_pose(phase_command, 1.5*self.duration, target_height, origin)
+            a = 2*np.arctan2(future[6], future[3])
+            rotation = np.array(((np.cos(a), -np.sin(a), 0),
+                                 (np.sin(a), np.cos(a), 0), (0, 0, 1)))
+            nominal = self.neutral_feet_body @ rotation.T + future[:3]
+            nominal[:, 2] = self.anchors[:, 2]
+            planned = {}
+            for leg in swing_legs:
+                def endpoint_reachable(point):
+                    self.ik.home = poses[-1]
+                    return self.ik.solve(leg, point) is not None
+
+                plan = plan_with_nominal_fallback(
+                    result['grid'], self.anchors[leg], nominal[leg], now,
+                    endpoint_reachable, self.cfg, allow_unknown=self.allow_unknown,
+                    path_reachable=lambda path, leg=leg: path_reachable(leg, path))
+                if plan.path is None:
+                    failure = f'{LEG_PREFIXES[leg]} {plan.status}'
+                    break
+                planned[leg] = plan
+            if len(planned) != len(swing_legs):
+                continue
+            self.plans = planned
+            self.phase_command = phase_command.copy()
+            self.phase_scale = limit * reduction
+            self.phase_origin, self.phase_height = origin, target_height
+            self.stopped_root = None
+            self.elapsed, self.blocked = 0.0, False
+            return True
+        self.status = f'Body held before lift: {failure}; reduce command/height or R retry'
+        return False
 
     def tick(self, result, command, dt, target_height, in_place=False, allow_unknown=True):
         now = time.monotonic()
@@ -98,7 +150,16 @@ class ContinuousFootholdGait:
             pose = self.root_pose(np.zeros(3), motion_dt, target_height)
         else:
             next_elapsed = min(self.duration, self.elapsed + motion_dt)
-            pose = self.root_pose(command, motion_dt, target_height)
+            # A phase uses the command/height that passed preflight. Other key
+            # changes take effect at the next tripod; zero velocity stops now.
+            if (np.max(np.abs(command)) <= 1e-5
+                    and np.max(np.abs(self.phase_command)) > 1e-5):
+                self.stop_body()
+            pose = self.root_pose(self.phase_command, next_elapsed,
+                                  self.phase_height, self.phase_origin)
+            pose[7:] = self.data.qpos[7:]
+            if self.stopped_root is not None:
+                pose[:7] = self.stopped_root
         targets = self.anchors.copy()
         if self.plans:
             if result is None:
@@ -142,14 +203,26 @@ class ContinuousFootholdGait:
         self.rate_scale = min(1.0, getattr(self, 'rate_scale', 1.0)*1.02)
         if self.plans:
             legs = '/'.join(LEG_PREFIXES[i] for i in self.plans)
-            self.status = f'Continuous tripod {legs}: {self.elapsed/self.duration:.0%}'
+            self.status = (f'Continuous tripod {legs}: {self.elapsed/self.duration:.0%} '
+                           f'| completed {self.completed_swings} | stride scale {self.phase_scale:.0%}')
             if self.elapsed >= self.duration:
                 for leg, plan in self.plans.items():
                     self.anchors[leg] = plan.selected.copy()
                 self.plans = {}
                 self.group_index = 1-self.group_index
+                self.completed_swings += 1
                 self.status = 'Touchdown; preparing next tripod' if requested else 'Stopped after touchdown'
 
     def retry(self):
         self.blocked = False
         self.last_attempt = -np.inf
+
+    def stop_body(self):
+        if self.plans and self.stopped_root is None:
+            self.stopped_root = self.data.qpos[:7].copy()
+
+    @property
+    def applied_command(self):
+        if not self.plans or self.blocked or self.stopped_root is not None:
+            return np.zeros(3)
+        return self.phase_command * self.rate_scale
