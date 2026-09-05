@@ -1,5 +1,10 @@
 # Hexapod Perceptive Residual Locomotion 구현 계획
 
+> 2026-09-06 구조 변경: 최신 결정은
+> [LiDAR·IMU → geometric foothold correction → RL residual 계획](HEXAPOD_LIDAR_FOOTHOLD_RESIDUAL_PLAN.md)을 따른다.
+> 첫 단계는 LiDAR 기반 elevation map과 착지 후보 선택이며, D435IF RGB는 후속 후보 점수에 사용한다.
+> 아래 LiDAR+Depth 동시 fusion과 기존 actor 차원은 이전 계획 기록이며 새 구현의 확정 계약이 아니다.
+
 작성일: 2026-08-27 (Asia/Seoul)  
 대상 브랜치: `codex/cartesian-residual-rl`  
 대상 환경: Isaac Lab 2.3.0 / Isaac Sim 5.1  

@@ -8,11 +8,94 @@
 > 평지→울퉁불퉁→경사면→10×20cm 최종 계단, best/stage/progress 영상과 checkpoint 규칙은
 > [mjx/RL_DESIGN.md](mjx/RL_DESIGN.md)를 따른다.
 
-Isaac 이식 이후의 최종 배포 목표는 MID-360 + Depth + IMU 기반 perceptive residual
-locomotion이다. GT 지형 누설 제거, gravity-aligned elevation map, asymmetric
-actor-critic, Jetson/STM32 역할과 단계별 gate는
-[docs/HEXAPOD_PERCEPTIVE_RESIDUAL_ISAACLAB_PLAN.md](docs/HEXAPOD_PERCEPTIVE_RESIDUAL_ISAACLAB_PLAN.md)를
-기준으로 한다.
+최신 인식·보행 구조는 **LiDAR + IMU 상태 추정 → local elevation map → geometric
+foothold correction → RL residual → Safety / IK**다. D435IF RGB는 후속 단계에서
+지도 위 traversability/semantic score로 착지 후보를 평가하는 데 추가한다.
+구현 단계와 인터페이스는
+[LiDAR 착지점·residual 설계](docs/HEXAPOD_LIDAR_FOOTHOLD_RESIDUAL_PLAN.md)를 따른다.
+
+## MuJoCo 착지점 탐색과 연속 tripod swing
+
+방향키로 넓은 장애물 코스를 이동하면서 MID-360 점군, 누적 높이 지도와 여섯 다리의
+착지 후보를 확인하는 **기구학 미리보기**다. 이동 명령을 주면
+`RF/RB/LM ↔ RM/LF/LB` 순서로 연속 swing한다. 다리 번호를 누를 필요는 없다.
+로봇은 기본적으로 **메시를 숨기고 skeleton만 표시**한다. 몸체 윤곽과 각 다리의
+관절 3개·발끝을 선과 점으로 연결해 swing과 착지 목표를 보기 쉽게 했다.
+
+### 시작
+
+이 기능과 루트 `mjx/` 실행 코드는 `codex/cartesian-residual-rl` 브랜치에 있다.
+기존 작업 파일이 있는 경우 브랜치 전환 전에 변경 상태를 확인한다.
+
+```bash
+git clone --branch codex/cartesian-residual-rl https://github.com/twwawy/Hexapod-Robot.git
+cd Hexapod-Robot
+python3 -m venv ~/.venvs/hexapod-mjx
+~/.venvs/hexapod-mjx/bin/python -m pip install 'mujoco==3.12.0' numpy glfw
+bash scripts/view_foothold_planner.sh --terrain steps
+```
+
+현재 개발 PC에서는 기존 가상환경을 사용해 바로 실행한다.
+
+```bash
+cd /home/huro/Hexapod-Robot
+bash scripts/view_foothold_planner.sh --terrain steps
+```
+
+가상환경 경로는 `~/.venvs/hexapod-mjx`이며 활성화 없이 실행 가능하다. 다른 Python을
+사용하려면 `HEXAPOD_PYTHON=/path/to/python`을 지정한다. 평지 비교는 `--terrain flat`이다.
+모델은 **로컬 `origin/main`**의 URDF·메시 snapshot을 읽는다. 새 URDF를 올렸다면
+`git fetch origin main` 후 다시 실행한다. `--revision d67abc1`처럼 커밋을 고정할 수도 있다.
+기본 `--robot-display skeleton`은 화면 표시 설정이다. LiDAR의 몸체 가림 계산과 발끝
+위치 추출에는 CAD 메시를 계속 사용한다. CAD 외형을 다시 보려면 `--robot-display mesh`를 붙인다.
+
+### 조작법
+
+방향키는 목표 속도를 증감한다. **키를 놓아도 이동하며 Space로 정지한다.**
+
+| 키 | 동작 |
+|---|---|
+| ↑ / ↓ | 전후진 속도 변경, 연속 tripod swing 시작 |
+| ← / → | 좌우 회전 속도 변경 |
+| A / D | 좌우 평행이동 |
+| Space | 몸체 이동 명령 0, 진행 중 swing을 착지까지 마친 뒤 정지 |
+| Enter | 제자리 연속 swing 켜기/끄기 |
+| PageUp / PageDown | 몸체 목표 높이 조절; 발 IK 가능 범위에서 적용 |
+| 1~6 | RF/RM/RB/LF/LM/LB의 후보 상세 표시만 선택 |
+| M / L / G | 높이 지도 / LiDAR 점군 / MID-360 FOV 표시 전환 |
+| F / T / V | 추적 카메라 / 위에서 보기 / 전체 코스 |
+| R / P / H | hold 재시도·갱신 / 지도·계획 저장 / 출발 pose 초기화 |
+| K / C | LiDAR scan 전환 / 지도 초기화 |
+
+### 지도·센서·착지점
+
+- `steps`: 12×12 m 공간의 계단, 경사로, 플랫폼, 징검다리, 좁은 돌출물, 요철과 바위.
+- 높이 지도: 8×8 m rolling ROI, 4 cm 셀, odom 좌표에 관측을 60초 유지.
+- LiDAR: 몸체 밑면 중심에서 **높이 215 mm, 전방 13.529 mm, 전방 기울기 45°**.
+  센서 +Z는 위를 향한다. `base_link` 기준 위치는 `(0, -0.013529, 0.1642) m`이다.
+- MID-360 FOV: 수평 360°, 수직 -7°~+52°. raycast와 센서에 부착된 FOV 경계선이
+  같은 각도 설정을 사용한다. [Livox 공식 사양](https://www.livoxtech.com/mid-360/specs)
+- 높이 셀은 16%, LiDAR 점은 22% 불투명도로 표시하고, 착지 목표는 크게 불투명하게 표시한다.
+- 주황색 목표: 미관측 nominal fallback. 파란색: geometric 목표.
+  청록색: 착지 patch는 관측됐지만 경로 일부는 미관측. 빨간 X: 실행 가능한 목표 없음.
+
+```bash
+# 표시를 더 옅게 / swing 속도를 느리게
+bash scripts/view_foothold_planner.sh --terrain steps \
+  --map-alpha 0.10 --lidar-point-alpha 0.15 --gait-swing-duration 1.2
+```
+
+지지 발은 odom에 고정하고, swing 목표는 시작 시 결정해 착지까지 유지한다. 유효한
+후보가 없으면 미관측 영역에서 nominal을 사용하되, 관측된 장애물·IK 실패는 무시하지 않는다.
+지형 검사나 IK에 실패하면 몸체와 swing을 hold하므로 이 경우에는 R로 재시도하거나 H로 초기화한다.
+
+**현재 범위:** `mj_step` 없는 기구학 제어이며 실제 STM32 접촉 제어기, LIO, 동역학 보행,
+RGB 또는 RL 추론은 연결 전이다. LiDAR는 angular raycast proxy이며 Livox 비반복 패턴과
+동일하지 않다. 연속 swing·지도·skeleton 확장본의 실행·렌더링·보행 검증은 사용자 요청에 따라
+수행하지 않았다.
+
+자세한 구성·확인 순서·저장 파일은
+[착지점 미리보기 사용 안내](docs/HEXAPOD_FOOTHOLD_PREVIEW_USAGE.md)를 참고한다.
 
 ## 현재 MJX 기준
 
