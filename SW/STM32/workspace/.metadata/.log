@@ -8625,3 +8625,99 @@ COM13
 
 !ENTRY com.st.stm32cube.ide.mcu.ide 1 1 2026-09-01 04:09:39.119
 !MESSAGE Started RMI Server, listening on port 41337
+!SESSION 2026-09-06 01:25:51.330 -----------------------------------------------
+eclipse.buildId=Version 2.2.0
+java.version=21.0.10
+java.vendor=Eclipse Adoptium
+BootLoader constants: OS=win32, ARCH=x86_64, WS=win32, NL=ko_KR
+Framework arguments:  C:\Project_TW\Hexapod\Hexapod-Robot\SW\STM32\workspace\Hexapod\.project
+Command-line arguments:  -os win32 -ws win32 -arch x86_64 C:\Project_TW\Hexapod\Hexapod-Robot\SW\STM32\workspace\Hexapod\.project
+
+!ENTRY com.st.stm32cube.ide.mcu.informationcenter 1 1 2026-09-06 01:26:09.210
+!MESSAGE Log4j2 initialized with config file C:\Project_TW\Hexapod\Hexapod-Robot\SW\STM32\workspace\.metadata\.log4j2.xml
+
+!ENTRY com.st.stm32cube.ide.mcu.ide 1 1 2026-09-06 01:26:25.990
+!MESSAGE Started RMI Server, listening on port 41337
+
+!ENTRY org.eclipse.cdt.core 1 0 2026-09-06 01:26:31.959
+!MESSAGE Indexed 'Hexapod' (83 sources, 195 headers) in 5.57 sec: 19,027 declarations; 100,942 references; 1 unresolved inclusions; 95 syntax errors; 240 unresolved names (0.2%)
+!SESSION 2026-09-06 01:30:12.429 -----------------------------------------------
+eclipse.buildId=Version 2.2.0
+java.version=21.0.10
+java.vendor=Eclipse Adoptium
+BootLoader constants: OS=win32, ARCH=x86_64, WS=win32, NL=ko_KR
+Framework arguments:  C:\Project_TW\Hexapod\Hexapod-Robot\SW\STM32\workspace\Hexapod\.project
+Command-line arguments:  -os win32 -ws win32 -arch x86_64 C:\Project_TW\Hexapod\Hexapod-Robot\SW\STM32\workspace\Hexapod\.project
+
+!ENTRY com.st.stm32cube.ide.mcu.informationcenter 1 1 2026-09-06 01:30:21.882
+!MESSAGE Log4j2 initialized with config file C:\Project_TW\Hexapod\Hexapod-Robot\SW\STM32\workspace\.metadata\.log4j2.xml
+
+!ENTRY com.st.stm32cube.ide.mcu.ide 1 1 2026-09-06 01:30:36.159
+!MESSAGE Started RMI Server, listening on port 41337
+
+!ENTRY org.eclipse.cdt.core 1 0 2026-09-06 01:30:42.185
+!MESSAGE Indexed 'Hexapod' (83 sources, 195 headers) in 5.64 sec: 19,027 declarations; 100,942 references; 1 unresolved inclusions; 95 syntax errors; 240 unresolved names (0.2%)
+
+!ENTRY com.st.stm32cube.ide.mpu.remote.serial 1 1 2026-09-06 01:30:42.712
+!MESSAGE Executed PowerShell command powershell.exe -Command "Get-CimInstance -ClassName Win32_SerialPort | Select-Object -ExpandProperty DeviceID":
+COM12
+COM13
+
+
+!ENTRY com.st.stm32cube.ide.mpu.remote.serial 1 1 2026-09-06 01:30:42.713
+!MESSAGE port: COM12
+
+!ENTRY com.st.stm32cube.ide.mpu.remote.serial 1 1 2026-09-06 01:30:42.713
+!MESSAGE port: COM13
+!SESSION 2026-09-06 01:34:49.525 -----------------------------------------------
+eclipse.buildId=Version 2.2.0
+java.version=21.0.10
+java.vendor=Eclipse Adoptium
+BootLoader constants: OS=win32, ARCH=x86_64, WS=win32, NL=ko_KR
+Framework arguments:  C:\Project_TW\Hexapod\Hexapod-Robot\SW\STM32\workspace\Hexapod\.project
+Command-line arguments:  -os win32 -ws win32 -arch x86_64 C:\Project_TW\Hexapod\Hexapod-Robot\SW\STM32\workspace\Hexapod\.project
+
+!ENTRY com.st.stm32cube.ide.mcu.informationcenter 1 1 2026-09-06 01:34:59.157
+!MESSAGE Log4j2 initialized with config file C:\Project_TW\Hexapod\Hexapod-Robot\SW\STM32\workspace\.metadata\.log4j2.xml
+
+!ENTRY com.st.stm32cube.ide.mcu.ide 1 1 2026-09-06 01:35:12.550
+!MESSAGE Started RMI Server, listening on port 41337
+
+!ENTRY org.eclipse.cdt.core 1 0 2026-09-06 01:35:18.106
+!MESSAGE Indexed 'Hexapod' (83 sources, 195 headers) in 5.2 sec: 19,027 declarations; 100,942 references; 1 unresolved inclusions; 95 syntax errors; 240 unresolved names (0.2%)
+
+!ENTRY com.st.stm32cube.ide.mpu.remote.serial 1 1 2026-09-06 01:35:20.243
+!MESSAGE Executed PowerShell command powershell.exe -Command "Get-CimInstance -ClassName Win32_SerialPort | Select-Object -ExpandProperty DeviceID":
+COM12
+COM13
+
+
+!ENTRY com.st.stm32cube.ide.mpu.remote.serial 1 1 2026-09-06 01:35:20.244
+!MESSAGE port: COM12
+
+!ENTRY com.st.stm32cube.ide.mpu.remote.serial 1 1 2026-09-06 01:35:20.245
+!MESSAGE port: COM13
+!SESSION 2026-09-06 02:06:19.910 -----------------------------------------------
+eclipse.buildId=Version 2.2.0
+java.version=21.0.10
+java.vendor=Eclipse Adoptium
+BootLoader constants: OS=win32, ARCH=x86_64, WS=win32, NL=ko_KR
+Command-line arguments:  -os win32 -ws win32 -arch x86_64
+
+!ENTRY com.st.stm32cube.ide.mcu.informationcenter 1 1 2026-09-06 02:06:38.830
+!MESSAGE Log4j2 initialized with config file C:\Project_TW\Hexapod\Hexapod-Robot\SW\STM32\workspace\.metadata\.log4j2.xml
+
+!ENTRY com.st.stm32cube.ide.mcu.ide 1 1 2026-09-06 02:06:54.501
+!MESSAGE Started RMI Server, listening on port 41337
+
+!ENTRY com.st.stm32cube.ide.mpu.remote.serial 1 1 2026-09-06 02:06:58.777
+!MESSAGE Executed PowerShell command powershell.exe -Command "Get-CimInstance -ClassName Win32_SerialPort | Select-Object -ExpandProperty DeviceID":
+COM12
+COM13
+
+
+!ENTRY com.st.stm32cube.ide.mpu.remote.serial 1 1 2026-09-06 02:06:58.779
+!MESSAGE port: COM12
+
+!ENTRY com.st.stm32cube.ide.mpu.remote.serial 1 1 2026-09-06 02:06:58.779
+!MESSAGE port: COM13

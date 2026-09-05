@@ -614,8 +614,7 @@ RobotFootTargets_t FootTrajectory_Step(FootTrajectory_Handle_t *handle,
     }
 
     manual_stance_hold = drone->manual_enable && !gait->enabled_internal &&
-                         !drone->tripod_enable &&
-                         (drone->tripod_mode == ROBOT_TRIPOD_NORMAL);  // 수동 보행 정지 조건을 계산한다.
+                         (drone->tripod_mode == ROBOT_TRIPOD_NORMAL);  // 입력 유지 중 IK 거부도 정지로 처리한다.
     all_stance_mode = drone->correction_enable && drone->body_control_enable &&
                       !gait->enabled_internal && !drone->tripod_enable &&
                       (drone->tripod_mode == ROBOT_TRIPOD_NORMAL);  // 명시적 보정 모드 조건을 계산한다.

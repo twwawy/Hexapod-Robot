@@ -5,6 +5,163 @@
 
 #include <math.h>
 
+/* 같은 최대 입력이 감속 후 추가 대기 없이 재사용되는지 검사한다. */
+static bool WorkspaceTest_CheckReducedCommand(void)
+{
+    WorkspaceLimiter_Handle_t limiter;  // 감속과 원본 명령 기억을 저장한다.
+    RobotBodyTwist_t candidate = {0};   // 작업공간을 넘는 최대 동시 입력을 저장한다.
+    RobotBodyTwist_t applied;           // 실제 적용된 감속 명령을 저장한다.
+    RobotEuler_t posture = {0};         // 평지 수평 자세를 저장한다.
+    RobotGaitPhase_t gait = {0};        // 검사할 Tripod 역할을 저장한다.
+    float reduced_scale;               // 최초 통과한 공통 축척을 저장한다.
+    bool accepted;                     // 원본 명령의 채택 여부를 저장한다.
+    uint32_t cycle;                    // 감속 검사 대기 주기를 저장한다.
+    uint32_t phase;                    // 반복 검사할 위상 번호를 저장한다.
+
+    WorkspaceLimiter_Init(&limiter);                   // 이전 검사와 명령을 제거한다.
+    candidate.vx = ROBOT_MAX_LINEAR_SPEED_MPS;          // 최대 전진 속도를 요청한다.
+    candidate.vy = ROBOT_MAX_LATERAL_SPEED_MPS;         // 최대 횡이동 속도를 요청한다.
+    candidate.wz = ROBOT_MAX_YAW_RATE_RADPS;            // 최대 회전 속도를 함께 요청한다.
+    gait.enabled_internal = true;                      // 정상 보행 검사를 활성화한다.
+    gait.next_phase_preview = true;                    // 최초 위상 검사를 요청한다.
+    gait.next_phase_startup = true;                    // 최초 반 보폭을 선택한다.
+    gait.next_phase_swing_mask = 0x15U;                 // 첫 Tripod 그룹을 선택한다.
+    applied = WorkspaceLimiter_Gait(&limiter, &candidate, 0.0f, true,
+                                    &gait, &posture, false,
+                                    &accepted);  // 불가능한 원본 명령을 한 번 검사한다.
+    if (accepted || !limiter.preview_active || limiter.phase_result_valid ||
+        limiter.phase_result_accepted || (applied.vx != 0.0f) ||
+        (applied.vy != 0.0f) || (applied.wz != 0.0f))
+    {
+        return false;  // 원본 실패가 즉시 적용되거나 최종 정지로 확정되는지 확인한다.
+    }
+
+    gait.next_phase_preview = false;  // 최초 요청을 반복하지 않고 재검사를 진행한다.
+    for (cycle = 0U; limiter.preview_active && (cycle < 16U); ++cycle)
+    {
+        applied = WorkspaceLimiter_Gait(&limiter, &candidate, 0.0f, true,
+                                        &gait, &posture, false,
+                                        &accepted);  // 다음 제어 주기에서 감속 후보를 검사한다.
+        if (accepted || (limiter.preview_active && limiter.phase_result_valid))
+        {
+            return false;  // 감속 중 원본 채택이나 미완료 결과 확정을 차단한다.
+        }
+    }
+    reduced_scale = applied.vx / candidate.vx;  // 실제 속도로 공통 축척을 확인한다.
+    if (limiter.preview_active || !limiter.phase_result_valid ||
+        !limiter.phase_result_accepted || (reduced_scale <= 0.0f) ||
+        (reduced_scale >= 1.0f) ||
+        (fabsf(applied.vy - candidate.vy * reduced_scale) > 1.0e-6f) ||
+        (fabsf(applied.wz - candidate.wz * reduced_scale) > 1.0e-6f) ||
+        (fabsf(limiter.gait_applied_scale - reduced_scale) > 1.0e-6f) ||
+        (limiter.gait_requested.vx != candidate.vx) ||
+        (limiter.gait_requested.vy != candidate.vy) ||
+        (limiter.gait_requested.wz != candidate.wz))
+    {
+        return false;  // 원본 방향을 유지한 유효 감속과 원본 기억을 확인한다.
+    }
+
+    for (phase = 1U; phase < 5U; ++phase)
+    {
+        const uint8_t expected_steps = ((phase % 2U) == 0U) ? 1U : 2U;  // 두 걸음 묶음의 위치를 계산한다.
+
+        if (phase == 2U)
+        {
+            candidate.vx -= 0.0005f;  // 같은 조종 입력의 작은 X 위치 보정 변화를 넣는다.
+            candidate.vy -= 0.0005f;  // 같은 조종 입력의 작은 Y 위치 보정 변화를 넣는다.
+        }
+
+        gait.next_phase_preview = true;                                    // 다음 위상의 검사를 요청한다.
+        gait.next_phase_startup = false;                                   // 반복 전체 보폭을 선택한다.
+        gait.next_phase_swing_mask = ((phase % 2U) == 0U) ? 0x15U : 0x2AU;  // 두 Tripod를 교대로 검사한다.
+        applied = WorkspaceLimiter_Gait(&limiter, &candidate, 0.0f, true,
+                                        &gait, &posture, false,
+                                        &accepted);  // 같은 입력의 기존 축척을 재검증한다.
+        if (accepted || limiter.preview_active || !limiter.phase_result_valid ||
+            !limiter.phase_result_accepted ||
+            (limiter.gait_applied_step_count != expected_steps) ||
+            (fabsf(applied.vx - candidate.vx * reduced_scale) > 1.0e-6f) ||
+            (fabsf(applied.vy - candidate.vy * reduced_scale) > 1.0e-6f) ||
+            (fabsf(applied.wz - candidate.wz * reduced_scale) > 1.0e-6f))
+        {
+            return false;  // 같은 입력에서 재감속 대기나 속도 누적 축소를 검출한다.
+        }
+    }
+
+    posture.roll = NAN;                   // 저장된 축척으로도 검사 불가능한 새 자세를 넣는다.
+    gait.next_phase_swing_mask = 0x2AU;  // 다음 둘째 걸음에서 현재 자세를 재검사한다.
+    applied = WorkspaceLimiter_Gait(&limiter, &candidate, 0.0f, true,
+                                    &gait, &posture, false,
+                                    &accepted);  // 캐시가 최신 IK 검사를 우회하는지 확인한다.
+    gait.next_phase_preview = false;  // 같은 자세의 검사 요청을 반복하지 않는다.
+    for (cycle = 0U; limiter.preview_active && (cycle < 16U); ++cycle)
+    {
+        if (accepted || limiter.phase_result_accepted)
+        {
+            return false;  // 불가능한 자세의 캐시 재사용 허가를 검출한다.
+        }
+        applied = WorkspaceLimiter_Gait(&limiter, &candidate, 0.0f, true,
+                                        &gait, &posture, false,
+                                        &accepted);  // 불가능한 자세의 재검사를 제한된 주기에 종료한다.
+    }
+    if (accepted || limiter.preview_active || !limiter.phase_result_valid ||
+        limiter.phase_result_accepted ||
+        (fabsf(applied.vx - candidate.vx * reduced_scale) > 1.0e-6f) ||
+        (limiter.gait_applied_step_count != 1U))
+    {
+        return false;  // 실패한 캐시 검사가 기존 속도와 걸음 수를 바꾸는지 확인한다.
+    }
+
+    posture.roll = 0.0f;               // 다시 검사 가능한 수평 자세를 넣는다.
+    gait.next_phase_preview = true;  // 정상 자세에서 남은 둘째 걸음을 요청한다.
+    applied = WorkspaceLimiter_Gait(&limiter, &candidate, 0.0f, true,
+                                    &gait, &posture, false,
+                                    &accepted);  // 실패 전 감속 명령을 다시 검증한다.
+    if (accepted || limiter.preview_active || !limiter.phase_result_accepted ||
+        (limiter.gait_applied_step_count != 2U) ||
+        (fabsf(applied.vx - candidate.vx * reduced_scale) > 1.0e-6f))
+    {
+        return false;  // 자세 복구 뒤 유효 축척을 재사용하는지 확인한다.
+    }
+
+    candidate.vx = 0.01f;                 // 새 명령 묶음에 작은 안전 속도를 넣는다.
+    candidate.vy = 0.0f;                  // 횡이동 요청을 제거한다.
+    candidate.wz = 0.0f;                  // 회전 요청을 제거한다.
+    gait.next_phase_swing_mask = 0x15U;  // 다음 명령 묶음의 첫 Tripod를 선택한다.
+    applied = WorkspaceLimiter_Gait(&limiter, &candidate, 0.0f, true,
+                                    &gait, &posture, false,
+                                    &accepted);  // 변경된 안전 명령을 원래 크기로 검사한다.
+    if (!accepted || limiter.preview_active || !limiter.phase_result_accepted ||
+        (limiter.gait_applied_step_count != 1U) ||
+        (fabsf(limiter.gait_applied_scale - 1.0f) > 1.0e-6f) ||
+        (fabsf(applied.vx - candidate.vx) > 1.0e-6f) ||
+        (applied.vy != 0.0f) || (applied.wz != 0.0f))
+    {
+        return false;  // 이전 축척이 새 안전 명령까지 감속하는지 확인한다.
+    }
+
+    applied = WorkspaceLimiter_Gait(&limiter, &candidate, 0.0f, true,
+                                    &gait, &posture, true,
+                                    &accepted);  // 명시적 Reset으로 감속 기억을 제거한다.
+    if (!accepted || limiter.preview_active || limiter.phase_result_valid ||
+        limiter.phase_result_accepted || (limiter.gait_applied_step_count != 0U) ||
+        (limiter.gait_requested.vx != 0.0f) || (limiter.gait_requested.vy != 0.0f) ||
+        (limiter.gait_requested.wz != 0.0f) || (applied.vx != 0.0f) ||
+        (applied.vy != 0.0f) || (applied.wz != 0.0f))
+    {
+        return false;  // Reset 뒤 남은 명령이나 검사 결과를 검출한다.
+    }
+
+    candidate.vx = ROBOT_MAX_LINEAR_SPEED_MPS;   // Reset 뒤 원래 최대 전진 입력을 복구한다.
+    candidate.vy = ROBOT_MAX_LATERAL_SPEED_MPS;  // Reset 뒤 원래 최대 횡이동 입력을 복구한다.
+    candidate.wz = ROBOT_MAX_YAW_RATE_RADPS;     // Reset 뒤 원래 최대 회전 입력을 복구한다.
+    gait.next_phase_startup = true;             // Reset 뒤 첫 위상을 다시 선택한다.
+    (void)WorkspaceLimiter_Gait(&limiter, &candidate, 0.0f, true,
+                                &gait, &posture, false,
+                                &accepted);  // 같은 원본을 축척 기억 없이 다시 검사한다.
+    return !accepted && limiter.preview_active && !limiter.phase_result_valid;
+}
+
 /* 최대 보행 후보 채택과 과도한 발 위치의 최종 제한을 검사한다. */
 bool WorkspaceTest_Run(void)
 {
@@ -20,6 +177,12 @@ bool WorkspaceTest_Run(void)
     RobotVec3_t limited;                          // 최종 제한 발 위치를 저장한다.
     bool accepted;                                // 보행 채택 여부를 저장한다.
     bool was_limited;                             // 발 제한 여부를 저장한다.
+    uint32_t cycle;                               // 위험 후보의 재검사 주기를 저장한다.
+
+    if (!WorkspaceTest_CheckReducedCommand())
+    {
+        return false;
+    }
 
     WorkspaceLimiter_Init(&limiter);       // 직전 명령을 0으로 준비한다.
     gait.enabled_internal = true;          // 정상 보행 상태를 활성화한다.
@@ -97,9 +260,21 @@ bool WorkspaceTest_Run(void)
     gait.next_phase_swing_mask = 0x15U;  // 1·3·5번 다리를 다시 Swing으로 둔다.
     applied = WorkspaceLimiter_Gait(&limiter, &candidate, 0.0f, true,
                                     &gait, &posture, false,
-                                    &accepted);  // 두 걸음 뒤 위험 후보를 거부한다.
+                                    &accepted);  // 두 걸음 뒤 위험 후보의 감속 검사를 시작한다.
+    gait.next_phase_preview = false;  // 같은 위험 후보를 다시 시작하지 않는다.
+    for (cycle = 0U; limiter.preview_active && (cycle < 16U); ++cycle)
+    {
+        if (accepted || limiter.phase_result_valid || limiter.phase_result_accepted ||
+            (fabsf(applied.vx - ROBOT_MAX_LINEAR_SPEED_MPS) > 1.0e-6f))
+        {
+            return false;  // 위험 후보 재검사 중 직전 유효 속도 유지를 확인한다.
+        }
+        applied = WorkspaceLimiter_Gait(&limiter, &candidate, 0.0f, true,
+                                        &gait, &posture, false,
+                                        &accepted);  // 제한된 주기 안에서 불가능한 후보를 거부한다.
+    }
     if (accepted || !limiter.phase_result_valid ||
-        limiter.phase_result_accepted ||
+        limiter.preview_active || limiter.phase_result_accepted ||
         (fabsf(applied.vx - ROBOT_MAX_LINEAR_SPEED_MPS) > 1.0e-6f))
     {
         return false;

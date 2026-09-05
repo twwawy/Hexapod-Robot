@@ -8,7 +8,9 @@
 #include <stddef.h>
 #include <string.h>
 
-#define WORKSPACE_GAIT_COMMAND_HOLD_STEPS 2U  // 한 조종 명령을 유지할 걸음 수를 정의한다.
+#define WORKSPACE_GAIT_COMMAND_HOLD_STEPS 2U     // 한 조종 명령을 유지할 걸음 수를 정의한다.
+#define WORKSPACE_GAIT_SCALE_REDUCTION    0.8f   // 실패한 보폭을 줄일 공통 비율을 정의한다.
+#define WORKSPACE_GAIT_MAX_REDUCTIONS     8U     // 불가능한 경로의 축소 재시도 횟수를 제한한다.
 
 static const float workspace_leg_angle_rad[ROBOT_LEG_COUNT] =
 {
@@ -57,6 +59,29 @@ static bool WorkspaceLimiter_TwistEqual(const RobotBodyTwist_t *first,
            (first->wz == second->wz);  // 네 축 명령을 함께 비교한다.
 }
 
+/* 작은 입력·위치 보정 변화에는 기존 보폭 비율을 재사용한다. */
+static bool WorkspaceLimiter_TwistNearby(const RobotBodyTwist_t *first,
+                                         const RobotBodyTwist_t *second)
+{
+    return (fabsf(first->vx - second->vx) <= ROBOT_GAIT_LINEAR_THRESHOLD_MPS) &&
+           (fabsf(first->vy - second->vy) <= ROBOT_GAIT_LINEAR_THRESHOLD_MPS) &&
+           (fabsf(first->vz - second->vz) <= ROBOT_GAIT_LINEAR_THRESHOLD_MPS) &&
+           (fabsf(first->wz - second->wz) <= ROBOT_GAIT_YAW_THRESHOLD_RADPS);  // 보행 판정 폭 안의 입력 흔들림을 허용한다.
+}
+
+/* 이동 방향과 회전 비율을 유지하며 보폭을 줄인다. */
+static RobotBodyTwist_t WorkspaceLimiter_ScaleTwist(const RobotBodyTwist_t *input,
+                                                    float scale)
+{
+    RobotBodyTwist_t output;  // 공통 비율을 적용한 명령을 저장한다.
+
+    output.vx = input->vx * scale;  // 전후 보폭을 축소한다.
+    output.vy = input->vy * scale;  // 좌우 보폭을 축소한다.
+    output.vz = input->vz * scale;  // 수직 보폭을 축소한다.
+    output.wz = input->wz * scale;  // 이동에 대한 회전 비율을 유지한다.
+    return output;
+}
+
 /* 사용자 회전 명령에 최신 Heading 보정을 합친다. */
 static RobotBodyTwist_t WorkspaceLimiter_ComposeYaw(const RobotBodyTwist_t *user_command,
                                                      float yaw_feedback_radps)
@@ -72,13 +97,16 @@ static RobotBodyTwist_t WorkspaceLimiter_ComposeYaw(const RobotBodyTwist_t *user
 /* 새 보행 명령의 세 지점 검사를 시작한다. */
 static void WorkspaceLimiter_StartPreview(WorkspaceLimiter_Handle_t *handle,
                                            const RobotBodyTwist_t *user_candidate,
-                                           float yaw_feedback_radps,
                                            const RobotGaitPhase_t *gait)
 {
+    const bool reuse_scale = (handle->gait_applied_scale > 0.0f) &&
+        WorkspaceLimiter_TwistNearby(user_candidate,
+                                      &handle->gait_requested);  // 작은 보정 변화에도 기존 축소 비율을 찾는다.
+
     handle->gait_pending = *user_candidate;                    // 사용자 후보를 검사 동안 고정한다.
-    handle->gait_preview = WorkspaceLimiter_ComposeYaw(
-        user_candidate,
-        yaw_feedback_radps);                                   // 현재 Heading 보정을 검사값에 합친다.
+    handle->preview_scale = reuse_scale ?
+                            handle->gait_applied_scale : 1.0f;  // 같은 입력의 반복적인 보폭 탐색을 막는다.
+    handle->preview_reduction_count = 0U;                       // 새 위상의 축소 횟수를 초기화한다.
     handle->preview_sample = 0U;                               // 첫 경로 지점부터 시작한다.
     handle->preview_swing_mask = gait->next_phase_swing_mask;  // 다음 Tripod 역할을 고정한다.
     handle->preview_startup_phase = gait->next_phase_startup;  // 첫 위상 여부를 저장한다.
@@ -185,7 +213,7 @@ bool WorkspaceLimiter_AllFeetValid(const RobotVec3_t feet_body[ROBOT_LEG_COUNT],
     return true;
 }
 
-/* 다음 위상 후보의 세 지점을 한 제어 주기에 검사한다. */
+/* 다음 보폭을 검사하고 실패하면 다음 주기에 축소 후보를 검사한다. */
 RobotBodyTwist_t WorkspaceLimiter_Gait(WorkspaceLimiter_Handle_t *handle,
                                        const RobotBodyTwist_t *user_candidate,
                                        float yaw_feedback_radps,
@@ -229,10 +257,19 @@ RobotBodyTwist_t WorkspaceLimiter_Gait(WorkspaceLimiter_Handle_t *handle,
                  WORKSPACE_GAIT_COMMAND_HOLD_STEPS);  // 둘째 걸음의 기존 속도 사용 여부를 결정한다.
             WorkspaceLimiter_StartPreview(
                 handle,
-                handle->preview_reuses_applied ? &handle->gait_applied : user_candidate,
-                yaw_feedback_radps,
+                handle->preview_reuses_applied ? &handle->gait_requested : user_candidate,
                 gait);  // 두 걸음 사용자 속도와 최신 Heading 보정을 검사한다.
             *accepted = false;  // 세 지점 통과 전까지 적용을 보류한다.
+        }
+
+        if (handle->preview_active)
+        {
+            const RobotBodyTwist_t scaled = WorkspaceLimiter_ScaleTwist(
+                &handle->gait_pending, handle->preview_scale);  // 이번 주기에 검사할 보폭 하나를 만든다.
+
+            handle->gait_preview = WorkspaceLimiter_ComposeYaw(
+                &scaled, yaw_feedback_radps);  // 축소한 보폭에 현재 Heading 보정을 합친다.
+            *accepted = false;                 // 전체 경로 통과 전에는 채택을 보류한다.
         }
 
         while (handle->preview_active &&
@@ -240,10 +277,20 @@ RobotBodyTwist_t WorkspaceLimiter_Gait(WorkspaceLimiter_Handle_t *handle,
         {
             if (!WorkspaceLimiter_PreviewPoint(handle, posture_rad))
             {
-                handle->preview_active = false;        // 위험 지점에서 검사를 종료한다.
-                handle->phase_result_valid = true;     // 검사 실패 결과를 확정한다.
-                handle->phase_result_accepted = false; // 다음 위상 진입을 차단한다.
-                *accepted = false;                     // 직전 유효 명령을 유지한다.
+                if (handle->preview_reduction_count < WORKSPACE_GAIT_MAX_REDUCTIONS)
+                {
+                    handle->preview_scale *= WORKSPACE_GAIT_SCALE_REDUCTION;  // 방향을 유지하며 다음 보폭을 줄인다.
+                    handle->preview_reduction_count++;                        // 제한된 재시도 횟수를 누적한다.
+                    handle->preview_sample = 0U;                              // 축소 경로도 시작부터 다시 검사한다.
+                }
+                else
+                {
+                    handle->preview_active = false;         // 축소로 해결할 수 없는 검사를 종료한다.
+                    handle->preview_reuses_applied = false;  // 실패한 두 걸음 재사용 결정을 제거한다.
+                    handle->phase_result_valid = true;      // 최종 실패만 보행 상태기에 전달한다.
+                    handle->phase_result_accepted = false;  // 불가능한 다음 위상은 계속 차단한다.
+                }
+                break;  // 5 ms 주기에 후보 하나만 검사하고 다음 주기에 자동 재시도한다.
             }
             else
             {
@@ -255,14 +302,18 @@ RobotBodyTwist_t WorkspaceLimiter_Gait(WorkspaceLimiter_Handle_t *handle,
         if (handle->preview_active &&
             (handle->preview_sample >= ROBOT_GAIT_PREVIEW_SAMPLE_COUNT))
         {
+            handle->gait_applied = WorkspaceLimiter_ScaleTwist(
+                &handle->gait_pending, handle->preview_scale);  // 검사를 통과한 실제 보폭만 적용한다.
+            handle->gait_requested = handle->gait_pending;       // 동일 입력의 축소 비율 재사용 기준을 저장한다.
+            handle->gait_applied_scale = handle->preview_scale;  // 다음 걸음의 유효한 보폭 비율을 저장한다.
+
             if (handle->preview_reuses_applied)
             {
                 handle->gait_applied_step_count++;  // 반대 Tripod의 둘째 걸음을 기록한다.
             }
             else
             {
-                handle->gait_applied = handle->gait_pending;  // 새 두 걸음의 속도를 적용한다.
-                handle->gait_applied_step_count = 1U;          // 새 속도의 첫 걸음을 기록한다.
+                handle->gait_applied_step_count = 1U;  // 새 속도의 첫 걸음을 기록한다.
             }
             handle->preview_active = false;               // 한 주기 검사를 완료한다.
             handle->preview_reuses_applied = false;        // 완료한 재사용 결정을 제거한다.
@@ -275,6 +326,7 @@ RobotBodyTwist_t WorkspaceLimiter_Gait(WorkspaceLimiter_Handle_t *handle,
     else
     {
         handle->gait_applied = *user_candidate;  // 보정 모드는 발 Offset 단계에서 검사한다.
+        handle->gait_applied_scale = 0.0f;       // 다른 모드에서 보행 축소 비율을 제거한다.
         handle->gait_applied_step_count = 0U;   // 정상 보행의 두 걸음 기억을 제거한다.
         handle->preview_active = false;         // 수동 보행 검사를 중단한다.
         handle->preview_reuses_applied = false; // 진행 중인 재사용 결정을 제거한다.

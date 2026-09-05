@@ -3,6 +3,7 @@
 #include "high_control/foot_trajectory.h"
 #include "high_control/gait_manager.h"
 #include "high_control/leg_kinematics.h"
+#include "high_control/workspace_limiter.h"
 
 #include <math.h>
 #include <string.h>
@@ -75,6 +76,7 @@ static bool GaitTest_CheckManualStanceHold(void)
     RobotFootTargets_t before;             // 정지 전 발 위치를 저장한다.
     RobotFootTargets_t after;              // 정지 후 발 위치를 저장한다.
     uint32_t leg;                          // 비교할 다리 번호를 저장한다.
+    uint32_t cycle;                        // 정지 입력과 검사 거부를 구분한다.
 
     memset(&twist, 0, sizeof(twist));      // 직전 보행 명령을 초기화한다.
     memset(&drone, 0, sizeof(drone));      // 수동 정지 출력을 초기화한다.
@@ -90,17 +92,22 @@ static bool GaitTest_CheckManualStanceHold(void)
     {
         before.foot[leg] = trajectory.memory[leg];  // 정지 전 발 위치를 저장한다.
         gait.state[leg] = ROBOT_LEG_STANCE;         // 여섯 발을 Stance로 둔다.
+        trajectory.adapted_stance[leg] = true;     // 착지 후 실제 위치 적분을 준비한다.
     }
 
-    after = FootTrajectory_Step(&trajectory, &twist, &drone,
-                                &gait, &posture);  // 수동 정지 출력을 한 주기 계산한다.
-    for (leg = 0U; leg < ROBOT_LEG_COUNT; ++leg)
+    for (cycle = 0U; cycle < 2U; ++cycle)
     {
-        if ((fabsf(after.foot[leg].x - before.foot[leg].x) > 0.0000001f) ||
-            (fabsf(after.foot[leg].y - before.foot[leg].y) > 0.0000001f) ||
-            (fabsf(after.foot[leg].z - before.foot[leg].z) > 0.0000001f))
+        drone.tripod_enable = (cycle != 0U);  // 정지 입력과 검사 거부 후 활성 입력을 각각 넣는다.
+        after = FootTrajectory_Step(&trajectory, &twist, &drone,
+                                    &gait, &posture);  // 내부 보행이 꺼진 발 목표를 계산한다.
+        for (leg = 0U; leg < ROBOT_LEG_COUNT; ++leg)
         {
-            return false;  // 수동 정지 중 발 이동을 검출한다.
+            if ((fabsf(after.foot[leg].x - before.foot[leg].x) > 0.0000001f) ||
+                (fabsf(after.foot[leg].y - before.foot[leg].y) > 0.0000001f) ||
+                (fabsf(after.foot[leg].z - before.foot[leg].z) > 0.0000001f))
+            {
+                return false;  // 사용자 정지와 검사 거부 주기의 발 이동을 검출한다.
+            }
         }
     }
 
@@ -660,6 +667,105 @@ static bool GaitTest_CheckSupportRecovery(void)
            (gait.state[1] == ROBOT_LEG_STANCE);  // 같은 Swing·Stance 역할로 재개되는지 확인한다.
 }
 
+/* 같은 최대 조종 입력이 감속 후 여러 위상을 끊김 없이 진행하는지 검사한다. */
+static bool GaitTest_CheckLimitedContinuousWalk(void)
+{
+    GaitManager_Handle_t manager;       // 연속 보행 위상 상태를 저장한다.
+    WorkspaceLimiter_Handle_t limiter;  // 위상별 작업공간 검사 상태를 저장한다.
+    RobotBodyTwist_t candidate = {0};   // 계속 유지할 최대 동시 입력을 저장한다.
+    RobotBodyTwist_t applied;           // 검사 뒤 실제 보행 속도를 저장한다.
+    RobotGaitPhase_t gait;              // 이번 주기 다리 상태를 저장한다.
+    RobotEuler_t posture = {0};         // 평지 수평 자세를 저장한다.
+    bool contact[ROBOT_LEG_COUNT];      // 지지와 착지를 보장할 접촉을 저장한다.
+    bool accepted;                     // 원본 입력 채택 여부를 저장한다.
+    bool first_validated = false;      // 최초 감속 검사 완료 여부를 저장한다.
+    float saved_scale = 0.0f;          // 최초 성공한 축척을 저장한다.
+    uint32_t preview_count = 0U;       // 교대로 검사한 Tripod 수를 저장한다.
+    uint32_t retry_count = 0U;         // 최초 감속의 추가 대기 주기를 저장한다.
+    uint32_t cycle;                    // 전체 보행 제어 주기를 저장한다.
+    uint32_t leg;                      // 이상적 접촉을 설정할 다리 번호를 저장한다.
+    const uint32_t cycle_limit =
+        (uint32_t)(6.0f * ROBOT_GAIT_PHASE_TIME_S / ROBOT_CONTROL_PERIOD_S) +
+        ROBOT_GAIT_START_DELAY_CYCLES + 32U;  // 여러 위상 완료를 기다릴 한계를 정한다.
+
+    GaitManager_Init(&manager);                        // 최초 보행 대기를 준비한다.
+    WorkspaceLimiter_Init(&limiter);                   // 명령과 검사 이력을 제거한다.
+    candidate.vx = ROBOT_MAX_LINEAR_SPEED_MPS;          // 최대 전진 속도를 유지한다.
+    candidate.vy = ROBOT_MAX_LATERAL_SPEED_MPS;         // 최대 횡이동 속도를 유지한다.
+    candidate.wz = ROBOT_MAX_YAW_RATE_RADPS;            // 최대 회전 속도를 함께 유지한다.
+
+    for (cycle = 0U; cycle < cycle_limit; ++cycle)
+    {
+        for (leg = 0U; leg < ROBOT_LEG_COUNT; ++leg)
+        {
+            const bool swing = ((leg % 2U) == (manager.phase_index % 2U));  // 현재 Tripod의 Swing 역할을 선택한다.
+
+            contact[leg] = !manager.initialized || !swing ||
+                           (manager.phase_time_s >= 0.95f * ROBOT_GAIT_PHASE_TIME_S);  // 지지발은 유지하고 Swing 끝에서 착지한다.
+        }
+        gait = GaitManager_StepContacts(&manager, true, true,
+                                        limiter.phase_result_valid,
+                                        limiter.phase_result_accepted,
+                                        ROBOT_TRIPOD_NORMAL, 0.0f,
+                                        contact, contact);  // 새 조종 입력 없이 기존 검사 결과로 위상을 진행한다.
+        if (!gait.enabled_internal || gait.late_landing_hold ||
+            gait.support_recovery_active ||
+            ((preview_count > 0U) &&
+             (manager.start_wait_count != ROBOT_GAIT_START_DELAY_CYCLES)))
+        {
+            return false;  // IK 감속 중 보행 해제나 100 ms 시작 대기 재진입을 검출한다.
+        }
+
+        if (gait.next_phase_preview)
+        {
+            const uint8_t expected_mask = ((preview_count % 2U) == 0U) ? 0x15U : 0x2AU;  // 다음 검사 그룹을 계산한다.
+
+            if (gait.next_phase_swing_mask != expected_mask)
+            {
+                return false;  // 같은 Tripod만 다시 시작하는 오류를 검출한다.
+            }
+            preview_count++;  // 새로 요청한 위상 검사를 누적한다.
+        }
+
+        applied = WorkspaceLimiter_Gait(&limiter, &candidate, 0.0f, true,
+                                        &gait, &posture, false,
+                                        &accepted);  // 동일한 원본 입력을 매 주기 전달한다.
+        if (accepted || (limiter.phase_result_valid && !limiter.phase_result_accepted))
+        {
+            return false;  // 위험한 원본 채택이나 해결 가능한 입력의 최종 거부를 검출한다.
+        }
+        if (limiter.preview_active)
+        {
+            if (first_validated || limiter.phase_result_valid || !gait.waiting_start)
+            {
+                return false;  // 최초 감속 이후 같은 명령에서 추가 검사 대기를 검출한다.
+            }
+            retry_count++;  // 최초 감속에 사용한 추가 제어 주기를 누적한다.
+        }
+        if (limiter.phase_result_valid && limiter.phase_result_accepted)
+        {
+            if (!first_validated)
+            {
+                saved_scale = applied.vx / candidate.vx;  // 최초 유효 보폭의 축척을 보존한다.
+                first_validated = true;                  // 다음 위상부터 캐시 재사용을 검사한다.
+            }
+            if ((saved_scale <= 0.0f) || (saved_scale >= 1.0f) ||
+                (fabsf(applied.vx - candidate.vx * saved_scale) > 1.0e-6f) ||
+                (fabsf(applied.vy - candidate.vy * saved_scale) > 1.0e-6f) ||
+                (fabsf(applied.wz - candidate.wz * saved_scale) > 1.0e-6f))
+            {
+                return false;  // 반복 위상에서 보폭 누적 축소나 방향 변화를 검출한다.
+            }
+        }
+        if (manager.initialized && (manager.phase_index >= 4U))
+        {
+            return first_validated && (preview_count >= 5U) && (retry_count > 0U);
+        }
+    }
+
+    return false;  // 같은 입력으로 여러 위상을 완료하지 못한 정지를 검출한다.
+}
+
 /* 명시적 접촉 입력으로 Tripod 상태 전환과 짧은 Enable 변화를 검사한다. */
 bool GaitTest_Run(void)
 {
@@ -680,7 +786,8 @@ bool GaitTest_Run(void)
         !GaitTest_CheckPreviewTransition() ||
         !GaitTest_CheckTwoStepCommandLatch() ||
         !GaitTest_CheckTouchdownConfirmation() ||
-        !GaitTest_CheckSupportRecovery())
+        !GaitTest_CheckSupportRecovery() ||
+        !GaitTest_CheckLimitedContinuousWalk())
     {
         return false;
     }
