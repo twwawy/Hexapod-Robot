@@ -991,132 +991,6 @@
   </collision>
 </link>
 
-<link name="M_column_1_1_1">
-  <inertial>
-    <origin xyz="0.0070714646053923885 -0.007071464816127873 0.10880049777869974" rpy="0 0 0"/>
-    <mass value="0.176682726853925"/>
-    <inertia ixx="0.000745" iyy="0.000745" izz="6e-06" ixy="3e-06" iyz="0.0" ixz="-0.0"/>
-  </inertial>
-  <visual>
-    <origin xyz="-0.062225 0.062225 -0.0552" rpy="0 0 0"/>
-    <geometry>
-      <mesh filename="package://HEXAPEDAL_URDF_description/meshes/M_column_1_1_1.stl" scale="0.001 0.001 0.001"/>
-    </geometry>
-    <material name="silver"/>
-  </visual>
-  <collision>
-    <origin xyz="-0.062225 0.062225 -0.0552" rpy="0 0 0"/>
-    <geometry>
-      <mesh filename="package://HEXAPEDAL_URDF_description/meshes/M_column_1_1_1.stl" scale="0.001 0.001 0.001"/>
-    </geometry>
-  </collision>
-</link>
-
-<link name="M_column_1_2_1">
-  <inertial>
-    <origin xyz="0.007071464394658528 0.007071043249154155 0.10880049777869971" rpy="0 0 0"/>
-    <mass value="0.176682726853925"/>
-    <inertia ixx="0.000745" iyy="0.000745" izz="6e-06" ixy="-3e-06" iyz="-0.0" ixz="-0.0"/>
-  </inertial>
-  <visual>
-    <origin xyz="-0.062225 -0.062084 -0.0552" rpy="0 0 0"/>
-    <geometry>
-      <mesh filename="package://HEXAPEDAL_URDF_description/meshes/M_column_1_2_1.stl" scale="0.001 0.001 0.001"/>
-    </geometry>
-    <material name="silver"/>
-  </visual>
-  <collision>
-    <origin xyz="-0.062225 -0.062084 -0.0552" rpy="0 0 0"/>
-    <geometry>
-      <mesh filename="package://HEXAPEDAL_URDF_description/meshes/M_column_1_2_1.stl" scale="0.001 0.001 0.001"/>
-    </geometry>
-  </collision>
-</link>
-
-<link name="M_column_1_3_1">
-  <inertial>
-    <origin xyz="-0.007071043361667972 -0.007071464507171374 0.10880049777869971" rpy="0 0 0"/>
-    <mass value="0.176682726853925"/>
-    <inertia ixx="0.000745" iyy="0.000745" izz="6e-06" ixy="-3e-06" iyz="-0.0" ixz="-0.0"/>
-  </inertial>
-  <visual>
-    <origin xyz="0.062084 0.062225 -0.0552" rpy="0 0 0"/>
-    <geometry>
-      <mesh filename="package://HEXAPEDAL_URDF_description/meshes/M_column_1_3_1.stl" scale="0.001 0.001 0.001"/>
-    </geometry>
-    <material name="silver"/>
-  </visual>
-  <collision>
-    <origin xyz="0.062084 0.062225 -0.0552" rpy="0 0 0"/>
-    <geometry>
-      <mesh filename="package://HEXAPEDAL_URDF_description/meshes/M_column_1_3_1.stl" scale="0.001 0.001 0.001"/>
-    </geometry>
-  </collision>
-</link>
-
-<link name="M_column_1_4_1">
-  <inertial>
-    <origin xyz="-0.007071043150933237 0.0070710429401984465 0.10880049777869966" rpy="0 0 0"/>
-    <mass value="0.176682726853925"/>
-    <inertia ixx="0.000745" iyy="0.000745" izz="6e-06" ixy="3e-06" iyz="0.0" ixz="-0.0"/>
-  </inertial>
-  <visual>
-    <origin xyz="0.062084 -0.062084 -0.0552" rpy="0 0 0"/>
-    <geometry>
-      <mesh filename="package://HEXAPEDAL_URDF_description/meshes/M_column_1_4_1.stl" scale="0.001 0.001 0.001"/>
-    </geometry>
-    <material name="silver"/>
-  </visual>
-  <collision>
-    <origin xyz="0.062084 -0.062084 -0.0552" rpy="0 0 0"/>
-    <geometry>
-      <mesh filename="package://HEXAPEDAL_URDF_description/meshes/M_column_1_4_1.stl" scale="0.001 0.001 0.001"/>
-    </geometry>
-  </collision>
-</link>
-
-<link name="M_column_2_1">
-  <inertial>
-    <origin xyz="-0.059326289216462845 0.16298328900583026 -0.005935902471697008" rpy="0 0 0"/>
-    <mass value="0.4810966615533545"/>
-    <inertia ixx="0.001069" iyy="0.001069" izz="0.001835" ixy="0.0" iyz="0.0" ixz="0.0"/>
-  </inertial>
-  <visual>
-    <origin xyz="-0.059397 0.163054 -0.3292" rpy="0 0 0"/>
-    <geometry>
-      <mesh filename="package://HEXAPEDAL_URDF_description/meshes/M_column_2_1.stl" scale="0.001 0.001 0.001"/>
-    </geometry>
-    <material name="silver"/>
-  </visual>
-  <collision>
-    <origin xyz="-0.059397 0.163054 -0.3292" rpy="0 0 0"/>
-    <geometry>
-      <mesh filename="package://HEXAPEDAL_URDF_description/meshes/M_column_2_1.stl" scale="0.001 0.001 0.001"/>
-    </geometry>
-  </collision>
-</link>
-
-<link name="M_column_3_fix_1">
-  <inertial>
-    <origin xyz="0.019999710670863962 0.021069711524937598 -0.21794922921038556" rpy="0 0 0"/>
-    <mass value="0.4404030088724962"/>
-    <inertia ixx="0.000372" iyy="0.000387" izz="0.000176" ixy="-0.0" iyz="-9e-06" ixz="-0.0"/>
-  </inertial>
-  <visual>
-    <origin xyz="0.019929 0.020071 -0.3351" rpy="0 0 0"/>
-    <geometry>
-      <mesh filename="package://HEXAPEDAL_URDF_description/meshes/M_column_3_fix_1.stl" scale="0.001 0.001 0.001"/>
-    </geometry>
-    <material name="silver"/>
-  </visual>
-  <collision>
-    <origin xyz="0.019929 0.020071 -0.3351" rpy="0 0 0"/>
-    <geometry>
-      <mesh filename="package://HEXAPEDAL_URDF_description/meshes/M_column_3_fix_1.stl" scale="0.001 0.001 0.001"/>
-    </geometry>
-  </collision>
-</link>
-
 <link name="M_column_1_1">
   <inertial>
     <origin xyz="4.6455624200247847e-07 -4.647669775148522e-07 0.004943138802826083" rpy="0 0 0"/>
@@ -1159,6 +1033,27 @@
   </collision>
 </link>
 
+<link name="M_column_3_fix_1">
+  <inertial>
+    <origin xyz="-2.8932913603613077e-07 0.0010697115249376009 0.037050770789614454" rpy="0 0 0"/>
+    <mass value="0.4404030088724962"/>
+    <inertia ixx="0.000372" iyy="0.000387" izz="0.000176" ixy="-0.0" iyz="-9e-06" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="-7.1e-05 7.1e-05 -0.0801" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://HEXAPEDAL_URDF_description/meshes/M_column_3_fix_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-7.1e-05 7.1e-05 -0.0801" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://HEXAPEDAL_URDF_description/meshes/M_column_3_fix_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
 <link name="livox_mid_360_2">
   <inertial>
     <origin xyz="-0.024431329875830785 -0.01799971067812863 -0.016220940752814474" rpy="2.8797932657906444 0 -1.5707963267948966"/>
@@ -1197,6 +1092,27 @@
     <origin xyz="-0.011071 0.009071 -0.1161" rpy="0 0 0"/>
     <geometry>
       <mesh filename="package://HEXAPEDAL_URDF_description/meshes/camera_fixer_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="mid-360-fov-asm_ver.ksh_MID-360_4_1_1_1">
+  <inertial>
+    <origin xyz="-3.0009021704220456e-07 -0.002702514686128593 0.010087666111087745" rpy="0 0 0"/>
+    <mass value="0.2760142598595122"/>
+    <inertia ixx="4.7e-05" iyy="4.8e-05" izz="6.5e-05" ixy="-0.0" iyz="-5e-06" ixz="-0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="-7.1e-05 0.010436 -0.179782" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://HEXAPEDAL_URDF_description/meshes/mid-360-fov-asm_ver.ksh_MID-360_4_1_1_1.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="silver"/>
+  </visual>
+  <collision>
+    <origin xyz="-7.1e-05 0.010436 -0.179782" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://HEXAPEDAL_URDF_description/meshes/mid-360-fov-asm_ver.ksh_MID-360_4_1_1_1.stl" scale="0.001 0.001 0.001"/>
     </geometry>
   </collision>
 </link>
@@ -1705,27 +1621,6 @@
   </collision>
 </link>
 
-<link name="livox_mid_360_1">
-  <inertial>
-    <origin xyz="0.02443105558853103 0.01799971078347508 0.016220816346548705" rpy="3.141592653589793 0 1.5707963267948966"/>
-    <mass value="1.068415791165833"/>
-    <inertia ixx="0.000459" iyy="0.000444" izz="0.000711" ixy="0.0" iyz="-1e-06" ixz="0.0"/>
-  </inertial>
-  <visual>
-    <origin xyz="0.011962306582794464 0.017929289216514384 0.2746291446897346" rpy="3.141592653589793 0 1.5707963267948966"/>
-    <geometry>
-      <mesh filename="package://HEXAPEDAL_URDF_description/meshes/livox_mid_360_1.stl" scale="0.001 0.001 0.001"/>
-    </geometry>
-    <material name="silver"/>
-  </visual>
-  <collision>
-    <origin xyz="0.011962306582794464 0.017929289216514384 0.2746291446897346" rpy="3.141592653589793 0 1.5707963267948966"/>
-    <geometry>
-      <mesh filename="package://HEXAPEDAL_URDF_description/meshes/livox_mid_360_1.stl" scale="0.001 0.001 0.001"/>
-    </geometry>
-  </collision>
-</link>
-
 <link name="RF_link1_right_1">
   <inertial>
     <origin xyz="-0.022677020519566077 -0.037455160000820775 -0.015609126867096363" rpy="0 0 0"/>
@@ -2226,27 +2121,6 @@
     <origin xyz="-0.251164 -0.289772 0.0" rpy="0 0 0"/>
     <geometry>
       <mesh filename="package://HEXAPEDAL_URDF_description/meshes/LB_bearing_3_1.stl" scale="0.001 0.001 0.001"/>
-    </geometry>
-  </collision>
-</link>
-
-<link name="mid-360-fov-asm_ver.ksh_MID-360_4_1_1_1">
-  <inertial>
-    <origin xyz="-3.0009021704220456e-07 -0.025176514686128595 -0.04971233388891225" rpy="0 0 0"/>
-    <mass value="0.2760142598595122"/>
-    <inertia ixx="4.7e-05" iyy="4.8e-05" izz="6.5e-05" ixy="-0.0" iyz="-5e-06" ixz="-0.0"/>
-  </inertial>
-  <visual>
-    <origin xyz="-7.1e-05 -0.012038 -0.239582" rpy="0 0 0"/>
-    <geometry>
-      <mesh filename="package://HEXAPEDAL_URDF_description/meshes/mid-360-fov-asm_ver.ksh_MID-360_4_1_1_1.stl" scale="0.001 0.001 0.001"/>
-    </geometry>
-    <material name="silver"/>
-  </visual>
-  <collision>
-    <origin xyz="-7.1e-05 -0.012038 -0.239582" rpy="0 0 0"/>
-    <geometry>
-      <mesh filename="package://HEXAPEDAL_URDF_description/meshes/mid-360-fov-asm_ver.ksh_MID-360_4_1_1_1.stl" scale="0.001 0.001 0.001"/>
     </geometry>
   </collision>
 </link>
@@ -3283,42 +3157,6 @@
   <child link="M_hold_4_1"/>
 </joint>
 
-<joint name="강체 190" type="fixed">
-  <origin xyz="-0.007071 0.007071 0.007" rpy="0 0 0"/>
-  <parent link="M_hold_1_1"/>
-  <child link="M_column_1_1_1"/>
-</joint>
-
-<joint name="강체 191" type="fixed">
-  <origin xyz="-0.007071 -0.007071 0.007" rpy="0 0 0"/>
-  <parent link="M_hold_2_1"/>
-  <child link="M_column_1_2_1"/>
-</joint>
-
-<joint name="강체 192" type="fixed">
-  <origin xyz="0.007071 0.007071 0.007" rpy="0 0 0"/>
-  <parent link="M_hold_3_1"/>
-  <child link="M_column_1_3_1"/>
-</joint>
-
-<joint name="강체 193" type="fixed">
-  <origin xyz="0.007071 -0.007071 0.007" rpy="0 0 0"/>
-  <parent link="M_hold_4_1"/>
-  <child link="M_column_1_4_1"/>
-</joint>
-
-<joint name="강체 194" type="fixed">
-  <origin xyz="-0.002828 -0.100829 0.274" rpy="0 0 0"/>
-  <parent link="M_column_1_1_1"/>
-  <child link="M_column_2_1"/>
-</joint>
-
-<joint name="강체 205" type="fixed">
-  <origin xyz="-0.079326 0.142983 0.0059" rpy="0 0 0"/>
-  <parent link="M_column_2_1"/>
-  <child link="M_column_3_fix_1"/>
-</joint>
-
 <joint name="강체 230" type="fixed">
   <origin xyz="0.0 0.0 0.007" rpy="0 0 0"/>
   <parent link="M_hold_1_1"/>
@@ -3331,17 +3169,30 @@
   <child link="base_1"/>
 </joint>
 
+<joint name="강체 232" type="fixed">
+  <origin xyz="-0.069225 0.069225 0.015" rpy="0 0 0"/>
+  <parent link="base_1"/>
+  <child link="M_column_3_fix_1"/>
+</joint>
+
 <joint name="강체 233" type="fixed">
-  <!-- Fusion geometryOneTransform: red X, green Y, blue Z at the new Livox origin. -->
-  <origin xyz="0.0019999998946324676 -0.004476314951083259 -0.19538202795101503" rpy="3.141592653589793 0.26179938779914885 -1.5707963267948966"/>
+  <!-- Fusion geometryOneTransform: red X, green Y, blue Z at the Livox origin. -->
+  <origin xyz="-0.01800000000000003 -0.024476315056450298 0.05961797204898482" rpy="3.141592653589793 0.26179938779914885 -1.5707963267948966"/>
   <parent link="M_column_3_fix_1"/>
   <child link="livox_mid_360_2"/>
 </joint>
 
 <joint name="강체 234" type="fixed">
-  <origin xyz="0.031 0.011 -0.219" rpy="0 0 0"/>
+  <origin xyz="0.011 -0.009 0.036" rpy="0 0 0"/>
   <parent link="M_column_3_fix_1"/>
   <child link="camera_fixer_1"/>
+</joint>
+
+<joint name="강체 235" type="fixed">
+  <!-- Counter-transform keeps the FOV link at its exported world pose. -->
+  <origin xyz="-0.024 -0.017999999999999978 -0.03504700000000003" rpy="2.8797932657906444 0 -1.5707963267948966"/>
+  <parent link="livox_mid_360_2"/>
+  <child link="mid-360-fov-asm_ver.ksh_MID-360_4_1_1_1"/>
 </joint>
 
 <joint name="LF_1" type="revolute">
@@ -3512,13 +3363,6 @@
   <limit upper="2.356194" lower="-2.356194" effort="100" velocity="100"/>
 </joint>
 
-<joint name="강체 204" type="fixed">
-  <!-- Fusion geometryOneTransform: red X, green Y, blue Z at the original Livox origin. -->
-  <origin xyz="0.002 0.00810840441142677 -0.0604708553102654" rpy="3.141592653589793 0 1.5707963267948966"/>
-  <parent link="M_column_3_fix_1"/>
-  <child link="livox_mid_360_1"/>
-</joint>
-
 <joint name="강체 95" type="fixed">
   <origin xyz="-0.052821 0.025244 0.015" rpy="0 0 0"/>
   <parent link="RF_DS51150_270_2_1"/>
@@ -3661,13 +3505,6 @@
   <origin xyz="0.070357 0.077428 -0.015" rpy="0 0 0"/>
   <parent link="LB_link1_left_1"/>
   <child link="LB_bearing_3_1"/>
-</joint>
-
-<joint name="강체 201" type="fixed">
-  <!-- Counter-transform keeps the FOV link at its exported world pose. -->
-  <origin xyz="0.024 0.018 0.035047" rpy="3.141592653589793 0 1.5707963267948966"/>
-  <parent link="livox_mid_360_1"/>
-  <child link="mid-360-fov-asm_ver.ksh_MID-360_4_1_1_1"/>
 </joint>
 
 <joint name="LF_3" type="revolute">
