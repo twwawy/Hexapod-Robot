@@ -1,4 +1,4 @@
-"""Explicit 23-D checkpoint contract shared by training and replay."""
+"""Explicit 24-D checkpoint contract shared by training and replay."""
 import functools
 import hashlib
 import json
@@ -25,7 +25,8 @@ def network_factory():
 def contract(env):
     root = Path(__file__).resolve().parent
     sources = ('adaptive_gait_controller.py', 'adaptive_gait_env.py', 'adaptive_gait_perception.py',
-               'adaptive_foothold_estimator.py',
+               'adaptive_foothold_estimator.py', 'foothold_feasibility.py',
+               'hybrid_gait_supervisor.py', 'wave_gait_scheduler.py',
                'adaptive_gait_policy.py', 'firmware_mjx_controller.py', 'rough_terrain_env.py',
                'prepare_rl_scene.py', 'servo_model.py', 'terrain_curriculum.py', 'lidar_extrinsics.py')
     revision = subprocess.check_output(['git', '-C', str(root.parent), 'rev-parse', 'HEAD'], text=True).strip()
@@ -33,9 +34,12 @@ def contract(env):
         reward_contract=REWARD_CONTRACT, action_size=ACTION_SIZE,
         observation_size={'state': ACTOR_SIZE, 'privileged_state': CRITIC_SIZE},
         actor_source=env.perception, leg_order=LEG_ORDER,
-        action_slices={'xy': [0, 12], 'clearance': [12, 18], 'pitch_roll_height': [18, 21], 'stride': 21, 'phase': 22},
+        gait_mode=env.gait_mode,
+        action_slices={'xy': [0, 12], 'clearance': [12, 18], 'roll_pitch_height': [18, 21],
+                       'stride': 21, 'apex_phase': 22, 'transfer_timing': 23},
         limits=dict(xy_m=.04, clearance_residual_m=.04, clearance_m=[.04, .18],
-                    pitch_deg=10., roll_deg=5., height_m=.03, stride=[.5, 1.3], phase_s=[.3, .7]),
+                    pitch_deg=10., roll_deg=5., height_m=.03, stride=[.5, 1.3],
+                    tripod_phase_s=[.25, .7], wave_phase_s=[.6, 1.4], timing_residual=.15),
         frames='controller forward/left/up; model forward -Y, left +X; map world XY; metres/radians/seconds',
         geometry='230 mm distal training link; 32 mm sphere centre is IK endpoint',
         joint_order=[f'{leg}_{joint}' for leg in LEG_ORDER for joint in (1, 2, 3)],
@@ -77,7 +81,7 @@ def read_contract(path):
     path = resolve_checkpoint(path)
     manifest = path/'adaptive_contract.json'
     if not manifest.is_file():
-        raise ValueError(f'Missing 23-D adaptive contract: {manifest}; stage31 18-D cannot be loaded')
+        raise ValueError(f'Missing 24-D adaptive contract: {manifest}; stage31 18-D cannot be loaded')
     metadata = json.loads(manifest.read_text())
     for field, expected in (('action_contract', ACTION_CONTRACT), ('observation_contract', OBSERVATION_CONTRACT),
                             ('action_size', ACTION_SIZE),

@@ -1,4 +1,4 @@
-"""23-D parameter policy on the firmware's contact-aware tripod controller.
+"""24-D residual policy on a contact-aware Tripod/Wave controller.
 
 The adaptive environment calls this controller explicitly. Legacy 18-D
 environments keep their own controller. Foot memory is updated before posture/IK.
@@ -8,9 +8,10 @@ from collections import namedtuple
 import jax
 import jax.numpy as jp
 import firmware_mjx_controller as fw
+import wave_gait_scheduler as scheduler
 
-ACTION_SIZE = 23
-ACTION_CONTRACT = 'adaptive_tripod_reference_residual_23_v2'
+ACTION_SIZE = 24
+ACTION_CONTRACT = 'adaptive_hybrid_geometry_residual_24_v3'
 LEG_ORDER = ('RF', 'RM', 'RB', 'LF', 'LM', 'LB')
 AdaptiveState = namedtuple('AdaptiveState', fw.FirmwareState._fields + (
     'request', 'proposal_end', 'proposal_known', 'proposal_safe', 'proposal_clearance',
@@ -20,35 +21,45 @@ AdaptiveState = namedtuple('AdaptiveState', fw.FirmwareState._fields + (
     'root_rotation', 'root_position', 'proposal_world', 'goal_world',
     'posture_target', 'height_applied',
     'proposal_index', 'active_index',
+    'scheduler', 'proposal_mode', 'proposal_permit', 'proposal_epoch',
+    'proposal_apex_phase', 'proposal_transfer', 'apex_phase', 'transfer',
+    'proposal_speed_scale', 'speed_scale', 'raw_contacts', 'confirmed_contacts',
 ))
 
 
 def initial_state():
-    return AdaptiveState(*fw.initial_state(), jp.zeros(23), fw.BASE_FEET,
+    return AdaptiveState(*fw.initial_state(), jp.zeros(ACTION_SIZE), fw.BASE_FEET,
                          jp.zeros(6, dtype=jp.bool_), jp.ones(6, dtype=jp.bool_), jp.full(6, .06),
                          jp.zeros(3), jp.asarray(1.), jp.asarray(.5),
                          jp.asarray(.5), jp.asarray(1.), fw.BASE_FEET, jp.full(6, .06),
-                         jp.zeros(6, dtype=jp.bool_), jp.zeros(3), jp.zeros(23), jp.asarray(False),
+                         jp.zeros(6, dtype=jp.bool_), jp.zeros(3), jp.zeros(ACTION_SIZE), jp.asarray(False),
                          jp.eye(3), jp.zeros(3), jp.zeros((6, 3)), jp.zeros((6, 3)),
                          jp.zeros(3), jp.asarray(0.),
-                         jp.full(6, -1, dtype=jp.int32), jp.full(6, -1, dtype=jp.int32))
+                         jp.full(6, -1, dtype=jp.int32), jp.full(6, -1, dtype=jp.int32),
+                         scheduler.initial_scheduler(), jp.asarray(0), jp.asarray(False), jp.asarray(-1),
+                         jp.full(6, .5), jp.full(6, .5), jp.full(6, .5), jp.full(6, .5),
+                         jp.asarray(1.), jp.asarray(1.), jp.zeros(6, dtype=jp.bool_), jp.zeros(6, dtype=jp.bool_))
 
 
 def decode(action):
     a = jp.clip(action, -1., 1.)
     stride = 1. + jp.where(a[21] < 0., .5*a[21], .3*a[21])
-    period = .5 * (1. + .4*a[22])
-    # policy order pitch/roll/height; controller order roll/pitch/height
-    posture = jp.array((a[19]*jp.deg2rad(5.), a[18]*jp.deg2rad(10.), a[20]*.03))
-    return a[:12].reshape(6, 2)*.04, a[12:18]*.04, posture, stride, period
+    posture = jp.array((a[18]*jp.deg2rad(5.), a[19]*jp.deg2rad(10.), a[20]*.03))
+    return a[:12].reshape(6, 2)*.04, a[12:18]*.04, posture, stride, a[22]*.15, a[23]*.15
 
 
-def planned_swing(progress, start, end, clearance):
+def planned_swing(progress, start, end, clearance, apex_phase=.5, transfer=.5):
     """Controller-owned lift/transfer/lower; clearance is above the higher end."""
     phase = jp.broadcast_to(progress, start.shape[:-1])
-    xy = fw._quintic(jp.clip((phase-.25)/.5, 0., 1.))
-    up = fw._quintic(jp.clip(phase/.25, 0., 1.))
-    down = fw._quintic(jp.clip((phase-.75)/.25, 0., 1.))
+    apex_phase = jp.clip(apex_phase, .3, .7)
+    transfer = jp.clip(transfer, .35, .65)
+    xy = fw._quintic(jp.clip((phase-(transfer-.25))/.5, 0., 1.))
+    # Preserve the neutral lift/transfer/lower plateau; apex_phase moves the
+    # first maximum earlier/later with smooth zero-velocity joins.
+    peak_start = apex_phase-.2
+    peak_end = apex_phase+.2
+    up = fw._quintic(jp.clip(phase/peak_start, 0., 1.))
+    down = fw._quintic(jp.clip((phase-peak_end)/(1.-peak_end), 0., 1.))
     top = jp.maximum(start[..., 2], end[..., 2]) + clearance
     points = start + xy[..., None]*(end-start)
     return points.at[..., 2].set(start[..., 2] + up*(top-start[..., 2]) + down*(end[..., 2]-top))
@@ -107,183 +118,50 @@ def _preview_gait(candidate: jax.Array, posture: jax.Array, duration: jax.Array)
     return jp.all(base_valid) & jp.all(stance_valid) & jp.all(swing_valid)
 
 
-def _update_gait(
-    state: AdaptiveState, tripod_enable: jax.Array, contacts: jax.Array
-) -> tuple[dict[str, jax.Array], dict[str, jax.Array]]:
-    new_run = tripod_enable & (~state.gait_running)
-    running = state.gait_running | tripod_enable
-    stop_pending = jp.where(tripod_enable, False, state.stop_pending | running)
-    initialized = jp.where(new_run, False, state.gait_initialized)
-    phase_index = jp.where(new_run, 0, state.phase_index)
-    phase_time = jp.where(new_run, 0.0, state.phase_time)
-    airborne = jp.where(new_run, jp.zeros_like(state.airborne_seen), state.airborne_seen)
-    landed = jp.where(new_run, jp.zeros_like(state.landed), state.landed)
-
-    phase_time = jp.where(
-        running & initialized,
-        phase_time + FIRMWARE_CONTROL_DT,
-        phase_time,
-    )
-    initialized = initialized | running
-    progress = jp.clip(phase_time / state.phase_duration, 0.0, 1.0)
-    leg_group_135 = (jp.arange(6) % 2) == 0
-    swing_group = leg_group_135 == ((phase_index % 2) == 0)
-    airborne = airborne | (running & swing_group & (~contacts))
-    landed = landed | (
-        running
-        & swing_group
-        & (airborne | stop_pending)
-        & contacts
-        & (progress >= EARLY_LANDING_PROGRESS)
-    )
-    all_swing_landed = jp.all((~swing_group) | landed)
-    completed = running & (progress >= 1.0) & all_swing_landed
-    stop_completed = completed & stop_pending
-    running = running & (~stop_completed)
-    initialized = initialized & (~stop_completed)
-    stop_pending = stop_pending & (~stop_completed)
-    phase_index = jp.where(completed & (~stop_completed), phase_index + 1, phase_index)
-    phase_time = jp.where(completed, 0.0, phase_time)
-    airborne = jp.where(completed, jp.zeros_like(airborne), airborne)
-    landed = jp.where(completed, jp.zeros_like(landed), landed)
-    progress = jp.where(completed, 0.0, progress)
-    swing_group = leg_group_135 == ((phase_index % 2) == 0)
-    gait_state = jp.where(
-        running & swing_group & (~landed),
-        jp.where(progress >= 1.0, LEG_LATE_LANDING, LEG_SWING),
-        LEG_STANCE,
-    ).astype(jp.int32)
-    gait_progress = jp.where(running, jp.full(6, progress), jp.zeros(6))
-    updates = {
-        "phase_index": phase_index,
-        "phase_time": phase_time,
-        "airborne_seen": airborne,
-        "landed": landed,
-        "gait_initialized": initialized,
-        "gait_running": running,
-        "stop_pending": stop_pending,
-    }
-    output = {
-        "state": gait_state,
-        "progress": gait_progress,
-        "startup": running & (phase_index == 0),
-        "enabled": running,
-    }
-    return updates, output
+def _update_gait(state, tripod_enable, contacts):
+    sched, gait = scheduler.advance(state.scheduler,
+        requested_mode=state.proposal_mode, permit=state.proposal_permit,
+        proposal_epoch=state.proposal_epoch, command_active=tripod_enable,
+        contacts=state.confirmed_contacts, raw_contacts=state.raw_contacts,
+        duration=state.phase_duration, dt=FIRMWARE_CONTROL_DT)
+    return dict(scheduler=sched, phase_index=sched.phase, phase_time=sched.elapsed,
+                airborne_seen=sched.airborne, landed=sched.landed,
+                gait_initialized=sched.running, gait_running=sched.running,
+                stop_pending=~tripod_enable & sched.running), gait
 
 
-def _foot_trajectory(
-    state: AdaptiveState,
-    gait: dict[str, jax.Array],
-    applied_twist: jax.Array,
-    tripod_enable: jax.Array,
-) -> tuple[dict[str, jax.Array], jax.Array]:
-    displacement = jp.stack(
-        (
-            state.phase_duration * (-applied_twist[0] + applied_twist[3] * BASE_FEET[:, 1]),
-            state.phase_duration * (-applied_twist[1] - applied_twist[3] * BASE_FEET[:, 0]),
-            jp.full(6, state.phase_duration * -applied_twist[2]),
-        ),
-        axis=-1,
-    )
-    front = BASE_FEET - 0.5 * displacement
-    rear = BASE_FEET + 0.5 * displacement
-    default_start = jp.where(gait["startup"], BASE_FEET, rear)
-    current = gait["state"]
-    previous = state.previous_leg_state
-    progress = gait["progress"]
-
-    entering_swing = (current == LEG_SWING) & (previous != LEG_SWING)
-    swing_start = jp.where(
-        entering_swing[:, None],
-        jp.where(state.adapted_stance[:, None], state.foot_memory, default_start),
-        state.swing_start,
-    )
-    custom_swing = jp.where(entering_swing, state.adapted_stance, state.custom_swing)
-    adapted = jp.where(entering_swing, False, state.adapted_stance)
-    actual_swing_start = jp.where(custom_swing[:, None], swing_start, default_start)
-    swing_end = jp.where(entering_swing[:, None], state.proposal_end, state.swing_end)
-    swing_clearance = jp.where(entering_swing, state.proposal_clearance, state.swing_clearance)
-    active_known = jp.where(entering_swing, state.proposal_known, state.active_known)
-    # Mapped swings start from the same pre-posture memory as stance, never an
-    # externally transformed world-space path. Nominal blind swing is unchanged.
-    actual_swing_start = jp.where((active_known & entering_swing)[:, None], state.foot_memory, actual_swing_start)
-    swing_start = jp.where((active_known & entering_swing)[:, None], state.foot_memory, swing_start)
-    custom_swing = custom_swing | active_known
-    actual_swing_start = jp.where(custom_swing[:, None], swing_start, actual_swing_start)
-    swing_target = jp.where(active_known[:, None],
-        planned_swing(progress, actual_swing_start, swing_end, swing_clearance),
-        _swing(progress, actual_swing_start, front))
-
-    late_repeat = (current == LEG_LATE_LANDING) & (previous == LEG_LATE_LANDING)
-    inward = jp.stack(
-        (
-            jp.cos(LEG_ANGLES),
-            jp.sin(LEG_ANGLES),
-            jp.zeros(6),
-        ),
-        axis=-1,
-    )
-    late_target = state.foot_memory - late_repeat[:, None] * (
-        FIRMWARE_CONTROL_DT
-        * (LATE_INWARD_SPEED * inward + jp.array((0.0, 0.0, LATE_LANDING_SPEED)))
-    )
-    adapted = adapted | (current == LEG_LATE_LANDING)
-
-    previous_late = (current == LEG_STANCE) & (previous == LEG_LATE_LANDING)
-    early_landing = (
-        (current == LEG_STANCE)
-        & (previous == LEG_SWING)
-        & (progress >= EARLY_LANDING_PROGRESS)
-    )
-    adapted = adapted | previous_late | early_landing
-    early_target = jp.where(active_known[:, None], state.foot_memory,
-                            _swing(progress, actual_swing_start, front))
-    adapted = adapted | (active_known & (current != LEG_SWING))
-    stance_integrated = state.foot_memory + FIRMWARE_CONTROL_DT * jp.stack(
-        (
-            -applied_twist[0] + applied_twist[3] * state.foot_memory[:, 1],
-            -applied_twist[1] - applied_twist[3] * state.foot_memory[:, 0],
-            jp.full(6, -applied_twist[2]),
-        ),
-        axis=-1,
-    )
-    normal_stance = jp.where(
-        gait["startup"],
-        BASE_FEET + progress[:, None] * (rear - BASE_FEET),
-        front + progress[:, None] * (rear - front),
-    )
-    all_stance_mode = ~tripod_enable
-    stance_target = jp.where(
-        all_stance_mode,
-        stance_integrated,
-        jp.where(
-            previous_late[:, None],
-            state.foot_memory,
-            jp.where(
-                early_landing[:, None],
-                early_target,
-                jp.where(adapted[:, None], stance_integrated, normal_stance),
-            ),
-        ),
-    )
-    target = jp.where(
-        (current == LEG_SWING)[:, None],
-        swing_target,
-        jp.where(
-            (current == LEG_LATE_LANDING)[:, None], late_target, stance_target
-        ),
-    )
-    return {
-        "swing_end": swing_end,
-        "swing_clearance": swing_clearance,
-        "active_known": active_known,
-        "foot_memory": target,
-        "swing_start": swing_start,
-        "previous_leg_state": current,
-        "adapted_stance": adapted,
-        "custom_swing": custom_swing,
-    }, target
+def _foot_trajectory(state, gait, applied_twist, tripod_enable):
+    entering = gait['entering']
+    start = jp.where(entering[:, None], state.foot_memory, state.swing_start)
+    end = jp.where(entering[:, None], state.proposal_end, state.swing_end)
+    clearance = jp.where(entering, state.proposal_clearance, state.swing_clearance)
+    known = jp.where(entering, state.proposal_known, state.active_known)
+    apex = jp.where(entering, state.proposal_apex_phase, state.apex_phase)
+    transfer = jp.where(entering, state.proposal_transfer, state.transfer)
+    current, previous = gait['state'], state.previous_leg_state
+    swing = planned_swing(gait['progress'], start, end, clearance, apex, transfer)
+    late = state.foot_memory - FIRMWARE_CONTROL_DT*jp.stack((
+        scheduler.LATE_INWARD_SPEED*jp.cos(LEG_ANGLES),
+        scheduler.LATE_INWARD_SPEED*jp.sin(LEG_ANGLES),
+        jp.full(6, scheduler.LATE_SPEED)), axis=-1)
+    # The first Wave revolution moves stance at half rate, as on main.
+    startup_scale = jp.where((state.scheduler.mode == scheduler.WAVE) & gait['startup'], .5, 1.)
+    velocity = jp.stack((-applied_twist[0]+applied_twist[3]*state.foot_memory[:, 1],
+                         -applied_twist[1]-applied_twist[3]*state.foot_memory[:, 0],
+                         jp.full(6, -applied_twist[2])), axis=-1)
+    stance = state.foot_memory + startup_scale*FIRMWARE_CONTROL_DT*velocity
+    landing = (current == scheduler.STANCE) & (previous != scheduler.STANCE)
+    stance = jp.where(landing[:, None], state.foot_memory, stance)
+    target = jp.where((current == scheduler.SWING)[:, None], swing,
+                       jp.where((current == scheduler.LATE)[:, None], late, stance))
+    hold = (current == scheduler.HOLD) | (current == scheduler.TOUCHDOWN)
+    # During delayed contact, do not continue driving support legs backwards.
+    hold |= (current == scheduler.STANCE) & jp.any(current == scheduler.LATE)
+    target = jp.where(hold[:, None], state.foot_memory, target)
+    return dict(swing_start=start, swing_end=end, swing_clearance=clearance,
+                active_known=known, apex_phase=apex, transfer=transfer,
+                foot_memory=target, previous_leg_state=current,
+                adapted_stance=jp.ones(6, dtype=jp.bool_), custom_swing=jp.ones(6, dtype=jp.bool_)), target
 
 
 def step(
@@ -302,10 +180,10 @@ def step(
     swing_height_floor: jax.Array = SWING_HEIGHT_MIN,
 ) -> tuple[AdaptiveState, FirmwareOutput]:
     """Advance one firmware tick using the environment's prepared parameters."""
+    command_requested = (jp.abs(target_velocity[0]) >= .001) | (jp.abs(target_velocity[1]) >= .001)
     # Ratio coupling: shortening stride and duration together makes shorter,
     # faster steps without simply changing nominal mean speed.
-    speed_ratio = state.stride_scale / (state.phase_duration / .5)
-    target_velocity = target_velocity.at[0].multiply(speed_ratio)
+    target_velocity = target_velocity * state.speed_scale
     target_pose = state.posture_target
     rate = jp.array((jp.deg2rad(15.), jp.deg2rad(15.), .04)) * FIRMWARE_CONTROL_DT
     adapt_posture = state.adapt_posture + jp.clip(target_pose-state.adapt_posture, -rate, rate)
@@ -374,24 +252,30 @@ def step(
         jp.zeros(4),
         jp.where(gait_preview_valid, candidate_twist, state.gait_applied),
     )
-    tripod_enable = (jp.abs(user_vx) >= 0.005) | (jp.abs(user_wz) >= jp.deg2rad(1.0))
+    # Determine intent before Wave's .2 multiplier; a small arrow-key command
+    # must not become a false stop after the supervisor reduces speed.
+    tripod_enable = command_requested
     gait_updates, gait = _update_gait(state, tripod_enable, contacts)
-    entering = (gait["state"] == LEG_SWING) & (state.previous_leg_state != LEG_SWING)
+    entering = gait['entering']
     # Check the requested stance/swing geometry with the active posture before
     # starting a tripod. A known bad target is never relabeled as blind terrain.
-    samples = jax.vmap(planned_swing, in_axes=(0, None, None, None))(
-        jp.linspace(0., 1., 21), state.foot_memory, state.proposal_end, state.proposal_clearance)
+    samples = jax.vmap(planned_swing, in_axes=(0, None, None, None, None, None))(
+        jp.linspace(0., 1., 21), state.foot_memory, state.proposal_end, state.proposal_clearance,
+        state.proposal_apex_phase, state.proposal_transfer)
     shifted_samples = samples.at[..., 2].add(-jp.clip(height_offset, -.10, .10))
     _, path_ik = _solve_ik(_rotate_inverse(shifted_samples, state.posture_command))
     feasible = state.proposal_safe & jp.all(path_ik, axis=0)
     blocked = jp.any(entering & state.proposal_known & ~feasible)
     blocked = blocked | jp.any(entering & ~state.proposal_safe)
-    gait_updates = {key: jp.where(blocked, getattr(state, key), value) for key, value in gait_updates.items()}
+    gait_updates = {key: jax.tree_util.tree_map(lambda old, new: jp.where(blocked, old, new),
+                    getattr(state, key), value) for key, value in gait_updates.items()}
+    gait['entering'] &= ~blocked
     gait["state"] = jp.where(blocked, state.previous_leg_state, gait["state"])
     gait["progress"] = jp.where(blocked, jp.clip(state.phase_time/state.phase_duration, 0., 1.), gait["progress"])
     gait["enabled"] = jp.where(blocked, state.gait_running, gait["enabled"])
     gait["startup"] = jp.where(blocked, state.gait_running & (state.phase_index == 0), gait["startup"])
     gait_applied = jp.where(blocked, jp.zeros_like(gait_applied), gait_applied)
+    gait_applied = jp.where(gait['frozen'] | jp.any(gait['state'] == scheduler.LATE), 0., gait_applied)
     gait_accepted = gait_accepted & ~blocked
     boundary = jp.any(entering) & ~blocked
     phase_duration = jp.where(boundary, state.proposal_period, state.phase_duration)
@@ -410,8 +294,10 @@ def step(
     body_goal = jp.stack((-model_goal[:, 1], model_goal[:, 0], model_goal[:, 2]), axis=-1)
     pre_goal = body_goal @ fw._rotation_matrix(state.posture_command).T
     pre_goal = pre_goal.at[:, 2].add(jp.clip(height_offset, -.10, .10))
-    trajectory_state = state._replace(phase_duration=phase_duration,
-        proposal_end=pre_goal, swing_end=jp.where(state.active_known[:, None], pre_goal, state.swing_end))
+    mapped = state.active_known | (entering & state.proposal_known)
+    trajectory_state = state._replace(phase_duration=phase_duration, scheduler=gait_updates['scheduler'],
+        proposal_end=jp.where(state.proposal_known[:, None], pre_goal, state.proposal_end),
+        swing_end=jp.where(mapped[:, None], pre_goal, state.swing_end))
     foot_updates, nominal_feet = _foot_trajectory(
         trajectory_state, gait, gait_applied, tripod_enable
     )
@@ -455,7 +341,7 @@ def step(
         accepted_nominal_feet, posture_command
     )
 
-    # The 23-D policy changes trajectory parameters, not a second 18-D foot
+    # The 24-D policy changes trajectory parameters, not a second 18-D foot
     # residual. There is exactly one target/IK path and one foot-memory update.
     residual_filter = jp.zeros(18)
     _, policy_valid = _solve_ik(nominal_posture_feet)
@@ -476,6 +362,7 @@ def step(
 
     next_state = state._replace(
         phase_duration=phase_duration, stride_scale=stride_scale,
+        speed_scale=jp.where(boundary, state.proposal_speed_scale, state.speed_scale),
         goal_world=goal_world,
         active_index=jp.where(entering & ~blocked, state.proposal_index, state.active_index),
         posture_target=posture_target, height_applied=height_applied,
@@ -485,7 +372,7 @@ def step(
         throttle_filter=throttle_filter,
         yaw_filter=yaw_filter,
         yaw_reference=yaw_reference,
-        position_reference=jp.where(blocked, body_position_world[:2], position_reference),
+        position_reference=jp.where(blocked | gait['frozen'], body_position_world[:2], position_reference),
         previous_twist=candidate_twist,
         gait_applied=gait_applied,
         posture_command=posture_command,

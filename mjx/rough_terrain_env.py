@@ -312,9 +312,10 @@ def _base_reward_terms(
     body_contact: jax.Array,
     self_collision: jax.Array,
     command_active: jax.Array = jp.asarray(True),
+    progress_speed_floor: float = PROGRESS_COMMAND_FLOOR_MPS,
 ) -> dict[str, jax.Array]:
     """Compute locomotion rewards with no profitable stationary solution."""
-    speed_command = jp.maximum(command[0], PROGRESS_COMMAND_FLOOR_MPS)
+    speed_command = jp.maximum(command[0], progress_speed_floor)
     active_speed_command = jp.where(command_active, command[0], 0.0)
     motion_gate = jp.where(
         command_active,
@@ -1007,6 +1008,12 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
     def _reward_height_command(self, info, controller_state):
         return info["command"][2]
 
+    def _reward_command(self, info, controller_state):
+        return info['command']
+
+    def _reward_speed_floor(self):
+        return PROGRESS_COMMAND_FLOOR_MPS
+
     def reset(self, rng: jax.Array) -> mjx_env.State:
         if self._config.dr_enabled:
             (
@@ -1385,7 +1392,8 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
         feet_world = data.site_xpos[self._foot_site_ids]
         reward_terms = _base_reward_terms(
             forward_velocity=filtered_forward_velocity,
-            command=state.info["command"],
+            command=self._reward_command(state.info, controller_state),
+            progress_speed_floor=self._reward_speed_floor(),
             yaw_velocity=data.qvel[5],
             attitude=attitude,
             posture_target=posture_target,

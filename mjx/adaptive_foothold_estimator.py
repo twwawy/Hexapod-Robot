@@ -31,9 +31,11 @@ CANDIDATE_FEATURES = (
     'dx', 'dy', 'relative_height', 'center_known', 'coverage', 'terrain_ok', 'safe',
     'cell_spread', 'age', 'path_rise', 'path_coverage', 'plane_residual', 'slope',
     'edge_margin', 'edge_observed', 'ik_ok', 'path_ok', 'reference',
+    'normal_x', 'normal_y', 'normal_z', 'slope_x', 'slope_y', 'confidence',
+    'patch_length', 'patch_width', 'ik_margin', 'joint_margin',
 )
-UNKNOWN, LOW_COVERAGE, EDGE_ROUGH, IK_PATH, SAFE = range(5)
-STATUS_NAMES = ('UNKNOWN', 'LOW_COVERAGE', 'EDGE_ROUGH', 'IK_PATH', 'SAFE')
+UNKNOWN, LOW_COVERAGE, EDGE_ROUGH, IK_REJECTED, PATH_REJECTED, SAFE = range(6)
+STATUS_NAMES = ('UNKNOWN', 'LOW_COVERAGE', 'EDGE_ROUGH', 'IK_REJECTED', 'PATH_REJECTED', 'SAFE')
 
 
 def support_quality(height, known, spread):
@@ -50,6 +52,9 @@ def support_quality(height, known, spread):
     error = jp.where(known, height-height[..., :1]-fitted, 0.)
     residual = jp.sqrt(jp.sum(error**2, axis=-1)/jp.maximum(jp.sum(weights, axis=-1), 1.))
     slope = jp.arctan(jp.linalg.norm(plane[..., :2]/RESOLUTION, axis=-1))
+    gradient = plane[..., :2]/RESOLUTION
+    normal = jp.concatenate((-gradient, jp.ones_like(gradient[..., :1])), axis=-1)
+    normal /= jp.linalg.norm(normal, axis=-1, keepdims=True)
     cell_spread = jp.max(jp.where(known, spread, 0.), axis=-1)
     neighbor_jump = jp.any(known[..., 1:] & known[..., :1] &
                            (jp.abs(height[..., 1:]-height[..., :1]) > EDGE_JUMP), axis=-1)
@@ -58,7 +63,8 @@ def support_quality(height, known, spread):
         rank_ok & ((residual > MAX_PLANE_RESIDUAL) | (slope > MAX_SLOPE_RAD)))
     return dict(center_known=known[..., 0], any_known=jp.any(known, axis=-1),
                 complete=jp.all(known, axis=-1), coverage=coverage, coverage_ok=coverage_ok,
-                rank_ok=rank_ok, plane_residual=residual, slope=slope, spread=cell_spread, rough=rough)
+                rank_ok=rank_ok, plane_residual=residual, slope=slope, gradient=gradient,
+                normal=normal, spread=cell_spread, rough=rough)
 
 
 def edge_distance(height, known, spread):
@@ -77,7 +83,7 @@ def edge_distance(height, known, spread):
     return jp.minimum(edge, .15), jp.isfinite(edge)
 
 
-def evaluate_candidates(env, data, info, xy, nominal, basis, lift, *, privileged=False):
+def evaluate_candidates(env, data, info, xy, nominal, basis, lift, *, apex_delta=0., transfer_delta=0., privileged=False):
     """Terrain, endpoint/path IK and observed swing collisions for all 6x25 points."""
     query = lambda points: env._query(info['lidar_map'], points, data.time, privileged=privileged)
     height, known, age, spread = query(xy[..., None, :] + PATCH_OFFSETS)
@@ -103,14 +109,24 @@ def evaluate_candidates(env, data, info, xy, nominal, basis, lift, *, privileged
     path_high = jp.max(jp.where(pk, ph, -jp.inf), axis=(-2, -1))
     path_high = jp.where(jp.any(pk, axis=(-2, -1)), path_high, center_h)
     required = jp.maximum(path_high-jp.maximum(feet[:, None, 2]-FOOT_RADIUS, center_h), 0.)
-    clearance = jp.clip(fw.SWING_HEIGHT + required + jp.asarray(lift)[:, None], .04, .18)
-    paths = jax.vmap(adaptive.planned_swing, in_axes=(0, None, None, None))(
-        fractions, starts, pre, clearance).transpose(1, 2, 0, 3)
+    minimum_clearance = jp.maximum(.04, required+.02)
+    clearance = jp.clip(jp.maximum(required+fw.SWING_HEIGHT+jp.asarray(lift)[:, None], minimum_clearance), .04, .18)
+    rise = center_h-(feet[:, None, 2]-FOOT_RADIUS)
+    apex_phase = jp.clip(.5-jp.clip(rise/.15, -1., 1.)*.1+apex_delta, .3, .7)
+    transfer = jp.clip(.5+transfer_delta, .35, .65)*jp.ones_like(clearance)
+    paths = jax.vmap(adaptive.planned_swing, in_axes=(0, None, None, None, None, None))(
+        fractions, starts, pre, clearance, apex_phase, transfer).transpose(1, 2, 0, 3)
     shifted = paths.at[..., 2].add(-cs.height_applied)
     controller_paths = fw._rotate_inverse(shifted, cs.posture_command)
     # Firmware IK expects the leg axis immediately before XYZ.
-    _, path_ik = fw._solve_ik(controller_paths.transpose(1, 2, 0, 3))
-    ik_ok = jp.all(path_ik, axis=1).T
+    ik_vectors = controller_paths.transpose(1, 2, 0, 3)
+    angles, path_ik = fw._solve_ik(ik_vectors)
+    local = fw._body_to_leg(ik_vectors)
+    reach = jp.sqrt((jp.linalg.norm(local[..., :2], axis=-1)-fw.LINK_1)**2 + local[..., 2]**2)
+    reach_margin = jp.minimum(fw.LINK_2+fw.LINK_3-reach, reach-abs(fw.LINK_2-fw.LINK_3))
+    ik_margin = jp.min(reach_margin, axis=1).T
+    joint_margin = jp.min(fw.JOINT_LIMIT-jp.max(jp.abs(angles), axis=-1), axis=1).T
+    ik_ok = jp.all(path_ik, axis=1).T & (ik_margin >= fw.WORKSPACE_MARGIN) & (joint_margin >= .01745)
     path_model = jp.stack((controller_paths[..., 1], -controller_paths[..., 0], controller_paths[..., 2]), axis=-1)
     path_world = data.qpos[:3] + path_model @ rotation.T
     ch, ck, _, _ = query(path_world[..., None, :2] + footprint)
@@ -119,15 +135,27 @@ def evaluate_candidates(env, data, info, xy, nominal, basis, lift, *, privileged
     collision = ck & interior[None, None, :, None] & (
         path_world[..., 2, None]-FOOT_RADIUS < ch+.002)
     path_ok = ~jp.any(collision, axis=(-2, -1)) & (clearance >= required+.02)
-    safe = terrain_ok & ik_ok & path_ok
+    path_coverage = jp.mean(ck.astype(jp.float32), axis=(-2, -1))
+    path_observed = path_coverage >= MIN_COVERAGE
+    safe = terrain_ok & ik_ok & path_ok & path_observed
     status = jp.where(~quality['any_known'], UNKNOWN,
         jp.where(unsafe, EDGE_ROUGH, jp.where(~quality['coverage_ok'], LOW_COVERAGE,
-        jp.where(~(ik_ok & path_ok), IK_PATH, SAFE)))).astype(jp.int32)
+        jp.where(~ik_ok, IK_REJECTED, jp.where(~path_ok, PATH_REJECTED,
+        jp.where(~path_observed, LOW_COVERAGE, SAFE)))))).astype(jp.int32)
     distance = jp.linalg.norm(xy-nominal[:, None, :2], axis=-1)
     reference_index = jp.where(jp.any(safe, axis=1), jp.argmin(jp.where(safe, distance, jp.inf), axis=1), -1)
     reference = (jp.arange(CANDIDATE_COUNT)[None, :] == reference_index[:, None])
     relative = center_h-(data.qpos[2]+fw.BASE_FOOT_Z-FOOT_RADIUS)
-    path_coverage = jp.mean(ck.astype(jp.float32), axis=(-2, -1))
+    confidence = quality['coverage']*jp.exp(-quality['plane_residual']/.008)*jp.clip(1.-age[..., 0]/MAX_AGE, 0., 1.)
+    # Contiguous observed support extents through the centre in world-grid axes.
+    same_surface = ek & (jp.abs(eh-center_h[..., None]) <= EDGE_JUMP) & (es <= EDGE_JUMP)
+    grid_ok = same_surface.reshape(6, CANDIDATE_COUNT, 5, 5)
+    lengths = []
+    for axis in (0, 1):
+        line = grid_ok[..., :, 2] if axis == 0 else grid_ok[..., 2, :]
+        neg = line[..., 1].astype(jp.float32) + (line[..., 1] & line[..., 0]).astype(jp.float32)
+        pos = line[..., 3].astype(jp.float32) + (line[..., 3] & line[..., 4]).astype(jp.float32)
+        lengths.append(jp.where(line[..., 2], (1.+neg+pos)*RESOLUTION, 0.))
     features = jp.concatenate((jp.broadcast_to(CANDIDATE_OFFSETS, (6, CANDIDATE_COUNT, 2))/SEARCH_RADIUS,
         jp.stack((jp.where(quality['center_known'], relative/.2, 0.), quality['center_known'].astype(jp.float32),
             quality['coverage'], terrain_ok.astype(jp.float32), safe.astype(jp.float32),
@@ -135,11 +163,17 @@ def evaluate_candidates(env, data, info, xy, nominal, basis, lift, *, privileged
             jp.where(quality['center_known'], required/.2, 0.), path_coverage,
             jp.clip(quality['plane_residual']/.01, 0., 5.), quality['slope']/MAX_SLOPE_RAD,
             margin/.15, edge_observed.astype(jp.float32), ik_ok.astype(jp.float32),
-            path_ok.astype(jp.float32), reference.astype(jp.float32)), axis=-1)), axis=-1)
+            path_ok.astype(jp.float32), reference.astype(jp.float32),
+            quality['normal'][..., 0], quality['normal'][..., 1], quality['normal'][..., 2],
+            quality['gradient'][..., 0], quality['gradient'][..., 1], confidence,
+            lengths[0]/.25, lengths[1]/.25, jp.clip(ik_margin/.1, -2., 2.),
+            jp.clip(joint_margin, -2., 2.)), axis=-1)), axis=-1)
     return dict(xy=xy, height=center_h, known=quality['coverage_ok'], unsafe=unsafe,
         safe=safe, terrain_ok=terrain_ok, ik_ok=ik_ok, path_ok=path_ok, status=status,
         path_height=path_high, path_coverage=path_coverage, required=required, clearance=clearance,
         pre=pre, world=world, features=features, nominal=nominal, basis=basis,
         edge_margin=margin, edge_observed=edge_observed, edge_rejected=edge_rejected,
         patch_known=known, patch_height=jp.where(known, height, 0.),
+        confidence=confidence, patch_length=lengths[0], patch_width=lengths[1],
+        ik_margin=ik_margin, joint_margin=joint_margin, apex_phase=apex_phase, transfer=transfer,
         reference_index=reference_index, **quality)
