@@ -37,12 +37,14 @@ cd /home/huro/Hexapod-Robot-integration
 source /home/huro/.venvs/hexapod-mjx/bin/activate
 bash scripts/view_foothold_planner.sh --controller adaptive --terrain flat --perception oracle
 bash scripts/view_foothold_planner.sh --controller adaptive --terrain steps --perception oracle
-bash scripts/view_foothold_planner.sh --controller adaptive --terrain steps --perception lidar --stage0
+bash scripts/view_foothold_planner.sh --controller adaptive --terrain steps --perception lidar --stage0 --speed 0.04
 ```
 
 먼저 flat의 zero-action Tripod, 계단의 candidate/reference/selected/latched marker,
 short-step·Wave 전환과 unknown HOLD를 확인한다. 이후 학습/오프라인 Jetson/ARM 빌드는
 [순서별 명령](docs/ADAPTIVE_INTEGRATION_V4.md#사용자-실행-순서)을 사용한다.
+방향키 포커스 문제가 있으면 `W/S`로 전후, `A/D`로 회전할 수 있다. 키가 들어오면 콘솔에
+`command: vx=...`가 즉시 출력된다. `--speed 0.04`는 키 입력 없이 시작 명령을 넣는다.
 
 ## 프로젝트 소개
 

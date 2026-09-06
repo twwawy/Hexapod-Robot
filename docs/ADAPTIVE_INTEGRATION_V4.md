@@ -24,6 +24,12 @@ IK/joint margin, path obstacle/coverage, feasible stride 및 Tripod/Wave feasibi
 RL: landing XY, clearance, roll/pitch/height, stride preference, apex/transfer timing.
 Supervisor: normal Tripod → short Tripod → observed failure일 때 Wave → HOLD.
 UNKNOWN은 unsafe의 증거가 아니므로 자동 Wave 전환을 허가하지 않는다.
+단, 위를 보는 LiDAR가 첫 착지 영역을 못 본 상태에서 mapping과 이동이 서로 기다리는 것을 막기 위해
+시작 시 6발 접촉이 확인되고 feasible Tripod landing이 아직 한 번도 만들어지지 않았을 때만 0.5 stride의
+classical Tripod를 이어간다. feasible plan이 한 번 확보되면 bootstrap을 영구 종료하며 이후 UNKNOWN은
+다시 HOLD한다. 영구 blind walking을 막기 위해 최대 24 phase로 제한한다. 이는 Wave 전환 근거로
+쓰지 않는다. 엄격한 UNKNOWN 검사에는 viewer의
+`--no-bootstrap-classical`을 사용한다.
 STM32: actual transition, raw/confirmed contact, Early/Late, support recovery,
 workspace/IK, joint/PWM/relay/Kill/Fault의 최종 권한.
 

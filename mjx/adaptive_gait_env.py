@@ -32,13 +32,15 @@ REWARD_CONTRACT = 'adaptive_hybrid_efficient_progress_v4'
 PROPRIO_SIZE = 157
 GLOBAL_SIZE = 23
 REFERENCE_SIZE = 6*9
+BOOTSTRAP_MAX_PHASES = 24
 ACTOR_SIZE = PROPRIO_SIZE + GLOBAL_SIZE + REFERENCE_SIZE + 6*CANDIDATE_COUNT*len(CANDIDATE_FEATURES)
 CRITIC_SIZE = ACTOR_SIZE + 6*CANDIDATE_COUNT*2 + 15
 
 
 class AdaptiveGaitEnv(HexapodRoughTerrainEnv):
     def __init__(self, *, terrain_level=0, perception='lidar', config=None,
-                 azimuths=90, elevations=8, dropout=.05, noise=.005, gait_mode='hybrid', diagnostics=False):
+                 azimuths=90, elevations=8, dropout=.05, noise=.005, gait_mode='hybrid', diagnostics=False,
+                 bootstrap_unmapped=True):
         if perception not in ('lidar', 'teacher', 'blind', 'oracle'):
             raise ValueError('perception must be lidar, teacher, blind or debug-only oracle')
         if terrain_spec(terrain_level).kind == 'rough':
@@ -47,6 +49,7 @@ class AdaptiveGaitEnv(HexapodRoughTerrainEnv):
         if gait_mode not in ('hybrid', 'tripod', 'wave'):
             raise ValueError('gait_mode must be hybrid, tripod or wave')
         self.gait_mode, self.diagnostics = gait_mode, diagnostics
+        self.bootstrap_unmapped = bool(bootstrap_unmapped)
         config = default_config() if config is None else config
         # Posture is owned by the parameter policy, not a terrain-kind sampler.
         config.command.height_min = config.command.height_max = 0.
@@ -88,6 +91,7 @@ class AdaptiveGaitEnv(HexapodRoughTerrainEnv):
         info['contact_confirm_time'] = jp.zeros(6)
         info['confirmed_contacts'] = jp.zeros(6, dtype=jp.bool_)
         info['slip_estimate'] = jp.zeros(6)
+        info['bootstrap_complete'] = jp.asarray(self.perception != 'lidar')
         info['foothold_plan'] = self._landing_plan(data, info, jp.zeros(adaptive.ACTION_SIZE))
         return info
 
@@ -288,6 +292,41 @@ class AdaptiveGaitEnv(HexapodRoughTerrainEnv):
             plan['selected_clearance'] = jp.full(6, fw.SWING_HEIGHT)
             plan['selected_apex_phase'], plan['selected_transfer'] = jp.full(6, .5), jp.full(6, .5)
             proposal_safe, accepted, posture = jp.ones(6, dtype=jp.bool_), jp.zeros(adaptive.ACTION_SIZE), jp.zeros(3)
+
+        # The upward-mounted LiDAR may not observe the first landing patches
+        # until the body has moved. Break that mapping/locomotion deadlock with
+        # conservative classical Tripod phases. This is permitted only until a
+        # local support patch has been observed, with all six feet confirmed,
+        # and without claiming that unknown map cells are generally safe.
+        local_plan_ready = jp.any(checks['feasible'])
+        info['bootstrap_complete'] = info['bootstrap_complete'] | local_plan_ready
+        bootstrap = (self.bootstrap_unmapped & (self.perception == 'lidar') &
+                     ~info['bootstrap_complete'] & ~cs.scheduler.running & jp.all(contacts) &
+                     (cs.scheduler.epoch < BOOTSTRAP_MAX_PHASES))
+        bootstrap_stride = jp.asarray(.5)
+        bootstrap_period = supervisor.phase_duration(bootstrap_stride, scheduler.TRIPOD)
+        bootstrap_plan = self._candidates(data, info, bootstrap_stride, bootstrap_period,
+                                          mode=scheduler.TRIPOD)
+        bootstrap_world = bootstrap_plan['nominal'].at[:, 2].add(-FOOT_RADIUS)
+        model = (bootstrap_world+jp.array((0., 0., FOOT_RADIUS))-data.qpos[:3]) @ data.xmat[self._root_id]
+        body = jp.stack((-model[:, 1], model[:, 0], model[:, 2]), axis=-1)
+        bootstrap_pre = (body @ fw._rotation_matrix(cs.posture_command).T).at[:, 2].add(cs.height_applied)
+        plan['selected_world'] = jp.where(bootstrap, bootstrap_world, plan['selected_world'])
+        plan['selected_pre'] = jp.where(bootstrap, bootstrap_pre, plan['selected_pre'])
+        plan['selected_clearance'] = jp.where(bootstrap, jp.full(6, fw.SWING_HEIGHT), plan['selected_clearance'])
+        plan['selected_required'] = jp.where(bootstrap, jp.zeros(6), plan['selected_required'])
+        plan['selected_apex_phase'] = jp.where(bootstrap, jp.full(6, .5), plan['selected_apex_phase'])
+        plan['selected_transfer'] = jp.where(bootstrap, jp.full(6, .5), plan['selected_transfer'])
+        known = jp.where(bootstrap, jp.ones(6, dtype=jp.bool_), known)
+        proposal_safe = jp.where(bootstrap, jp.ones(6, dtype=jp.bool_), proposal_safe)
+        selected = jp.where(bootstrap, jp.full(6, -1, dtype=jp.int32), selected)
+        accepted = jp.where(bootstrap, jp.zeros(adaptive.ACTION_SIZE), accepted)
+        posture = jp.where(bootstrap, jp.zeros(3), posture)
+        decision = jp.where(bootstrap, supervisor.SHORT, decision)
+        mode = jp.where(bootstrap, scheduler.TRIPOD, mode)
+        stride = jp.where(bootstrap, bootstrap_stride, stride)
+        period = jp.where(bootstrap, bootstrap_period, period)
+        global_known = global_known | bootstrap
         projection = jp.where(known, jp.linalg.norm(plan['selected_world'][:, :2]-requested, axis=-1), 0.)
         plan.update(time=data.time, reference_index=reference_index, reference_world=ref, selected_index=selected,
                     wide_xy=reference_plan['xy'], wide_height=reference_plan['height'],
@@ -298,6 +337,7 @@ class AdaptiveGaitEnv(HexapodRoughTerrainEnv):
                     projection=projection, accepted_action=accepted, posture=posture, stride=stride, period=period,
                     reference_safe=reference_plan['safe'], reference_status=reference_plan['status'],
                     decision=decision, mode=mode, permit=decision != supervisor.HOLD,
+                    bootstrap_classical=bootstrap,
                     speed_scale=stride*jp.where(mode == scheduler.WAVE, scheduler.WAVE_PHASE_S*scheduler.WAVE_SPEED_SCALE,
                                                scheduler.TRIPOD_PHASE_S)/period,
                     max_feasible_stride=max_stride, tripod_feasible=checks['feasible'],

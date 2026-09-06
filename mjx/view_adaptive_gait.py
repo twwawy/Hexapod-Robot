@@ -22,6 +22,8 @@ def main():
     parser.add_argument('--residual-scale', type=float, default=1.)
     parser.add_argument('--gait-mode', choices=('hybrid', 'tripod', 'wave'))
     parser.add_argument('--stage0', action='store_true', help='extra same-pose GT oracle comparison; no policy')
+    parser.add_argument('--no-bootstrap-classical', action='store_true',
+                        help='strict UNKNOWN->HOLD check; disables blind-zone short Tripod startup')
     parser.add_argument('--seed', type=int, default=40)
     parser.add_argument('--speed', type=float, default=0.)
     parser.add_argument('--fov-display-radius', type=float, default=1.2,
@@ -63,7 +65,8 @@ def main():
     sensor = metadata['lidar'] if metadata else dict(azimuths=90, elevations=8, dropout=.05, noise_m=.005)
     env = AdaptiveGaitEnv(terrain_level=level, perception=perception, config=cfg,
         azimuths=sensor['azimuths'], elevations=sensor['elevations'], dropout=sensor['dropout'], noise=sensor['noise_m'],
-        gait_mode=args.gait_mode or (metadata['gait_mode'] if metadata else 'hybrid'), diagnostics=args.stage0)
+        gait_mode=args.gait_mode or (metadata['gait_mode'] if metadata else 'hybrid'), diagnostics=args.stage0,
+        bootstrap_unmapped=not args.no_bootstrap_classical)
     # Use the exact emitter transform held by the JAX raycaster, including the
     # measured 45-degree mount. No separate CAD site or display-only TF is used.
     lidar_tf = np.asarray(env.sensor.tf)
@@ -85,7 +88,7 @@ def main():
     output = Path(__file__).resolve().parent/'generated/adaptive_gait'
     print(f'24-D adaptive | {perception} | {env.gait_mode} | {env.terrain_description} | '+
           ('NEW CHECKPOINT' if policy else 'ZERO ACTION, NO TRAINED POLICY'), flush=True)
-    print('Arrows: speed/yaw; Space: stop; Enter: pause; H: reset; C: clear map; M: map; G: LiDAR FOV; B: rejected candidates; P: save trace', flush=True)
+    print('Up/W forward, Down/S reverse, Left/A and Right/D yaw; Space stop; Enter pause; H reset; C clear map; M map; G FOV; B rejected; P save', flush=True)
     print('MID-360 FOV: H360 V[-7,+52]deg; orange=lower, blue=upper; wires show angular limits, not returns.', flush=True)
     print('Candidates: gray=unknown yellow=coverage orange=edge/rough blue=IK purple=path green=safe; white=wide reference cyan=request orange=projected red=latched; local XY grid 3/2 cm shares 5 cm map cells.', flush=True)
     if perception == 'oracle':
@@ -108,14 +111,18 @@ def main():
             save = False
             while not keys.empty():
                 code = keys.get()
-                if code == 265:
+                if code in (265, ord('W')):
                     vx = min(.12, vx+.02)
-                elif code == 264:
+                    print(f'command: vx={vx:+.2f} m/s, yaw={wz:+.2f} rad/s', flush=True)
+                elif code in (264, ord('S')):
                     vx = max(-.12, vx-.02)
-                elif code == 263:
+                    print(f'command: vx={vx:+.2f} m/s, yaw={wz:+.2f} rad/s', flush=True)
+                elif code in (263, ord('A')):
                     wz = min(.3, wz+.1)
-                elif code == 262:
+                    print(f'command: vx={vx:+.2f} m/s, yaw={wz:+.2f} rad/s', flush=True)
+                elif code in (262, ord('D')):
                     wz = max(-.3, wz-.1)
+                    print(f'command: vx={vx:+.2f} m/s, yaw={wz:+.2f} rad/s', flush=True)
                 elif code == 32:
                     vx = wz = 0.
                 elif code == 257:
@@ -228,6 +235,7 @@ def main():
                     f'IK={np.asarray(state.info["controller_output"].ik_valid).astype(int)} '+
                     f'reject={bool(cs.plan_rejected)} stride={float(cs.stride_scale):.2f} phase={float(cs.phase_duration):.2f}s '+
                     f'mode={MODE_NAMES[int(plan["decision"])]} active_gait={int(cs.scheduler.mode)} '+
+                    f'bootstrap={bool(plan["bootstrap_classical"])} '+
                     f'Lmax_scale={float(plan["max_feasible_stride"]):.3f} support={float(plan["support_margin"]):.3f}m '+
                     f'fault={bool(cs.scheduler.fault)}', flush=True)
                 print(f'  stride_bank=[1.3,1,.75,.5,.25,.125] feasible={plan["tripod_feasible"].astype(int)} '+

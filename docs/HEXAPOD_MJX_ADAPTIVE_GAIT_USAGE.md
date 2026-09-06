@@ -8,6 +8,19 @@
 
 ## 경로와 실행
 
+키 입력을 배제하고 보행 경로부터 확인하려면 시작 속도를 직접 준다.
+
+```bash
+bash scripts/view_foothold_planner.sh --controller adaptive \
+  --terrain steps --perception lidar --stage0 --speed 0.04
+```
+
+방향키 또는 `W/S`는 전후 속도를 0.02 m/s씩 바꾸고 `A/D`는 yaw를 바꾼다.
+입력이 들어오면 콘솔의 `command: vx=...`가 즉시 변한다. `v`는 변하는데 움직이지 않으면
+같은 줄의 `mode`, `bootstrap`, `fault`와 다리별 `reason`을 확인한다. LiDAR blind-zone에서는
+feasible foothold를 처음 얻을 때까지 stride 0.5 classical Tripod가 동작하고 이후 planner로 넘긴다.
+이를 끄고 UNKNOWN→HOLD만 확인하려면 `--no-bootstrap-classical`을 추가한다.
+
 ```bash
 cd /home/huro/Hexapod-Robot
 source /home/huro/.venvs/hexapod-mjx/bin/activate
