@@ -7,6 +7,8 @@
 #include "test/gait_test.h"
 #include "test/kinematics_test.h"
 #include "test/mode_transition_test.h"
+#include "test/rl_controller_test.h"
+#include "test/rl_stop_test.h"
 #include "test/safety_test.h"
 #include "test/user_command_test.h"
 #include "test/workspace_test.h"
@@ -48,6 +50,12 @@ static bool TestRunner_Execute(AlgorithmTestStep_t step)
 
         case ALGORITHM_TEST_COMMUNICATION:
             return CommunicationTest_Run();  // 관제 패킷 알고리즘을 검사한다.
+
+        case ALGORITHM_TEST_RL_INPUT:
+            return RlControllerTest_Run();  // 관측·세션·순번·수치 범위를 검사한다.
+
+        case ALGORITHM_TEST_RL_STOP:
+            return RlStopTest_Run();  // 이륙 취소와 현재 착지 완료를 검사한다.
 
         default:
             return false;
@@ -125,7 +133,9 @@ const char *TestRunner_GetStepName(AlgorithmTestStep_t step)
         "GAIT",              // 보행 위상 검사를 표시한다.
         "MODE_TRANSITION",   // 모드 전환 검사를 표시한다.
         "SAFETY",            // Safety 검사를 표시한다.
-        "COMMUNICATION"      // 관제 패킷 검사를 표시한다.
+        "COMMUNICATION",     // 관제 패킷 검사를 표시한다.
+        "RL_INPUT",          // 강화학습 입력 검사를 표시한다.
+        "RL_STOP"            // 강화학습 정지 검사를 표시한다.
     };
 
     return (step < ALGORITHM_TEST_COUNT) ? names[step] : "INVALID";  // 범위 밖 단계를 구분한다.

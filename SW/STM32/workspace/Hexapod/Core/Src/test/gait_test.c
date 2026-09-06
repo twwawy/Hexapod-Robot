@@ -5,9 +5,147 @@
 #include "high_control/stance_trajectory.h"
 #include "high_control/leg_kinematics.h"
 #include "high_control/workspace_limiter.h"
+#include "high_control/swing_trajectory.h"
 
 #include <math.h>
 #include <string.h>
+
+/* 잔차 0의 RL 첫 위상이 기존 수동 보행과 같은지 검사한다. */
+static bool GaitTest_CheckRlZeroResidual(void)
+{
+    FootTrajectory_Handle_t manual;       // 기존 수동 발 궤적을 준비한다.
+    FootTrajectory_Handle_t rl;           // 잔차 0의 RL 발 궤적을 준비한다.
+    FootTrajectory_Plan_t plan;           // RL의 기본 계획을 저장한다.
+    RobotDroneOutput_t manual_drone = {0};  // 기존 수동 보행 허가를 준비한다.
+    RobotDroneOutput_t rl_drone;          // 독립 RL 보행 허가를 준비한다.
+    RobotBodyTwist_t twist = {0};         // 전진과 회전을 함께 검사한다.
+    RobotGaitPhase_t gait = {0};          // 두 경로에 같은 위상을 전달한다.
+    RobotEuler_t posture = {0};           // 같은 수평 자세를 전달한다.
+    uint32_t cycle;                       // 한 위상의 제어 주기를 진행한다.
+    uint32_t leg;                         // 여섯 발의 출력 차이를 검사한다.
+
+    FootTrajectory_Init(&manual);          // 기존 첫 걸음의 초기 상태를 만든다.
+    FootTrajectory_Init(&rl);              // RL 첫 걸음의 초기 상태를 맞춘다.
+    manual_drone.manual_enable = true;     // 기존 수동 경로를 선택한다.
+    manual_drone.body_control_enable = true;  // 두 경로의 발 제어를 허가한다.
+    manual_drone.tripod_enable = true;        // 두 경로의 정상 보행을 허가한다.
+    rl_drone = manual_drone;               // 같은 보행 조건을 복사한다.
+    rl_drone.manual_enable = false;        // 수동 허가 없이 RL을 검사한다.
+    rl_drone.locomotion_enable = true;     // RL의 공통 보행 허가를 켠다.
+    twist.vx = 0.01f;                      // 작은 전진 속도를 요청한다.
+    twist.wz = 0.02f;                      // 작은 회전 속도를 함께 요청한다.
+    gait.enabled_internal = true;         // 위상 속도 고정을 활성화한다.
+    gait.startup_phase = true;            // 첫 반 보폭을 선택한다.
+    FootTrajectory_BuildPlan(&plan, rl.memory, &rl.body_offset_m,
+                              &twist, ROBOT_GAIT_TRIPOD, 0x15U);  // 잔차가 없는 기본 계획을 만든다.
+    plan.plan_id = 1U;  // 실제 적용할 첫 계획 번호를 지정한다.
+    if (!FootTrajectory_SetPlan(&rl, &plan))
+    {
+        return false;
+    }
+    for (cycle = 0U; cycle <= 100U; ++cycle)
+    {
+        RobotFootTargets_t manual_feet;  // 기존 발 목표를 저장한다.
+        RobotFootTargets_t rl_feet;      // 같은 위상의 RL 발 목표를 저장한다.
+
+        for (leg = 0U; leg < ROBOT_LEG_COUNT; ++leg)
+        {
+            gait.progress[leg] = (float)cycle * 0.01f;  // 두 경로의 진행률을 동일하게 지정한다.
+            gait.state[leg] = ((leg % 2U) == 0U) ? ROBOT_LEG_SWING : ROBOT_LEG_STANCE;  // 같은 첫 Tripod 역할을 지정한다.
+        }
+        manual_feet = FootTrajectory_Step(&manual, &twist, &manual_drone, &gait, &posture);  // 기존 수동 목표를 계산한다.
+        rl_feet = FootTrajectory_Step(&rl, &twist, &rl_drone, &gait, &posture);              // 잔차 0의 RL 목표를 계산한다.
+        for (leg = 0U; leg < ROBOT_LEG_COUNT; ++leg)
+        {
+            if ((fabsf(manual_feet.foot[leg].x - rl_feet.foot[leg].x) > 1.0e-6f) ||
+                (fabsf(manual_feet.foot[leg].y - rl_feet.foot[leg].y) > 1.0e-6f) ||
+                (fabsf(manual_feet.foot[leg].z - rl_feet.foot[leg].z) > 1.0e-6f))
+            {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+/* RL 잔차가 현재 Swing·지지발·착지 오차에 중복 적용되지 않는지 검사한다. */
+static bool GaitTest_CheckRlPlanLatch(void)
+{
+    FootTrajectory_Handle_t trajectory;  // 실제 발 궤적 상태를 준비한다.
+    FootTrajectory_Plan_t plan;          // 검증기를 대신할 고정 계획을 준비한다.
+    RobotBodyTwist_t twist = {0};        // 잔차 효과만 확인할 정지 속도를 준비한다.
+    RobotDroneOutput_t drone = {0};      // RL 공통 보행 출력을 준비한다.
+    RobotGaitPhase_t gait = {0};         // 명시적 Swing 위상을 준비한다.
+    RobotEuler_t posture = {0};          // 수평 자세를 준비한다.
+    RobotFootTargets_t output;           // 실제 궤적 출력을 저장한다.
+    RobotVec3_t expected;                // 고정 계획으로 직접 계산한 위치를 저장한다.
+    RobotVec3_t stance;                  // 잔차를 적용하지 않을 지지발을 보존한다.
+
+    FootTrajectory_Init(&trajectory);  // 여섯 기본 발 위치를 준비한다.
+    FootTrajectory_BuildPlan(&plan, trajectory.memory, &trajectory.body_offset_m,
+                              &twist, ROBOT_GAIT_TRIPOD, 0x15U);  // 실제 실행과 같은 기본 계획을 만든다.
+    plan.plan_id = 7U;                                            // 첫 적용 계획 번호를 지정한다.
+    plan.target[0].x += 0.005f;                                   // 착지 X 잔차를 반영한다.
+    plan.target[0].y += 0.003f;                                   // 착지 Y 잔차를 반영한다.
+    plan.target[0].z += 0.006f;                                   // 착지 Z 잔차를 반영한다.
+    plan.height[0] += 0.005f;                                     // Swing 높이 잔차를 별도로 반영한다.
+    drone.locomotion_enable = true;                               // 수동 플래그 없이 RL 정상 보행을 허가한다.
+    drone.body_control_enable = true;                             // 발 궤적을 활성화한다.
+    drone.tripod_enable = true;                                   // 정상 Tripod 진행을 허가한다.
+    gait.enabled_internal = true;                                 // 실제 위상 적용을 활성화한다.
+    gait.startup_phase = true;                                    // 첫 위상의 반 보폭을 선택한다.
+    gait.state[0] = ROBOT_LEG_SWING;                              // 첫 Tripod의 첫 다리를 들어 올린다.
+    gait.state[2] = ROBOT_LEG_SWING;                              // 첫 Tripod의 둘째 다리를 들어 올린다.
+    gait.state[4] = ROBOT_LEG_SWING;                              // 첫 Tripod의 셋째 다리를 들어 올린다.
+    gait.progress[0] = 0.5f;                                      // 높이 잔차를 확인할 중앙을 선택한다.
+    stance = trajectory.memory[1];                                // 이동하지 않을 지지발 위치를 보존한다.
+    if (!FootTrajectory_SetPlan(&trajectory, &plan))
+    {
+        return false;
+    }
+    output = FootTrajectory_Step(&trajectory, &twist, &drone, &gait, &posture);  // 첫 이륙에서 계획을 고정한다.
+    expected = SwingTrajectory_Calculate(0.5f, &plan.start[0], &plan.target[0],
+                                          plan.height[0], ROBOT_SWING_RADIAL_OFFSET_M,
+                                          -45.0f * ROBOT_DEG_TO_RAD_F);  // 검증과 실행이 공유할 위치를 계산한다.
+    if (!trajectory.active_plan_valid || (trajectory.active_plan_id != 7U) ||
+        (trajectory.active_plan_mask != 0x15U) ||
+        (fabsf(output.foot[0].x - expected.x) > 1.0e-6f) ||
+        (fabsf(output.foot[0].y - expected.y) > 1.0e-6f) ||
+        (fabsf(output.foot[0].z - expected.z) > 1.0e-6f) ||
+        (memcmp(&output.foot[1], &stance, sizeof(stance)) != 0) ||
+        (trajectory.landing_target_z[0] != plan.target[0].z))
+    {
+        return false;
+    }
+
+    plan.plan_id = 8U;          // 진행 중 Swing 이후의 후보를 준비한다.
+    plan.target[0].x += 0.02f;  // 현재 끝점을 바꾸려는 새 후보를 만든다.
+    if (!FootTrajectory_SetPlan(&trajectory, &plan))
+    {
+        return false;
+    }
+    output = FootTrajectory_Step(&trajectory, &twist, &drone, &gait, &posture);  // 같은 Swing에는 새 계획을 적용하지 않는다.
+    if ((trajectory.active_plan_id != 7U) ||
+        (fabsf(output.foot[0].x - expected.x) > 1.0e-6f))
+    {
+        return false;
+    }
+    FootTrajectory_CancelPlan(&trajectory);                                      // 후보만 취소하고 실행 목표를 유지한다.
+    drone.hold_feet = true;                                                      // RL 종료 후 발 위치를 유지한다.
+    drone.body_control_enable = false;                                           // 비활성 경로에서도 기본점 복귀를 막는다.
+    output = FootTrajectory_Step(&trajectory, &twist, &drone, &gait, &posture);  // 현재 위치를 연속 유지한다.
+    if ((fabsf(output.foot[0].x - expected.x) > 1.0e-6f) || trajectory.pending_plan.valid)
+    {
+        return false;
+    }
+    trajectory.memory[0] = trajectory.active_plan.target[0];  // 의도한 Z 잔차 위치에서 접촉한다.
+    if (!FootTrajectory_LatchCommandedTouchdown(&trajectory, 0U))
+    {
+        return false;
+    }
+    return fabsf(trajectory.landing_z_error[0]) < 1.0e-6f;  // 의도한 착지 Z를 지형 오차로 수집하지 않는다.
+}
+
 
 /* 접촉 주기에 직전 Swing 발 위치가 유지되는지 검사한다. */
 static bool GaitTest_CheckImmediateContactHold(void)
@@ -239,10 +377,14 @@ static bool GaitTest_CheckLateLandingLimit(void)
         }
     }
 
+    const float landing_distance_m = base[0].z - feet.foot[0].z;  // 실제 누적 탐색 거리를 계산한다.
+    const float landing_step_m = ROBOT_LATE_LANDING_SPEED_MPS *
+                                 ROBOT_CONTROL_PERIOD_S;       // 5 ms마다 0.6 mm씩 이동하는 탐색 단위를 계산한다.
+
     if (!gait.late_landing_stop || !gait.late_landing_exhausted[0] ||
         !gait.late_landing_hold || !manager.late_landing_hold ||
-        (fabsf((base[0].z - feet.foot[0].z) -
-               ROBOT_LATE_LANDING_MAX_DISTANCE_M) > 0.000001f))
+        (landing_distance_m < ROBOT_LATE_LANDING_MAX_DISTANCE_M - 0.000001f) ||
+        (landing_distance_m > ROBOT_LATE_LANDING_MAX_DISTANCE_M + landing_step_m + 0.000001f))
     {
         return false;
     }
@@ -1177,7 +1319,9 @@ bool GaitTest_Run(void)
                    ROBOT_CONTROL_PERIOD_S) + 1U;  // 조기 착지 허용 직후 주기를 계산한다.
     uint32_t cycle;                                 // 진행할 제어 주기 번호를 저장한다.
 
-    if (!GaitTest_CheckWaveIntegrated() ||
+    if (!GaitTest_CheckRlZeroResidual() ||
+        !GaitTest_CheckRlPlanLatch() ||
+        !GaitTest_CheckWaveIntegrated() ||
         !GaitTest_CheckWaveSequence() ||
         !GaitTest_CheckWaveTransitions() ||
         !GaitTest_CheckWaveTrajectory() ||

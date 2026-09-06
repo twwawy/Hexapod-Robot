@@ -2,6 +2,7 @@
 #define WORKSPACE_LIMITER_H
 
 #include "common/robot_types.h"
+#include "high_control/foot_trajectory.h"
 
 typedef struct
 {
@@ -27,9 +28,27 @@ typedef struct
     bool preview_active;                   // 세 지점 검사의 진행 여부를 저장한다.
     bool phase_result_valid;               // 위상 검사 결과 존재 여부를 저장한다.
     bool phase_result_accepted;            // 위상 검사 통과 여부를 저장한다.
+    FootTrajectory_Plan_t rl_plan;         // 공개한 기본 목표와 고정된 잔차 계획을 저장한다.
+    uint16_t rl_plan_counter;              // 같은 운용 중 계획 번호의 재사용을 막는다.
+    bool rl_enabled;                      // 잔차 수신 후 위상 검사를 허가한다.
+    bool rl_action_ready;                 // 이번 계획의 잔차 고정 여부를 저장한다.
+    bool rl_plan_rejected;                // 새 후보가 필요한 경로 거부를 저장한다.
 } WorkspaceLimiter_Handle_t;
 
 void WorkspaceLimiter_Init(WorkspaceLimiter_Handle_t *handle);  // 적용 명령을 0으로 초기화한다.
+
+void WorkspaceLimiter_SetRlEnabled(WorkspaceLimiter_Handle_t *handle,
+                                    bool enabled);  // RL 계획 수신 대기를 선택한다.
+
+bool WorkspaceLimiter_GetRlPlan(const WorkspaceLimiter_Handle_t *handle,
+                                 FootTrajectory_Plan_t *plan);  // 변경되지 않는 기본 계획을 복사한다.
+
+bool WorkspaceLimiter_SubmitRlResidual(WorkspaceLimiter_Handle_t *handle,
+                                        uint16_t plan_id,
+                                        uint8_t swing_mask,
+                                        const RobotLegResidual_t residual[ROBOT_LEG_COUNT]);  // 여섯 다리 잔차를 하나의 후보로 고정한다.
+
+void WorkspaceLimiter_CancelRlAction(WorkspaceLimiter_Handle_t *handle);  // 기본 계획을 보존하며 만료된 후보를 폐기한다.
 
 void WorkspaceLimiter_SetFeet(WorkspaceLimiter_Handle_t *handle,
                               const RobotVec3_t feet[ROBOT_LEG_COUNT],

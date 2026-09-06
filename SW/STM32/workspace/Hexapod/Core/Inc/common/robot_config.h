@@ -59,6 +59,16 @@
 #define ROBOT_MAX_PITCH_RAD             (45.0f * ROBOT_DEG_TO_RAD_F)
 #define ROBOT_MAX_CORRECTION_YAW_RAD    (30.0f * ROBOT_DEG_TO_RAD_F)
 
+#define ROBOT_RL_ACTION_TIMEOUT_MS           100U                          // 새 정책 명령의 최대 대기 시간을 정의한다.
+#define ROBOT_RL_OBSERVATION_MAX_AGE_MS       60U                           // 추론 관측의 최대 나이를 정의한다.
+#define ROBOT_RL_OBSERVATION_HISTORY_COUNT   32U                           // 최근 관측의 검증 이력 수를 정의한다.
+#define ROBOT_RL_MAX_ROLL_RAD                (15.0f * ROBOT_DEG_TO_RAD_F)  // 정책 Roll 목표의 허용 크기를 정의한다.
+#define ROBOT_RL_MAX_PITCH_RAD               (15.0f * ROBOT_DEG_TO_RAD_F)  // 정책 Pitch 목표의 허용 크기를 정의한다.
+#define ROBOT_RL_MAX_DX_M                    0.03f                         // 착지 X 잔차의 허용 크기를 정의한다.
+#define ROBOT_RL_MAX_DY_M                    0.03f                         // 착지 Y 잔차의 허용 크기를 정의한다.
+#define ROBOT_RL_MAX_DZ_M                    0.03f                         // 착지 Z 잔차의 허용 크기를 정의한다.
+#define ROBOT_RL_MAX_DH_M                    0.03f                         // Swing 높이 잔차의 허용 크기를 정의한다.
+
 #define ROBOT_GAIT_LINEAR_THRESHOLD_MPS 0.005f      // 보행 시작 선속도 기준을 정의한다.
 #define ROBOT_GAIT_YAW_THRESHOLD_RADPS  (1.0f * ROBOT_DEG_TO_RAD_F)
 #define ROBOT_SWING_HEIGHT_M            0.20f       // 기본 Swing 높이를 정의한다.

@@ -35,6 +35,6 @@ void DroneController_Init(DroneController_Handle_t *handle);  // 모드와 필�
 RobotDroneOutput_t DroneController_Step(DroneController_Handle_t *handle,
                                         const RobotPriorityOutput_t *priority,
                                         const bool contact[ROBOT_LEG_COUNT],
-                                        float yaw_measured_rad);  // 선택 모드를 실제 제어 명령으로 변환한다.
+                                        float yaw_measured_rad);  // 수동·강화학습 등 선택 모드를 제어 명령으로 변환한다.
 
 #endif
