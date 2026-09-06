@@ -2,6 +2,7 @@
 #define JETSON_SPI_H
 
 #include "common/robot_types.h"
+#include "communication/adaptive_spi_protocol.h"
 #include "stm32f4xx_hal.h"
 
 #include <stdbool.h>
@@ -59,9 +60,12 @@ typedef struct
 
 typedef struct
 {
+    uint16_t transfer_size;
+    RobotAdaptiveExecutionPlan_t execution;
+    bool execution_pending;
     SPI_HandleTypeDef *spi;                       // SPI2 Slave Handle을 저장한다.
-    uint8_t tx_frame[JETSON_SPI_FRAME_SIZE];      // 다음 전송에서 Jetson으로 보낼 프레임이다.
-    uint8_t rx_frame[JETSON_SPI_FRAME_SIZE];      // Jetson에서 마지막으로 받은 프레임이다.
+    uint8_t tx_frame[ADAPTIVE_SPI_SIZE];      // 다음 전송에서 Jetson으로 보낼 프레임이다.
+    uint8_t rx_frame[ADAPTIVE_SPI_SIZE];      // Jetson에서 마지막으로 받은 프레임이다.
     JetsonSpi_ParsedPacket_t rx_packet;           // 마지막 정상 수신 패킷을 저장한다.
     JetsonSpi_CommandFrame_t command;             // 마지막 정상 Jetson 명령 프레임을 저장한다.
     uint16_t tx_sequence;                         // 다음 센서 패킷에 넣을 순번이다.
@@ -112,4 +116,7 @@ bool JetsonSpi_GetLastRxPacket(const JetsonSpi_Handle_t *handle,
 bool JetsonSpi_TakeCommand(JetsonSpi_Handle_t *handle,
                            JetsonSpi_CommandFrame_t *command);  // 대기 중인 명령을 한 번 꺼내고 소비 처리한다.
 
+bool JetsonSpi_EnableV3(JetsonSpi_Handle_t *handle);
+bool JetsonSpi_PrepareV3(JetsonSpi_Handle_t *handle, const AdaptiveSpi_Observation_t *o, bool detail);
+bool JetsonSpi_TakeExecution(JetsonSpi_Handle_t *handle, RobotAdaptiveExecutionPlan_t *plan);
 #endif

@@ -1,4 +1,5 @@
 #include "app/hexapod_app.h"
+static void HexapodApp_PrepareAdaptiveSpi(HexapodApp_Handle_t *handle);
 
 #include "common/robot_calibration.h"
 #include "high_control/stand_landing.h"
@@ -364,6 +365,38 @@ static void HexapodApp_ApplyRlAction(HexapodApp_Handle_t *handle, uint32_t now_m
     if (!RlController_GetAction(&handle->rl.input, &action, now_ms))
     {
         return;  // 기본 계획만 공개하며 첫 정상 출력을 기다린다.
+    }
+
+    if (handle->rl.input.execution_valid) {
+        RobotAdaptiveExecutionPlan_t execution;
+        const FootTrajectory_Plan_t *active=&handle->foot_trajectory.active_plan;
+        if (active->adaptive && handle->foot_trajectory.active_plan_valid)
+            handle->drone.posture_reference_rad=active->posture_reference_rad;
+        if (RlController_GetExecution(&handle->rl.input,&execution,now_ms)) {
+            handle->drone.gait_pattern=execution.requested_gait_pattern;
+            /* A negotiation/HOLD command never authorizes a swing. Keep the RC
+             * intent to allow a fresh phase advertisement when the pattern changes. */
+            if (!execution.execute) {
+                HexapodApp_CancelRlCandidate(handle);
+                return;
+            }
+            if (handle->drone.tripod_enable && !handle->rl.candidate_valid &&
+                (!handle->rl.has_leg_attempt || execution.sequence != handle->rl.last_leg_attempt_sequence) &&
+                (uint32_t)(now_ms-handle->rl.input.action_observation_ms) <= ROBOT_RL_OBSERVATION_MAX_AGE_MS &&
+                WorkspaceLimiter_SubmitExecution(&handle->workspace_limiter,&execution)) {
+                handle->rl.candidate_valid=true;
+                handle->rl.candidate_sequence=execution.sequence;
+                handle->rl.last_leg_attempt_sequence=execution.sequence;
+                handle->rl.has_leg_attempt=true;
+                handle->rl.candidate_plan_id=execution.plan_id;
+                handle->rl.candidate_received_ms=handle->rl.input.last_action_ms;
+                handle->rl.candidate_observation_ms=handle->rl.input.action_observation_ms;
+            }
+        } else {
+            /* Already consumed plan: preserve requested mode, never restore RC Tripod mid-wave. */
+            handle->drone.gait_pattern=handle->rl.input.execution.requested_gait_pattern;
+        }
+        return;
     }
 
     handle->drone.posture_reference_rad.roll = action.posture_reference_rad.roll;    // 정책의 절대 Roll 목표를 전달한다.
@@ -799,7 +832,8 @@ HAL_StatusTypeDef HexapodApp_Init(HexapodApp_Handle_t *handle,
 
     if (hardware->jetson_spi != NULL)
     {
-        JetsonSpi_Init(&handle->jetson, hardware->jetson_spi);  // 32바이트 SPI 센서 프로토콜을 준비한다.
+        JetsonSpi_Init(&handle->jetson, hardware->jetson_spi);
+        (void)JetsonSpi_EnableV3(&handle->jetson);  // 32바이트 SPI 센서 프로토콜을 준비한다.
     }
 
     status = GPS_Start(&handle->gps);  // GPS 인터럽트 수신을 시작한다.
@@ -894,12 +928,16 @@ void HexapodApp_Process(HexapodApp_Handle_t *handle)
     {
         if (!handle->jetson.tx_frame_ready && !handle->jetson.transfer_active)
         {
-            (void)JetsonSpi_PrepareSensorFrame(&handle->jetson,
+            if (handle->jetson.transfer_size == ADAPTIVE_SPI_SIZE) HexapodApp_PrepareAdaptiveSpi(handle);
+            else (void)JetsonSpi_PrepareSensorFrame(&handle->jetson,
                                                &handle->sensor_snapshot,
                                                relay_state_mask != 0U,
                                                now_ms);  // DMA가 비어 있을 때만 다음 센서 패킷을 만든다.
         }
-        (void)JetsonSpi_Process(&handle->jetson);  // DMA 완료 처리 또는 다음 전송 Arm을 수행한다.
+        (void)JetsonSpi_Process(&handle->jetson);
+        RobotAdaptiveExecutionPlan_t execution;
+        if (JetsonSpi_TakeExecution(&handle->jetson,&execution))
+            (void)HexapodApp_SubmitAdaptiveExecution(handle,&execution);  // DMA 완료 처리 또는 다음 전송 Arm을 수행한다.
     }
 
     crsf_buffer_used = (uint16_t)((handle->crsf_receiver.head -
@@ -1079,6 +1117,12 @@ static void HexapodApp_ControlStep(HexapodApp_Handle_t *handle)
         &position.position_world,
         position.valid_leg_count,
         handle->sensor_snapshot.imu.attitude_rad.yaw);              // 사용자와 PI 보행 명령을 결합한다.
+    const bool adaptive_running=(handle->drone.rl_enable || handle->rl.stopping) &&
+        (handle->rl.input.execution_valid || handle->foot_trajectory.active_plan.adaptive);
+    GaitManager_SetAdaptiveTiming(&handle->gait_manager, adaptive_running,
+        handle->rl.candidate_valid && handle->workspace_limiter.phase_result_accepted ?
+        handle->workspace_limiter.rl_plan.phase_duration_s :
+        handle->gait_manager.pending_duration_s);
     GaitManager_SetPattern(&handle->gait_manager, handle->drone.gait_pattern);  // 착지 후 적용할 보행 패턴을 요청한다.
     handle->gait = GaitManager_StepContacts(
         &handle->gait_manager,
@@ -1093,7 +1137,7 @@ static void HexapodApp_ControlStep(HexapodApp_Handle_t *handle)
     FootTrajectory_UpdateCommandedLanding(
         &handle->foot_trajectory,
         &handle->gait,
-        (ROBOT_COMMON_Z_RECOVERY_ENABLE != 0U) &&
+        (ROBOT_COMMON_Z_RECOVERY_ENABLE != 0U) && !adaptive_running &&
         (handle->drone.manual_enable || handle->drone.locomotion_enable) &&
         (handle->drone.tripod_mode == ROBOT_TRIPOD_NORMAL));  // 활성 시 확정 접촉의 공통 Z 오차를 수집한다.
     handle->touchdown_control_mask = 0U;  // Gait가 소비한 접촉 Latch를 비운다.
@@ -1108,6 +1152,7 @@ static void HexapodApp_ControlStep(HexapodApp_Handle_t *handle)
         gait_user_command.wz *= ROBOT_WAVE_SPEED_SCALE;       // 회전과 이동의 비율을 유지한다.
         gait_pose.yaw_feedback_radps *= ROBOT_WAVE_SPEED_SCALE;  // Heading 보정도 같은 지지 시간에 맞춘다.
     }
+    handle->workspace_limiter.adaptive_height_current_m=handle->foot_trajectory.adaptive_height_applied_m;
     WorkspaceLimiter_SetFeet(&handle->workspace_limiter,
                               handle->foot_trajectory.memory,
                               &handle->foot_trajectory.body_offset_m);  // 실제 다섯 지지점에서 다음 경로를 검사한다.
@@ -1144,6 +1189,11 @@ static void HexapodApp_ControlStep(HexapodApp_Handle_t *handle)
         handle->rl.observation.leg_ack_valid = true;                                 // 실제 다리 적용 이력을 활성화한다.
         handle->rl.candidate_valid = false;                                         // 현재 Swing에 반영한 후보를 소비한다.
     }
+    FootTrajectory_ApplyAdaptiveHeight(&handle->foot_trajectory, &feet,
+        &handle->posture_control.command_rad, adaptive_running,
+        handle->rl.stopping && !handle->gait.enabled_internal);
+    if (adaptive_running && !handle->rl.stopping && handle->foot_trajectory.active_plan.adaptive)
+        handle->drone.posture_reference_rad=handle->foot_trajectory.active_plan.posture_reference_rad;
     StandLanding_Calculate(handle->drone.stand_enable,
                            handle->drone.landing_enable,
                            handle->drone.posture_progress,
@@ -1410,4 +1460,47 @@ void HexapodApp_BoardUartErrorCallback(UART_HandleTypeDef *uart)
 void HexapodApp_BoardUartTxCpltCallback(UART_HandleTypeDef *uart)
 {
     HexapodApp_UartTxCpltCallback(&g_hexapod_app, uart);  // 해당 UART 드라이버의 다음 송신을 허가한다.
+}
+
+RlController_SubmitResult_t HexapodApp_SubmitAdaptiveExecution(HexapodApp_Handle_t *h,
+    const RobotAdaptiveExecutionPlan_t *p)
+{
+    if (!h || !h->initialized) return RL_SUBMIT_INVALID_ARGUMENT;
+    return RlController_SubmitExecution(&h->rl.input,p,HAL_GetTick());
+}
+
+static void HexapodApp_PrepareAdaptiveSpi(HexapodApp_Handle_t *h)
+{
+    AdaptiveSpi_Observation_t *o=&h->adaptive_spi_observation;
+    if (!h->adaptive_spi_detail_next) {
+        HexapodApp_RlObservation_t captured={0};
+        bool active=HexapodApp_GetRlObservation(h,&captured);
+        memset(o,0,sizeof(*o));
+        if (active) {
+            o->session_id=captured.session_id;o->sequence=captured.sequence;
+            o->plan_id=captured.plan.plan_id;o->swing_mask=captured.plan.swing_mask;
+            o->flags=(captured.plan.valid?1:0)|(captured.leg_ack_valid?2:0)|
+                (captured.gait.startup_phase?4:0)|(captured.gait.enabled_internal?8:0);
+            o->ack_sequence=captured.leg_sequence;o->ack_plan=captured.leg_plan_id;o->ack_mask=captured.leg_mask;
+            o->command.vx=captured.vx_command_mps;o->command.wz=captured.wz_command_radps;
+            o->applied=captured.applied_twist;o->imu=captured.sensor.imu.attitude_rad;
+            o->gait=(uint8_t)captured.gait.gait_pattern;o->state=(uint8_t)captured.state;
+            o->planned_gait=(uint8_t)captured.plan.gait_pattern;
+            o->next_phase=(uint8_t)(h->gait_manager.phase_index%6U);
+            o->elapsed_s=h->gait_manager.phase_time_s;
+            o->duration_s=h->gait_manager.adaptive_enabled?h->gait_manager.active_duration_s:ROBOT_GAIT_PHASE_TIME_S;
+            o->height_m=h->foot_trajectory.adaptive_height_applied_m;
+            o->posture_command=h->posture_control.command_rad;o->timestamp_ms=captured.timestamp_ms;
+            o->result=(uint8_t)h->rl.input.last_result;
+            for(unsigned i=0;i<18;++i) o->joints[i]=captured.sensor.joint_angle_rad[i];
+            for(unsigned i=0;i<6;++i) {
+                o->nominal[i]=captured.plan.nominal[i];o->start[i]=captured.plan.start[i];
+                o->feet[i]=h->foot_trajectory.memory[i];o->leg_state[i]=(uint8_t)captured.gait.state[i];
+                if(captured.sensor.foot_contact[i]) o->contacts|=(uint8_t)(1U<<i);
+                if(captured.sensor.foot_contact_raw[i]) o->raw_contacts|=(uint8_t)(1U<<i);
+            }
+        }
+    }
+    if(JetsonSpi_PrepareV3(&h->jetson,o,h->adaptive_spi_detail_next))
+        h->adaptive_spi_detail_next=!h->adaptive_spi_detail_next;
 }

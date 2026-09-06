@@ -321,6 +321,15 @@ static bool JetsonSpi_FinalizeTransfer(JetsonSpi_Handle_t *handle)
     }
 
     handle->transfer_count++;
+    if (handle->transfer_size == ADAPTIVE_SPI_SIZE) {
+        bool empty=true;
+        for (unsigned i=0;i<ADAPTIVE_SPI_SIZE;++i) empty &= handle->rx_frame[i]==0;
+        if (empty) return true; /* NOP never renews a command lease. */
+        if (AdaptiveSpi_DecodeExecution(handle->rx_frame,&handle->execution)) {
+            handle->execution_pending=true; handle->valid_rx_count++; handle->command_count++;
+        } else handle->invalid_rx_count++;
+        return true;
+    }
 
     /* Jetson이 센서 읽기만 수행하며 보낸 32바이트 0은 명령 오류로 세지 않는다. */
     if (JetsonSpi_IsEmptyFrame(handle->rx_frame))
@@ -395,7 +404,7 @@ bool JetsonSpi_Process(JetsonSpi_Handle_t *handle)
     status = HAL_SPI_TransmitReceive_DMA(handle->spi,
                                          handle->tx_frame,
                                          handle->rx_frame,
-                                         JETSON_SPI_FRAME_SIZE);
+                                         handle->transfer_size == ADAPTIVE_SPI_SIZE ? ADAPTIVE_SPI_SIZE : JETSON_SPI_FRAME_SIZE);
     if (status != HAL_OK)
     {
         handle->error_count++;
@@ -457,4 +466,17 @@ bool JetsonSpi_TakeCommand(JetsonSpi_Handle_t *handle,
     *command = handle->command;
     handle->command_pending = false;
     return true;
+}
+
+bool JetsonSpi_EnableV3(JetsonSpi_Handle_t *h) {
+    if(!h || h->transfer_active || h->transfer_complete) return false;
+    h->transfer_size=ADAPTIVE_SPI_SIZE;h->tx_frame_ready=false;return true;
+}
+bool JetsonSpi_PrepareV3(JetsonSpi_Handle_t *h,const AdaptiveSpi_Observation_t *o,bool detail) {
+    if(!h||!o||h->transfer_size!=ADAPTIVE_SPI_SIZE||h->transfer_active||h->transfer_complete) return false;
+    AdaptiveSpi_EncodeObservation(h->tx_frame,o,detail);h->tx_frame_ready=true;return true;
+}
+bool JetsonSpi_TakeExecution(JetsonSpi_Handle_t *h,RobotAdaptiveExecutionPlan_t *p) {
+    if(!h||!p||!h->execution_pending) return false;
+    *p=h->execution;h->execution_pending=false;return true;
 }
