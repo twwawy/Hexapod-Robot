@@ -41,7 +41,7 @@
 자동 적용하지 않는다. Isaac `data/training/latest_mjx_training.json`은 기존 run 기록과 호환성/안전 gate를
 담은 handoff이며, 이번 코드 변경 후의 신규 학습 결과가 아니다.
 
-measured LiDAR TF(215 mm, 전방 45°)와 URDF CAD 장착 chain은 별도 출처다.
+measured LiDAR TF(215 mm, 기존 45°에서 scan을 7° 올린 전방 38°)와 URDF CAD 장착 chain은 별도 출처다.
 이번 CAD 변경을 measured TF와 같은 값이라고 해석하지 않는다.
 
 ## 파일 관리와 검증 상태

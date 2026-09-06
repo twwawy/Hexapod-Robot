@@ -108,8 +108,9 @@ bash scripts/view_foothold_planner.sh --terrain steps --residual-scale 0
 우측 8° 경사와 돌출물, 뒤쪽 요철·둥근 바위가 있다. 독립 재생기의 6.5 cm 계단 7단과 다른 코스다.
 2 cm heightfield는 원래 상자 모서리와 좁은 돌출물을 근사한다.
 
-기본 measured TF는 밑면 중심에서 높이 **215 mm**, 전방 **13.529 mm**, 위를 향해 전방으로 **45°**다.
-base 기준 XYZ `(0, -0.013529, 0.1642) m`, RPY `(0, 45°, -90°)`다.
+기본 measured TF는 밑면 중심에서 높이 **215 mm**, 전방 **13.529 mm**다. 기존 전방 기울기
+45°에서 scan을 7° 위로 올려 현재 전방 기울기는 **38°**다.
+base 기준 XYZ `(0, -0.013529, 0.1642) m`, RPY `(0, 38°, -90°)`다.
 MID-360 FOV는 수평 360°, 수직 -7°~+52°, 거리 0.1~8 m, 기본 720×64 angular rays다.
 실제 Livox 비반복 스캔 패턴의 재현은 아니다. URDF CAD 장착 chain과 measured override는 별도다.
 

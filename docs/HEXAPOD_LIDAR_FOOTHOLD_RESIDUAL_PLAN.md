@@ -88,7 +88,8 @@ teacher–student 방식과도 연결된다. 해당 결과를 이 hexapod의 성
 루트 MJX/Isaac 개발 코드는 v4/100 mm residual이므로, v3 가중치와 혼합하지 않는다.
 같은 차원이어도 행동 의미가 다르면 별도 정책으로 취급한다.
 
-MID-360 기본 measured TF는 밑면 중심 기준 높이 215 mm, 전방 13.529 mm, 위를 향해 전방 45°다.
+MID-360 기본 measured TF는 밑면 중심 기준 높이 215 mm, 전방 13.529 mm이며,
+기존 45°에서 scan을 7° 위로 올린 전방 기울기 38°다.
 수평 FOV 360°, 수직 -7°~+52°, 8×8 m/4 cm/60초 rolling map을 사용한다.
 CAD URDF fixed chain과 측정 override는 출처를 manifest에 구분한다. 현재 rays는 angular proxy다.
 
