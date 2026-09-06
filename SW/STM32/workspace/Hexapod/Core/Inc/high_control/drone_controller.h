@@ -27,7 +27,7 @@ typedef struct
     float yaw_reference_memory;                 // Heading 기준을 저장한다.
     bool stand_complete;                        // 서기 완료 상태를 저장한다.
     bool gait_was_active;                       // 착지 전 보행 여부를 저장한다.
-    bool previous_s1;                           // 이전 S1 이동 방식을 저장한다.
+    uint8_t previous_s1;                        // 이전 S1의 세 보행 선택을 저장한다.
 } DroneController_Handle_t;
 
 void DroneController_Init(DroneController_Handle_t *handle);  // 모드와 필터 상태를 초기화한다.

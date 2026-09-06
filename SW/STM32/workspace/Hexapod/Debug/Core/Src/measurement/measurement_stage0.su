@@ -1,5 +1,5 @@
-../Core/Src/measurement/measurement_stage0.c:23:13:MeasurementStage0_UpdateRelay	16	static
-../Core/Src/measurement/measurement_stage0.c:46:6:MeasurementStage0_Init	24	static
-../Core/Src/measurement/measurement_stage0.c:98:6:MeasurementStage0_Process	16	static
-../Core/Src/measurement/measurement_stage0.c:119:6:MeasurementStage0_UartRxCallback	16	static
-../Core/Src/measurement/measurement_stage0.c:126:6:MeasurementStage0_UartErrorCallback	16	static
+../Core/Src/measurement/measurement_stage0.c:28:13:MeasurementStage0_ProcessCrsf	24	static
+../Core/Src/measurement/measurement_stage0.c:59:6:MeasurementStage0_Init	24	static
+../Core/Src/measurement/measurement_stage0.c:123:6:MeasurementStage0_Process	16	static
+../Core/Src/measurement/measurement_stage0.c:144:6:MeasurementStage0_UartRxCallback	16	static
+../Core/Src/measurement/measurement_stage0.c:152:6:MeasurementStage0_UartErrorCallback	16	static

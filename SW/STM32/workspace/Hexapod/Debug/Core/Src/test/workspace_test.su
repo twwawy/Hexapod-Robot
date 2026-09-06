@@ -1,1 +1,2 @@
-../Core/Src/test/workspace_test.c:9:6:WorkspaceTest_Run	296	static
+../Core/Src/test/workspace_test.c:9:13:WorkspaceTest_CheckReducedCommand	224	static
+../Core/Src/test/workspace_test.c:166:6:WorkspaceTest_Run	336	static

@@ -51,6 +51,7 @@ Core/Src/main.o: ../Core/Src/main.c ../Core/Inc/main.h \
  ../Core/Inc/user_command/crsf_protocol.h \
  ../Core/Inc/user_command/crsf_receiver.h \
  ../Core/Inc/user_command/user_command.h \
+ ../Core/Inc/measurement/measurement_stage0.h \
  ../Core/Inc/measurement/measurement_stage4.h \
  ../Core/Inc/measurement/measurement_stage5.h
 ../Core/Inc/main.h:
@@ -113,5 +114,6 @@ Core/Src/main.o: ../Core/Src/main.c ../Core/Inc/main.h \
 ../Core/Inc/user_command/crsf_protocol.h:
 ../Core/Inc/user_command/crsf_receiver.h:
 ../Core/Inc/user_command/user_command.h:
+../Core/Inc/measurement/measurement_stage0.h:
 ../Core/Inc/measurement/measurement_stage4.h:
 ../Core/Inc/measurement/measurement_stage5.h:

@@ -39,7 +39,9 @@ Core/Src/measurement/measurement_stage0.o: \
  ../Core/Inc/sensor/mcp3008.h ../Core/Inc/user_command/user_command.h \
  ../Core/Inc/measurement/measurement_runner.h \
  ../Core/Inc/measurement/sensor_raw_measurement.h \
- ../Core/Inc/sensor/sensor_manager.h ../Core/Inc/sensor/gps.h
+ ../Core/Inc/sensor/sensor_manager.h ../Core/Inc/sensor/gps.h \
+ ../Core/Inc/user_command/crsf_protocol.h \
+ ../Core/Inc/user_command/crsf_receiver.h
 ../Core/Inc/measurement/measurement_stage0.h:
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal.h:
 ../Core/Inc/stm32f4xx_hal_conf.h:
@@ -85,3 +87,5 @@ Core/Src/measurement/measurement_stage0.o: \
 ../Core/Inc/measurement/sensor_raw_measurement.h:
 ../Core/Inc/sensor/sensor_manager.h:
 ../Core/Inc/sensor/gps.h:
+../Core/Inc/user_command/crsf_protocol.h:
+../Core/Inc/user_command/crsf_receiver.h:

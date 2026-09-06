@@ -5,6 +5,51 @@
 
 #include <math.h>
 
+/* 한 발 명령의 즉시 갱신과 실제 지지점의 경로 거부를 검사한다. */
+static bool WorkspaceTest_CheckWavePreview(void)
+{
+    WorkspaceLimiter_Handle_t limiter;  // 실제 경로 검사 상태를 저장한다.
+    RobotBodyTwist_t candidate = {0};   // 감속된 조종 후보를 저장한다.
+    RobotGaitPhase_t gait = {0};        // 한 발 경로 검사 요청을 저장한다.
+    RobotEuler_t posture = {0};         // 수평 자세를 준비한다.
+    RobotVec3_t feet[ROBOT_LEG_COUNT];  // 실제 지지점의 시험 좌표를 저장한다.
+    RobotVec3_t offset = {0};           // 기본 몸체 위치를 준비한다.
+    bool accepted;                     // 조종 후보 채택 여부를 저장한다.
+    uint32_t cycle;                    // 축소 검사 횟수를 제한한다.
+
+    WorkspaceLimiter_Init(&limiter);                   // 이전 속도와 검사 결과를 제거한다.
+    LegKinematics_GetBaseFeet(feet);                    // 실제 출발 지지점을 준비한다.
+    WorkspaceLimiter_SetFeet(&limiter, feet, &offset);  // 실제 발 위치를 경로 검사기에 전달한다.
+    candidate.vx = 0.005f;                              // 작은 전진 명령을 준비한다.
+    gait.enabled_internal = true;                      // 정상 보행 검사를 활성화한다.
+    gait.next_phase_pattern = ROBOT_GAIT_WAVE;         // 개별 보행의 다음 경로를 선택한다.
+    gait.next_phase_preview = true;                    // 첫 발 경로를 요청한다.
+    gait.next_phase_swing_mask = 1U;                   // 첫 다리만 이륙시킨다.
+    (void)WorkspaceLimiter_Gait(&limiter, &candidate, 0.0f, true,
+                                &gait, &posture, false, &accepted);  // 첫 한 발 명령을 검사한다.
+    if (!limiter.phase_result_accepted)
+    {
+        return false;
+    }
+    candidate.vx = -0.005f;                  // 다음 발에 반대 방향을 요청한다.
+    gait.next_phase_swing_mask = 1U << 5U;  // 다음 다리만 이륙시킨다.
+    (void)WorkspaceLimiter_Gait(&limiter, &candidate, 0.0f, true,
+                                &gait, &posture, false, &accepted);  // 이전 두 걸음 명령 기억 없이 검사한다.
+    if (!limiter.phase_result_accepted || (limiter.gait_requested.vx != candidate.vx))
+    {
+        return false;
+    }
+    feet[2].x += 1.0f;                                  // 이동발 외의 지지점을 작업공간 밖으로 옮긴다.
+    WorkspaceLimiter_SetFeet(&limiter, feet, &offset);  // 잘못된 실제 지지점을 전달한다.
+    for (cycle = 0U; cycle < 10U; ++cycle)
+    {
+        gait.next_phase_preview = (cycle == 0U);  // 최초 요청 이후 축소 검사만 진행한다.
+        (void)WorkspaceLimiter_Gait(&limiter, &candidate, 0.0f, true,
+                                    &gait, &posture, false, &accepted);  // 보폭 축소로 숨길 수 없는 시작점 오류를 검사한다.
+    }
+    return limiter.phase_result_valid && !limiter.phase_result_accepted;  // 실제 지지점 오류에서 이륙을 거부한다.
+}
+
 /* 같은 최대 입력이 감속 후 추가 대기 없이 재사용되는지 검사한다. */
 static bool WorkspaceTest_CheckReducedCommand(void)
 {
@@ -179,7 +224,7 @@ bool WorkspaceTest_Run(void)
     bool was_limited;                             // 발 제한 여부를 저장한다.
     uint32_t cycle;                               // 위험 후보의 재검사 주기를 저장한다.
 
-    if (!WorkspaceTest_CheckReducedCommand())
+    if (!WorkspaceTest_CheckWavePreview() || !WorkspaceTest_CheckReducedCommand())
     {
         return false;
     }

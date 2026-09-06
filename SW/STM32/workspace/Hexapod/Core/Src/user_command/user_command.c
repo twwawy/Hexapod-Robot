@@ -82,29 +82,38 @@ static uint8_t UserCommand_MapSwitch(const UserCommand_ChannelCalibration_t *cal
     return calibration->switch_map[physical_position];  // 실측 논리값으로 변환한다.
 }
 
-/* S1 위치를 중앙 기준의 두 이동 방식으로 변환한다. */
+/* 보정된 S1 전체 범위를 세 보행 선택 구간으로 변환한다. */
 static uint8_t UserCommand_MapS1Mode(const UserCommand_ChannelCalibration_t *calibration,
                                      uint16_t raw)
 {
-    bool right_side;  // 보정 방향을 적용한 오른쪽 위치를 저장한다.
+    uint32_t span;             // 보정된 전체 입력 폭을 저장한다.
+    uint32_t position;         // 왼쪽 끝에서의 입력 거리를 저장한다.
+    uint32_t scaled_position;  // 소수 경계를 비교할 입력 거리를 저장한다.
 
-    if (calibration == NULL)
+    if ((calibration == NULL) || (calibration->raw_min >= calibration->raw_max))
     {
-        return 0U;
+        return ROBOT_WALK_TRIPOD_TURN;
     }
 
-    if (raw == calibration->raw_center)
-    {
-        return 0U;  // 정확한 중앙값은 기본 회전 방식으로 둔다.
-    }
-
-    right_side = (raw > calibration->raw_center);  // 중앙보다 큰 쪽을 오른쪽으로 해석한다.
+    span = (uint32_t)calibration->raw_max - calibration->raw_min;  // 중립값과 무관하게 전체 폭을 계산한다.
+    position = (uint32_t)UserCommand_ClampI32((int32_t)raw - calibration->raw_min,
+                                              0, (int32_t)span);  // 보정 범위 밖 입력을 양 끝으로 제한한다.
     if (calibration->direction < 0)
     {
-        right_side = !right_side;  // 반전 채널이면 물리 방향을 바로잡는다.
+        position = span - position;  // 반전 채널의 물리적인 좌우 방향을 복원한다.
     }
 
-    return right_side ? 1U : 0U;
+    scaled_position = position * 1000U;  // 나눗셈 반올림 없이 경계를 비교한다.
+    if (scaled_position < span * 333U)
+    {
+        return ROBOT_WALK_TRIPOD_TURN;  // 33.3% 미만에서 세 발 회전 보행을 선택한다.
+    }
+    if (scaled_position > span * 666U)
+    {
+        return ROBOT_WALK_TRIPOD_LATERAL;  // 66.6% 초과에서 세 발 횡이동 보행을 선택한다.
+    }
+
+    return ROBOT_WALK_WAVE_TURN;  // 33.3~66.6% 경계를 포함해 한 발 보행을 선택한다.
 }
 
 /* 현재 네 짐벌이 중립 범위인지 확인한다. */

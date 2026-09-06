@@ -13,6 +13,7 @@ typedef struct
     RobotBodyTwist_t phase_twist;                     // 현재 위상에 고정한 보행 속도를 저장한다.
 
     float landing_target_z[ROBOT_LEG_COUNT];         // 다리별 정상 착지 Z를 저장한다.
+    float previous_progress[ROBOT_LEG_COUNT];        // 위상 정지 중 지지발 적분을 막을 진행률을 저장한다.
     float landing_z_error[ROBOT_LEG_COUNT];          // 다리별 PWM 명령 착지 Z 오차를 저장한다.
     float common_z_recovery_remaining[2];            // 두 Tripod의 남은 Z 복구량을 저장한다.
     float common_z_recovery_total[2];                // 두 Tripod의 S-curve 전체 복구량을 저장한다.

@@ -9,6 +9,12 @@ typedef struct
     RobotBodyTwist_t gait_requested;       // 마지막으로 통과한 축소 전 명령을 저장한다.
     RobotBodyTwist_t gait_pending;         // 검사 중인 사용자 명령을 저장한다.
     RobotBodyTwist_t gait_preview;         // Heading 보정을 합친 검사 명령을 저장한다.
+    RobotVec3_t current_feet[ROBOT_LEG_COUNT];  // 다음 검사에 사용할 실제 발 목표를 저장한다.
+    RobotVec3_t preview_feet[ROBOT_LEG_COUNT];  // 검사 시작 순간 발 목표를 고정한다.
+    RobotVec3_t body_offset_m;                 // 보정 모드에서 이동한 기준점을 저장한다.
+    RobotVec3_t preview_offset_m;              // 검사 시작 순간 기준점 보정을 고정한다.
+    RobotGaitPattern_t applied_pattern;        // 적용 명령의 보행 패턴을 저장한다.
+    RobotGaitPattern_t preview_pattern;        // 검사할 보행 패턴을 저장한다.
     float gait_applied_scale;              // 통과한 명령의 공통 보폭 비율을 저장한다.
     float preview_scale;                   // 검사 중인 공통 보폭 비율을 저장한다.
     uint8_t gait_applied_step_count;       // 현재 명령을 적용한 걸음 수를 저장한다.
@@ -16,6 +22,7 @@ typedef struct
     uint8_t preview_sample;                // 다음 검사 지점 번호를 저장한다.
     uint8_t preview_swing_mask;            // 검사할 Swing 다리를 저장한다.
     bool preview_startup_phase;            // 첫 위상 검사 여부를 저장한다.
+    bool preview_continuous;               // 개별 보행과 패턴 전환의 실제 시작점을 검사한다.
     bool preview_reuses_applied;           // 둘째 걸음의 기존 명령 재사용 여부를 저장한다.
     bool preview_active;                   // 세 지점 검사의 진행 여부를 저장한다.
     bool phase_result_valid;               // 위상 검사 결과 존재 여부를 저장한다.
@@ -23,6 +30,10 @@ typedef struct
 } WorkspaceLimiter_Handle_t;
 
 void WorkspaceLimiter_Init(WorkspaceLimiter_Handle_t *handle);  // 적용 명령을 0으로 초기화한다.
+
+void WorkspaceLimiter_SetFeet(WorkspaceLimiter_Handle_t *handle,
+                              const RobotVec3_t feet[ROBOT_LEG_COUNT],
+                              const RobotVec3_t *body_offset_m);  // 개별 보행 검사의 실제 시작점을 전달한다.
 
 bool WorkspaceLimiter_AllFeetValid(const RobotVec3_t feet_body[ROBOT_LEG_COUNT],
                                    const RobotEuler_t *posture_rad);  // 자세 적용 후 여섯 발 IK를 검사한다.

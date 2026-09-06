@@ -88,10 +88,10 @@ RobotDroneOutput_t DroneController_Step(DroneController_Handle_t *handle,
         }
     }
 
-    lateral_mode = (priority->s1 != 0U);                                      // S1 이동 방식을 해석한다.
+    lateral_mode = (priority->s1 == ROBOT_WALK_TRIPOD_LATERAL);                 // 오른쪽 구간에서만 횡이동을 선택한다.
     mode_changed = (priority->active_mode != handle->previous_mode);           // 모드 전환을 검출한다.
     s1_changed = (priority->active_mode == ROBOT_MODE_MANUAL) &&
-                 (lateral_mode != handle->previous_s1);                        // 수동 S1 전환을 검출한다.
+                 (priority->s1 != handle->previous_s1);                         // 세 구간 사이의 수동 S1 전환을 검출한다.
     output.reset_command = priority->reset_command;                             // Reset 요청을 전달한다.
 
     if (mode_changed)
@@ -281,6 +281,8 @@ RobotDroneOutput_t DroneController_Step(DroneController_Handle_t *handle,
         output.manual_enable = true;       // 수동 제어를 활성화한다.
         output.body_control_enable = true; // 위치·Heading PI를 활성화한다.
         output.posture_enable = true;      // 자세 PI를 활성화한다.
+        output.gait_pattern = (priority->s1 == ROBOT_WALK_WAVE_TURN) ?
+            ROBOT_GAIT_WAVE : ROBOT_GAIT_TRIPOD;  // 가운데 구간에서 한 발 보행을 선택한다.
         output.vx_user_mps = ROBOT_MAX_LINEAR_SPEED_MPS * handle->throttle_filter;  // 전후 속도를 계산한다.
 
         if (lateral_mode)
@@ -332,8 +334,12 @@ RobotDroneOutput_t DroneController_Step(DroneController_Handle_t *handle,
         }
         else
         {
+            const float yaw_scale = (output.gait_pattern == ROBOT_GAIT_WAVE)
+                                  ? ROBOT_WAVE_SPEED_SCALE : 1.0f;  // 개별 보행의 감속 회전량을 기준에 반영한다.
+
             handle->yaw_reference_memory = DroneController_WrapPi(
-                handle->yaw_reference_memory + output.wz_user_radps * ROBOT_CONTROL_PERIOD_S);  // 사용자 회전을 Heading에 적분한다.
+                handle->yaw_reference_memory + output.wz_user_radps *
+                ROBOT_CONTROL_PERIOD_S * yaw_scale);  // 실제 보행 회전량으로 Heading을 적분한다.
         }
 
         output.posture_reference_rad.yaw = handle->yaw_reference_memory;  // 수동 Heading 기준을 전달한다.
@@ -341,6 +347,6 @@ RobotDroneOutput_t DroneController_Step(DroneController_Handle_t *handle,
 
     output.posture_progress = handle->posture_memory;  // 현재 자세 진행률을 반환한다.
     handle->previous_mode = priority->active_mode;     // 다음 주기 모드 전환을 위해 저장한다.
-    handle->previous_s1 = lateral_mode;                // 다음 주기 S1 전환을 위해 저장한다.
+    handle->previous_s1 = priority->s1;                // 다음 주기에 세 보행 선택의 변경을 비교한다.
     return output;
 }

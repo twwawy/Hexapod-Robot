@@ -8,10 +8,10 @@
 ../Core/Src/high_control/foot_trajectory.c:141:13:FootTrajectory_RecordLandingZ	6
 ../Core/Src/high_control/foot_trajectory.c:183:13:FootTrajectory_ApplyCommonZRecovery	10
 ../Core/Src/high_control/foot_trajectory.c:246:20:FootTrajectory_ResetLeg	1
-../Core/Src/high_control/foot_trajectory.c:263:20:FootTrajectory_AdaptiveLeg	27
-../Core/Src/high_control/foot_trajectory.c:420:6:FootTrajectory_Init	3
-../Core/Src/high_control/foot_trajectory.c:444:13:FootTrajectory_SaveTouchdown	1
-../Core/Src/high_control/foot_trajectory.c:457:6:FootTrajectory_LatchTouchdown	6
-../Core/Src/high_control/foot_trajectory.c:480:6:FootTrajectory_LatchCommandedTouchdown	4
-../Core/Src/high_control/foot_trajectory.c:498:6:FootTrajectory_UpdateCommandedLanding	8
-../Core/Src/high_control/foot_trajectory.c:539:20:FootTrajectory_Step	49
+../Core/Src/high_control/foot_trajectory.c:263:20:FootTrajectory_AdaptiveLeg	26
+../Core/Src/high_control/foot_trajectory.c:422:6:FootTrajectory_Init	3
+../Core/Src/high_control/foot_trajectory.c:446:13:FootTrajectory_SaveTouchdown	1
+../Core/Src/high_control/foot_trajectory.c:459:6:FootTrajectory_LatchTouchdown	6
+../Core/Src/high_control/foot_trajectory.c:482:6:FootTrajectory_LatchCommandedTouchdown	4
+../Core/Src/high_control/foot_trajectory.c:500:6:FootTrajectory_UpdateCommandedLanding	8
+../Core/Src/high_control/foot_trajectory.c:541:20:FootTrajectory_Step	48
