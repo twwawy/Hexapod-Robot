@@ -57,7 +57,12 @@ class LearnedFootholdGait:
         self.ik = SiteIK(self.model, self.data.qpos)
         self.home_height = float(self.data.qpos[2])
         self.duration, self.elapsed, self.phase_scale = 0.8, 0.0, 1.0
-        self.plans = {}  # LiDAR plans are overlays; never claim they drive this PPO.
+        self.plans = {}
+        self.control_mode = 'NOMINAL / RL=0'
+        self.mapped_legs = np.zeros(6, dtype=bool)
+        self.swing = np.zeros(6, dtype=bool)
+        self.landing_targets = None
+        self.last_map_stamp = None
         self.targets = None
         self.action = np.zeros(18)
         self.anchors = self.ik.positions(self.data)
@@ -70,7 +75,7 @@ class LearnedFootholdGait:
         self._applied = np.zeros(3)
 
     def tick(self, result, command, dt, target_height, **unused):
-        del result, unused
+        del unused
         if self.failed:
             return
         try:
@@ -85,6 +90,10 @@ class LearnedFootholdGait:
                 self.data.time = message['time']
                 mujoco.mj_forward(self.model, self.data)
                 self.targets, self.action = message['targets'], message['action']
+                self.plans = message['plans']
+                self.control_mode, self.mapped_legs = message['control_mode'], message['mapped_legs']
+                self.swing = message['swing']
+                self.landing_targets = message['landing_targets']
                 self.anchors = self.ik.positions(self.data)
                 self.completed_swings = message['completed_swings']
                 self.terminal, self.status = message['terminal'], message['status']
@@ -93,6 +102,7 @@ class LearnedFootholdGait:
                 self.elapsed = float(np.max(message['progress']))*self.duration
             if self.reset_requested and not self.pending:
                 self.backend.connection.send(dict(kind='reset'))
+                self.last_map_stamp = None
                 self.pending, self.reset_requested = True, False
                 self.status = 'Resetting policy and dynamics'
                 return
@@ -103,7 +113,12 @@ class LearnedFootholdGait:
             if not self.pending and not self.terminal and self.accumulator >= self.policy_dt:
                 height = float(np.clip(target_height-self.home_height, -0.05, 0.10))
                 policy_command = [float(command[0]), float(command[2]), height, 0.0, 0.0]
-                self.backend.connection.send(dict(kind='step', command=policy_command))
+                message = dict(kind='step', command=policy_command)
+                stamp = None if result is None else (result['generation'], result['stamp'])
+                if stamp != self.last_map_stamp or result is None:
+                    message['grid'] = None if result is None else result['grid']
+                    self.last_map_stamp = stamp
+                self.backend.connection.send(message)
                 self.pending = True
                 self.accumulator = 0.0
         except (EOFError, OSError, RuntimeError) as error:

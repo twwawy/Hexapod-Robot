@@ -46,6 +46,10 @@ def course_heightfield(terrain, spacing=0.02):
 def make_explorer_environment(module, config, level, request, source):
     """Called after archived robot imports, inside the isolated policy process."""
     import terrain_curriculum as curriculum
+    import firmware_mjx_controller as firmware
+    from foothold_policy_controller import extend_state, step as foothold_step
+    # This process has imported the packaged v3 snapshot, never the working v4.
+    firmware.step = foothold_step
     field = course_heightfield(request['terrain'])
     # One heightfield keeps the MJX contact graph bounded across the wide arena.
     # Its 2 cm raster is used for both the physical surface and LiDAR raycasts.
@@ -92,6 +96,39 @@ def make_explorer_environment(module, config, level, request, source):
     config.command_delay = 0.0
 
     class ExplorerEnvironment(module.HexapodRoughTerrainEnv):
+        def reset(self, rng):
+            state = super().reset(rng)
+            state.info['controller_state'] = extend_state(state.info['controller_state'])
+            return state
+
+        def _terrain_features(self, data, support_height):
+            # Unknown cells have a neutral feature; they are NOT map observations.
+            return jp.zeros(15)
+
+        def _get_obs(self, data, info):
+            obs = super()._get_obs(data, info)
+            control = info['controller_state']
+            if hasattr(control, 'terrain_features'):
+                # v3 contract: 76 proprioceptive entries, then 15 height samples.
+                obs = obs.at[76:91].set(control.terrain_features)
+            return obs
+
+        def _terrain_pitch_ff(self, data, support_height, previous_ff):
+            # Do not let simulator terrain anticipate an unseen first step.
+            return jp.zeros(())
+
+        def _terrain_swing_boost(self, data, support_height):
+            # The observed planner path supplies clearance instead.
+            return jp.zeros(())
+
+        def _support_height(self, data, contacts):
+            heights = data.site_xpos[self._foot_site_ids, 2] - 0.032
+            count = jp.sum(contacts.astype(jp.int32))
+            ordered = jp.sort(jp.where(contacts, heights, jp.inf))
+            median = ordered[jp.maximum((count - 1) // 2, 0)]
+            # Contact/kinematic estimate, with nominal clearance when airborne.
+            return jp.where(count > 0, median, data.qpos[2] - self._config.target_clearance)
+
         def _configure_terrain_geometry(self):
             for name in ['rough_hfield_geom', 'terrain_ramp', 'terrain_plateau'] + [
                     f'stair_{i+1}' for i in range(curriculum.MAX_STAIR_COUNT)]:

@@ -194,8 +194,14 @@ class Preview:
                        rl_action=self.gait.action.tolist() if self.policy_mode else [0.0]*18,
                        policy_targets_odom=(self.gait.targets.tolist() if self.policy_mode
                                             and self.gait.targets is not None else None),
-                       lidar_foothold_feedback=not self.policy_mode,
-                       gait_status=self.gait.status, active_tripod=list(self.gait.plans),
+                       lidar_foothold_feedback=True,
+                       control_mode=self.gait.control_mode if self.policy_mode else 'nominal_kinematic',
+                       mapped_legs=self.gait.mapped_legs.tolist() if self.policy_mode else None,
+                       landing_targets_odom=(self.gait.landing_targets.tolist() if self.policy_mode
+                                             and self.gait.landing_targets is not None else None),
+                       gait_status=self.gait.status,
+                       active_tripod=(np.flatnonzero(self.gait.swing).tolist() if self.policy_mode
+                                      else list(self.gait.plans)),
                        completed_swings=self.gait.completed_swings,
                        phase_progress=self.gait.elapsed/self.gait.duration,
                        phase_stride_scale=self.gait.phase_scale,
@@ -295,9 +301,9 @@ class Preview:
                            f'Near-foot coverage {result["near_valid_fraction"]:.0%} | snapshot age {now-result["stamp"]:.1f}s\n'
                            f'Scan {result["scan_ms"]:.0f} ms | six-leg plan {result["plan_ms"]:.0f} ms')
         applied = self.gait.applied_command
-        mode = 'PPO stage31 / DYNAMICS' if self.policy_mode else 'KINEMATIC / RL=0'
+        mode = f'{self.gait.control_mode} / DYNAMICS' if self.policy_mode else 'KINEMATIC / RL=0'
         controls = ('Arrows: forward/back + turn | SPACE velocity zero | ENTER pause | PgUp/PgDn height trim\n'
-                    'PPO white dots: current foot commands | LiDAR colored candidates: display only\n'
+                    'White: current commands | blue: latched observed path | orange: nominal prediction / RL=0\n'
                     if self.policy_mode else
                     'Arrows: forward/back + turn | A/D strafe | SPACE STOP | PgUp/PgDn height\n'
                     'Continuous tripod | Enter in-place toggle\n')
@@ -307,7 +313,8 @@ class Preview:
                 f'| vx={self.command[0]:+.2f} vy={self.command[1]:+.2f} wz={self.command[2]:+.2f}\n'
                 f'Applied vx={applied[0]:+.2f} vy={applied[1]:+.2f} wz={applied[2]:+.2f} '
                 f'| completed swings={self.gait.completed_swings}\n'
-                + (f'PPO action norm={np.linalg.norm(self.gait.action):.3f} | simulation={self.data.time:.2f}s\n'
+                + (f'Gated stage31 action norm={np.linalg.norm(self.gait.action):.3f} '
+                   f'| mapped legs={int(self.gait.mapped_legs.sum())}/6 | simulation={self.data.time:.2f}s\n'
                    if self.policy_mode else '') +
                 f'{diagnostics}\n' + '\n'.join(rows) + '\n'
                 + controls +
@@ -324,7 +331,7 @@ def main():
     parser.add_argument('--revision', default='origin/main')
     parser.add_argument('--terrain', choices=('flat', 'steps'), default='steps')
     parser.add_argument('--controller', choices=('trained', 'nominal'), default='trained',
-                        help='trained stage31 PPO dynamics (default), or nominal kinematic planning')
+                        help='nominal fallback + LiDAR footholds + gated stage31 PPO dynamics (default), or kinematic planning')
     parser.add_argument('--policy-package', type=Path,
                         default=Path(__file__).resolve().parent/'policies/progress-v2-stage31-level6')
     parser.add_argument('--policy-seed', type=int, default=20040)
@@ -370,7 +377,7 @@ def main():
                 viewer.opt.geomgroup[1] = 1
                 viewer.opt.geomgroup[5] = int(args.robot_display == 'mesh')
                 viewer.cam.distance, viewer.cam.azimuth, viewer.cam.elevation = 3.2, 135, -50
-            print('Arrows move the robot; '+('stage31 PPO + dynamics + LiDAR overlays.' if preview.policy_mode
+            print('Arrows move the robot; '+('nominal fallback -> LiDAR footholds + gated stage31 PPO dynamics.' if preview.policy_mode
                                              else 'nominal kinematic control.'), flush=True)
             print(f'Artifacts: {args.output}', flush=True)
             previous = time.monotonic()
