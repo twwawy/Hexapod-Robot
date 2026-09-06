@@ -1,388 +1,375 @@
 # Hexapod-Robot
 
-6족 로봇의 CAD/URDF, MuJoCo MJX 보행 학습, LiDAR 높이 지도 뷰어와 Isaac Lab 이식 코드를 관리한다.
-**새 adaptive 모드는 geometry baseline + RL residual + Safety/IK**다.
-기본 실행기의 기존 stage31 18-D 비교 경로와 새 adaptive 24-D 경로를 분리해 유지한다.
+6족 로봇의 기구·전자회로·펌웨어와 MuJoCo MJX 보행 학습을 관리하는 저장소다.
+현재 작업은 **LiDAR 기반 지형 인식 + 제어기 기반 보행 + RL residual**을 MJX에 구성하는 것이다.
+MJX에서 보행을 확인한 뒤 Isaac Lab으로 sim-to-sim 이전한다.
 
-다음 학습은 **MJX에서 착지·보폭·몸체 자세·스윙 궤적의 residual을 학습하고 Isaac Lab으로 sim-to-sim 이전**하는 순서다.
-[학습 설계](docs/HEXAPOD_MJX_ADAPTIVE_GAIT_LEARNING_PLAN.md)에 따라 **24-D MJX 환경·LiDAR actor/GT critic PPO·재생기**를 추가했다.
-새 가중치는 아직 학습하지 않았으며 실행 검증은 사용자가 진행한다. 아래 기본 실행기는 기존 stage31 비교 모드다.
+| 항목 | 현재 기준 |
+|---|---|
+| 주 작업 브랜치 | `codex/cartesian-residual-rl` |
+| 하드웨어 보행 참고 | `main`의 Wave gait·접촉 처리·전환 조건 |
+| 새 보행 모드 | adaptive 24-D, Tripod → short-step → Wave → HOLD |
+| 기존 비교 모드 | stage31 v3 checkpoint, 18-D residual |
+| 구현 상태 | planner·supervisor·controller·viewer·PPO 진입점 구현 |
+| 검증 상태 | 최소 정적 확인만 진행; 보행·JIT rollout·학습 검증은 사용자 진행 |
+| 새 학습 가중치 | 아직 없음; checkpoint 없이 실행하면 action=0 baseline |
 
-## 새 24-D Tripod / Wave hybrid 모드
+## 목차
 
-LiDAR는 높이 **215 mm / 위를 보는 45° / MID-360 FOV**를 유지한다.
-25개 후보에서 safe reference를 고르고 RL은 XY·apex·roll/pitch/height·보폭·궤적 timing만 조절한다.
-landing Z는 map이 소유한다. Supervisor 순서는 **Tripod normal → 잔발 → Wave → HOLD**다.
-UNKNOWN은 기본 hybrid에서 HOLD하며, Wave로 바로 보내지 않는다. 목표는 swing 시작에 고정한다.
-`main`의 Wave 순서·Early/Late contact·all-contact 전환을 참고했다.
-[변경 전 분석과 main 비교](docs/HEXAPOD_HYBRID_GAIT_ANALYSIS.md)를 먼저 작성하고 구현했다.
+- [1. 프로젝트 구성](#project)
+- [2. 어떻게 구현했는가](#implementation)
+- [3. 실행 방법](#run)
+- [4. 뷰어 조작과 확인 항목](#viewer)
+- [5. 모델·센서·시뮬레이션 환경](#environment)
+- [6. 학습 단계와 checkpoint](#training)
+- [7. 기존 모드와 레거시](#legacy)
+- [8. 문서 안내와 남은 작업](#docs)
+
+<a id="project"></a>
+
+## 1. 프로젝트 구성
+
+인하대학교 로봇연구회가 2024년부터 개발하는 6족 보행 로봇 프로젝트다.
+Jetson Orin Nano Super가 인지·상위 제어를, STM32 NUCLEO-F446RE가 센서 수집과
+200 Hz 실시간 보행 제어를 담당하는 구조를 목표로 한다.
+
+| 경로 | 역할 |
+|---|---|
+| [HW/](HW/README.md) | CAD, URDF, PCB, 부품과 제작 파일 |
+| [SW/Controller/](SW/Controller/Controller_Architecture.md) | MATLAB/Simulink 제어기 설계·좌표계 |
+| [SW/STM32/](SW/STM32/) | 하드웨어 보행 펌웨어 |
+| [SW/Jetson/](SW/Jetson/README.md) | Jetson 상위 제어 소프트웨어 |
+| [mjx/](mjx/) | MJX 제어기·LiDAR·planner·학습·viewer |
+| [scripts/](scripts/) | viewer·학습 실행 스크립트 |
+| [isaaclab_hexapod/](isaaclab_hexapod/README.md) | Isaac Lab 모델·센서·학습 scaffold |
+| [docs/](docs/README.md) | 설계, 실행 안내, 업데이트 기록 |
+| [SW/mjx/](SW/mjx/) | 과거 whole-body residual 학습 실험 |
+
+<a id="implementation"></a>
+
+## 2. 어떻게 구현했는가
+
+### 2.1 설계 원칙과 데이터 흐름
+
+기존 adaptive 코드의 action·observation·후보 거절 조건을 먼저 분석하고,
+`main`의 Wave gait를 대조했다. 이후 geometry, residual, gait 선택, 접촉 제어를 분리했다.
+변경 전 구성은 [구현 전 분석](docs/HEXAPOD_HYBRID_GAIT_ANALYSIS.md)에 기록했다.
+
+```text
+LiDAR + body state
+        ↓
+height map → surface normal / edge / confidence
+        ↓
+command → nominal landing → safe reference / feasible stride
+                                   ↓
+                            reference + RL residual
+                                   ↓
+                          Safety / IK / path projection
+                                   ↓
+                      swing 진입 시 목표·궤적 parameter 고정
+                                   ↓
+                         classical controller → Motor
+
+Geometry feasibility → Tripod normal → short-step → Wave → HOLD
+```
+
+| 담당 | 결정하는 값 |
+|---|---|
+| LiDAR / geometry | terrain Z, normal, slope, roughness, edge, 관측률, support 크기 |
+| Foothold planner | safe reference, 경로 장애물 높이, 도달 가능 후보, feasible stride |
+| RL residual | reference 기준 XY, apex 여유, 몸체 자세·높이, 보폭, 궤적 timing |
+| Supervisor | Tripod 유지·잔발·Wave·HOLD와 복귀 hysteresis |
+| Controller / safety | swing latch, contact, 궤적 생성, IK·workspace·관절 제한 |
+
+### 2.2 착지점과 지형 검사
+
+기존 nominal 주변 3×3 후보를 **5×5 = 다리당 25개**로 확대했다.
+검색 offset은 XY 각각 `-8, -4, 0, +4, +8 cm`이며, RL residual 범위 ±4 cm와 분리한다.
+
+후보는 중심 관측, 최소 60% support coverage, 비공선 local plane fit을 요구한다.
+관측된 높이의 plane residual·경사·단차·edge 여유를 검사하고, 이후 IK와 sampled swing path를 검사한다.
+unknown을 평지로 채우지 않으며 **SAFE / UNKNOWN / UNSAFE**를 구분한다.
+
+```text
+p_final_xy = safe_reference_xy + RL_XY → 안전 후보로 projection
+p_final_z  = terrain_surface_z
+apex       = path_required_clearance + baseline_margin + RL_residual
+body_pose  = terrain_normal_baseline + RL_residual
+```
+
+발 구의 반지름은 terrain surface Z를 IK endpoint로 변환할 때 더한다.
+선택한 world landing과 clearance/timing은 swing 진입 시 고정한다.
+진행 중 map 갱신으로 현재 landing을 바꾸지 않는다.
+
+### 2.3 Tripod → 잔발 → Wave → HOLD
+
+Tripod는 다리별 top-3 후보의 **27개 조합**으로 foothold와 support margin을 검사한다.
+보폭 scale `[1.3, 1, .75, .5, .25, .125]`의 고정 검색으로 가능한 범위를 구한다.
+normal이 불가능하면 작은 보폭을 먼저 시도하고, 관측된 Tripod 실패가 확인되면 Wave를 검토한다.
+
+Wave는 `main`을 참고해 **RF → LB → RM → LF → RB → LM** 순서로 한 발씩 움직인다.
+Early/Late Landing, support contact recovery, all-contact 전환 조건을 MJX scheduler에 포팅했다.
+실제 모드 변경은 swing 완료 후 모든 발의 contact를 확인한 경계에서만 적용한다.
+Wave→Tripod 복귀에는 다음 두 Tripod phase의 feasibility와 시간 hysteresis를 요구한다.
+
+**UNKNOWN은 기본 hybrid에서 HOLD한다.** LiDAR 사각지대 때문에 첫걸음을 관측하지 못하면
+자동으로 미관측 지형을 밟지 않는다. 무관측 기본 보행은 별도 `blind` debug 모드로 비교한다.
+
+### 2.4 Action·observation과 코드 위치
+
+| 24-D action | 내용 |
+|---|---|
+| 0:12 | 6다리 landing XY residual, ±4 cm |
+| 12:18 | 6다리 apex/clearance residual, ±4 cm |
+| 18 / 19 / 20 | body roll / pitch / height residual |
+| 21 | 요청 step scale; planner의 feasible 범위로 제한 |
+| 22 / 23 | apex plateau phase / XY transfer timing |
+
+landing Z와 gait mode는 action에 없다. phase duration도 제어기가 보폭과 연결해 결정한다.
+한 policy가 모든 다리의 action을 출력하고 controller가 active swing에만 적용한다.
+actor는 **4410-D**, privileged critic은 **4725-D**다.
+
+| 파일 (`mjx/`) | 구현 내용 |
+|---|---|
+| [adaptive_gait_perception.py](mjx/adaptive_gait_perception.py) | JAX LiDAR ray와 rolling height map |
+| [adaptive_foothold_estimator.py](mjx/adaptive_foothold_estimator.py) | 후보·plane·edge·confidence·IK/path 검사 |
+| [foothold_feasibility.py](mjx/foothold_feasibility.py) | top-K 조합과 support margin |
+| [hybrid_gait_supervisor.py](mjx/hybrid_gait_supervisor.py) | normal / short / Wave / HOLD 결정 |
+| [wave_gait_scheduler.py](mjx/wave_gait_scheduler.py) | Wave 순서·contact·안전 전환 |
+| [adaptive_gait_controller.py](mjx/adaptive_gait_controller.py) | 24-D 적용·latch·궤적·기존 IK 연결 |
+| [adaptive_gait_env.py](mjx/adaptive_gait_env.py) | MJX 통합·관측·보상·oracle 비교 |
+| [adaptive_gait_policy.py](mjx/adaptive_gait_policy.py) | network와 checkpoint 계약 |
+| [view_adaptive_gait.py](mjx/view_adaptive_gait.py) / [train_adaptive_gait.py](mjx/train_adaptive_gait.py) | 화면 진단 / 단계별 PPO |
+
+세부 threshold, frame, 정규화, main과의 차이는 [adaptive 사용 가이드](docs/HEXAPOD_MJX_ADAPTIVE_GAIT_USAGE.md)를 따른다.
+
+<a id="run"></a>
+
+## 3. 실행 방법
+
+### 3.1 작업 경로와 가상환경
 
 ```bash
 cd /home/huro/Hexapod-Robot
 source /home/huro/.venvs/hexapod-mjx/bin/activate
+```
 
-# Stage 0: GT 100% known으로 planner/controller 확인 (action 0)
+기존 MuJoCo·MJX·JAX·mujoco-playground·Brax/Orbax 환경을 사용한다.
+실행 스크립트는 이 가상환경의 Python을 직접 선택하며 `HEXAPOD_PYTHON`으로 변경할 수 있다.
+첫 화면까지 JAX 컴파일 시간이 필요하다.
+
+### 3.2 새 adaptive 모드: oracle → LiDAR 순서
+
+```bash
+# 평지에서 action=0 baseline
+bash scripts/view_foothold_planner.sh --controller adaptive --terrain flat --perception oracle
+
+# 계단: GT 100% known으로 planner/controller 확인
 bash scripts/view_foothold_planner.sh --controller adaptive --terrain steps --perception oracle
 
-# LiDAR 기반 착지/단차 보정 확인 (5 cm × 7단, action 0)
+# 계단: LiDAR 입력 + 같은 자세의 GT 비교 지표
 bash scripts/view_foothold_planner.sh --controller adaptive --terrain steps --perception lidar --stage0
+```
 
-# 사용자 확인 후 새 LiDAR 정책 학습 시작
+| 옵션 | 용도 |
+|---|---|
+| `--perception oracle` | GT 높이·100% known, policy 없는 planner 진단 |
+| `--perception lidar` | LiDAR actor/planner; GT는 critic·평가용 |
+| `--perception teacher` | GT 높이 + LiDAR known mask; oracle과 다름 |
+| `--perception blind` | 무관측 nominal 보행 debug; hybrid 안전 fallback 아님 |
+| `--gait-mode tripod` / `wave` / `hybrid` | 고정 gait 또는 supervisor 비교 |
+| `--stage0` | 같은 pose의 oracle 대비 후보·edge·오차 metric 추가 |
+| `--terrain flat` / `ramp` / `steps` | 지형 선택 |
+
+**`--controller adaptive`를 생략하면 기존 stage31 비교 viewer가 실행된다.**
+
+<a id="viewer"></a>
+
+## 4. 뷰어 조작과 확인 항목
+
+### 4.1 Adaptive 조작
+
+| 키 | 동작 |
+|---|---|
+| ↑ / ↓, ← / → | 전진 속도 / yaw 증감; 키를 놓아도 계속 보행 |
+| Space / Enter | 속도 0 / 일시정지·재개 |
+| H / C | 환경 초기화 / 지도 초기화 |
+| M / G / B | 지도 / LiDAR FOV / 거절 후보 표시 |
+| P | trace·map·후보 진단·모델·contract 저장 |
+
+| 표시 | 의미 |
+|---|---|
+| 반투명 청록 | LiDAR height map |
+| 회색 / 노랑 | unknown / support 또는 path coverage 부족 |
+| 주황 / 파랑 / 보라 | rough·edge / IK / path 거절 |
+| 초록 / 흰색 | SAFE 후보 / safe reference |
+| 빨강 | selected / 실제 swing에 latch된 목표; label로 구분 |
+
+FOV는 기본 표시하며 주황 하단 -7°, 파랑 상단 +52° 경계를 그린다.
+`--fov-display-radius 1.2`는 안내선 반경이며 센서 측정 범위를 바꾸지 않는다.
+
+### 4.2 사용자가 확인할 순서
+
+| 확인 상황 | 볼 내용 |
+|---|---|
+| flat oracle | 연속 Tripod, normal stride, 안정적인 목표 |
+| 계단 접근 | edge·거리 감지, 잔발, terrain Z·apex·pitch 변화 |
+| Tripod 불가 | 작은 보폭도 실패한 뒤 all-contact 경계에서 Wave 전환 |
+| 평탄 지형 복귀 | 두 phase feasible + hysteresis 후 Tripod 복귀 |
+| 후보 없음 | UNKNOWN/UNSAFE 사유와 HOLD |
+| oracle에서도 실패 | planner·workspace·IK·path·support·scheduler 확인 |
+| oracle만 성공 | LiDAR TF·sampling·coverage·age·filter 확인 |
+
+콘솔에 다리별 `known / coverage_pass / surface_safe / ik_safe / path_safe`,
+reference·selected·active index, stride bank feasibility와 gait 결정이 출력된다.
+초록 후보가 있어도 support 조합이나 contact 조건이 실패하면 phase가 시작되지 않을 수 있다.
+
+P 저장 위치는 `mjx/generated/adaptive_gait/`다.
+`foothold_diagnostics.json`, `foothold_plan.npz`, `trace.npz`, `map.npz`로 원인을 비교한다.
+GT 오차는 관측된 샘플만 비교하며 비교 개수가 0인 지표를 성공으로 해석하지 않는다.
+
+<a id="environment"></a>
+
+## 5. 모델·센서·시뮬레이션 환경
+
+두 viewer는 서로 다른 지도·지형 설정을 사용한다.
+
+| 항목 | 새 adaptive | 기존 stage31 비교 viewer |
+|---|---|---|
+| 로봇 | 학습 link skeleton, distal 230 mm, foot sphere 반경 32 mm | 학습 box/capsule/sphere skeleton |
+| LiDAR TF 기준 | 높이 215 mm, 전방 13.529 mm, 위를 보는 45° | 동일 measured TF 기준 |
+| MID-360 FOV / range | H360°, V[-7°, +52°], 0.1–8 m | 동일 |
+| angular ray | 90×8, 10 Hz, dropout 5%, noise 5 mm | 720×64 proxy |
+| 지도 | 64×64 cell, 5 cm 해상도, 60초 유지 | 8×8 m, 4 cm 해상도, 60초 유지 |
+| steps | 5 cm 계단 7단, tread 25 cm | 12×12 m 코스의 4 cm 계단 6단 등 |
+| state estimation | simulator pose·velocity·contact | simulator body state |
+| policy / controller 주기 | 20 ms / 5 ms | 기록된 v3 제어 계약 |
+
+measured TF는 CAD URDF chain과 구분하며 Livox 비반복 스캔 패턴의 정확한 재현은 아니다.
+루트 MJX의 물리 모델은 10 kg 질량 정규화, DS51150-270 12.6 V servo 기준이다.
+토크 14.709975 Nm, 관절 속도 315.8 deg/s, `kp=500`, `kv=10`, armature 0.02,
+damping 0.15, friction loss 0.8은 실측 식별 전의 모델 prior다.
+
+<a id="training"></a>
+
+## 6. 학습 단계와 checkpoint
+
+### 6.1 학습 순서
+
+| 단계 | 구성 | 목적 |
+|---|---|---|
+| Stage 0 | RL 없음, oracle vs LiDAR | planner·map·후보 검증 |
+| Stage 1 | `--stage 1`, Tripod only | flat → ramp → 작은 계단 |
+| Stage 2 | `--stage 2`, Wave only | 한 발씩 contact·지형 적응 학습 |
+| Stage 3 | `--stage 3`, deterministic hybrid | 같은 policy로 잔발·Wave fallback 통합 |
+| 이후 | Isaac Lab sim-to-sim | 동일 action·frame·contact 계약 이전 |
+
+Stage 0에서 planner가 실패하면 PPO를 먼저 시작하지 않는다.
+학습·보행 검증은 사용자가 진행하며 새 가중치는 아직 학습하지 않았다.
+
+```bash
+# Stage 0 확인 후 Stage 1 시작
 bash scripts/train_adaptive_gait.sh --stage 1 --perception lidar --terrain-level 0 \
   --num-envs 64 --timesteps 10000000 --output mjx/runs/adaptive-lidar-flat
+
+# 생성된 새 adaptive checkpoint 재생
+bash scripts/view_foothold_planner.sh --controller adaptive --terrain flat \
+  --checkpoint mjx/runs/adaptive-lidar-flat
 ```
 
-방향키로 계속 걷고, Space 정지, Enter 일시정지, H 초기화, C 지도 지우기, M 지도 표시, G LiDAR FOV, B 거절 후보, P trace 저장이다.
-청록 반투명 map, 회색 unknown, 노랑 coverage 부족, 주황 edge/rough, 파랑 IK, 보라 path,
-초록 safe, 흰색 reference, 빨강 selected/latched다. 콘솔에 다리별 gate와 gait 결정 사유를 출력한다.
-`--gait-mode tripod|wave|hybrid`로 비교한다. 미관측 기본 보행은 `--perception blind` 명시적 debug 모드다.
-FOV는 기본 표시되며 주황색 하단(-7°)·파란색 상단(+52°) 경계와 센서 원점을 그린다.
-`--fov-display-radius 1.2`로 표시 반경을 조절한다. 이는 실제 측정 거리가 아닌 시야각 안내선이다.
-이전 adaptive 23-D와 기존 stage31 18-D 가중치는 새 모드에 호환되지 않는다.
-문법/CLI 등 최소 정적 확인만 진행했다. 보행·JIT rollout·학습 성능·회귀 테스트 실행 검증은 사용자에게 맡겼다.
+단계별 이관 명령과 reward 설명은 [학습 설계](docs/HEXAPOD_MJX_ADAPTIVE_GAIT_LEARNING_PLAN.md)와
+[실행 가이드](docs/HEXAPOD_MJX_ADAPTIVE_GAIT_USAGE.md#사용자-확인-후-학습)에 있다.
+`--restore`는 가중치·normalizer 초기화이며 optimizer는 재시작한다.
+`--wandb`를 붙이면 로그인된 계정의 `hexapod-adaptive-gait` 프로젝트에 기록한다.
 
-[새 모드 실행·학습·환경 구성·확인 항목](docs/HEXAPOD_MJX_ADAPTIVE_GAIT_USAGE.md)에
-checkpoint 재생, 계단 학습, teacher 이관, 관측 계약과 현재 제한을 정리했다.
+### 6.2 호환성
 
-## 바로 실행
+| 경로 | Action / observation | 상태 |
+|---|---|---|
+| 새 adaptive | 24-D / actor 4410-D, critic 4725-D | 새 학습 필요 |
+| stage31 v3 재생 | 18-D / 146-D | 기존 checkpoint 사용 |
+| 루트 MJX v4 residual | 18-D / 146-D | v3와 residual scale·소스 계약 다름 |
+| 과거 `SW/mjx/` | 24-D / 113-D | 별도 whole-body residual 계약 |
+
+차원이 같아도 checkpoint를 서로 공유하지 않는다.
+새 adaptive는 이전 23-D adaptive 및 stage31 18-D checkpoint를 거절한다.
+가중치와 함께 action/observation 계약·source SHA·센서·모델 설정을 기록한다.
+
+<a id="legacy"></a>
+
+## 7. 기존 모드와 레거시
+
+### 7.1 Stage31 비교 viewer
+
+기본 가중치는 `progress-v2-stage31-level6_20260828-111825_seed40`의
+checkpoint `000001703936`이다. GT 높이로 학습된 정책에 LiDAR 입력을 연결한 비교 실험이며,
+LiDAR 공백/오차에 적응하도록 새로 학습한 가중치는 아니다.
 
 ```bash
-cd /home/huro/Hexapod-Robot
-source /home/huro/.venvs/hexapod-mjx/bin/activate
+# stage31 + LiDAR 입력
 bash scripts/view_foothold_planner.sh --terrain steps
-```
 
-기존 창을 닫고 다시 실행한다. MuJoCo/MJX·JAX·Brax·Orbax가 있는 `~/.venvs/hexapod-mjx`를 사용한다.
-스크립트가 해당 Python을 직접 선택하므로 activate는 선택 사항이다. 첫 실행에는 JAX 컴파일 시간이 필요하다.
-
-기본 가중치는 `progress-v2-stage31-level6_20260828-111825_seed40`의 checkpoint `000001703936`이다.
-학습용 skeleton 모델을 사용하고, 같은 창에서 방향키로 12×12 m 코스의 계단·경사·플랫폼을 살펴본다.
-
-| 키 | 기본 동역학 모드 |
-|---|---|
-| ↑ / ↓ | 전후진 속도 ±0.04 m/s, 범위 ±0.12 m/s |
-| ← / → | 회전 속도 ±0.15 rad/s, 범위 ±0.3 rad/s |
-| Space / Enter | 속도 0 / 물리 일시정지·재개 |
-| PageUp / PageDown | 몸체 높이 trim ±2 cm, 범위 -5~+10 cm |
-| H / R | 상태·지도 초기화 / 인식 재시도·종료 상태 reset |
-| 1~6 | 다리별 후보 상세 표시 |
-| M / L / G | 높이 지도 / 점군 / MID-360 FOV 표시 |
-| K / C / P | scan 전환 / 지도 초기화·속도 0 / 진단 저장 |
-| F / T / V | 추적 / 위에서 보기 / 전체 코스 |
-
-방향키는 속도를 증감하므로 키를 놓아도 계속 걷는다. 흰 점은 실제 제어 목표, 색상 점과 경로는
-LiDAR 착지 후보다. **후보를 못 찾아도 기본 gait가 계속 진행하며, 후보가 실제 착지 목표를 뜻하지 않는다.**
-
-## 현재 보행과 센서 입력
-
-```text
-명령 + 몸체/접촉 상태 → 펌웨어 nominal gait ─┐
-                                           ├→ Safety / IK → MJX 동역학
-LiDAR 높이 지도 + proprioception → RL residual ┘
-
-LiDAR 지도 → 착지 후보 표시
-LiDAR 샘플 ↔ simulator GT → 오차 비교/저장, 후속 학습의 정답
-```
-
-- 첫걸음에서 정책의 15개 높이 샘플이 모두 미관측이면 **NOMINAL / RL=0**으로 걷는다.
-- 관측이 생기면 **NOMINAL + RL RESIDUAL**이다. 목표 gain은 `residual-scale × 관측 비율`이며 0.5초 시정수로 변화를 완화한다. 이 비율은 임시 가용성 기준이다.
-- 미관측 입력은 중립값 0이며 지도에 관측으로 채우지 않는다. 관측이 모두 사라지면 residual/filter를 0으로 지운다.
-- 원래 v3 펌웨어의 swing/stance/late landing, residual 의미, foot memory, IK·관절 속도 제한을 유지한다. 외부 경로·odom stance anchor를 넣지 않는다.
-- GT 기반 pitch feedforward/swing boost는 끈다. 지형 GT 비교값은 actor나 제어 보정에 입력하지 않는다.
-
-기존 가중치는 GT 높이 입력으로 학습됐다. LiDAR 공백/오차에 적응한 새 정책을 학습한 것은 아니며,
-현재 입력 교체와 gain 조절은 통합 실험이다. 실제 등반 성공은 사용자가 검증한다.
-LiDAR+IMU odometry 대신 현재 뷰어의 몸체 상태는 MuJoCo 상태를 사용한다.
-
-## 비교 실행과 확인
-
-```bash
-# 같은 MJX 동역학에서 기본 제어기만 실행
+# 같은 동역학에서 기본 제어기만 비교
 bash scripts/view_foothold_planner.sh --terrain steps --residual-scale 0
 
-# residual을 줄여 비교
-bash scripts/view_foothold_planner.sh --terrain steps --residual-scale 0.25
-
-# 평지
-bash scripts/view_foothold_planner.sh --terrain flat
-
-# 이전 기구학 착지 경로 모드; 동역학 비교와 구분
-bash scripts/view_foothold_planner.sh --terrain steps --controller nominal
-
-# 별도 v3 정책 재생: 저장된 지형 설정과 GT 입력
+# 저장된 설정과 GT 입력으로 기존 정책 재생
 bash scripts/view_trained_policy.sh
+
+# 이전 기구학 preview / CAD 비교
+bash scripts/view_foothold_planner.sh --terrain steps --controller nominal --robot-model mesh
 ```
 
-사용자는 먼저 scale 0에서 연속 스윙을 보고, residual 적용 후 `IK valid`, `residual IK valid`,
-`reach limited`, 흰 목표와 실제 발을 비교한다. K/C로 입력을 비웠을 때도 보행이 이어지는지 확인한다.
-이번 수정은 코드 문법·diff만 확인했으며, GUI·추론·보행 테스트와 재학습은 실행하지 않았다.
+이 모드는 미관측 첫걸음에서 nominal로 걷고, 관측이 생기면 residual gain을 완만하게 적용한다.
+LiDAR 후보는 표시용이며 실제 제어 목표를 뜻하지 않는다. 새 adaptive의 HOLD·landing latch와 구분한다.
+P 저장 위치는 `mjx/generated/foothold_preview/`다.
+조작키·gain·GT 비교·저장 파일은 [기존 viewer 사용법](docs/HEXAPOD_FOOTHOLD_PREVIEW_USAGE.md)에 있다.
 
-P로 `mjx/generated/foothold_preview/`에 다음 자료를 저장한다.
+v3 재생은 `0805164` 코드/URDF를 격리해 사용한다. 당시 미커밋 소스가 저장되지 않아
+W&B 영상과의 정확한 재현은 미확인이다. [가중치 출처](mjx/policies/progress-v2-stage31-level6/README.md)를 참고한다.
 
-| 파일 | 내용 |
+### 7.2 V4·SW/mjx·Isaac Lab
+
+| 구분 | 참고 문서 |
 |---|---|
-| `latest_plan.json` | 제어 모드·gain·action·IK 상태·후보·현재 목표·LiDAR/GT 오차 |
-| `latest_map.npz` | 높이·valid·시각·점군 |
-| `latest_lidar_gt_pair.npz` | 동일 XY의 15개 LiDAR/GT 높이·valid·age·입력 pose/시각 |
-| `scene_manifest.json` | 모델·checkpoint·센서·제어 설정 |
+| 루트 v4/18-D, curriculum 0~16 | [MJX 학습 계약](mjx/RL_DESIGN.md), [기본 펌웨어](mjx/FIRMWARE_BASE.md) |
+| `SW/mjx/`의 foot18 + body6 residual, 과거 학습·W&B 명령 | [레거시 Residual RL](docs/RESIDUAL_RL.md) |
+| Isaac Lab v4 Torch controller·USD·센서 scaffold | [실행 안내](isaaclab_hexapod/README.md), [이식 기록](isaaclab_hexapod/PORT_RESULT_AND_USAGE.md) |
 
-GT 오차는 관측된 샘플만 비교하며, 없으면 `n/a`다. 기준은 2 cm 코스 raster의 bilinear 높이라
-물리 표면 모서리의 삼각형 보간과 차이가 날 수 있다. P는 최근 샘플을 덮어쓰며 대규모 학습 데이터셋 수집은 별도다.
+과거 `SW/mjx/`의 24-D는 새 adaptive 24-D와 의미가 다르다.
+이전 학습 명령·설치 절차는 해당 문서를 따르며 현재 adaptive 실행 명령과 섞지 않는다.
 
-## 센서·지형·모델
+<a id="docs"></a>
 
-| 항목 | 뷰어 기본값 |
+## 8. 문서 안내와 남은 작업
+
+### 설계·실행·업데이트
+
+| 문서 | 찾을 내용 |
 |---|---|
-| LiDAR measured TF | 밑면 중심에서 높이 215 mm, 전방 13.529 mm, 전방 기울기 45°로 복원 |
-| base→LiDAR | XYZ `(0,-0.013529,0.1642) m`, RPY `(0,45°,-90°)` |
-| MID-360 proxy | 수평 360°, 수직 -7°~+52°, 거리 0.1~8 m, 720×64 angular rays |
-| 높이 지도 | odom 정렬 8×8 m rolling map, 4 cm 셀, 60초 유지 |
-| 불투명도 | 지도 16%, 점군 22%, 후보 마커 불투명 |
-| 코스 | 12×12 m, 정면 4 cm 계단 6단·경사·플랫폼·돌출물·바위 |
-| 로봇 | 학습 box/capsule/sphere skeleton; 구형 발 반지름 32 mm |
+| [전체 문서 목차](docs/README.md) | 문서별 적용 모드와 상태 |
+| [Hybrid 구현 전 분석](docs/HEXAPOD_HYBRID_GAIT_ANALYSIS.md) | 기존 데이터 흐름·gate·main Wave 비교·변경 계획 |
+| [Adaptive 사용 가이드](docs/HEXAPOD_MJX_ADAPTIVE_GAIT_USAGE.md) | 상세 환경·threshold·action/observation·진단·학습 명령 |
+| [Adaptive 학습 설계](docs/HEXAPOD_MJX_ADAPTIVE_GAIT_LEARNING_PLAN.md) | 역할 분리·Stage 0–3·sim-to-sim 순서 |
+| [기존 LiDAR/residual 계획](docs/HEXAPOD_LIDAR_FOOTHOLD_RESIDUAL_PLAN.md) | stage31 통합 실험과 후속 학습 배경 |
+| [2026-09-06 업데이트 기록](docs/HEXAPOD_UPDATE_2026-09-06.md) | 당시 viewer·소스·문서·모델 변경 기록 |
 
-measured TF는 CAD의 URDF 장착 chain과 별도다. Livox 비반복 스캔 패턴을 정확히 재현하지 않는다.
-물리·raycast는 같은 2 cm heightfield를 사용한다. 별도 정책 재생기의 기록 지형은 6.5 cm 계단 7단이다.
-CAD 비교는 `--controller nominal --robot-model mesh`로 열 수 있다.
+### 하드웨어·펌웨어
 
-## 코드·가중치 버전 구분
-
-| 경로 | 역할·계약 |
+| 문서 | 내용 |
 |---|---|
-| `scripts/view_foothold_planner.sh` 기본 모드 | 격리된 v3/18-D action·146-D observation + LiDAR 입력과 residual gain |
-| `scripts/view_trained_policy.sh` | stage31 가중치와 저장 설정으로 v3 재생, GT 입력 사용 |
-| `--controller adaptive` / `scripts/train_adaptive_gait.sh` | 신규 24-D residual action, actor 4410-D / critic 4725-D; Tripod→short→Wave→HOLD; 아직 새 학습 결과 없음 |
-| 루트 `mjx/` 학습 | v4/18-D action·146-D observation, swing X/Y·stance Z 최대 ±100 mm, curriculum 0~16 |
-| `isaaclab_hexapod/` | v4 Torch 제어기·센서·지형·학습 scaffold와 USD 이식 |
-| `SW/mjx/` | 과거 24-D/113-D 실험; 아래 레거시 설명 참고 |
+| [제어기 Architecture](SW/Controller/Controller_Architecture.md) / [상세 설계](SW/Controller/Controller_detail.md) | 제어 계층과 설계 |
+| [좌표계·관절 정의](SW/Controller/좌표축/README.md) | frame과 joint 기준 |
+| [조종기 입력](SW/Controller/드론%20조종기%20입력/README.md) | 사용자 명령 입력 |
+| [STM32 설정](SW/STM32/STM32F446RE%20설정%20정리본.md) | 보드·개발환경 |
+| [부품 목록](HW/parts.md) | 하드웨어 구성 |
 
-v3와 v4는 차원이 같아도 residual scale이 달라 직접 checkpoint를 공유하지 않는다.
-뷰어는 `0805164` 코드/URDF를 격리해 사용한다. 당시 미커밋 소스가 저장되지 않아 W&B 영상의 정확한 재현은 미확인이다.
-Isaac handoff의 과거 안전 평가와 최신 v4 호환성은 별도로 기록하며, 기존 MJX 가중치를 자동 로드하지 않는다.
+### 현재 제한과 다음 단계
 
-현재 루트 MJX 모델의 물리 기준은 10 kg 질량 정규화, DS51150-270 12.6 V servo,
-14.709975 Nm 정격 모델, 315.8 deg/s 관절 속도 제한이다. `kp=500`, `kv=10`, armature 0.02,
-damping 0.15, friction loss 0.8은 실측 식별 전 사용하는 모델 prior다.
+현재 safety는 sampled foot path와 quasi-static support 검사다.
+전신 swept collision, 동적 안정성, 새 장애물에 대한 mid-swing abort는 아직 포함하지 않는다.
+실제 LIO·센서 사각지대 대응·대규모 JIT/batch 성능·계단 등판은 확인이 남아 있다.
 
-```bash
-# 루트 MJX의 v4 새 학습 예시; stage31 v3 재생과 구분
-/home/huro/bin/hexapod-mjx-python mjx/train_competence_curriculum.py \
-  --run-name firmware-terrain-residual-v4 --seed 8 \
-  --flat-baseline-timesteps 262144 --start-level 1 --max-level 16 \
-  --stages 44 --stage-timesteps 5000000 --level-progression competence \
-  --checkpoint-selection best --wandb --wandb-project hexapod-firmware-terrain \
-  -- --num-envs 1024 --num-evals 4 --num-eval-envs 32
-```
-
-## 문서와 업데이트 기록
-
-- [문서 안내·최신 상태](docs/README.md)
-- [뷰어 실행·환경·사용자 확인 순서](docs/HEXAPOD_FOOTHOLD_PREVIEW_USAGE.md)
-- [LiDAR 입력, GT 정답, residual 학습 구조](docs/HEXAPOD_LIDAR_FOOTHOLD_RESIDUAL_PLAN.md)
-- [2026-09-06 수정 및 미커밋 업데이트 정리](docs/HEXAPOD_UPDATE_2026-09-06.md)
-- [현재 MJX 학습 계약](mjx/RL_DESIGN.md), [기본 펌웨어 설명](mjx/FIRMWARE_BASE.md)
-- [Isaac Lab 실행 안내](isaaclab_hexapod/README.md), [이식 기록](isaaclab_hexapod/PORT_RESULT_AND_USAGE.md)
-- [stage31 가중치 출처](mjx/policies/progress-v2-stage31-level6/README.md)
-
-## 레거시 `SW/mjx/` 경로
-
-아래 24-D/113-D `SW/mjx/` 설명은 과거 classical whole-body residual 실험을
-재현하기 위한 참고 자료다. 현재 루트 `mjx/`의 18-D/146-D v4 firmware residual이나
-10 kg/DS51150 동역학 계약과 checkpoint를 섞어 사용하지 않는다.
-
-Canonical contract: `classical_wbc_cartesian_body6d_residual_v1` action(24-D) +
-`gt_attitude_collision_contact6_coarse9_touchdown6_v3` observation(113-D)
-
-```text
-forward/lateral/yaw command → Position/Heading PI → final body twist
-        → controller-owned Tripod PULL/Bezier trajectory
-        → phase/contact-masked 18-D foot residual + contact adaptation
-        → attitude PI + 6-D body pose residual → six-leg workspace gate
-        → URDF analytical IK → joint speed/position + fixed ±8 Nm legacy actuator
-```
-
-- Action 24-D: 다리 순서 `RF, RM, RB, LF, LM, LB`의 발 `[Δx, Δy, Δz] × 6` + 몸체 병진/회전 6-D
-- Swing leg는 XYZ residual을, stance leg는 Z-only residual을 쓴다. stance 착지 XY는 항상 정확히 0이다.
-- 마지막 6-D는 몸체 forward/lateral/height `±50/±50/±100 mm`, roll/pitch/yaw `±45/±45/±25 deg`이며 0.15초 filter와 전체 workspace 승인을 거친다.
-- gait phase/stride/frequency와 nominal swing height `0.20 m`, radial offset `0.07 m`는 정책이 아니라 제어기가 소유한다.
-- 0.5초 phase가 끝나도 swing 3발 착지가 확인되지 않으면 다음 tripod를 들지 않고 late-landing 탐색을 계속한다.
-- 접촉은 압력센서·발높이 추정 없이 MuJoCo foot–world terrain collision만 사용하고,
-  roll/pitch/yaw는 MuJoCo root ground truth를 사용한다.
-- 우선순위는 `safety > contact > RL residual > nominal gait`다. early landing이면 contact/safety 계층이 현재 발 위치를 유지해 residual을 무시한다.
-- 이전 6-D/7-D/22-D residual checkpoint는 action/observation 계약이 달라 재사용할 수 없다. `fresh`로 새 학습을 시작해야 한다.
-
-설계·관측·보상·실행 방법은 [docs/RESIDUAL_RL.md](docs/RESIDUAL_RL.md)에만 최신 기준으로 정리한다.
-
-## 주요 위치
-
-- `SW/mjx/tripod_core.py`: source-controller PI, Tripod PULL/Bezier, contact phase, body overlay, IK safety
-- `SW/mjx/rough_terrain_env.py`: 24-D residual action, 113-D observation, reward와 termination
-- `SW/mjx/train_command_curriculum.py`: flat walking+turning curriculum 학습 진입점
-- `SW/mjx/train_rough_terrain.py`: mixed terrain 학습(task 엔진, command 학습도 여기서 재사용)
-- `SW/mjx/train_competence_curriculum.py`: evaluation success로 level을 올리고 내리는 전체 curriculum launcher
-- `SW/mjx/best_policy_video.py` / `SW/mjx/visualize_residual_policy.py`: 최고 policy GIF 렌더 / viewer replay
-- `Hexapod-MJX-가이드/residual_rl_run.sh`: 레거시 7-D residual(`train_residual_ppo.py`) 학습·재개·영상 wrapper
-- `HW/`: 실제 로봇의 URDF, CAD, PCB, 부품 자료
-
-## 빠른 시작
-
-저장소를 클론하고 가상환경을 준비한다. 아래 문서와 스크립트는 저장소 위치를
-`~/Hexapod-Robot`으로 가정하므로 다른 경로에 클론했다면 `HEXAPOD_ROBOT_REPO`
-환경 변수로 지정한다.
-
-```bash
-git clone https://github.com/seoneum/hexapod-residual-rl-mjx.git ~/Hexapod-Robot
-cd ~/Hexapod-Robot
-
-# 최초 1회: 가상환경 + 의존성
-python3 -m venv ~/.venvs/hexapod-mjx
-~/.venvs/hexapod-mjx/bin/python -m pip install -r SW/mjx/requirements-train.txt
-# NVIDIA GPU(CUDA 12) 머신에서만 CPU JAX를 CUDA wheel로 교체
-~/.venvs/hexapod-mjx/bin/python -m pip install --upgrade "jax[cuda12]==0.6.2"
-~/.venvs/hexapod-mjx/bin/python -c "import jax; print(jax.devices())"  # GpuDevice 확인
-```
-
-### W&B 준비 (최초 1회)
-
-학습 스크립트는 `--wandb`를 붙일 때 로그인된 W&B 계정으로 기록한다.
-
-```bash
-~/.venvs/hexapod-mjx/bin/pip install wandb   # requirements-train.txt에는 미포함이라 별도 설치
-~/.venvs/hexapod-mjx/bin/wandb login         # https://wandb.ai/authorize 의 API key 입력
-```
-
-### 실행 명령
-
-가장 작은 검증 실행(wrapper 사용):
-
-```bash
-cd ~/Hexapod-Robot
-./Hexapod-MJX-가이드/빠른학습.sh fresh   # fresh 대신 이어서(resume)는 인자 생략
-```
-
-Smoke 테스트(환경·계약 검증, 학습 없음 수준의 짧은 rollout):
-
-```bash
-PY=~/.venvs/hexapod-mjx/bin/python
-
-$PY SW/mjx/train_command_curriculum.py \
-  --smoke --smoke-steps 100 --run-name command-smoke
-
-$PY SW/mjx/train_rough_terrain.py \
-  --smoke --smoke-steps 100 --terrain-layout mixed --terrain-level 4 \
-  --terrain-randomize --run-name terrain-smoke
-
-$PY -m unittest discover -s SW/mjx/tests -v
-```
-
-본 학습 — flat walking+turning부터 fresh로 시작한다:
-
-```bash
-$PY SW/mjx/train_command_curriculum.py \
-  --run-name flat-transfer-source \
-  --timesteps 50000000 --num-envs 2048 --num-evals 100 \
-  --wandb --wandb-project hexapod-command-curriculum
-```
-
-Flat checkpoint로 mixed terrain을 초기화한다:
-
-```bash
-$PY SW/mjx/train_rough_terrain.py \
-  --run-name terrain-transfer-level0 \
-  --terrain-layout mixed --terrain-level 0 \
-  --init-checkpoint SW/mjx/runs/command/<flat-run>/checkpoints \
-  --timesteps 50000000 --num-envs 2048 --num-evals 100 \
-  --wandb --wandb-project hexapod-rough-terrain
-```
-
-짧은 flat baseline부터 시작해 rough→총 20 cm 계단으로 진행하는 전체 curriculum:
-
-```bash
-$PY SW/mjx/train_competence_curriculum.py \
-  --run-name mixed-body6d \
-  --flat-baseline-timesteps 1000000 \
-  --stages 8 --stage-timesteps 5000000 \
-  --level-progression sequential \
-  --wandb \
-  -- --num-envs 2048 --num-evals 20 --terrain-randomize --best-video
-```
-
-Checkpoint·monitor·GIF는 run directory(`SW/mjx/runs/<task>/<name>_<timestamp>_seed<seed>/`)에
-저장되고, 같은 `--run-name`을 다시 써도 timestamp 때문에 섞이지 않는다.
-레거시 7-D residual 워크플로(`residual_rl_run.sh`)는
-`./Hexapod-MJX-가이드/residual_rl_run.sh --fresh`로 실행할 수 있다.
-
-전체 명령 옵션과 평가 기준은 [Residual RL 가이드](docs/RESIDUAL_RL.md)를 따른다.
-
-## W&B 보는법
-
-`--wandb`로 실행하면 브라우저에서 대시보드로 결과를 볼 수 있다.
-
-- 프로젝트 URL: `https://wandb.ai/<내-entity>/<project>`
-  - flat command 학습 → project `hexapod-command-curriculum`
-  - mixed terrain 학습 → project `hexapod-rough-terrain`
-  - competence launcher → baseline과 모든 stage를 project
-    `hexapod-rough-terrain`, group `<run-name>`에 함께 기록
-  - legacy wrapper(`residual_rl_run.sh`) → project `hexapod-residual-rl`
-  - entity 없이 로그인했다면 URL에서 entity 부분이 개인 계정명이 된다.
-- 공통 x축은 `train/global_step`이다. Panels에서 x축을 이 값으로 고정하면
-  eval 주기가 달라도 run 간 비교가 어긋나지 않는다.
-
-주요 지표:
-
-| 지표 | 의미 |
-| --- | --- |
-| `eval/episode_reward` | 종합 reward. 학습이 잘 되고 있는지 첫 번째로 보는 곡선 |
-| `eval/episode_reward/*` | reward 구성요소(tracking/upright/cost 등) 분해 |
-| `eval/episode_terrain_success` | episode 종료 시 성공(termination 없음 + 속도 오차 < 0.08 m/s + progress > 0.5 m) 비율 |
-| `eval/stage0|1|2/reward_mean` 외 | flat run의 고정 script 평가(속도 오차, yaw 오차, torque 등) |
-| `best/*` | NEW_BEST 시점 스냅샷 지표 |
-| `best/video_stage0_forward` ~ `best/video_curriculum_full` | flat run 최고 policy GIF (stage별 + 전체) |
-| `best/video` | terrain run 최고 policy GIF (`videos/best_policy.gif`와 동일) |
-| `progress/video` | 각 flat/stage run의 0·25·50·75·100% 시점 20초 GIF 추세 |
-
-위 curriculum 명령은 flat baseline과 terrain stage 0~7을 W&B project
-`hexapod-rough-terrain`의 group `mixed-body6d` 아래 별도 run으로 묶는다. 각 run의 `progress/video` panel에는 학습
-0/25/50/75/100% 시점 영상이 순서대로 쌓이며, 로컬 원본은 각 run의
-`videos/progress/`에 남는다. 기본은 run당 5개·각 20초이고
-`--progress-video-count`, `--progress-video-duration`으로 조절할 수 있다. NEW_BEST
-영상도 별도 `best/*` 키로 계속 저장된다.
-
-Adaptive launcher는 `eval/episode_terrain_success`(evaluation success)가 0.8보다
-크면 level을 올리고 0.5보다 낮으면 내린다. Competence curriculum 진행 상황도 이
-지표로 판단한다.
-
-네트워크 접속이 없는 서버에서는 offline으로 기록한 뒤 나중에 올릴 수 있다.
-
-```bash
-$PY SW/mjx/train_command_curriculum.py ... --wandb --wandb-mode offline
-wandb sync SW/mjx/runs/command/<run-dir>   # 또는 ./wandb/offline-run-* 디렉터리
-```
-
-W&B 기록 없이 로컬 파일만 남기려면 `--wandb` 플래그를 빼면 된다. monitor JSON과
-GIF는 run directory에 그대로 저장된다.
-
-## 참고 자료
-
-`완전 튜토리얼.md`는 초기 MuJoCo/Isaac 학습을 위한 배경 자료다. 현재 MJX residual 구현의 명세나 실행 기준은 [docs/RESIDUAL_RL.md](docs/RESIDUAL_RL.md)다.
-## 전체 프로젝트 개요
-
-인하대학교 로봇연구회가 2024년부터 개발하고 있는 6족 보행 로봇 프로젝트이다. Jetson Orin Nano Super가 인지와 자율주행을 담당하고, STM32 NUCLEO-F446RE가 센서 수집과 200 Hz 실시간 보행 제어를 담당하는 구조를 목표로 한다.
-
-### 저장소 구성
-
-| 경로 | 내용 |
-|---|---|
-| [HW](HW/README.md) | 기구, PCB, 부품, URDF와 제작 파일 |
-| [SW/Controller](SW/Controller/Controller_Architecture.md) | MATLAB/Simulink 보행 제어기 |
-| [SW/STM32](SW/STM32/STM32F446RE%20설정%20정리본.md) | STM32 설정과 펌웨어 |
-| [SW/Jetson](SW/Jetson/README.md) | Jetson 상위 제어 소프트웨어 |
-
-### 주요 문서
-
-- [제어기 Architecture](SW/Controller/Controller_Architecture.md)
-- [제어기 상세 설계](SW/Controller/Controller_detail.md)
-- [좌표계와 관절 정의](SW/Controller/좌표축/README.md)
-- [드론 조종기 입력](SW/Controller/드론%20조종기%20입력/README.md)
-- [STM32F446RE 설정](SW/STM32/STM32F446RE%20설정%20정리본.md)
-- [하드웨어 부품 목록](HW/parts.md)
+사용자 보행 검증 → Stage 1–3 학습 → Isaac Lab 이전 순서로 진행한다.
+D435 RGB semantic/traversability를 LiDAR map 위에 projection하는 기능과 learned gait selector는 이후 확장이다.
+추가된 [hybrid 단위 테스트](mjx/tests/test_adaptive_hybrid.py)는 사용자가 필요할 때 실행하며,
+정적 확인만으로 최종 보행 성공 조건을 달성했다고 간주하지 않는다.
