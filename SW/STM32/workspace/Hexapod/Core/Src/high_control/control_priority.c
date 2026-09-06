@@ -187,7 +187,8 @@ RobotPriorityOutput_t ControlPriority_Step(ControlPriority_Handle_t *handle,
         output.roll = user->roll;          // 동작 모드에서 Roll을 전달한다.
         output.pitch = user->pitch;        // 동작 모드에서 Pitch를 전달한다.
         output.sa = (user->sa != 0U) ? 1U : 0U;  // SA를 논리값으로 전달한다.
-        output.s1 = (user->s1 != 0U) ? 1U : 0U;  // S1 이동 방식을 전달한다.
+        output.s1 = (user->s1 <= ROBOT_WALK_WAVE_TURN) ?
+            user->s1 : ROBOT_WALK_TRIPOD_TURN;  // 유효한 세 보행 선택을 그대로 전달한다.
     }
 
     return output;

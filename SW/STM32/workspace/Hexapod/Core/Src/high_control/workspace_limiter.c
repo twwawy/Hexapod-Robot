@@ -100,6 +100,7 @@ static void WorkspaceLimiter_StartPreview(WorkspaceLimiter_Handle_t *handle,
                                            const RobotGaitPhase_t *gait)
 {
     const bool reuse_scale = (handle->gait_applied_scale > 0.0f) &&
+        (handle->applied_pattern == gait->next_phase_pattern) &&
         WorkspaceLimiter_TwistNearby(user_candidate,
                                       &handle->gait_requested);  // 작은 보정 변화에도 기존 축소 비율을 찾는다.
 
@@ -110,6 +111,12 @@ static void WorkspaceLimiter_StartPreview(WorkspaceLimiter_Handle_t *handle,
     handle->preview_sample = 0U;                               // 첫 경로 지점부터 시작한다.
     handle->preview_swing_mask = gait->next_phase_swing_mask;  // 다음 Tripod 역할을 고정한다.
     handle->preview_startup_phase = gait->next_phase_startup;  // 첫 위상 여부를 저장한다.
+    handle->preview_continuous = (gait->next_phase_pattern == ROBOT_GAIT_WAVE) ||
+                                (handle->applied_pattern != gait->next_phase_pattern);  // 패턴 교체도 현재 발 위치에서 검사한다.
+    handle->preview_pattern = gait->next_phase_pattern;       // 착지 후 적용할 패턴을 고정한다.
+    memcpy(handle->preview_feet, handle->current_feet,
+           sizeof(handle->preview_feet));                     // 검사 중 발 시작점 변경을 막는다.
+    handle->preview_offset_m = handle->body_offset_m;         // 보정된 기준 위치를 고정한다.
     handle->preview_active = true;                             // 세 지점 검사를 활성화한다.
     handle->phase_result_valid = false;                        // 이전 위상 검사 결과를 제거한다.
     handle->phase_result_accepted = false;                     // 새 후보를 미통과 상태로 둔다.
@@ -136,6 +143,13 @@ static bool WorkspaceLimiter_PreviewPoint(const WorkspaceLimiter_Handle_t *handl
         const bool swing = (handle->preview_swing_mask &
                             (uint8_t)(1U << leg)) != 0U;  // 현재 다리 역할을 선택한다.
 
+        if (handle->preview_continuous)
+        {
+            base[leg].x -= handle->preview_offset_m.x;  // 실제 궤적의 기준 X를 맞춘다.
+            base[leg].y -= handle->preview_offset_m.y;  // 실제 궤적의 기준 Y를 맞춘다.
+            base[leg].z -= handle->preview_offset_m.z;  // 실제 궤적의 기준 Z를 맞춘다.
+        }
+
         displacement.x = ROBOT_GAIT_PHASE_TIME_S *
                          (-handle->gait_preview.vx +
                           handle->gait_preview.wz * base[leg].y);  // Stance X 이동량을 계산한다.
@@ -144,14 +158,39 @@ static bool WorkspaceLimiter_PreviewPoint(const WorkspaceLimiter_Handle_t *handl
                           handle->gait_preview.wz * base[leg].x);  // Stance Y 이동량을 계산한다.
         displacement.z = ROBOT_GAIT_PHASE_TIME_S *
                          (-handle->gait_preview.vz);               // Stance Z 이동량을 계산한다.
-        front.x = base[leg].x - 0.5f * displacement.x;             // 앞쪽 X 끝점을 계산한다.
-        front.y = base[leg].y - 0.5f * displacement.y;             // 앞쪽 Y 끝점을 계산한다.
-        front.z = base[leg].z - 0.5f * displacement.z;             // 앞쪽 Z 끝점을 계산한다.
+        const float stance_phases = (handle->preview_pattern == ROBOT_GAIT_WAVE)
+                                  ? (float)ROBOT_WAVE_STANCE_PHASES : 1.0f;  // 전체 지지 구간을 선택한다.
+
+        front.x = base[leg].x - 0.5f * stance_phases * displacement.x;  // 앞쪽 X 끝점을 계산한다.
+        front.y = base[leg].y - 0.5f * stance_phases * displacement.y;  // 앞쪽 Y 끝점을 계산한다.
+        front.z = base[leg].z - 0.5f * stance_phases * displacement.z;  // 앞쪽 Z 끝점을 계산한다.
         rear.x = base[leg].x + 0.5f * displacement.x;              // 뒤쪽 X 끝점을 계산한다.
         rear.y = base[leg].y + 0.5f * displacement.y;              // 뒤쪽 Y 끝점을 계산한다.
         rear.z = base[leg].z + 0.5f * displacement.z;              // 뒤쪽 Z 끝점을 계산한다.
 
-        if (swing)
+        if (handle->preview_continuous)
+        {
+            if (swing)
+            {
+                const float height = fminf(fmaxf(ROBOT_SWING_HEIGHT_M + handle->preview_offset_m.z,
+                                                  ROBOT_SWING_HEIGHT_MIN_M),
+                                            ROBOT_SWING_HEIGHT_MAX_M);  // 실제 보정 높이와 같은 Swing을 검사한다.
+
+                feet[leg] = SwingTrajectory_Calculate(progress, &handle->preview_feet[leg],
+                                                       &front, height, ROBOT_SWING_RADIAL_OFFSET_M,
+                                                       workspace_leg_angle_rad[leg]);  // 실제 이륙 위치부터 단일 발 경로를 검사한다.
+            }
+            else
+            {
+                const float duration_s = progress * ROBOT_GAIT_PHASE_TIME_S *
+                    ((handle->preview_startup_phase && (handle->preview_pattern == ROBOT_GAIT_WAVE))
+                     ? 0.5f : 1.0f);  // 개별 보행 첫 순회의 지지 이동량을 맞춘다.
+
+                feet[leg] = StanceTrajectory_Advance(&handle->preview_feet[leg],
+                                                     &handle->gait_preview, duration_s);  // 다섯 지지점의 실제 다음 위치를 검사한다.
+            }
+        }
+        else if (swing)
         {
             const RobotVec3_t *start = handle->preview_startup_phase
                                      ? &base[leg]
@@ -186,7 +225,22 @@ void WorkspaceLimiter_Init(WorkspaceLimiter_Handle_t *handle)
     if (handle != NULL)
     {
         memset(handle, 0, sizeof(*handle));  // 이전 적용 명령을 제거한다.
+        LegKinematics_GetBaseFeet(handle->current_feet);  // 단독 시험의 기본 시작점을 준비한다.
     }
+}
+
+/* 다음 위상 검사에 사용할 실제 발 목표와 몸체 보정을 전달한다. */
+void WorkspaceLimiter_SetFeet(WorkspaceLimiter_Handle_t *handle,
+                              const RobotVec3_t feet[ROBOT_LEG_COUNT],
+                              const RobotVec3_t *body_offset_m)
+{
+    if ((handle == NULL) || (feet == NULL) || (body_offset_m == NULL))
+    {
+        return;
+    }
+
+    memcpy(handle->current_feet, feet, sizeof(handle->current_feet));  // 다음 검사의 실제 시작점을 갱신한다.
+    handle->body_offset_m = *body_offset_m;                           // 보정된 궤적 기준점을 전달한다.
 }
 
 /* 자세 역회전 후 여섯 발의 IK 가능 여부를 검사한다. */
@@ -243,6 +297,12 @@ RobotBodyTwist_t WorkspaceLimiter_Gait(WorkspaceLimiter_Handle_t *handle,
     }
     else if (manual_enable)
     {
+        if (!gait->enabled_internal && gait->waiting_start && !gait->next_phase_preview)
+        {
+            handle->preview_active = false;         // 패턴 전환으로 취소한 경로 검사를 제거한다.
+            handle->phase_result_valid = false;     // 이전 패턴의 검사 결과 재사용을 막는다.
+            handle->phase_result_accepted = false;  // 새 패턴 검사 전 이륙을 차단한다.
+        }
         if (!gait->enabled_internal && !gait->next_phase_preview &&
             !handle->preview_active)
         {
@@ -252,6 +312,8 @@ RobotBodyTwist_t WorkspaceLimiter_Gait(WorkspaceLimiter_Handle_t *handle,
         if (gait->next_phase_preview)
         {
             handle->preview_reuses_applied =
+                (gait->next_phase_pattern == ROBOT_GAIT_TRIPOD) &&
+                (handle->applied_pattern == gait->next_phase_pattern) &&
                 (handle->gait_applied_step_count > 0U) &&
                 (handle->gait_applied_step_count <
                  WORKSPACE_GAIT_COMMAND_HOLD_STEPS);  // 둘째 걸음의 기존 속도 사용 여부를 결정한다.
@@ -306,6 +368,7 @@ RobotBodyTwist_t WorkspaceLimiter_Gait(WorkspaceLimiter_Handle_t *handle,
                 &handle->gait_pending, handle->preview_scale);  // 검사를 통과한 실제 보폭만 적용한다.
             handle->gait_requested = handle->gait_pending;       // 동일 입력의 축소 비율 재사용 기준을 저장한다.
             handle->gait_applied_scale = handle->preview_scale;  // 다음 걸음의 유효한 보폭 비율을 저장한다.
+            handle->applied_pattern = handle->preview_pattern;  // 다른 패턴의 명령 재사용을 막는다.
 
             if (handle->preview_reuses_applied)
             {

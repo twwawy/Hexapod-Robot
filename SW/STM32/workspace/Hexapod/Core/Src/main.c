@@ -35,6 +35,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+#define SENSOR_RAW_TEST_MODE         0U  // 세 보행 모드를 포함한 일반 제어 앱을 실행한다.
 #define JOINT_ZERO_CALIBRATION_MODE  0U  // 관절 기구학 영점 정렬 모드를 선택한다.
 #define JOINT_ADC_CALIBRATION_MODE   0U  // L1 J3·L2 J3 ADC 보정 모드를 선택한다.
 #define JETSON_SPI_BRINGUP_TEST      0U  // 실제 로봇 제어 앱을 실행한다.

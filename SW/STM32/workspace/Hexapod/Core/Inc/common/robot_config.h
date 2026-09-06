@@ -39,6 +39,8 @@
 #define ROBOT_WORKSPACE_MARGIN_M        0.001f      // IK 작업공간 여유를 정의한다.
 
 #define ROBOT_GAIT_PHASE_TIME_S         1.0f        // 한 Tripod 위상 시간을 정의한다.
+#define ROBOT_WAVE_STANCE_PHASES        5U          // 개별 다리가 지지하는 위상 수를 정의한다.
+#define ROBOT_WAVE_SPEED_SCALE          0.2f        // 다섯 지지 위상에서도 기존 보폭 범위를 유지한다.
 #define ROBOT_GAIT_START_DELAY_MS       100U        // 정지 상태의 첫 보행 입력 안정 시간을 정의한다.
 #define ROBOT_GAIT_START_DELAY_CYCLES   \
     (ROBOT_GAIT_START_DELAY_MS / ROBOT_CONTROL_PERIOD_MS)  // 첫 보행 대기 주기 수를 계산한다.

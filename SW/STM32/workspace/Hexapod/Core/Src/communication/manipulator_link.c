@@ -34,7 +34,8 @@ static uint8_t ManipulatorLink_PackSwitches(const RobotUserCommand_t *user)
     switches |= (uint8_t)((user->sc & 0x03U) << 3U);             // SC 3단 상태를 bit 3~4에 넣는다.
     switches |= (uint8_t)((user->sd != 0U) ? (1U << 5U) : 0U);  // SD 상태를 bit 5에 넣는다.
     switches |= (uint8_t)((user->se != 0U) ? (1U << 6U) : 0U);  // SE 상태를 bit 6에 넣는다.
-    switches |= (uint8_t)((user->s1 != 0U) ? (1U << 7U) : 0U);  // S1 상태를 bit 7에 넣는다.
+    switches |= (uint8_t)((user->s1 == ROBOT_WALK_TRIPOD_LATERAL) ?
+                         (1U << 7U) : 0U);  // 기존 S1 bit 7에는 횡이동 선택만 전달한다.
 
     return switches;
 }

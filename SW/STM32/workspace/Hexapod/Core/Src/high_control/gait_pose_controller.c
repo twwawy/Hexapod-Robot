@@ -89,15 +89,17 @@ GaitPoseController_Output_t GaitPoseController_Step(
         {
             float error_x;  // World X 위치 오차를 저장한다.
             float error_y;  // World Y 위치 오차를 저장한다.
+            const float reference_scale = (drone->gait_pattern == ROBOT_GAIT_WAVE)
+                                        ? ROBOT_WAVE_SPEED_SCALE : 1.0f;  // 감속된 실제 보행 속도로 위치 기준을 적분한다.
 
             handle->x_reference_m +=
                 (cosf(drone->posture_reference_rad.yaw) * drone->vx_user_mps -
                  sinf(drone->posture_reference_rad.yaw) * drone->vy_user_mps) *
-                ROBOT_CONTROL_PERIOD_S;  // 사용자 속도로 World X 기준을 적분한다.
+                ROBOT_CONTROL_PERIOD_S * reference_scale;  // 보행 종류에 맞는 World X 기준을 적분한다.
             handle->y_reference_m +=
                 (sinf(drone->posture_reference_rad.yaw) * drone->vx_user_mps +
                  cosf(drone->posture_reference_rad.yaw) * drone->vy_user_mps) *
-                ROBOT_CONTROL_PERIOD_S;  // 사용자 속도로 World Y 기준을 적분한다.
+                ROBOT_CONTROL_PERIOD_S * reference_scale;  // 보행 종류에 맞는 World Y 기준을 적분한다.
 
             error_x = handle->x_reference_m - body_position_world->x;  // X 위치 오차를 계산한다.
             error_y = handle->y_reference_m - body_position_world->y;  // Y 위치 오차를 계산한다.

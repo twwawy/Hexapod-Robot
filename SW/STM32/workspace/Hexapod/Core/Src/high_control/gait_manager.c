@@ -5,27 +5,45 @@
 #include <string.h>
 
 /* 현재 위상에서 Swing 다리인지 확인한다. */
-static bool GaitManager_IsSwingLeg(uint32_t phase_index, uint32_t leg)
+static bool GaitManager_IsSwingLeg(RobotGaitPattern_t pattern,
+                                   uint32_t phase_index, uint32_t leg)
 {
+    if (pattern == ROBOT_GAIT_WAVE)
+    {
+        static const uint8_t wave_order[ROBOT_LEG_COUNT] =
+            {0U, 5U, 1U, 3U, 2U, 4U};  // 논문 순서를 실제 1·6·2·4·3·5번 다리로 변환한다.
+
+        return leg == wave_order[phase_index % ROBOT_LEG_COUNT];  // 한 위상에서 한 발만 들어 올린다.
+    }
+
     const bool group_135 = ((leg % 2U) == 0U);  // 1·3·5 그룹 여부를 계산한다.
     return ((phase_index % 2U) == 0U) ? group_135 : !group_135;  // 위상에 맞는 Swing 그룹을 반환한다.
 }
 
 /* 지정한 위상의 Swing 그룹을 비트로 만든다. */
-static uint8_t GaitManager_SwingMask(uint32_t phase_index)
+static uint8_t GaitManager_SwingMask(RobotGaitPattern_t pattern, uint32_t phase_index)
 {
     uint8_t mask = 0U;  // Swing 다리 비트를 준비한다.
     uint32_t leg;       // 확인할 다리 번호를 저장한다.
 
     for (leg = 0U; leg < ROBOT_LEG_COUNT; ++leg)
     {
-        if (GaitManager_IsSwingLeg(phase_index, leg))
+        if (GaitManager_IsSwingLeg(pattern, phase_index, leg))
         {
             mask |= (uint8_t)(1U << leg);  // 선택한 위상의 Swing 다리를 표시한다.
         }
     }
 
     return mask;
+}
+
+/* 최초 보행에서 지지발을 중립 위치부터 이동하는 구간인지 확인한다. */
+static bool GaitManager_IsStartup(const GaitManager_Handle_t *handle, uint32_t phase_index)
+{
+    const uint32_t startup_phases = (handle->active_pattern == ROBOT_GAIT_WAVE)
+                                 ? ROBOT_LEG_COUNT : 1U;  // Wave는 여섯 발을 한 번씩 옮길 때까지 완만히 출발한다.
+
+    return !handle->resume_phase && (phase_index < startup_phases);  // 초기 지지발 이동 구간만 표시한다.
 }
 
 /* 현재 위상에서 이미 지면을 밀고 있는 발을 비트로 만든다. */
@@ -36,7 +54,8 @@ static uint8_t GaitManager_SupportMask(const GaitManager_Handle_t *handle)
 
     for (leg = 0U; leg < ROBOT_LEG_COUNT; ++leg)
     {
-        if (!GaitManager_IsSwingLeg(handle->phase_index, leg) || handle->landed[leg])
+        if (!GaitManager_IsSwingLeg(handle->active_pattern, handle->phase_index, leg) ||
+            handle->landed[leg])
         {
             mask |= (uint8_t)(1U << leg);  // 기존 Stance와 Early Landing 발을 포함한다.
         }
@@ -69,6 +88,17 @@ void GaitManager_Init(GaitManager_Handle_t *handle)
     }
 }
 
+/* 공중에 있는 발의 역할을 유지한 채 다음 보행 패턴을 예약한다. */
+void GaitManager_SetPattern(GaitManager_Handle_t *handle,
+                            RobotGaitPattern_t requested_pattern)
+{
+    if (handle != NULL)
+    {
+        handle->requested_pattern = (requested_pattern == ROBOT_GAIT_WAVE)
+                                  ? ROBOT_GAIT_WAVE : ROBOT_GAIT_TRIPOD;  // 유효한 정상 보행 패턴만 예약한다.
+    }
+}
+
 /* Enable·모드·접촉에 따라 여섯 다리 상태와 진행률을 갱신한다. */
 RobotGaitPhase_t GaitManager_StepContacts(
     GaitManager_Handle_t *handle,
@@ -89,6 +119,22 @@ RobotGaitPhase_t GaitManager_StepContacts(
     if ((handle == NULL) || (contact == NULL) || (contact_raw == NULL))
     {
         return output;
+    }
+
+    if ((tripod_mode == ROBOT_TRIPOD_NORMAL) && normal_mode_enable &&
+        !handle->initialized &&
+        (handle->active_pattern != handle->requested_pattern) &&
+        GaitManager_AllMaskContact((uint8_t)((1U << ROBOT_LEG_COUNT) - 1U), contact))
+    {
+        handle->active_pattern = handle->requested_pattern;       // 여섯 발 접촉 상태에서 보행 패턴을 확정한다.
+        handle->resume_phase = handle->resume_phase || handle->run_enable;  // 진행 중 바뀐 패턴은 현재 발 위치에서 재개한다.
+        handle->phase_index = 0U;                                 // 새 패턴의 첫 발부터 검사한다.
+        handle->start_wait_count = 0U;                            // 입력 안정 대기를 다시 준비한다.
+        handle->phase_cycle_count = 0U;                           // 이전 패턴의 위상 주기를 제거한다.
+        handle->phase_time_s = 0.0f;                              // 이전 패턴의 위상 시간을 제거한다.
+        handle->command_pair_step_count = 0U;                     // 이전 Tripod 걸음 묶음을 제거한다.
+        handle->next_phase_enable = false;                       // 이전 패턴의 검사 결정을 폐기한다.
+        handle->next_phase_locked = false;                       // 새 패턴의 경로 검사를 요구한다.
     }
 
     if (!tripod_enable)
@@ -149,7 +195,7 @@ RobotGaitPhase_t GaitManager_StepContacts(
         }
         else if (handle->run_enable)
         {
-            handle->stop_pending = true;  // 두 걸음 완료 뒤 정지를 예약한다.
+            handle->stop_pending = true;  // Tripod 두 걸음 또는 Wave 한 발 완료 뒤 정지를 예약한다.
         }
         else
         {
@@ -192,10 +238,18 @@ RobotGaitPhase_t GaitManager_StepContacts(
         bool all_swing_landed = true;  // Swing 그룹 전체 착지를 저장한다.
 
         if (!handle->initialized &&
+            ((handle->active_pattern == ROBOT_GAIT_WAVE) ||
+             (handle->active_pattern != handle->requested_pattern)) &&
+            !GaitManager_AllMaskContact((uint8_t)((1U << ROBOT_LEG_COUNT) - 1U), contact))
+        {
+            output.startup_phase = GaitManager_IsStartup(handle, handle->phase_index);  // 시작할 위상 종류를 유지한다.
+            output.waiting_start = true;                  // 다섯 지지발 확보 전에는 이륙하지 않는다.
+        }
+        else if (!handle->initialized &&
             (handle->start_wait_count < ROBOT_GAIT_START_DELAY_CYCLES))
         {
             handle->start_wait_count++;                 // 첫 짐벌 입력이 안정될 때까지 기다린다.
-            output.startup_phase = !handle->resume_phase;  // 첫 위상 종류를 유지한다.
+            output.startup_phase = GaitManager_IsStartup(handle, handle->phase_index);  // 첫 위상 종류를 유지한다.
             output.waiting_start = true;                   // 대기 중 현재 발 위치를 고정한다.
         }
         else if (!handle->initialized && !handle->next_phase_locked)
@@ -203,10 +257,11 @@ RobotGaitPhase_t GaitManager_StepContacts(
             handle->next_phase_enable = true;            // 한 번 받은 시작 명령으로 첫 걸음을 보장한다.
             handle->next_phase_locked = true;            // 첫 위상 검사 요청을 표시한다.
             output.next_phase_preview = true;            // 첫 위상 세 지점 검사를 요청한다.
-            output.next_phase_startup = !handle->resume_phase;  // 최초 반 보폭 여부를 전달한다.
+            output.next_phase_startup = GaitManager_IsStartup(handle, handle->phase_index);  // 최초 지지발 이동 구간을 전달한다.
             output.next_phase_swing_mask =
-                GaitManager_SwingMask(handle->phase_index);  // 시작할 Tripod 그룹을 전달한다.
-            output.startup_phase = !handle->resume_phase;  // 최초 보행의 반 보폭 여부를 유지한다.
+                GaitManager_SwingMask(handle->active_pattern, handle->phase_index);  // 시작할 보행 패턴의 Swing 발을 전달한다.
+            output.next_phase_pattern = handle->active_pattern;  // 검사할 보폭의 보행 패턴을 전달한다.
+            output.startup_phase = GaitManager_IsStartup(handle, handle->phase_index);  // 최초 지지발 이동 구간을 유지한다.
             output.waiting_start = true;                   // 한 제어 주기 검사 중 발 목표를 고정한다.
         }
         else if (!handle->initialized &&
@@ -220,7 +275,7 @@ RobotGaitPhase_t GaitManager_StepContacts(
             }
             else
             {
-                output.startup_phase = !handle->resume_phase;  // 검사 완료까지 첫 위상 종류를 유지한다.
+                output.startup_phase = GaitManager_IsStartup(handle, handle->phase_index);  // 검사 완료까지 첫 위상 종류를 유지한다.
                 output.waiting_start = true;                   // 검사 완료까지 서보 목표를 고정한다.
             }
         }
@@ -296,14 +351,13 @@ RobotGaitPhase_t GaitManager_StepContacts(
                     }
                     output.progress[leg] = progress;  // 정지한 기존 위상 진행률을 유지한다.
                 }
-                output.startup_phase = (handle->phase_index == 0U) &&
-                                       !handle->resume_phase;  // 정지 중 현재 위상 종류를 유지한다.
+                output.startup_phase = GaitManager_IsStartup(handle, handle->phase_index);  // 정지 중 현재 위상 종류를 유지한다.
             }
             else
             {
                 for (leg = 0U; leg < ROBOT_LEG_COUNT; ++leg)
                 {
-                    if (!GaitManager_IsSwingLeg(handle->phase_index, leg))
+                    if (!GaitManager_IsSwingLeg(handle->active_pattern, handle->phase_index, leg))
                     {
                         continue;
                     }
@@ -330,10 +384,19 @@ RobotGaitPhase_t GaitManager_StepContacts(
                         (uint8_t)((1U << ROBOT_LEG_COUNT) - 1U), contact))
                 {
                     const bool pair_incomplete =
-                        (handle->command_pair_step_count == 0U);  // 반대 Tripod 걸음 필요 여부를 계산한다.
+                        (handle->active_pattern == ROBOT_GAIT_TRIPOD) &&
+                        (handle->command_pair_step_count == 0U);  // Tripod만 반대 그룹 걸음을 보장한다.
+                    const bool pattern_change =
+                        (handle->active_pattern != handle->requested_pattern);  // 착지 후 패턴 교체 여부를 계산한다.
                     bool preview_started = false;                 // 이번 주기의 새 검사 요청 여부를 저장한다.
 
-                    if (!handle->next_phase_locked)
+                    if (pattern_change)
+                    {
+                        handle->next_phase_enable = false;  // 이전 패턴의 추가 이륙을 취소한다.
+                        handle->next_phase_locked = false;  // 이전 패턴의 검사 결과를 폐기한다.
+                        output.waiting_start = true;        // 패턴 교체 경계에서 착지한 발을 고정한다.
+                    }
+                    else if (!handle->next_phase_locked)
                     {
                         handle->next_phase_enable = pair_incomplete ||
                                                     tripod_enable;  // 첫 걸음 뒤에는 정지 입력과 무관하게 반대 걸음을 허가한다.
@@ -342,9 +405,11 @@ RobotGaitPhase_t GaitManager_StepContacts(
                         if (preview_started)
                         {
                             output.next_phase_preview = true;             // 다음 위상 세 지점 검사를 요청한다.
-                            output.next_phase_startup = false;             // 반복 위상 전체 보폭을 선택한다.
+                            output.next_phase_startup = GaitManager_IsStartup(
+                                handle, handle->phase_index + 1U);  // 다음 위상의 초기 지지발 이동 여부를 전달한다.
                             output.next_phase_swing_mask =
-                                GaitManager_SwingMask(handle->phase_index + 1U);  // 반대 Tripod 그룹을 전달한다.
+                                GaitManager_SwingMask(handle->active_pattern, handle->phase_index + 1U);  // 다음 위상의 Swing 발을 전달한다.
+                            output.next_phase_pattern = handle->active_pattern;  // 검사할 보폭의 보행 패턴을 전달한다.
                         }
                     }
 
@@ -393,7 +458,8 @@ RobotGaitPhase_t GaitManager_StepContacts(
                 {
                     for (leg = 0U; leg < ROBOT_LEG_COUNT; ++leg)
                     {
-                        const bool swing = GaitManager_IsSwingLeg(handle->phase_index, leg);  // 현재 Swing 그룹을 확인한다.
+                        const bool swing = GaitManager_IsSwingLeg(
+                            handle->active_pattern, handle->phase_index, leg);  // 확정한 보행 패턴의 Swing 발을 확인한다.
                         const bool candidate = swing && !handle->landed[leg] &&
                             (handle->airborne_seen[leg] || handle->stop_pending) &&
                             contact_raw[leg] &&
@@ -419,8 +485,7 @@ RobotGaitPhase_t GaitManager_StepContacts(
                         output.progress[leg] = progress;  // 다리별 진행률을 출력한다.
                     }
 
-                    output.startup_phase = (handle->phase_index == 0U) &&
-                                           !handle->resume_phase;  // 최초 반 보폭 위상만 표시한다.
+                    output.startup_phase = GaitManager_IsStartup(handle, handle->phase_index);  // 최초 지지발 이동 구간을 표시한다.
                 }
             }
         }
@@ -507,6 +572,7 @@ RobotGaitPhase_t GaitManager_StepContacts(
         output.late_landing_hold = true;  // 탐색 한계 정지 상태를 전달한다.
     }
 
+    output.gait_pattern = handle->active_pattern;  // 실제 발 역할을 결정한 보행 패턴을 전달한다.
     output.enabled_internal = (tripod_mode == ROBOT_TRIPOD_NORMAL)
                             ? handle->run_enable
                             : (tripod_enable &&
@@ -543,7 +609,8 @@ RobotGaitPhase_t GaitManager_Step(GaitManager_Handle_t *handle,
     {
         for (leg = 0U; leg < ROBOT_LEG_COUNT; ++leg)
         {
-            if (!GaitManager_IsSwingLeg(handle->phase_index, leg) || handle->landed[leg])
+            if (!GaitManager_IsSwingLeg(handle->active_pattern, handle->phase_index, leg) ||
+                handle->landed[leg])
             {
                 confirmed[leg] = true;  // 기존 시험 호출에서는 지지발 접촉을 정상으로 가정한다.
                 raw[leg] = true;        // 지지발 접촉 후보도 정상으로 가정한다.

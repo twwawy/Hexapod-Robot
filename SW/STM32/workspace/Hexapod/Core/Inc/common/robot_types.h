@@ -77,6 +77,19 @@ typedef enum
     ROBOT_TRIPOD_RECOVERY_246   // 2·4·6번 다리 복구를 나타낸다.
 } RobotTripodMode_t;
 
+typedef enum
+{
+    ROBOT_WALK_TRIPOD_TURN = 0,     // S1 하단의 3발 회전 보행을 나타낸다.
+    ROBOT_WALK_TRIPOD_LATERAL = 1,  // S1 상단의 3발 평행이동을 나타낸다.
+    ROBOT_WALK_WAVE_TURN = 2        // S1 중앙의 한 발 회전 보행을 나타낸다.
+} RobotWalkMode_t;
+
+typedef enum
+{
+    ROBOT_GAIT_TRIPOD = 0,  // 두 그룹이 번갈아 움직이는 3발 보행을 나타낸다.
+    ROBOT_GAIT_WAVE         // 다섯 발로 지지하는 개별 다리 보행을 나타낸다.
+} RobotGaitPattern_t;
+
 typedef struct
 {
     RobotVec3_t acceleration_mps2;       // 몸체 가속도를 저장한다.
@@ -144,6 +157,7 @@ typedef struct
     bool landing_enable;                      // 착지 활성화를 저장한다.
     bool tripod_enable;                       // Tripod 활성화를 저장한다.
     RobotTripodMode_t tripod_mode;            // Tripod 동작 모드를 저장한다.
+    RobotGaitPattern_t gait_pattern;          // 요청한 정상 보행 패턴을 저장한다.
     bool posture_enable;                      // 자세 제어 활성화를 저장한다.
     bool manual_enable;                       // 수동 모드 활성화를 저장한다.
     bool correction_enable;                   // 보정 모드 활성화를 저장한다.
@@ -163,6 +177,8 @@ typedef struct
 {
     RobotLegState_t state[ROBOT_LEG_COUNT];        // 다리별 상태를 저장한다.
     float progress[ROBOT_LEG_COUNT];               // 다리별 진행률을 저장한다.
+    RobotGaitPattern_t gait_pattern;               // 현재 착지까지 유지할 보행 패턴을 저장한다.
+    RobotGaitPattern_t next_phase_pattern;         // 다음 경로 검사에 사용할 보행 패턴을 저장한다.
     bool late_landing_exhausted[ROBOT_LEG_COUNT];  // 다리별 Late Landing 한계 도달을 저장한다.
     bool startup_phase;                            // 시작 위상 여부를 저장한다.
     bool waiting_start;                            // 위상 경로 검사 중 발 고정 여부를 저장한다.

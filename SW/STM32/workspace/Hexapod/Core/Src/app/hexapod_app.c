@@ -789,6 +789,7 @@ static void HexapodApp_ControlStep(HexapodApp_Handle_t *handle)
         &position.position_world,
         position.valid_leg_count,
         handle->sensor_snapshot.imu.attitude_rad.yaw);              // 사용자와 PI 보행 명령을 결합한다.
+    GaitManager_SetPattern(&handle->gait_manager, handle->drone.gait_pattern);  // 착지 후 적용할 보행 패턴을 요청한다.
     handle->gait = GaitManager_StepContacts(
         &handle->gait_manager,
         handle->drone.manual_enable,
@@ -808,6 +809,17 @@ static void HexapodApp_ControlStep(HexapodApp_Handle_t *handle)
     handle->touchdown_control_mask = 0U;  // Gait가 소비한 접촉 Latch를 비운다.
     gait_user_command = gait_pose.twist;                  // 위치 보정을 포함한 보행 후보를 복사한다.
     gait_user_command.wz = handle->drone.wz_user_radps;   // Heading 보정을 두 걸음 기억에서 분리한다.
+    if (handle->drone.manual_enable && (handle->drone.gait_pattern == ROBOT_GAIT_WAVE))
+    {
+        gait_user_command.vx *= ROBOT_WAVE_SPEED_SCALE;       // 다섯 지지 위상의 전후 보폭을 제한한다.
+        gait_user_command.vy *= ROBOT_WAVE_SPEED_SCALE;       // 위치 보정의 횡방향 보폭을 제한한다.
+        gait_user_command.vz *= ROBOT_WAVE_SPEED_SCALE;       // 위치 보정의 수직 보폭을 제한한다.
+        gait_user_command.wz *= ROBOT_WAVE_SPEED_SCALE;       // 회전과 이동의 비율을 유지한다.
+        gait_pose.yaw_feedback_radps *= ROBOT_WAVE_SPEED_SCALE;  // Heading 보정도 같은 지지 시간에 맞춘다.
+    }
+    WorkspaceLimiter_SetFeet(&handle->workspace_limiter,
+                              handle->foot_trajectory.memory,
+                              &handle->foot_trajectory.body_offset_m);  // 실제 다섯 지지점에서 다음 경로를 검사한다.
     twist = WorkspaceLimiter_Gait(&handle->workspace_limiter,
                                   &gait_user_command,
                                   gait_pose.yaw_feedback_radps,
