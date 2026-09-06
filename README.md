@@ -14,6 +14,27 @@ foothold correction → RL residual → Safety / IK**다. D435IF RGB는 후속 �
 구현 단계와 인터페이스는
 [LiDAR 착지점·residual 설계](docs/HEXAPOD_LIDAR_FOOTHOLD_RESIDUAL_PLAN.md)를 따른다.
 
+## 선택한 W&B 학습 정책 실행
+
+`progress-v2-stage31-level6_20260828-111825_seed40`의 **최고 점수 checkpoint
+000001703936**과 관측 정규화 정보를 저장소에 포함했다. 아래 명령은 저장된 PPO 가중치를
+불러와 학습용 링크 모델과 STM32 기반 제어기·MJX 동역학으로 실행한다.
+
+```bash
+cd /home/huro/Hexapod-Robot
+bash scripts/view_trained_policy.sh
+```
+
+가상환경은 `~/.venvs/hexapod-mjx`이며, 기존 JAX/MJX/Brax 학습 환경을 사용한다.
+기본 지형은 해당 run에 기록된 **7단 × 6.5 cm 계단**, seed는 best 영상 기준 `20040`이다.
+Space는 시뮬레이션 일시정지/재개, R은 reset이다. 첫 실행에는 JAX 컴파일 시간이 필요하다.
+
+이 정책은 146-D 관측·18-D 출력의 **v3**다. 기록된 코드 버전을 별도 경로에 추출해 사용하며,
+현재 v4 학습 코드나 아래 LiDAR 착지점 제어기에 가중치를 바로 끼워 넣지 않는다.
+학습 당시 미커밋 코드가 없어 W&B 영상과 완전히 같은 재현은 미확인이다.
+사용자 요청에 따라 정책 로딩·추론·보행 실행 검증은 수행하지 않았다.
+선택 기준·파일 구성·조작법은 [학습 정책 안내](mjx/policies/progress-v2-stage31-level6/README.md)를 참고한다.
+
 ## MuJoCo 착지점 탐색과 연속 tripod swing
 
 방향키로 넓은 장애물 코스를 이동하면서 MID-360 점군, 누적 높이 지도와 여섯 다리의
