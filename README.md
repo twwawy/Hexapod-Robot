@@ -4,6 +4,9 @@
 **현재 뷰어 제어는 펌웨어 기본 보행 + 학습된 residual + Safety/IK**다. 기본 제어기는 관측 여부와
 무관하게 gait·접촉·자세를 계속 처리한다. LiDAR 착지 후보를 발의 절대 경로로 주입하는 전환은 제거했다.
 
+다음 학습은 **MJX에서 보폭·주기·몸체 자세·스윙 높이의 residual을 학습하고 Isaac Lab으로 sim-to-sim 이전**하는 순서로 진행한다.
+[파라미터 학습 설계](docs/HEXAPOD_MJX_ADAPTIVE_GAIT_LEARNING_PLAN.md)는 후속 계획이며, 아래 실행기는 기존 stage31 비교 모드다.
+
 ## 바로 실행
 
 ```bash

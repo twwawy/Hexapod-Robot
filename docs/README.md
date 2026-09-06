@@ -6,6 +6,7 @@ LiDAR 착지 후보를 절대 경로로 넣는 이전 전환 방식은 제거했
 | 문서 | 용도·상태 |
 |---|---|
 | [루트 README](../README.md) | 시작 명령, 환경, 조작, v3/v4 경로 구분 |
+| [MJX 지형 적응 보행 학습 계획](HEXAPOD_MJX_ADAPTIVE_GAIT_LEARNING_PLAN.md) | 다음 단계: 보폭·주기·몸체 자세·스윙 높이 residual, MJX→Isaac 순서; 아직 미구현 |
 | [뷰어 사용법](HEXAPOD_FOOTHOLD_PREVIEW_USAGE.md) | 현재 실행 구성, scale 0 비교, 사용자 확인과 진단 저장 |
 | [LiDAR/residual 설계](HEXAPOD_LIDAR_FOOTHOLD_RESIDUAL_PLAN.md) | 최신 결정, GT 정답과 actor 입력 분리, 미구현 학습 계획 |
 | [업데이트 기록](HEXAPOD_UPDATE_2026-09-06.md) | 이번 수정과 이전 미커밋 소스·문서·모델 반영 범위 |

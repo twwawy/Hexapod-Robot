@@ -4,6 +4,12 @@
 이 문서가 과거 geometric foothold 경로를 직접 제어기에 주입하던 계획보다 우선한다.
 [실행 안내](HEXAPOD_FOOTHOLD_PREVIEW_USAGE.md)와 [업데이트 기록](HEXAPOD_UPDATE_2026-09-06.md)을 함께 본다.
 
+## 다음 학습 목표
+
+후속 목표는 **MJX에서 착지 위치·스윙 여유 높이·몸체 자세·보폭·주기 residual을 학습한 뒤 Isaac Lab으로 이전**하는 것이다.
+[새 파라미터 학습 설계](HEXAPOD_MJX_ADAPTIVE_GAIT_LEARNING_PLAN.md)의 23-D 제안과 teacher/student 순서를 따른다.
+아래는 현재 구현된 stage31 viewer이며, 새 학습 계약의 구현 완료를 뜻하지 않는다.
+
 ## 현재 구현
 
 ```mermaid
