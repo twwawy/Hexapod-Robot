@@ -28,6 +28,8 @@
 | 브랜치 분석·파일 출처 | [사전 분석](docs/ADAPTIVE_INTEGRATION_ANALYSIS.md), [전체 변경 파일](docs/ADAPTIVE_INTEGRATION_FILES.md) |
 | Stage0 viewer·표시·조작 | [viewer 사용법](docs/HEXAPOD_MJX_ADAPTIVE_GAIT_USAGE.md) |
 | 학습 단계 | [학습 계획](docs/HEXAPOD_MJX_ADAPTIVE_GAIT_LEARNING_PLAN.md) |
+| 짧은 평지 cycle 반복·cycle별 W&B score/영상 | [실행 명령 및 저장 규칙](docs/ADAPTIVE_OBSERVE_CYCLES.md) |
+| 수 회 Tripod 후 정지·영상 종료 수정 | [원인·수정·사용자 검증 명령](docs/TRIPOD_STOP_FIX.md) |
 | Jetson ↔ STM32 wire | [SPI v3](docs/ADAPTIVE_SPI_V3.md) |
 | STM32 실제 contact/Wave 기준 | [Wave gait](SW/STM32/WAVE_GAIT.md) |
 | 기존 18-D replay | `scripts/view_trained_policy.sh`, 기존 `mjx/firmware_mjx_controller.py` |

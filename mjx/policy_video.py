@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import json
 from typing import Any, Callable
 
 import jax
@@ -15,6 +16,11 @@ def _camera(camera: Any, data: Any) -> None:
     camera.distance = 1.75
     camera.azimuth = 135
     camera.elevation = -24
+def _block_tree(tree):
+    """Synchronize every JAX array in an observation pytree."""
+    for leaf in jax.tree_util.tree_leaves(tree):
+        if hasattr(leaf, "block_until_ready"):
+            leaf.block_until_ready()
 
 
 def render_policy_video(
@@ -47,7 +53,7 @@ def render_policy_video(
     reset = jax.jit(env.reset)
     step = jax.jit(env.step)
     state = reset(jax.random.PRNGKey(seed))
-    state.obs.block_until_ready()
+    _block_tree(state.obs)
 
     control_steps = max(1, int(np.ceil(duration / float(env.dt))))
     frame_count = max(1, int(np.ceil(duration * fps)))
@@ -99,4 +105,14 @@ def render_policy_video(
         optimize=False,
     )
     temporary.replace(output)
+    report = {
+        'elapsed_s': (control_step + 1) * float(env.dt),
+        'requested_duration_s': duration,
+        'done': done,
+        'termination': {k: float(np.asarray(v)) for k, v in state.metrics.items()
+                        if k.startswith('termination/') and float(np.asarray(v)) != 0.},
+        'terrain_success': float(np.asarray(state.metrics.get('terrain_success', 0.))),
+    }
+    output.with_suffix('.termination.json').write_text(json.dumps(report, indent=2) + '\n')
+    print(f'Policy video: {report}', flush=True)
     return output

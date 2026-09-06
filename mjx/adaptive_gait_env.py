@@ -28,7 +28,7 @@ from adaptive_foothold_estimator import (
 )
 
 OBSERVATION_CONTRACT = 'adaptive_hybrid_geometry_local25_extent_24_v4'
-REWARD_CONTRACT = 'adaptive_hybrid_efficient_progress_v4'
+REWARD_CONTRACT = 'adaptive_hybrid_efficifent_progress_v4'
 PROPRIO_SIZE = 157
 GLOBAL_SIZE = 23
 REFERENCE_SIZE = 6*9
@@ -40,7 +40,7 @@ CRITIC_SIZE = ACTOR_SIZE + 6*CANDIDATE_COUNT*2 + 15
 class AdaptiveGaitEnv(HexapodRoughTerrainEnv):
     def __init__(self, *, terrain_level=0, perception='lidar', config=None,
                  azimuths=90, elevations=8, dropout=.05, noise=.005, gait_mode='hybrid', diagnostics=False,
-                 bootstrap_unmapped=True):
+                 bootstrap_unmapped=True, action_profile='full',):
         if perception not in ('lidar', 'teacher', 'blind', 'oracle'):
             raise ValueError('perception must be lidar, teacher, blind or debug-only oracle')
         if terrain_spec(terrain_level).kind == 'rough':
@@ -50,6 +50,48 @@ class AdaptiveGaitEnv(HexapodRoughTerrainEnv):
             raise ValueError('gait_mode must be hybrid, tripod or wave')
         self.gait_mode, self.diagnostics = gait_mode, diagnostics
         self.bootstrap_unmapped = bool(bootstrap_unmapped)
+        self.action_profile = action_profile
+
+        if action_profile == 'flat_safe':
+            # 평지 초기 학습:
+            # foothold와 clearance만 약하게 허용.
+            # posture / stride / timing은 classical baseline에 고정.
+            self.action_scale = jp.concatenate((
+                jp.full(12, 0.10),  # landing XY
+                jp.full(6, 0.10),   # clearance
+                jp.zeros(3),        # roll / pitch / body height
+                jp.zeros(1),        # stride
+                jp.zeros(2),        # apex / transfer
+            ))
+
+        elif action_profile == 'terrain_mid':
+            self.action_scale = jp.concatenate((
+                jp.full(12, 0.50),
+                jp.full(6, 0.50),
+                jp.full(3, 0.35),
+                jp.full(1, 0.35),
+                jp.full(2, 0.35),
+            ))
+
+        elif action_profile == 'terrain_high':
+            self.action_scale = jp.concatenate((
+                jp.full(12, 0.75),
+                jp.full(6, 0.75),
+                jp.full(3, 0.65),
+                jp.full(1, 0.65),
+                jp.full(2, 0.65),
+            ))
+
+        elif action_profile == 'full':
+            self.action_scale = jp.ones(
+                adaptive.ACTION_SIZE
+            )
+
+        else:
+            raise ValueError(
+                'action_profile must be '
+                'flat_safe, terrain_mid, terrain_high or full'
+            )
         config = default_config() if config is None else config
         # Posture is owned by the parameter policy, not a terrain-kind sampler.
         config.command.height_min = config.command.height_max = 0.
@@ -97,13 +139,35 @@ class AdaptiveGaitEnv(HexapodRoughTerrainEnv):
 
     def _query(self, grid, xy, now, *, privileged=False):
         height, known, age, spread = sample(grid, xy, now)
+
         if self.perception == 'blind':
             known = jp.zeros_like(known)
-        if privileged or self.perception in ('teacher', 'oracle'):
-            height = self._terrain_height(xy.reshape(-1, 2)).reshape(xy.shape[:-1])
+
+        # Teacher/oracle uses ground-truth terrain geometry.
+        # Teacher must not inherit LiDAR UNKNOWN cells, otherwise the GT teacher
+        # can deadlock in the initial LiDAR blind zone.
+        if self.perception in ('teacher', 'oracle'):
+            height = self._terrain_height(
+                xy.reshape(-1, 2)
+            ).reshape(xy.shape[:-1])
+
             spread = jp.zeros_like(height)
-        if self.perception == 'oracle' or (privileged and self.diagnostics):
-            known, age = jp.ones_like(known), jp.zeros_like(age)
+            known = jp.ones_like(known)
+            age = jp.zeros_like(age)
+
+        # Privileged critic/diagnostics may inspect GT terrain,
+        # but this must not leak into the LiDAR actor.
+        elif privileged:
+            height = self._terrain_height(
+                xy.reshape(-1, 2)
+            ).reshape(xy.shape[:-1])
+
+            spread = jp.zeros_like(height)
+
+            if self.diagnostics:
+                known = jp.ones_like(known)
+                age = jp.zeros_like(age)
+
         return height, known, age, spread
 
     def _candidates(self, data, info, stride=1., period=1., *, lift=None, apex_delta=0.,
@@ -122,16 +186,11 @@ class AdaptiveGaitEnv(HexapodRoughTerrainEnv):
         front = fw.BASE_FEET - .5*jp.where(mode == scheduler.WAVE, scheduler.WAVE_STANCE_PHASES, 1.)*displacement
         body = fw._rotate_inverse(front.at[:, 2].add(-cs.height_applied), cs.posture_command)
         model = jp.stack((body[:, 1], -body[:, 0], body[:, 2]), axis=-1)
-        # Predict translation and yaw to touchdown, then freeze the chosen world
-        # patch at swing entry. Subsequent sensing cannot retarget that swing.
-        heading = jp.arctan2((rotation @ MODEL_FORWARD)[1], (rotation @ MODEL_FORWARD)[0])
-        angle = wz*period
-        yaw_rot = jp.array(((jp.cos(angle), -jp.sin(angle), 0.),
-                            (jp.sin(angle), jp.cos(angle), 0.), (0., 0., 1.)))
-        heading_mid = heading+angle/2
-        translation = period*jp.array((vx*jp.cos(heading_mid)-vy*jp.sin(heading_mid),
-                                        vx*jp.sin(heading_mid)+vy*jp.cos(heading_mid), 0.))
-        nominal = data.qpos[:3] + translation + model @ (yaw_rot @ rotation).T
+        # Execution latches a body-frame endpoint (also on STM32), not a
+        # world-locked foot. Adding predicted body travel here and converting
+        # back with the current pose added a whole extra stride to that endpoint.
+        # Keep the classical +/- half-stance excursion in the execution frame.
+        nominal = data.qpos[:3] + model @ rotation.T
         basis = jp.stack((rotation @ MODEL_FORWARD, rotation @ MODEL_LATERAL))[:, :2]
         xy = nominal[:, None, :2] + CANDIDATE_OFFSETS[None, :, :] @ basis
         return evaluate_candidates(self, data, info, xy, nominal, basis, lift, apex_delta=apex_delta,
@@ -373,12 +432,21 @@ class AdaptiveGaitEnv(HexapodRoughTerrainEnv):
         return controller_state.height_applied
 
     def _reward_command(self, info, controller_state):
-        # Wave/short-step tracking follows the speed the supervisor accepted.
-        scale = jp.where(controller_state.scheduler.running, controller_state.speed_scale, 0.)
+        # While locomotion is running, reward against the supervisor-accepted
+        # speed because SHORT/WAVE intentionally reduce speed.
+        #
+        # While stopped/HOLD, NEVER turn the requested command into zero.
+        # Otherwise stationary behavior becomes a profitable reward solution.
+        scale = jp.where(
+            controller_state.scheduler.running,
+            controller_state.speed_scale,
+            1.0,
+        )
+
         return info['command'].at[:2].multiply(scale)
 
     def _reward_speed_floor(self):
-        return .005
+        return .05
 
     def _get_obs(self, data, info):
         cs, out = info['controller_state'], info['controller_output']
@@ -439,12 +507,18 @@ class AdaptiveGaitEnv(HexapodRoughTerrainEnv):
             'foothold_safe_fraction', 'foothold_selected_fraction', 'foothold_residual_rejected_fraction',
             'gait_mode', 'supervisor_mode', 'max_feasible_stride', 'support_margin', 'gait_switch',
             'scheduler_fault', 'oracle_safe_recall', 'oracle_false_safe', 'oracle_unknown_fraction',
-            'oracle_foothold_error_m', 'oracle_compared', 'oracle_edge_recall', 'oracle_edge_precision')})
+            'oracle_foothold_error_m', 'oracle_compared', 'oracle_edge_recall', 'oracle_edge_precision', 'action_authority_mean',)})
         return state
 
     def step(self, state, action):
         if action.shape != (adaptive.ACTION_SIZE,):
             raise ValueError('hybrid controller requires 24 actions; previous adaptive/stage31 policies are incompatible')
+            # Progressive residual authority.
+    #
+    # The network always keeps the same 24-D contract, but early curriculum
+    # stages are prevented from destroying the known-good classical gait.
+        action = jp.clip(action, -1.0, 1.0)
+        action = action * self.action_scale
         # Copy dictionaries because the legacy environment updates them in-place.
         state = state.replace(info=dict(state.info), metrics=dict(state.metrics))
         raw = self._foot_contacts(state.data)
@@ -534,7 +608,7 @@ class AdaptiveGaitEnv(HexapodRoughTerrainEnv):
                             .02*excess_clearance + .003*tiny_stride)
         result.metrics.update(efficiency_joint_speed=joint_speed, efficiency_vertical_speed=vertical_speed,
             efficiency_foot_travel=foot_travel, efficiency_excess_clearance=excess_clearance,
-            efficiency_tiny_stride=tiny_stride)
+            efficiency_tiny_stride=tiny_stride, action_authority_mean=jp.mean(self.action_scale),)
         return result.replace(reward=result.reward-penalty, obs=self._get_obs(result.data, result.info))
 
     @property

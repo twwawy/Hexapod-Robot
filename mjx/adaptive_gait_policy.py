@@ -34,7 +34,7 @@ def contract(env):
         reward_contract=REWARD_CONTRACT, action_size=ACTION_SIZE,
         observation_size={'state': ACTOR_SIZE, 'privileged_state': CRITIC_SIZE},
         actor_source=env.perception, leg_order=LEG_ORDER,
-        gait_mode=env.gait_mode,
+        gait_mode=env.gait_mode, action_profile=env.action_profile,
         action_slices={'xy': [0, 12], 'clearance': [12, 18], 'roll_pitch_height': [18, 21],
                        'stride': 21, 'apex_phase': 22, 'transfer_timing': 23},
         limits=dict(xy_x_m=.06, xy_y_m=.04, clearance_residual_m=.04, clearance_m=[.04, .18],

@@ -26,6 +26,8 @@ def main():
                         help='strict UNKNOWN->HOLD check; disables blind-zone short Tripod startup')
     parser.add_argument('--seed', type=int, default=40)
     parser.add_argument('--speed', type=float, default=0.)
+    parser.add_argument('--realtime-scale', type=float, default=1.,
+                        help='viewer playback multiplier; simulation/controller semantics stay unchanged')
     parser.add_argument('--fov-display-radius', type=float, default=1.2,
                         help='MID-360 FOV wire radius [m], independent of sensing range; G toggles')
     args = parser.parse_args()
@@ -35,6 +37,8 @@ def main():
         parser.error('choose --terrain or --terrain-level')
     if not math.isfinite(args.fov_display_radius) or args.fov_display_radius <= 0.:
         parser.error('--fov-display-radius must be finite and positive')
+    if not math.isfinite(args.realtime_scale) or not 0.1 <= args.realtime_scale <= 10.:
+        parser.error('--realtime-scale must be finite and in [0.1, 10]')
     import jax
     import jax.numpy as jp
     import mujoco
@@ -66,7 +70,8 @@ def main():
     env = AdaptiveGaitEnv(terrain_level=level, perception=perception, config=cfg,
         azimuths=sensor['azimuths'], elevations=sensor['elevations'], dropout=sensor['dropout'], noise=sensor['noise_m'],
         gait_mode=args.gait_mode or (metadata['gait_mode'] if metadata else 'hybrid'), diagnostics=args.stage0,
-        bootstrap_unmapped=not args.no_bootstrap_classical)
+        bootstrap_unmapped=not args.no_bootstrap_classical,
+        action_profile=metadata.get('action_profile', 'full') if metadata else 'full')
     # Use the exact emitter transform held by the JAX raycaster, including the
     # measured 45-degree mount. No separate CAD site or display-only TF is used.
     lidar_tf = np.asarray(env.sensor.tf)
@@ -284,7 +289,10 @@ def main():
                 (output/'foothold_diagnostics.json').write_text(json.dumps(diagnostic, indent=2)+'\n')
                 mujoco.mj_saveLastXML(str(output/'model.xml'), model)
                 print(f'Saved trace/map/model/contract: {output}', flush=True)
-            time.sleep(max(0., env.dt-(time.monotonic()-tick_start)))
+            # Playback changes only wall-clock display pacing. The 20-ms MJX
+            # policy/control step, trajectory, LiDAR and contact timing remain
+            # exactly the same.
+            time.sleep(max(0., env.dt/args.realtime_scale-(time.monotonic()-tick_start)))
 
 
 if __name__ == '__main__':
