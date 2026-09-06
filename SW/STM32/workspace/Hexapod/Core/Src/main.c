@@ -23,6 +23,7 @@
 /* USER CODE BEGIN Includes */
 #include "app/hexapod_app.h"
 #include "communication/jetson_spi.h"
+#include "measurement/measurement_stage0.h"
 #include "measurement/measurement_stage4.h"
 #include "measurement/measurement_stage5.h"
 
@@ -38,7 +39,7 @@
 #define SENSOR_RAW_TEST_MODE         0U  // 세 보행 모드를 포함한 일반 제어 앱을 실행한다.
 #define JOINT_ZERO_CALIBRATION_MODE  0U  // 관절 기구학 영점 정렬 모드를 선택한다.
 #define JOINT_ADC_CALIBRATION_MODE   0U  // L1 J3·L2 J3 ADC 보정 모드를 선택한다.
-#define JETSON_SPI_BRINGUP_TEST      0U  // 실제 로봇 제어 앱을 실행한다.
+#define JETSON_SPI_BRINGUP_TEST      0U  // Jetson SPI 단독 시험 모드를 선택한다.
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -141,7 +142,12 @@ int main(void)
   MX_USART3_UART_Init();
   MX_USART6_UART_Init();
   /* USER CODE BEGIN 2 */
-#if JOINT_ADC_CALIBRATION_MODE
+#if SENSOR_RAW_TEST_MODE
+  if (!MeasurementStage0_Init(&huart2, &huart3, &hspi1, &huart6))
+  {
+    Error_Handler();  // 전체 센서 모드 초기화 오류를 디버거에서 확인한다.
+  }
+#elif JOINT_ADC_CALIBRATION_MODE
   if (!MeasurementStage5_Init(&hspi1,
                               &htim1,
                               &htim2,
@@ -181,7 +187,9 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-#if JOINT_ADC_CALIBRATION_MODE
+#if SENSOR_RAW_TEST_MODE
+    MeasurementStage0_Process();  // GPS·IMU·ADC·조종기 값을 계속 기록한다.
+#elif JOINT_ADC_CALIBRATION_MODE
     MeasurementStage5_Process();  // L1 J3·L2 J3의 세 각도 ADC를 자동 측정한다.
 #elif JOINT_ZERO_CALIBRATION_MODE
     MeasurementStage4_Process();  // 전체 관절을 보정표 기준 0도로 유지한다.
@@ -992,43 +1000,49 @@ static void MX_GPIO_Init(void)
 
 /* USER CODE BEGIN 4 */
 
-/* UART 수신 완료를 최종 앱으로 전달한다. */
+/* UART 수신 완료를 현재 실행 모드에 전달한다. */
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
-#if !JOINT_ZERO_CALIBRATION_MODE && !JOINT_ADC_CALIBRATION_MODE
+#if SENSOR_RAW_TEST_MODE
+  MeasurementStage0_UartRxCallback(huart);  // GPS·WT931·CRSF의 다음 수신을 준비한다.
+#elif !JOINT_ZERO_CALIBRATION_MODE && !JOINT_ADC_CALIBRATION_MODE && !JETSON_SPI_BRINGUP_TEST
   HexapodApp_BoardUartRxCallback(huart);  // 해당 UART의 다음 수신을 준비한다.
 #else
-  (void)huart;  // 영점 모드에서 UART 완료 콜백을 사용하지 않는다.
+  (void)huart;  // UART를 사용하지 않는 시험 모드에서는 처리하지 않는다.
 #endif
 }
 
-/* UART 송수신 오류를 최종 앱으로 전달한다. */
+/* UART 송수신 오류를 현재 실행 모드에 전달한다. */
 void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
 {
-#if !JOINT_ZERO_CALIBRATION_MODE && !JOINT_ADC_CALIBRATION_MODE
+#if SENSOR_RAW_TEST_MODE
+  MeasurementStage0_UartErrorCallback(huart);  // GPS·WT931·CRSF 수신을 복구한다.
+#elif !JOINT_ZERO_CALIBRATION_MODE && !JOINT_ADC_CALIBRATION_MODE && !JETSON_SPI_BRINGUP_TEST
   HexapodApp_BoardUartErrorCallback(huart);  // 해당 UART 송수신을 복구한다.
 #else
-  (void)huart;  // 영점 모드에서 UART 오류 콜백을 사용하지 않는다.
+  (void)huart;  // UART를 사용하지 않는 시험 모드에서는 처리하지 않는다.
 #endif
 }
 
 /* UART 송신 완료를 최종 앱으로 전달한다. */
 void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
 {
-#if !JOINT_ZERO_CALIBRATION_MODE && !JOINT_ADC_CALIBRATION_MODE
+#if !SENSOR_RAW_TEST_MODE && !JOINT_ZERO_CALIBRATION_MODE && \
+    !JOINT_ADC_CALIBRATION_MODE && !JETSON_SPI_BRINGUP_TEST
   HexapodApp_BoardUartTxCpltCallback(huart);  // 해당 UART의 다음 송신을 허가한다.
 #else
-  (void)huart;  // 영점 모드에서 UART 송신 콜백을 사용하지 않는다.
+  (void)huart;  // 센서·보정 시험 모드에서 UART 송신 콜백을 사용하지 않는다.
 #endif
 }
 
 /* 압력·제어 Timer 완료를 최종 앱으로 전달한다. */
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
-#if !JOINT_ZERO_CALIBRATION_MODE && !JOINT_ADC_CALIBRATION_MODE
+#if !SENSOR_RAW_TEST_MODE && !JOINT_ZERO_CALIBRATION_MODE && \
+    !JOINT_ADC_CALIBRATION_MODE && !JETSON_SPI_BRINGUP_TEST
   HexapodApp_BoardTimerCallback(htim);  // TIM6 압력·제어 실행을 요청한다.
 #else
-  (void)htim;  // 영점 모드에서 제어 타이머 콜백을 사용하지 않는다.
+  (void)htim;  // 센서·보정 시험 모드에서 제어 타이머 콜백을 사용하지 않는다.
 #endif
 }
 
