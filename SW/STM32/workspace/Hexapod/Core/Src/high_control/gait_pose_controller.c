@@ -63,7 +63,8 @@ GaitPoseController_Output_t GaitPoseController_Step(
     float yaw_measured_rad)
 {
     GaitPoseController_Output_t output;  // 이번 제어 출력을 저장한다.
-    const bool manual = (drone != NULL) && drone->manual_enable;          // 수동 모드 상태를 저장한다.
+    const bool manual = (drone != NULL) &&
+        (drone->manual_enable || drone->locomotion_enable);              // 공통 정상 보행 상태를 저장한다.
     const bool correction = (drone != NULL) && drone->correction_enable;  // 보정 모드 상태를 저장한다.
 
     memset(&output, 0, sizeof(output));  // 기본 출력을 0으로 준비한다.

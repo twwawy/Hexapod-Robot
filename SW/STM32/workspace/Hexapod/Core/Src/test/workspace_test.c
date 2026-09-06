@@ -4,6 +4,91 @@
 #include "high_control/workspace_limiter.h"
 
 #include <math.h>
+#include <string.h>
+
+/* 기본 계획 공개·잔차 고정·경로 거부 후 재시도를 검사한다. */
+static bool WorkspaceTest_CheckRlPlan(void)
+{
+    WorkspaceLimiter_Handle_t limiter;                   // RL 경로 검사를 준비한다.
+    FootTrajectory_Plan_t plan;                          // 최초 공개 계획을 보존한다.
+    RobotLegResidual_t residual[ROBOT_LEG_COUNT] = {0};  // 원자적으로 적용할 잔차를 준비한다.
+    RobotBodyTwist_t candidate = {0};                    // 작은 전진 명령을 준비한다.
+    RobotGaitPhase_t gait = {0};                         // 첫 위상 검사 요청을 준비한다.
+    RobotEuler_t posture = {0};                          // 수평 자세를 준비한다.
+    bool accepted;                                       // 경로 검사 결과를 저장한다.
+    uint32_t cycle;                                      // 여러 제어 주기를 진행한다.
+
+    WorkspaceLimiter_Init(&limiter);                // 기본 지지점과 검사 상태를 준비한다.
+    WorkspaceLimiter_SetRlEnabled(&limiter, true);  // RL 잔차 대기를 활성화한다.
+    candidate.vx = 0.005f;                          // 작업공간 안의 전진 속도를 선택한다.
+    gait.waiting_start = true;                      // 잔차 전에는 발을 고정한다.
+    gait.next_phase_preview = true;                 // 기본 계획 생성을 요청한다.
+    gait.next_phase_startup = true;                 // 첫 반 보폭 위상을 선택한다.
+    gait.next_phase_swing_mask = 0x15U;             // 1·3·5번 다리 잔차를 적용한다.
+    (void)WorkspaceLimiter_Gait(&limiter, &candidate, 0.0f, true,
+                                &gait, &posture, false, &accepted);  // 잔차 없이도 기본 계획을 공개한다.
+    if (accepted || limiter.preview_active || limiter.phase_result_valid ||
+        !WorkspaceLimiter_GetRlPlan(&limiter, &plan))
+    {
+        return false;
+    }
+
+    gait.next_phase_preview = false;  // 같은 계획의 대기를 계속한다.
+    candidate.vx = 0.02f;             // 다음 계획용 새 조종값을 넣는다.
+    (void)WorkspaceLimiter_Gait(&limiter, &candidate, 0.1f, true,
+                                &gait, &posture, false, &accepted);  // 현재 공개 기준의 고정을 확인한다.
+    if (memcmp(plan.nominal, limiter.rl_plan.nominal, sizeof(plan.nominal)) != 0 ||
+        (plan.twist.vx != limiter.rl_plan.twist.vx) ||
+        WorkspaceLimiter_SubmitRlResidual(&limiter, plan.plan_id + 1U, 0x15U, residual) ||
+        WorkspaceLimiter_SubmitRlResidual(&limiter, plan.plan_id, 0x2AU, residual))
+    {
+        return false;
+    }
+    residual[1].dx = NAN;  // 적용 마스크 밖의 손상 값도 검사한다.
+    if (WorkspaceLimiter_SubmitRlResidual(&limiter, plan.plan_id, 0x15U, residual))
+    {
+        return false;
+    }
+    residual[1].dx = 0.01f;   // 지지발에 사용하지 않을 정상 잔차를 준비한다.
+    residual[0].dx = 0.005f;  // 첫 다리 착지점의 작은 이동을 요청한다.
+    residual[0].dz = 0.005f;  // 착지 높이와 Swing 높이를 구분한다.
+    residual[0].dh = -0.01f;  // 첫 다리 들어 올림 높이를 낮춘다.
+    if (!WorkspaceLimiter_SubmitRlResidual(&limiter, plan.plan_id, 0x15U, residual) ||
+        (limiter.rl_plan.target[1].x != plan.nominal[1].x))
+    {
+        return false;
+    }
+    residual[0].dx = 0.02f;  // 검사 중 후보를 교체하려는 값을 준비한다.
+    if (WorkspaceLimiter_SubmitRlResidual(&limiter, plan.plan_id, 0x15U, residual) ||
+        (fabsf(limiter.rl_plan.target[0].x - plan.nominal[0].x - 0.005f) > 1.0e-6f))
+    {
+        return false;
+    }
+    posture.roll = NAN;  // 기본 속도 축소로 해결할 수 없는 경로 오류를 만든다.
+    (void)WorkspaceLimiter_Gait(&limiter, &candidate, 0.0f, true,
+                                &gait, &posture, false, &accepted);  // 기존 기본 계획을 유지하며 후보만 거부한다.
+    if (!limiter.rl_plan_rejected || limiter.phase_result_valid ||
+        !limiter.rl_plan.valid || (limiter.rl_plan.plan_id != plan.plan_id) ||
+        (limiter.preview_scale != 1.0f))
+    {
+        return false;
+    }
+    posture.roll = 0.0f;      // 유효한 자세로 새 후보를 검사한다.
+    residual[0].dx = 0.005f;  // 같은 기준에 같은 잔차를 다시 요청한다.
+    if (!WorkspaceLimiter_SubmitRlResidual(&limiter, plan.plan_id, 0x15U, residual))
+    {
+        return false;
+    }
+    for (cycle = 0U; cycle < 3U; ++cycle)
+    {
+        (void)WorkspaceLimiter_Gait(&limiter, &candidate, 0.0f, true,
+                                    &gait, &posture, false, &accepted);  // 아홉 지점을 제한된 주기당 검사량으로 확인한다.
+    }
+    return accepted && limiter.phase_result_valid && limiter.phase_result_accepted &&
+           (fabsf(limiter.rl_plan.target[0].x - plan.nominal[0].x - 0.005f) < 1.0e-6f) &&
+           (fabsf(limiter.rl_plan.height[0] - plan.nominal_height[0] + 0.01f) < 1.0e-6f);  // 재시도에도 잔차가 누적되지 않는지 확인한다.
+}
+
 
 /* 한 발 명령의 즉시 갱신과 실제 지지점의 경로 거부를 검사한다. */
 static bool WorkspaceTest_CheckWavePreview(void)
@@ -224,7 +309,8 @@ bool WorkspaceTest_Run(void)
     bool was_limited;                             // 발 제한 여부를 저장한다.
     uint32_t cycle;                               // 위험 후보의 재검사 주기를 저장한다.
 
-    if (!WorkspaceTest_CheckWavePreview() || !WorkspaceTest_CheckReducedCommand())
+    if (!WorkspaceTest_CheckRlPlan() ||
+        !WorkspaceTest_CheckWavePreview() || !WorkspaceTest_CheckReducedCommand())
     {
         return false;
     }

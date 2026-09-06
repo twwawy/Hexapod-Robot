@@ -16,13 +16,15 @@ typedef enum
 typedef struct
 {
     ControlPriority_Supervisor_t supervisor;  // 상위 상태를 저장한다.
-    RobotControlMode_t motion_mode;            // SC가 마지막으로 선택한 동작 모드를 저장한다.
-    bool stand_command_armed;                  // 서기 재입력 허가를 저장한다.
-    bool motion_armed;                         // READY 입력 허가를 저장한다.
-    float neutral_time_s;                      // READY 중립 유지 시간을 저장한다.
+    RobotControlMode_t motion_mode;           // SC가 마지막으로 선택한 동작 모드를 저장한다.
+    bool stand_command_armed;                 // 서기 재입력 허가를 저장한다.
+    bool motion_armed;                        // READY 입력 허가를 저장한다.
+    bool previous_rl_request;                 // 직전 SB 강화학습 요청을 저장한다.
+    float neutral_time_s;                     // READY 중립 유지 시간을 저장한다.
 } ControlPriority_Handle_t;
 
 void ControlPriority_Init(ControlPriority_Handle_t *handle);  // 상위 상태를 LANDED로 초기화한다.
+void ControlPriority_DisarmMotion(ControlPriority_Handle_t *handle);  // 동작 재개 전에 중립 확인을 요구한다.
 
 RobotPriorityOutput_t ControlPriority_Step(ControlPriority_Handle_t *handle,
                                            const RobotUserCommand_t *user,

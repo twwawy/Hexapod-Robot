@@ -83,6 +83,76 @@ static RobotVec3_t FootTrajectory_PhaseDisplacement(const RobotVec3_t *foot,
     return displacement;
 }
 
+/* 기본 착지 목표와 높이를 한 계획에 고정한다. */
+void FootTrajectory_BuildPlan(FootTrajectory_Plan_t *plan,
+                               const RobotVec3_t feet[ROBOT_LEG_COUNT],
+                               const RobotVec3_t *body_offset_m,
+                               const RobotBodyTwist_t *twist,
+                               RobotGaitPattern_t pattern,
+                               uint8_t swing_mask)
+{
+    RobotVec3_t base[ROBOT_LEG_COUNT];  // 몸체 보정 전 기준점을 저장한다.
+    uint32_t leg;                       // 계획할 다리 번호를 저장한다.
+
+    if ((plan == NULL) || (feet == NULL) || (body_offset_m == NULL) || (twist == NULL))
+    {
+        return;
+    }
+
+    memset(plan, 0, sizeof(*plan));   // 이전 잔차와 목표를 제거한다.
+    LegKinematics_GetBaseFeet(base);  // 여섯 기본 발 위치를 준비한다.
+    plan->twist = *twist;             // 기본 끝점을 만든 속도를 고정한다.
+    plan->swing_mask = swing_mask;    // 잔차 적용 대상을 고정한다.
+    for (leg = 0U; leg < ROBOT_LEG_COUNT; ++leg)
+    {
+        RobotVec3_t displacement;  // 기준점의 한 위상 이동량을 저장한다.
+        const float stance_phases = (pattern == ROBOT_GAIT_WAVE)
+                                  ? (float)ROBOT_WAVE_STANCE_PHASES : 1.0f;  // 다음 이륙까지의 지지 구간을 선택한다.
+
+        base[leg].x -= body_offset_m->x;                                             // 몸체 보정 X를 반영한다.
+        base[leg].y -= body_offset_m->y;                                             // 몸체 보정 Y를 반영한다.
+        base[leg].z -= body_offset_m->z;                                             // 몸체 보정 Z를 반영한다.
+        displacement = FootTrajectory_PhaseDisplacement(&base[leg], twist);          // 실행과 같은 위상 이동량을 계산한다.
+        plan->start[leg] = feet[leg];                                                // 실제 연속 시작점을 고정한다.
+        plan->nominal[leg].x = base[leg].x - 0.5f * stance_phases * displacement.x;  // 기본 착지 X를 계산한다.
+        plan->nominal[leg].y = base[leg].y - 0.5f * stance_phases * displacement.y;  // 기본 착지 Y를 계산한다.
+        plan->nominal[leg].z = base[leg].z - 0.5f * stance_phases * displacement.z;  // 기본 착지 Z를 계산한다.
+        plan->nominal_height[leg] = fminf(fmaxf(ROBOT_SWING_HEIGHT_M + body_offset_m->z,
+                                                ROBOT_SWING_HEIGHT_MIN_M),
+                                          ROBOT_SWING_HEIGHT_MAX_M);  // 실행과 같은 기본 높이를 계산한다.
+        plan->target[leg] = plan->nominal[leg];                       // 잔차 0의 목표를 준비한다.
+        plan->height[leg] = plan->nominal_height[leg];                // 잔차 0의 높이를 준비한다.
+    }
+    plan->valid = (swing_mask != 0U) &&
+                  ((swing_mask & ~((1U << ROBOT_LEG_COUNT) - 1U)) == 0U);  // 실제 다리만 포함한 계획을 공개한다.
+}
+
+/* 검증된 계획을 현재 Swing과 분리해 다음 이륙까지 보관한다. */
+bool FootTrajectory_SetPlan(FootTrajectory_Handle_t *handle,
+                             const FootTrajectory_Plan_t *plan)
+{
+    if ((handle == NULL) || (plan == NULL) || !plan->valid)
+    {
+        return false;
+    }
+    if (handle->active_plan_valid && (handle->active_plan_id == plan->plan_id))
+    {
+        return true;
+    }
+    handle->pending_plan = *plan;  // 같은 끝점과 높이를 다음 위상에 전달한다.
+    return true;
+}
+
+/* 새 이륙만 취소하고 이미 실행 중인 착지 목표를 유지한다. */
+void FootTrajectory_CancelPlan(FootTrajectory_Handle_t *handle)
+{
+    if (handle != NULL)
+    {
+        handle->pending_plan.valid = false;  // 대기 후보가 뒤늦게 적용되는 일을 막는다.
+    }
+}
+
+
 /* 한 Stance 발을 Body Twist 반대 방향으로 한 주기 이동한다. */
 static void FootTrajectory_IntegrateStance(RobotVec3_t *position,
                                            const RobotBodyTwist_t *twist)
@@ -331,6 +401,12 @@ static RobotVec3_t FootTrajectory_AdaptiveLeg(FootTrajectory_Handle_t *handle,
     }
     else if (state == ROBOT_LEG_SWING)
     {
+        if (handle->active_plan.valid &&
+            ((handle->active_plan.swing_mask & (uint8_t)(1U << leg)) != 0U))
+        {
+            front = handle->active_plan.target[leg];          // 검사에 사용한 잔차 착지점을 그대로 사용한다.
+            swing_height = handle->active_plan.height[leg];  // 검사에 사용한 다리별 높이를 그대로 사용한다.
+        }
         if (previous != ROBOT_LEG_SWING)
         {
             handle->landing_z_error_valid[leg] = false;  // 새 Swing의 착지 오차를 준비한다.
@@ -584,6 +660,13 @@ RobotFootTargets_t FootTrajectory_Step(FootTrajectory_Handle_t *handle,
         FootTrajectory_Init(handle);  // 누락된 초기화를 보완한다.
     }
 
+    if (drone->hold_feet)
+    {
+        memcpy(output.foot, handle->memory, sizeof(output.foot));  // RL 종료 후 실제 접촉 발 위치를 보존한다.
+        output.command_accepted = true;                            // 연속 위치 유지 명령을 허가한다.
+        return output;
+    }
+
     if (gait->late_landing_hold)
     {
         FootTrajectory_ClearPhaseTwist(handle);  // 중단한 위상의 속도 기억을 제거한다.
@@ -598,7 +681,7 @@ RobotFootTargets_t FootTrajectory_Step(FootTrajectory_Handle_t *handle,
     LegKinematics_GetBaseFeet(base);  // 기본 발 위치를 계산한다.
     applied_twist = *twist;           // 상위 적용 Twist를 복사한다.
     output.command_accepted = true;   // 기본적으로 보정 명령을 채택한다.
-    if (drone->manual_enable &&
+    if ((drone->locomotion_enable || drone->manual_enable) &&
         (drone->tripod_mode == ROBOT_TRIPOD_NORMAL) &&
         gait->enabled_internal)
     {
@@ -611,6 +694,18 @@ RobotFootTargets_t FootTrajectory_Step(FootTrajectory_Handle_t *handle,
         }
         else if (new_swing_mask != 0U)
         {
+            handle->active_plan.valid = false;  // 이전 다리 잔차를 새 위상에 재사용하지 않는다.
+            if (handle->pending_plan.valid &&
+                (handle->pending_plan.swing_mask == swing_mask))
+            {
+                handle->active_plan = handle->pending_plan;       // 검증한 끝점과 높이를 한 번 고정한다.
+                handle->pending_plan.valid = false;               // 이번 위상 후보의 재사용을 막는다.
+                handle->active_plan_id = handle->active_plan.plan_id;  // 실제 이륙 계획 번호를 기록한다.
+                handle->active_plan_mask = swing_mask;            // 실제 잔차 적용 다리를 기록한다.
+                handle->active_plan_valid = true;                 // 실제 적용 이력을 활성화한다.
+                applied_twist = handle->active_plan.twist;        // 기본 계획과 같은 속도로 움직인다.
+            }
+            handle->pending_plan.valid = false;  // 위상이 달라진 오래된 후보도 폐기한다.
             handle->phase_twist = applied_twist;  // 착륙 시 세 지점 검증을 마친 속도를 현재 위상에 고정한다.
             handle->phase_twist_valid = true;     // 현재 위상 속도 고정을 활성화한다.
         }
@@ -630,7 +725,7 @@ RobotFootTargets_t FootTrajectory_Step(FootTrajectory_Handle_t *handle,
         FootTrajectory_ClearPhaseTwist(handle);  // 정지와 특수 모드에서 다음 첫 걸음을 준비한다.
     }
 
-    manual_stance_hold = drone->manual_enable && !gait->enabled_internal &&
+    manual_stance_hold = (drone->locomotion_enable || drone->manual_enable) && !gait->enabled_internal &&
                          (drone->tripod_mode == ROBOT_TRIPOD_NORMAL);  // 입력 유지 중 IK 거부도 정지로 처리한다.
     all_stance_mode = drone->correction_enable && drone->body_control_enable &&
                       !gait->enabled_internal && !drone->tripod_enable &&
@@ -638,7 +733,8 @@ RobotFootTargets_t FootTrajectory_Step(FootTrajectory_Handle_t *handle,
     trajectory_enable = drone->body_control_enable || drone->tripod_enable;  // 궤적 활성 조건을 계산한다.
     hold_stance = (drone->tripod_mode != ROBOT_TRIPOD_NORMAL) ||
                   gait->waiting_start || manual_stance_hold;  // 특수 착지·수동 정지 중 Stance를 유지한다.
-    common_z_enable = drone->manual_enable && gait->enabled_internal &&
+    common_z_enable = (drone->locomotion_enable || drone->manual_enable) && gait->enabled_internal &&
+                      !gait->waiting_start &&
                       (gait->gait_pattern == ROBOT_GAIT_TRIPOD) &&
                       (drone->tripod_mode == ROBOT_TRIPOD_NORMAL);  // 실제 보행 중에만 공통 Z를 적용한다.
 
@@ -651,7 +747,7 @@ RobotFootTargets_t FootTrajectory_Step(FootTrajectory_Handle_t *handle,
     {
         FootTrajectory_ApplyCommonZRecovery(handle, gait);  // 이전 Tripod의 공통 하강량을 복구한다.
     }
-    else if (!drone->manual_enable || (gait->gait_pattern == ROBOT_GAIT_WAVE) ||
+    else if (!(drone->locomotion_enable || drone->manual_enable) || (gait->gait_pattern == ROBOT_GAIT_WAVE) ||
              (drone->tripod_mode != ROBOT_TRIPOD_NORMAL))
     {
         FootTrajectory_ClearCommonZRecovery(handle);  // 다른 모드의 착지 오차를 제거한다.

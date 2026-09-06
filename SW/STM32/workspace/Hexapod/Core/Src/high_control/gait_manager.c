@@ -99,6 +99,29 @@ void GaitManager_SetPattern(GaitManager_Handle_t *handle,
     }
 }
 
+/* 현재 발의 착지는 유지하며 시작 전 계획과 이후 이륙을 차단한다. */
+void GaitManager_SetStopAfterLanding(GaitManager_Handle_t *handle,
+                                    bool stop_after_landing)
+{
+    if (handle == NULL)
+    {
+        return;
+    }
+
+    if (stop_after_landing && !handle->stop_after_landing)
+    {
+        handle->next_phase_enable = false;                  // 아직 시작하지 않은 위상 허가를 폐기한다.
+        handle->next_phase_locked = false;                  // 이전 경로 검사 결정을 폐기한다.
+        if (!handle->initialized)
+        {
+            handle->run_enable = false;                     // 이륙 전 대기 중이면 즉시 정지한다.
+            handle->stop_pending = false;                   // 진행 중인 Swing이 없는 정지 예약을 제거한다.
+            handle->start_wait_count = 0U;                  // 다음 진입의 입력 대기를 다시 준비한다.
+        }
+    }
+    handle->stop_after_landing = stop_after_landing;        // 명시적인 해제까지 새 이륙 차단을 유지한다.
+}
+
 /* Enable·모드·접촉에 따라 여섯 다리 상태와 진행률을 갱신한다. */
 RobotGaitPhase_t GaitManager_StepContacts(
     GaitManager_Handle_t *handle,
@@ -121,8 +144,13 @@ RobotGaitPhase_t GaitManager_StepContacts(
         return output;
     }
 
+    if (handle->stop_after_landing && (tripod_mode == ROBOT_TRIPOD_NORMAL))
+    {
+        tripod_enable = false;  // 정지 요청 동안 새 정상 보행 명령을 차단한다.
+    }
+
     if ((tripod_mode == ROBOT_TRIPOD_NORMAL) && normal_mode_enable &&
-        !handle->initialized &&
+        !handle->initialized && !handle->stop_after_landing &&
         (handle->active_pattern != handle->requested_pattern) &&
         GaitManager_AllMaskContact((uint8_t)((1U << ROBOT_LEG_COUNT) - 1U), contact))
     {
@@ -137,7 +165,7 @@ RobotGaitPhase_t GaitManager_StepContacts(
         handle->next_phase_locked = false;                       // 새 패턴의 경로 검사를 요구한다.
     }
 
-    if (!tripod_enable)
+    if (!tripod_enable && !handle->stop_after_landing)
     {
         handle->late_landing_hold = false;  // 입력 해제에서 탐색 한계 정지를 재가동 가능 상태로 만든다.
     }
@@ -385,7 +413,8 @@ RobotGaitPhase_t GaitManager_StepContacts(
                 {
                     const bool pair_incomplete =
                         (handle->active_pattern == ROBOT_GAIT_TRIPOD) &&
-                        (handle->command_pair_step_count == 0U);  // Tripod만 반대 그룹 걸음을 보장한다.
+                        (handle->command_pair_step_count == 0U) &&
+                        !handle->stop_after_landing;  // 강제 정지에서는 반대 그룹 추가 걸음을 차단한다.
                     const bool pattern_change =
                         (handle->active_pattern != handle->requested_pattern);  // 착지 후 패턴 교체 여부를 계산한다.
                     bool preview_started = false;                 // 이번 주기의 새 검사 요청 여부를 저장한다.
@@ -566,7 +595,7 @@ RobotGaitPhase_t GaitManager_StepContacts(
             memset(handle->landed, 0, sizeof(handle->landed));                // 착지 이력을 제거한다.
         }
     }
-    else if (handle->late_landing_hold && tripod_enable)
+    else if (handle->late_landing_hold && (tripod_enable || handle->stop_after_landing))
     {
         output.waiting_start = true;      // 입력 해제 전 모든 발 목표를 유지한다.
         output.late_landing_hold = true;  // 탐색 한계 정지 상태를 전달한다.

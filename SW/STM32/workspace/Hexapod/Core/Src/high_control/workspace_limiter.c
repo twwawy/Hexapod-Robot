@@ -11,6 +11,8 @@
 #define WORKSPACE_GAIT_COMMAND_HOLD_STEPS 2U     // 한 조종 명령을 유지할 걸음 수를 정의한다.
 #define WORKSPACE_GAIT_SCALE_REDUCTION    0.8f   // 실패한 보폭을 줄일 공통 비율을 정의한다.
 #define WORKSPACE_GAIT_MAX_REDUCTIONS     8U     // 불가능한 경로의 축소 재시도 횟수를 제한한다.
+#define WORKSPACE_RL_SAMPLE_COUNT         9U     // 잔차 경로의 중간 구간까지 검사한다.
+#define WORKSPACE_RL_SAMPLES_PER_CYCLE    3U     // 한 제어 주기의 IK 검사량을 제한한다.
 
 static const float workspace_leg_angle_rad[ROBOT_LEG_COUNT] =
 {
@@ -130,7 +132,8 @@ static bool WorkspaceLimiter_PreviewPoint(const WorkspaceLimiter_Handle_t *handl
     RobotVec3_t feet[ROBOT_LEG_COUNT];  // 검사할 여섯 발 위치를 저장한다.
     const float progress =
         (float)handle->preview_sample /
-        (float)(ROBOT_GAIT_PREVIEW_SAMPLE_COUNT - 1U);  // 시작·중앙·끝 세 지점을 만든다.
+        (float)((handle->rl_enabled ? WORKSPACE_RL_SAMPLE_COUNT :
+                 ROBOT_GAIT_PREVIEW_SAMPLE_COUNT) - 1U);  // RL 경로에는 추가 중간점을 사용한다.
     uint32_t leg;  // 계산할 다리 번호를 저장한다.
 
     LegKinematics_GetBaseFeet(base);  // 기본 발 위치를 계산한다.
@@ -143,7 +146,7 @@ static bool WorkspaceLimiter_PreviewPoint(const WorkspaceLimiter_Handle_t *handl
         const bool swing = (handle->preview_swing_mask &
                             (uint8_t)(1U << leg)) != 0U;  // 현재 다리 역할을 선택한다.
 
-        if (handle->preview_continuous)
+        if (handle->preview_continuous || handle->rl_enabled)
         {
             base[leg].x -= handle->preview_offset_m.x;  // 실제 궤적의 기준 X를 맞춘다.
             base[leg].y -= handle->preview_offset_m.y;  // 실제 궤적의 기준 Y를 맞춘다.
@@ -168,7 +171,22 @@ static bool WorkspaceLimiter_PreviewPoint(const WorkspaceLimiter_Handle_t *handl
         rear.y = base[leg].y + 0.5f * displacement.y;              // 뒤쪽 Y 끝점을 계산한다.
         rear.z = base[leg].z + 0.5f * displacement.z;              // 뒤쪽 Z 끝점을 계산한다.
 
-        if (handle->preview_continuous)
+        if (handle->rl_enabled && swing)
+        {
+            feet[leg] = SwingTrajectory_Calculate(progress,
+                                                   &handle->rl_plan.start[leg],
+                                                   &handle->rl_plan.target[leg],
+                                                   handle->rl_plan.height[leg],
+                                                   ROBOT_SWING_RADIAL_OFFSET_M,
+                                                   workspace_leg_angle_rad[leg]);  // 실행과 같은 고정 계획의 Swing을 검사한다.
+        }
+        else if (handle->rl_enabled && !handle->preview_startup_phase)
+        {
+            feet[leg] = StanceTrajectory_Advance(&handle->preview_feet[leg],
+                                                 &handle->gait_preview,
+                                                 progress * ROBOT_GAIT_PHASE_TIME_S);  // 잔차를 더하지 않고 실제 지지점 이동을 검사한다.
+        }
+        else if (handle->preview_continuous)
         {
             if (swing)
             {
@@ -228,6 +246,161 @@ void WorkspaceLimiter_Init(WorkspaceLimiter_Handle_t *handle)
         LegKinematics_GetBaseFeet(handle->current_feet);  // 단독 시험의 기본 시작점을 준비한다.
     }
 }
+
+/* RL 대기 후보와 수동 보행 검사의 재사용을 분리한다. */
+void WorkspaceLimiter_SetRlEnabled(WorkspaceLimiter_Handle_t *handle,
+                                    bool enabled)
+{
+    if ((handle == NULL) || (handle->rl_enabled == enabled))
+    {
+        return;
+    }
+
+    handle->rl_enabled = enabled;           // 새 검사 방식을 선택한다.
+    handle->rl_plan.valid = false;          // 이전 운용의 공개 계획을 폐기한다.
+    handle->rl_action_ready = false;        // 이전 잔차 후보를 폐기한다.
+    handle->rl_plan_rejected = false;       // 이전 거부 상태를 제거한다.
+    handle->preview_active = false;         // 다른 방식의 검사 재사용을 막는다.
+    handle->phase_result_valid = false;     // 다음 이륙은 새 검사를 기다린다.
+    handle->phase_result_accepted = false;  // 이전 위상 허가를 제거한다.
+    handle->gait_applied_step_count = 0U;   // 다른 운용의 두 걸음 기억을 제거한다.
+}
+
+/* 잔차 수신 전에도 변경되지 않는 기본 계획을 전달한다. */
+bool WorkspaceLimiter_GetRlPlan(const WorkspaceLimiter_Handle_t *handle,
+                                 FootTrajectory_Plan_t *plan)
+{
+    if ((handle == NULL) || (plan == NULL) || !handle->rl_enabled || !handle->rl_plan.valid)
+    {
+        return false;
+    }
+
+    *plan = handle->rl_plan;  // 하나의 일관된 기본 계획을 복사한다.
+    return true;
+}
+
+/* 기본 목표를 바꾸지 않고 만료되거나 거부된 후보를 제거한다. */
+void WorkspaceLimiter_CancelRlAction(WorkspaceLimiter_Handle_t *handle)
+{
+    if (handle != NULL)
+    {
+        handle->rl_action_ready = false;        // 같은 기본 계획의 새 잔차를 기다린다.
+        handle->rl_plan_rejected = true;        // 상위 제어에 후보 거부를 알린다.
+        handle->preview_active = false;         // 기존 잔차의 검사를 중단한다.
+        handle->preview_sample = 0U;            // 새 후보를 시작점부터 검사한다.
+        handle->phase_result_valid = false;     // Gait가 같은 계획에서 계속 기다리게 한다.
+        handle->phase_result_accepted = false;  // 만료된 위상의 이륙 허가를 제거한다.
+    }
+}
+
+/* 여섯 다리 값을 검증하고 현재 계획의 Swing 잔차만 한 번 고정한다. */
+bool WorkspaceLimiter_SubmitRlResidual(WorkspaceLimiter_Handle_t *handle,
+                                        uint16_t plan_id,
+                                        uint8_t swing_mask,
+                                        const RobotLegResidual_t residual[ROBOT_LEG_COUNT])
+{
+    uint32_t leg;  // 잔차를 검사할 다리 번호를 저장한다.
+
+    if ((handle == NULL) || (residual == NULL) || !handle->rl_enabled ||
+        !handle->rl_plan.valid || (handle->rl_plan.plan_id != plan_id) ||
+        (handle->rl_plan.swing_mask != swing_mask))
+    {
+        return false;
+    }
+    for (leg = 0U; leg < ROBOT_LEG_COUNT; ++leg)
+    {
+        if (!isfinite(residual[leg].dx) || !isfinite(residual[leg].dy) ||
+            !isfinite(residual[leg].dz) || !isfinite(residual[leg].dh) ||
+            (fabsf(residual[leg].dx) > ROBOT_RL_MAX_DX_M) ||
+            (fabsf(residual[leg].dy) > ROBOT_RL_MAX_DY_M) ||
+            (fabsf(residual[leg].dz) > ROBOT_RL_MAX_DZ_M) ||
+            (fabsf(residual[leg].dh) > ROBOT_RL_MAX_DH_M))
+        {
+            return false;
+        }
+    }
+    if (handle->rl_action_ready || handle->phase_result_accepted)
+    {
+        return false;  // 검사 중이거나 적용한 후보의 덮어쓰기를 차단한다.
+    }
+    for (leg = 0U; leg < ROBOT_LEG_COUNT; ++leg)
+    {
+        handle->rl_plan.target[leg] = handle->rl_plan.nominal[leg];         // 누적되지 않는 원래 목표를 선택한다.
+        handle->rl_plan.height[leg] = handle->rl_plan.nominal_height[leg];  // 누적되지 않는 원래 높이를 선택한다.
+        if ((swing_mask & (uint8_t)(1U << leg)) == 0U)
+        {
+            continue;  // 지지발 잔차를 이번 위상에 사용하지 않는다.
+        }
+        handle->rl_plan.target[leg].x += residual[leg].dx;  // 기본 착지 X에 잔차를 한 번 반영한다.
+        handle->rl_plan.target[leg].y += residual[leg].dy;  // 기본 착지 Y에 잔차를 한 번 반영한다.
+        handle->rl_plan.target[leg].z += residual[leg].dz;  // 기본 착지 Z에 잔차를 한 번 반영한다.
+        handle->rl_plan.height[leg] = fminf(fmaxf(handle->rl_plan.nominal_height[leg] + residual[leg].dh,
+                                                  ROBOT_SWING_HEIGHT_MIN_M),
+                                            ROBOT_SWING_HEIGHT_MAX_M);  // 최종 Swing 높이를 허용 범위로 제한한다.
+    }
+    handle->rl_action_ready = true;         // 한 스냅샷의 잔차 고정을 완료한다.
+    handle->rl_plan_rejected = false;       // 새 후보 검사를 시작한다.
+    handle->preview_sample = 0U;            // 경로 시작점부터 검사한다.
+    handle->preview_active = true;          // 다음 제어 주기에 경로 검사를 허가한다.
+    handle->phase_result_valid = false;     // 전체 통과 전 위상 시작을 보류한다.
+    handle->phase_result_accepted = false;  // 이전 후보의 허가를 제거한다.
+    return true;
+}
+
+/* RL 기본 계획을 먼저 공개하고 잔차를 받은 뒤 같은 경로를 검사한다. */
+static RobotBodyTwist_t WorkspaceLimiter_RlGait(WorkspaceLimiter_Handle_t *handle,
+                                                 const RobotBodyTwist_t *user_candidate,
+                                                 float yaw_feedback_radps,
+                                                 const RobotGaitPhase_t *gait,
+                                                 const RobotEuler_t *posture_rad,
+                                                 bool *accepted)
+{
+    uint32_t sample;  // 이번 제어 주기의 경로 검사량을 제한한다.
+
+    if (gait->next_phase_preview)
+    {
+        WorkspaceLimiter_StartPreview(handle, user_candidate, gait);                             // 실제 시작점과 기본 속도를 고정한다.
+        handle->preview_scale = 1.0f;                                                            // 잔차 기준 속도를 임의 축소하지 않는다.
+        handle->preview_reuses_applied = false;                                                  // 새 기본 계획에 이전 잔차를 재사용하지 않는다.
+        handle->gait_preview = WorkspaceLimiter_ComposeYaw(user_candidate, yaw_feedback_radps);  // 정책에 공개할 전체 속도를 고정한다.
+        FootTrajectory_BuildPlan(&handle->rl_plan, handle->preview_feet,
+                                  &handle->preview_offset_m, &handle->gait_preview,
+                                  handle->preview_pattern, handle->preview_swing_mask);  // 실행과 공유할 기본 끝점과 높이를 생성한다.
+        handle->rl_plan_counter++;                                                       // 기본 계획의 변경을 기록한다.
+        if (handle->rl_plan_counter == 0U)
+        {
+            handle->rl_plan_counter++;  // 계획 없음과 실제 계획 번호를 구분한다.
+        }
+        handle->rl_plan.plan_id = handle->rl_plan_counter;  // 새 기준 목표의 번호를 공개한다.
+        handle->rl_action_ready = false;                    // 이 계획을 참조한 새 잔차를 기다린다.
+        handle->rl_plan_rejected = false;                   // 이전 계획의 거부 상태를 제거한다.
+        handle->preview_active = false;                     // 잔차 전에는 기본 목표만 공개한다.
+    }
+
+    *accepted = false;  // 대기 중 사용자 명령을 미적용으로 표시한다.
+    for (sample = 0U; handle->preview_active &&
+         (sample < WORKSPACE_RL_SAMPLES_PER_CYCLE); ++sample)
+    {
+        if (!WorkspaceLimiter_PreviewPoint(handle, posture_rad))
+        {
+            WorkspaceLimiter_CancelRlAction(handle);  // 기준을 몰래 바꾸지 않고 같은 계획의 새 후보를 기다린다.
+            break;
+        }
+        handle->preview_sample++;  // 통과한 중간 지점을 기록한다.
+        if (handle->preview_sample >= WORKSPACE_RL_SAMPLE_COUNT)
+        {
+            handle->gait_applied = handle->rl_plan.twist;       // 검증한 계획의 속도를 실행에 전달한다.
+            handle->gait_requested = handle->gait_pending;      // 계획에 사용한 사용자 명령을 기록한다.
+            handle->applied_pattern = handle->preview_pattern;  // 검사한 보행 패턴을 기록한다.
+            handle->preview_active = false;                     // 모든 경로 지점의 검사를 완료한다.
+            handle->phase_result_valid = true;                  // 완료한 검사 결과를 Gait에 전달한다.
+            handle->phase_result_accepted = true;               // 신선도 확인 후 위상 시작을 허가한다.
+        }
+    }
+    *accepted = handle->phase_result_accepted;  // 전체 경로 검사를 통과한 경우만 채택한다.
+    return handle->gait_applied;
+}
+
 
 /* 다음 위상 검사에 사용할 실제 발 목표와 몸체 보정을 전달한다. */
 void WorkspaceLimiter_SetFeet(WorkspaceLimiter_Handle_t *handle,
@@ -294,6 +467,11 @@ RobotBodyTwist_t WorkspaceLimiter_Gait(WorkspaceLimiter_Handle_t *handle,
         memset(handle, 0, sizeof(*handle));  // Reset에서 보행 검사 상태를 제거한다.
         *accepted = true;                    // 0 명령 적용을 완료 상태로 표시한다.
         return zero;
+    }
+    else if (manual_enable && handle->rl_enabled)
+    {
+        return WorkspaceLimiter_RlGait(handle, user_candidate, yaw_feedback_radps,
+                                        gait, posture_rad, accepted);  // 공개 계획과 잔차를 함께 고정해 검사한다.
     }
     else if (manual_enable)
     {

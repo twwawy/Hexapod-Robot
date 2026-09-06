@@ -16,6 +16,8 @@ typedef enum
     ALGORITHM_TEST_MODE_TRANSITION,        // 모드 전환 연속성을 검사한다.
     ALGORITHM_TEST_SAFETY,                 // Fault Latch를 검사한다.
     ALGORITHM_TEST_COMMUNICATION,          // 관제 패킷 생성을 검사한다.
+    ALGORITHM_TEST_RL_INPUT,               // 강화학습 입력의 신선도와 범위를 검사한다.
+    ALGORITHM_TEST_RL_STOP,                // 새 이륙 없는 강화학습 정지를 검사한다.
     ALGORITHM_TEST_COUNT
 } AlgorithmTestStep_t;
 

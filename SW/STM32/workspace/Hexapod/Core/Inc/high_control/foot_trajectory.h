@@ -5,12 +5,30 @@
 
 typedef struct
 {
+    RobotVec3_t start[ROBOT_LEG_COUNT];       // 검사 시작 순간의 발 위치를 저장한다.
+    RobotVec3_t nominal[ROBOT_LEG_COUNT];     // 잔차 적용 전 착지 목표를 저장한다.
+    RobotVec3_t target[ROBOT_LEG_COUNT];      // 검사와 실행이 공유할 착지 목표를 저장한다.
+    float nominal_height[ROBOT_LEG_COUNT];   // 잔차 적용 전 Swing 높이를 저장한다.
+    float height[ROBOT_LEG_COUNT];           // 검사와 실행이 공유할 Swing 높이를 저장한다.
+    RobotBodyTwist_t twist;                  // 기본 계획을 만든 위상 속도를 저장한다.
+    uint16_t plan_id;                        // 기본 계획의 변경 번호를 저장한다.
+    uint8_t swing_mask;                      // 이번 계획에 잔차를 적용할 다리를 저장한다.
+    bool valid;                             // 공개 가능한 계획의 존재를 저장한다.
+} FootTrajectory_Plan_t;
+
+typedef struct
+{
     RobotVec3_t body_offset_m;                       // 보정 모드 몸체 Offset을 저장한다.
     RobotVec3_t memory[ROBOT_LEG_COUNT];             // 다리별 연속 발 위치를 저장한다.
     RobotVec3_t swing_start[ROBOT_LEG_COUNT];        // 사용자 정의 Swing 시작점을 저장한다.
     RobotVec3_t recovery_start[ROBOT_LEG_COUNT];     // 복구 Swing 시작점을 저장한다.
 
     RobotBodyTwist_t phase_twist;                     // 현재 위상에 고정한 보행 속도를 저장한다.
+    FootTrajectory_Plan_t pending_plan;                // 검증을 통과한 다음 위상 계획을 저장한다.
+    FootTrajectory_Plan_t active_plan;                 // 현재 Swing에 고정한 계획을 저장한다.
+    uint16_t active_plan_id;                           // 실제 이륙에 사용한 계획 번호를 저장한다.
+    uint8_t active_plan_mask;                          // 실제 잔차를 적용한 다리를 저장한다.
+    bool active_plan_valid;                           // 실제 RL 위상 적용 이력을 저장한다.
 
     float landing_target_z[ROBOT_LEG_COUNT];         // 다리별 정상 착지 Z를 저장한다.
     float previous_progress[ROBOT_LEG_COUNT];        // 위상 정지 중 지지발 적분을 막을 진행률을 저장한다.
@@ -32,6 +50,18 @@ typedef struct
 } FootTrajectory_Handle_t;
 
 void FootTrajectory_Init(FootTrajectory_Handle_t *handle);  // 발 위치와 보정 Offset을 초기화한다.
+
+void FootTrajectory_BuildPlan(FootTrajectory_Plan_t *plan,
+                               const RobotVec3_t feet[ROBOT_LEG_COUNT],
+                               const RobotVec3_t *body_offset_m,
+                               const RobotBodyTwist_t *twist,
+                               RobotGaitPattern_t pattern,
+                               uint8_t swing_mask);  // 다음 위상의 기본 착지점과 높이를 계산한다.
+
+bool FootTrajectory_SetPlan(FootTrajectory_Handle_t *handle,
+                             const FootTrajectory_Plan_t *plan);  // 검증된 계획을 다음 이륙까지 보관한다.
+
+void FootTrajectory_CancelPlan(FootTrajectory_Handle_t *handle);  // 진행 중 Swing을 보존하며 대기 계획을 취소한다.
 
 bool FootTrajectory_LatchTouchdown(FootTrajectory_Handle_t *handle,
                                    uint8_t leg,

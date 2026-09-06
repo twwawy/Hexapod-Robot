@@ -46,6 +46,26 @@ typedef struct
     float wz;   // Yaw 각속도를 저장한다.
 } RobotBodyTwist_t;
 
+typedef struct
+{
+    float dx;  // 기본 착지 X의 잔차를 m로 저장한다.
+    float dy;  // 기본 착지 Y의 잔차를 m로 저장한다.
+    float dz;  // 기본 착지 Z의 잔차를 m로 저장한다.
+    float dh;  // 기본 Swing 높이의 잔차를 m로 저장한다.
+} RobotLegResidual_t;
+
+typedef struct
+{
+    RobotEuler_t posture_reference_rad;             // 몸체 절대 자세 목표를 저장한다.
+    RobotLegResidual_t residual[ROBOT_LEG_COUNT];  // 여섯 다리의 착지·높이 잔차를 저장한다.
+    uint32_t session_id;                            // 현재 운용 세션을 식별한다.
+    uint16_t observation_sequence;                  // 추론에 사용한 관측 순번을 저장한다.
+    uint16_t sequence;                              // 새 정책 결과의 순번을 저장한다.
+    uint16_t plan_id;                               // 잔차를 적용할 기본 계획을 식별한다.
+    uint8_t swing_mask;                             // 이번 계획에서 이동할 다리를 저장한다.
+    bool leg_plan_valid;                            // 다리 계획을 포함한 명령인지 저장한다.
+} RobotRlAction_t;
+
 typedef enum
 {
     ROBOT_MODE_LANDING = 0,     // 착지 모드를 나타낸다.
@@ -56,7 +76,8 @@ typedef enum
     ROBOT_MODE_FAULT,           // 고장 모드를 나타낸다.
     ROBOT_MODE_KILL,            // 긴급 차단 모드를 나타낸다.
     ROBOT_MODE_ARM,             // SC 매니퓰레이터 모드를 나타낸다.
-    ROBOT_MODE_AUTONOMOUS       // 추후 자율주행 모드를 예약한다.
+    ROBOT_MODE_AUTONOMOUS,      // 추후 자율주행 모드를 예약한다.
+    ROBOT_MODE_RL              // SB 첫 위치의 강화학습 보행을 나타낸다.
 } RobotControlMode_t;
 
 typedef enum
@@ -160,6 +181,10 @@ typedef struct
     RobotGaitPattern_t gait_pattern;          // 요청한 정상 보행 패턴을 저장한다.
     bool posture_enable;                      // 자세 제어 활성화를 저장한다.
     bool manual_enable;                       // 수동 모드 활성화를 저장한다.
+    bool rl_enable;                           // 강화학습 명령원 활성화를 저장한다.
+    bool locomotion_enable;                   // 수동·강화학습 공통 보행 허가를 저장한다.
+    bool hold_feet;                           // 모드 전환 후 현재 발 위치 유지를 요청한다.
+    bool posture_return;                      // 자세 명령의 연속적인 영점 복귀를 요청한다.
     bool correction_enable;                   // 보정 모드 활성화를 저장한다.
     bool body_control_enable;                 // 몸체 피드백 활성화를 저장한다.
     float posture_progress;                   // 서기 진행률을 저장한다.

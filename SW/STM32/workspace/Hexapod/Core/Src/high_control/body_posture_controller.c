@@ -108,7 +108,25 @@ BodyPostureController_Output_t BodyPostureController_Step(
         memset(&handle->integral, 0, sizeof(handle->integral));        // 자세 적분을 제거한다.
         handle->correction_yaw_base_rad = measured_rad->yaw;           // 현재 Yaw를 보정 기준으로 저장한다.
     }
-    else if (drone->manual_enable)
+    else if (drone->posture_return)
+    {
+        candidate.roll = BodyPosture_MoveToward(handle->command_rad.roll,
+                                                0.0f, POSTURE_RATE_MAX * ROBOT_CONTROL_PERIOD_S);  // Roll 명령을 연속 복귀시킨다.
+        candidate.pitch = BodyPosture_MoveToward(handle->command_rad.pitch,
+                                                 0.0f, POSTURE_RATE_MAX * ROBOT_CONTROL_PERIOD_S);  // Pitch 명령을 연속 복귀시킨다.
+        candidate.yaw = BodyPosture_MoveToward(handle->command_rad.yaw,
+                                               0.0f, POSTURE_RATE_MAX * ROBOT_CONTROL_PERIOD_S);  // Yaw 명령을 연속 복귀시킨다.
+        if (WorkspaceLimiter_AllFeetValid(feet_body, &candidate))
+        {
+            handle->command_rad = candidate;                       // 유효한 복귀 자세를 채택한다.
+            memset(&handle->integral, 0, sizeof(handle->integral));  // 이전 자세의 적분을 제거한다.
+        }
+        else
+        {
+            output.accepted = false;  // 불가능한 복귀에서 직전 자세를 유지한다.
+        }
+    }
+    else if (drone->manual_enable || drone->locomotion_enable)
     {
         const float roll_error = BodyPosture_WrapPi(
             drone->posture_reference_rad.roll - measured_rad->roll);  // Roll 오차를 계산한다.
@@ -212,7 +230,7 @@ BodyPostureController_Output_t BodyPostureController_Step(
 
     output.targets.command_accepted = output.accepted;  // 자세 채택 상태를 발 출력에 기록한다.
     output.command_rad = handle->command_rad;           // 실제 자세 명령을 반환한다.
-    handle->previous_manual = drone->manual_enable;     // 다음 수동 진입 검출을 위해 저장한다.
+    handle->previous_manual = drone->manual_enable || drone->locomotion_enable;  // 다음 정상 보행 진입을 검출한다.
     handle->previous_correction = drone->correction_enable;  // 다음 보정 진입 검출을 위해 저장한다.
     return output;
 }

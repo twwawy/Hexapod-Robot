@@ -19,6 +19,7 @@ typedef struct
     bool initialized;                            // 정상 보행 초기화 여부를 저장한다.
     bool run_enable;                             // 내부 보행 활성화를 저장한다.
     bool stop_pending;                           // 현재 Swing 착지 후 정지 요청을 저장한다.
+    bool stop_after_landing;                    // 현재 발 착지 이후 새 Swing 차단을 저장한다.
     bool resume_phase;                           // 정지 자세에서 다음 위상 재개 여부를 저장한다.
     bool next_phase_enable;                      // 착륙 시점의 보행 Enable을 저장한다.
     bool next_phase_locked;                      // 다음 위상 결정 완료 여부를 저장한다.
@@ -30,6 +31,9 @@ void GaitManager_Init(GaitManager_Handle_t *handle);  // 기본 Tripod 보행을
 
 void GaitManager_SetPattern(GaitManager_Handle_t *handle,
                             RobotGaitPattern_t requested_pattern);  // 착지 뒤 적용할 보행 패턴을 예약한다.
+
+void GaitManager_SetStopAfterLanding(GaitManager_Handle_t *handle,
+                                    bool stop_after_landing);  // 현재 위상만 마친 뒤 정상 보행을 차단한다.
 
 RobotGaitPhase_t GaitManager_Step(GaitManager_Handle_t *handle,
                                   bool normal_mode_enable,

@@ -19,6 +19,8 @@ static bool ModeTransitionTest_CheckSwitchFunctions(void)
 
     memset(&user, 0, sizeof(user));        // 모든 사용자 입력을 해제한다.
     memset(&safety, 0, sizeof(safety));    // Fault 없는 상태를 준비한다.
+    user.connected = true;                // 정상 조종기 연결을 준비한다.
+    user.motion_armed = true;             // 입력 전처리의 동작 허가를 준비한다.
     ControlPriority_Init(&control);        // 우선순위 상태를 착지로 초기화한다.
     (void)ControlPriority_Step(&control, &user, false, false, &safety);  // 새 서기 요청을 무장한다.
     user.sb = 1U;                          // 서기 유지 위치를 선택한다.
@@ -77,8 +79,17 @@ static bool ModeTransitionTest_CheckSwitchFunctions(void)
     }
 
     user.sb = 0U;  // SB 첫 위치를 선택한다.
-    output = ControlPriority_Step(&control, &user, true, false, &safety);  // SB 무기능 위치를 적용한다.
-    if (output.active_mode != ROBOT_MODE_ARM)
+    output = ControlPriority_Step(&control, &user, true, false, &safety);  // 강화학습 진입 중립 확인을 시작한다.
+    if (output.active_mode != ROBOT_MODE_READY)
+    {
+        return false;
+    }
+
+    for (cycle = 0U; cycle < 41U; ++cycle)
+    {
+        output = ControlPriority_Step(&control, &user, true, false, &safety);  // 새 진입 중립 시간을 누적한다.
+    }
+    if (output.active_mode != ROBOT_MODE_RL)
     {
         return false;
     }
@@ -102,6 +113,205 @@ static bool ModeTransitionTest_CheckSwitchFunctions(void)
     user.sb = 2U;  // SB 끝의 착지를 선택한다.
     output = ControlPriority_Step(&control, &user, true, false, &safety);  // 착지 전환을 적용한다.
     return output.active_mode == ROBOT_MODE_LANDING;  // SB 끝 착지가 유지되는지 확인한다.
+}
+
+/* 강화학습 진입 허가와 상위 안전 요청의 우선순위를 검사한다. */
+static bool ModeTransitionTest_CheckRlPriority(void)
+{
+    ControlPriority_Handle_t control;                 // 강화학습 우선순위 상태를 저장한다.
+    RobotUserCommand_t user;                          // 조종기 입력과 연결 상태를 저장한다.
+    RobotSafetyOutput_t safety;                       // 시험할 안전 요청을 저장한다.
+    RobotPriorityOutput_t output;                     // 모드 선택 결과를 저장한다.
+    uint32_t cycle;                                   // 중립 유지 횟수를 저장한다.
+
+    memset(&user, 0, sizeof(user));      // SB 첫 위치와 중립을 준비한다.
+    memset(&safety, 0, sizeof(safety));  // 정상 안전 상태를 준비한다.
+    ControlPriority_Init(&control);      // 부팅 직후 착지 상태를 준비한다.
+    user.connected = true;               // 정상 조종기 연결을 준비한다.
+    user.motion_armed = true;            // 입력 동작 허가를 준비한다.
+
+    for (cycle = 0U; cycle < 50U; ++cycle)
+    {
+        output = ControlPriority_Step(&control, &user, false, true, &safety);  // 부팅 직후 SB 첫 위치를 유지한다.
+        if (output.active_mode != ROBOT_MODE_LANDING)
+        {
+            return false;
+        }
+    }
+
+    user.sb = 1U;                                                           // 명시적으로 서기를 요청한다.
+    output = ControlPriority_Step(&control, &user, false, false, &safety);  // 서기 상태로 진입한다.
+    if (output.active_mode != ROBOT_MODE_STAND)
+    {
+        return false;
+    }
+
+    user.sb = 0U;                                                           // 서기 완료 전에 강화학습을 선택한다.
+    output = ControlPriority_Step(&control, &user, false, false, &safety);  // 서기 완료까지 기다린다.
+    if (output.active_mode != ROBOT_MODE_STAND)
+    {
+        return false;
+    }
+
+    user.connected = false;                                                    // 조종기 연결이 끊긴 상태를 준비한다.
+    for (cycle = 0U; cycle < 50U; ++cycle)
+    {
+        output = ControlPriority_Step(&control, &user, true, false, &safety);  // 연결 없이 서기 완료를 전달한다.
+    }
+    if ((output.active_mode != ROBOT_MODE_READY) || control.motion_armed)
+    {
+        return false;
+    }
+
+    user.connected = true;                                                 // 조종기 연결을 복구한다.
+    user.motion_armed = false;                                             // 입력 무장은 아직 차단한다.
+    output = ControlPriority_Step(&control, &user, true, false, &safety);  // 연결만으로 진입하지 않는지 확인한다.
+    if ((output.active_mode != ROBOT_MODE_READY) || control.motion_armed)
+    {
+        return false;
+    }
+
+    user.motion_armed = true;                                                  // 입력 무장을 허가한다.
+    user.throttle = 1000;                                                      // 중립이 아닌 전진 입력을 준비한다.
+    for (cycle = 0U; cycle < 50U; ++cycle)
+    {
+        output = ControlPriority_Step(&control, &user, true, false, &safety);  // 비중립 진입 차단을 확인한다.
+    }
+    if ((output.active_mode != ROBOT_MODE_READY) || control.motion_armed)
+    {
+        return false;
+    }
+
+    user.throttle = 0;                                                         // 새 진입을 위해 중립으로 돌린다.
+    for (cycle = 0U; cycle < 41U; ++cycle)
+    {
+        output = ControlPriority_Step(&control, &user, true, false, &safety);  // 필요한 중립 시간을 유지한다.
+    }
+    if (output.active_mode != ROBOT_MODE_RL)
+    {
+        return false;
+    }
+
+    user.throttle = -800;                                                          // 부호가 있는 후진 입력을 준비한다.
+    user.yaw = 600;                                                                // 양의 회전 짐벌을 준비한다.
+    user.roll = 1000;                                                              // 강화학습에서 제외할 Roll을 준비한다.
+    user.pitch = -1000;                                                            // 강화학습에서 제외할 Pitch를 준비한다.
+    user.s1 = ROBOT_WALK_WAVE_TURN;                                                // 강화학습에서 제외할 Wave 선택을 준비한다.
+    for (user.sc = 0U; user.sc <= 2U; ++user.sc)
+    {
+        output = ControlPriority_Step(&control, &user, true, false, &safety);      // SB가 세 SC 선택보다 우선하는지 확인한다.
+        if ((output.active_mode != ROBOT_MODE_RL) || (output.throttle != -800) ||
+            (output.yaw != 600) || (output.roll != 0) || (output.pitch != 0) ||
+            (output.s1 != ROBOT_WALK_TRIPOD_TURN))
+        {
+            return false;
+        }
+    }
+
+    user.se = 1U;                                                           // 강화학습 중 READY를 요청한다.
+    output = ControlPriority_Step(&control, &user, true, false, &safety);   // READY가 강화학습을 차단하는지 확인한다.
+    if ((output.active_mode != ROBOT_MODE_READY) || !output.reset_command)
+    {
+        return false;
+    }
+
+    user.se = 0U;                                                          // READY 요청을 해제한다.
+    ControlPriority_DisarmMotion(&control);                                // 정책 오류 후 입력 허가를 제거한다.
+    output = ControlPriority_Step(&control, &user, true, false, &safety);  // 비중립 상태의 재개를 차단한다.
+    if ((output.active_mode != ROBOT_MODE_READY) || control.motion_armed)
+    {
+        return false;
+    }
+
+    user.sb = 2U;                                                          // 강화학습 선택 후 착지를 요청한다.
+    output = ControlPriority_Step(&control, &user, true, false, &safety);  // 착지가 중립 허가보다 우선하는지 확인한다.
+    if (output.active_mode != ROBOT_MODE_LANDING)
+    {
+        return false;
+    }
+
+    user.sb = 0U;                                                          // 강화학습을 다시 선택한다.
+    safety.rollover_fault = true;                                          // 전도 Fault를 입력한다.
+    output = ControlPriority_Step(&control, &user, true, false, &safety);  // Fault가 강화학습을 차단하는지 확인한다.
+    if (output.active_mode != ROBOT_MODE_FAULT)
+    {
+        return false;
+    }
+
+    user.sd = 1U;                                                          // Fault와 함께 Kill을 요청한다.
+    output = ControlPriority_Step(&control, &user, true, false, &safety);  // Kill의 최상위 우선순위를 확인한다.
+    return output.active_mode == ROBOT_MODE_KILL;                          // 최종 차단 모드를 확인한다.
+}
+
+/* 강화학습의 두 축 속도와 고정 보행 및 필터 전환을 검사한다. */
+static bool ModeTransitionTest_CheckRlDrone(void)
+{
+    DroneController_Handle_t controller;           // 시험용 필터와 모드 상태를 저장한다.
+    RobotPriorityOutput_t priority;                // 직접 전달할 모드 입력을 저장한다.
+    RobotDroneOutput_t output;                     // 강화학습 제어 결과를 저장한다.
+    bool contact[ROBOT_LEG_COUNT];                 // 여섯 발의 정상 접촉을 저장한다.
+    float previous_wz_radps;                       // S1 변경 직전 회전 속도를 저장한다.
+    uint32_t cycle;                                // 필터 진행 주기를 저장한다.
+
+    memset(&priority, 0, sizeof(priority));                                 // 중립 입력을 준비한다.
+    memset(contact, 1, sizeof(contact));                                    // 전체 접촉을 준비한다.
+    DroneController_Init(&controller);                                      // 이전 제어 상태를 제거한다.
+    priority.active_mode = ROBOT_MODE_MANUAL;                               // 기존 수동 필터를 준비한다.
+    priority.throttle = 1000;                                               // 전진 잔류값을 만든다.
+    priority.yaw = -1000;                                                   // 회전 잔류값을 만든다.
+    priority.roll = 1000;                                                   // Roll 잔류값을 만든다.
+    priority.pitch = -1000;                                                 // Pitch 잔류값을 만든다.
+    for (cycle = 0U; cycle < 40U; ++cycle)
+    {
+        (void)DroneController_Step(&controller, &priority, contact, 0.2f);  // 수동 필터를 누적한다.
+    }
+
+    priority.active_mode = ROBOT_MODE_RL;                                               // 강화학습 모드로 전환한다.
+    priority.throttle = 0;                                                              // 새 전진 입력을 제거한다.
+    priority.yaw = 0;                                                                   // 새 회전 입력을 제거한다.
+    output = DroneController_Step(&controller, &priority, contact, 0.2f);               // 강화학습 첫 출력을 계산한다.
+    if (!output.rl_enable || !output.locomotion_enable || output.manual_enable ||
+        !output.body_control_enable || !output.posture_enable || !output.stand_done ||
+        (output.vx_user_mps != 0.0f) || (output.wz_user_radps != 0.0f) ||
+        (output.posture_reference_rad.roll != 0.0f) ||
+        (output.posture_reference_rad.pitch != 0.0f) || output.tripod_enable)
+    {
+        return false;
+    }
+
+    priority.throttle = -1000;                                                 // 최대 후진 입력을 준비한다.
+    priority.yaw = 1000;                                                       // 반전되는 회전 입력을 준비한다.
+    priority.s1 = ROBOT_WALK_TRIPOD_LATERAL;                                   // 제외할 횡이동 선택을 준비한다.
+    for (cycle = 0U; cycle < 40U; ++cycle)
+    {
+        output = DroneController_Step(&controller, &priority, contact, 0.2f);  // 강화학습 속도를 필터링한다.
+    }
+    if ((output.vx_user_mps >= -ROBOT_GAIT_LINEAR_THRESHOLD_MPS) ||
+        (output.wz_user_radps >= -ROBOT_GAIT_YAW_THRESHOLD_RADPS) ||
+        (output.vy_user_mps != 0.0f) || !output.tripod_enable ||
+        (output.gait_pattern != ROBOT_GAIT_TRIPOD) ||
+        (output.posture_reference_rad.roll != 0.0f) ||
+        (output.posture_reference_rad.pitch != 0.0f))
+    {
+        return false;
+    }
+
+    previous_wz_radps = output.wz_user_radps;                                        // 고정 패턴 확인용 속도를 저장한다.
+    priority.s1 = ROBOT_WALK_WAVE_TURN;                                              // Wave 선택으로 변경한다.
+    output = DroneController_Step(&controller, &priority, contact, 0.2f);            // S1 변경 후에도 Tripod를 유지한다.
+    if ((output.gait_pattern != ROBOT_GAIT_TRIPOD) ||
+        (output.wz_user_radps > previous_wz_radps) || (output.vy_user_mps != 0.0f))
+    {
+        return false;
+    }
+
+    memset(&priority, 0, sizeof(priority));                                          // 모든 짐벌을 중립으로 만든다.
+    priority.active_mode = ROBOT_MODE_MANUAL;                                        // 수동 모드로 복귀한다.
+    output = DroneController_Step(&controller, &priority, contact, 0.2f);            // 강화학습 잔류 필터를 제거한다.
+    return output.manual_enable && output.locomotion_enable && !output.rl_enable &&
+           (output.vx_user_mps == 0.0f) && (output.wz_user_radps == 0.0f) &&
+           (output.posture_reference_rad.roll == 0.0f) &&
+           (output.posture_reference_rad.pitch == 0.0f);                             // 모드 복귀 시 이전 속도·자세 입력 차단을 확인한다.
 }
 
 /* 보정 자세가 ARM을 거친 뒤 수동 모드에서도 유지되는지 검사한다. */
@@ -219,13 +429,17 @@ static bool ModeTransitionTest_CheckCorrectionPostureMemory(void)
 /* 짐벌 기능이 바뀌는 모드와 S1 전환에서 잔류 명령을 검사한다. */
 bool ModeTransitionTest_Run(void)
 {
-    DroneController_Handle_t controller;       // 시험용 Drone Controller를 저장한다.
+    DroneController_Handle_t controller;        // 시험용 Drone Controller를 저장한다.
+    DroneController_Handle_t fresh_controller;  // 이전 모드 이력이 없는 비교 제어기를 저장한다.
     RobotPriorityOutput_t priority;             // 명시적 모드와 짐벌 입력을 저장한다.
     RobotDroneOutput_t output;                  // 제어 결과를 저장한다.
+    RobotDroneOutput_t fresh_output;            // 새 제어기의 동일 입력 결과를 저장한다.
     bool contact[ROBOT_LEG_COUNT];              // 명시적 접촉 상태를 저장한다.
     uint32_t cycle;                             // 필터 진행 횟수를 저장한다.
 
     if (!ModeTransitionTest_CheckSwitchFunctions() ||
+        !ModeTransitionTest_CheckRlPriority() ||
+        !ModeTransitionTest_CheckRlDrone() ||
         !ModeTransitionTest_CheckCorrectionMemory() ||
         !ModeTransitionTest_CheckCorrectionPostureMemory())
     {
@@ -250,8 +464,12 @@ bool ModeTransitionTest_Run(void)
 
     priority.active_mode = ROBOT_MODE_CORRECTION;  // 짐벌 기능을 보정으로 바꾼다.
     output = DroneController_Step(&controller, &priority, contact, 0.0f);  // 새 모드 첫 출력을 계산한다.
-    if ((fabsf(output.correction_velocity_mps.x) > 0.01f) ||
-        (fabsf(output.correction_velocity_mps.z) > 0.01f))
+    DroneController_Init(&fresh_controller);  // 이전 모드의 필터가 없는 기준을 준비한다.
+    fresh_output = DroneController_Step(&fresh_controller, &priority, contact, 0.0f);  // 동일한 첫 보정 입력을 계산한다.
+    if ((fabsf(output.correction_velocity_mps.x - fresh_output.correction_velocity_mps.x) > 0.0000001f) ||
+        (fabsf(output.correction_velocity_mps.y - fresh_output.correction_velocity_mps.y) > 0.0000001f) ||
+        (fabsf(output.correction_velocity_mps.z - fresh_output.correction_velocity_mps.z) > 0.0000001f) ||
+        (fabsf(output.posture_reference_rad.yaw - fresh_output.posture_reference_rad.yaw) > 0.0000001f))
     {
         return false;
     }

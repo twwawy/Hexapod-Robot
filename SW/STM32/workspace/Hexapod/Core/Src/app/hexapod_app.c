@@ -5,6 +5,7 @@
 #include "low_control/relay.h"
 #include "test/rc_command_generator.h"
 
+#include <math.h>
 #include <stddef.h>
 #include <string.h>
 
@@ -152,7 +153,8 @@ static RobotUserCommand_t HexapodApp_LimitUserCommand(const HexapodApp_Handle_t 
         limited.sc = 0U;       // Reset 명령을 차단한다.
         limited.se = 1U;       // 수동·보정 모드를 차단한다.
     }
-    else if (!handle->bringup.walking_allowed && (limited.sc != 2U))
+    else if (!handle->bringup.walking_allowed &&
+             ((limited.sc != 2U) || (limited.sb == 0U)))
     {
         limited.se = 1U;       // 4단계에서 수동 모드를 READY로 바꾼다.
         limited.throttle = 0;  // READY의 잔류 이동 명령을 제거한다.
@@ -162,6 +164,286 @@ static RobotUserCommand_t HexapodApp_LimitUserCommand(const HexapodApp_Handle_t 
     }
 
     return limited;
+}
+
+/* 아직 이륙하지 않은 강화학습 후보만 취소한다. */
+static void HexapodApp_CancelRlCandidate(HexapodApp_Handle_t *handle)
+{
+    WorkspaceLimiter_CancelRlAction(&handle->workspace_limiter);  // 진행 중인 경로 검사를 취소한다.
+    FootTrajectory_CancelPlan(&handle->foot_trajectory);          // 다음 Swing의 대기 계획을 제거한다.
+    handle->rl.candidate_valid = false;                           // 후보의 신선도 이력을 제거한다.
+}
+
+/* 여섯 발의 확정 접촉을 확인한다. */
+static bool HexapodApp_AllFeetContact(const HexapodApp_Handle_t *handle)
+{
+    uint32_t leg;  // 착지 확인 다리를 저장한다.
+
+    for (leg = 0U; leg < ROBOT_LEG_COUNT; ++leg)
+    {
+        if (!handle->sensor_snapshot.foot_contact[leg])
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
+/* 모든 발의 착지와 자세 명령 복귀 완료를 확인한다. */
+static bool HexapodApp_RlDrainComplete(const HexapodApp_Handle_t *handle)
+{
+    if (handle->gait_manager.run_enable || handle->gait_manager.initialized ||
+        handle->gait.late_landing_hold || handle->gait.support_recovery_active ||
+        (fabsf(handle->posture_control.command_rad.roll) > 0.00001f) ||
+        (fabsf(handle->posture_control.command_rad.pitch) > 0.00001f) ||
+        (fabsf(handle->posture_control.command_rad.yaw) > 0.00001f))
+    {
+        return false;
+    }
+    return HexapodApp_AllFeetContact(handle);  // 접촉 복구 전에는 종료하지 않는다.
+}
+
+/* RL 진입·오류·종료를 현재 발 궤적과 연결한다. */
+static void HexapodApp_SelectRlMode(HexapodApp_Handle_t *handle,
+                                    const RobotUserCommand_t *user,
+                                    bool sensor_updated,
+                                    uint32_t now_ms)
+{
+    RobotRlAction_t action;                                      // 최신 정책의 신선도를 확인한다.
+    const bool was_rl = handle->drone.rl_enable;                 // 직전 제어의 명령원을 확인한다.
+    const bool was_manual = handle->drone.manual_enable;         // 기존 수동 궤적의 정지를 판별한다.
+    const bool allowed = handle->bringup.walking_allowed &&
+        (handle->startup_zero_state == HEXAPOD_STARTUP_ZERO_COMPLETE) &&
+        user->connected && user->motion_armed && sensor_updated &&
+        handle->sensor_snapshot.imu.valid &&
+        ((uint32_t)(now_ms - handle->sensor_snapshot.imu.timestamp_ms) <= ROBOT_RL_ACTION_TIMEOUT_MS);  // RL 실행 조건을 확인한다.
+    const bool expired = handle->rl.input.session_active &&
+        handle->rl.input.has_received_action &&
+        !RlController_GetAction(&handle->rl.input, &action, now_ms);  // 첫 대기와 통신 만료를 구분한다.
+    const bool hard_stop = (handle->priority.active_mode == ROBOT_MODE_KILL) ||
+        (handle->priority.active_mode == ROBOT_MODE_FAULT);            // 즉시 차단 조건을 확인한다.
+
+    if (hard_stop)
+    {
+        RlController_EndSession(&handle->rl.input);             // 차단 전의 명령을 폐기한다.
+        HexapodApp_CancelRlCandidate(handle);                   // 다음 이륙 후보를 폐기한다.
+        WorkspaceLimiter_SetRlEnabled(&handle->workspace_limiter, false);  // RL 검사 경로를 종료한다.
+        GaitManager_SetStopAfterLanding(&handle->gait_manager, false);     // 기존 Fault 처리로 넘긴다.
+        handle->rl.stopping = false;                           // 일반 정지 절차를 중단한다.
+        handle->rl.rearm_required = true;                      // 새 SB 입력을 요구한다.
+        handle->rl.hold_after_exit = false;                    // 전원 차단의 기존 동작을 유지한다.
+        handle->rl.state = HEXAPOD_RL_BLOCKED;                  // 차단 상태를 기록한다.
+        return;
+    }
+
+    if ((user->sb != 0U) && !handle->rl.stopping)
+    {
+        handle->rl.rearm_required = false;  // RL 밖으로 옮긴 스위치 입력을 확인한다.
+    }
+    if ((handle->priority.active_mode == ROBOT_MODE_RL) &&
+        (!allowed || handle->rl.rearm_required))
+    {
+        handle->priority.active_mode = ROBOT_MODE_READY;  // 실행 조건이 없는 RL 진입을 차단한다.
+    }
+    if (was_rl && (expired || !allowed || handle->gait.late_landing_hold))
+    {
+        handle->rl.rearm_required = true;                  // 오류 복구 뒤 자동 재출발을 막는다.
+        handle->priority.active_mode = ROBOT_MODE_READY;  // 현재 착지 이후 정지를 요청한다.
+        ControlPriority_DisarmMotion(&handle->priority_control);  // 다음 진입에서 중립을 다시 확인한다.
+    }
+
+    if (!handle->rl.stopping &&
+        ((was_rl && (handle->priority.active_mode != ROBOT_MODE_RL)) ||
+         (was_manual && (user->sb == 0U) &&
+          (handle->priority.active_mode != ROBOT_MODE_MANUAL))))
+    {
+        handle->rl.stopping = true;                                     // 기존 궤적의 종료를 시작한다.
+        handle->rl.drain_mode = was_rl ? ROBOT_MODE_RL : ROBOT_MODE_MANUAL;  // 착지할 기존 명령원을 유지한다.
+        handle->rl.drain_pattern = handle->drone.gait_pattern;           // 착지 중 보행 패턴을 고정한다.
+        RlController_EndSession(&handle->rl.input);                      // 종료한 세션의 추가 입력을 거부한다.
+        HexapodApp_CancelRlCandidate(handle);                            // 다음 이륙만 취소한다.
+        GaitManager_SetStopAfterLanding(&handle->gait_manager, true);    // 반대 Tripod의 추가 보행을 차단한다.
+    }
+    if (handle->rl.stopping)
+    {
+        if (handle->gait.late_landing_hold && (user->sb != 0U) &&
+            HexapodApp_AllFeetContact(handle))
+        {
+            GaitManager_SetStopAfterLanding(&handle->gait_manager, false);  // 접촉 복구와 SB 해제 후 기존 Hold 해제를 허가한다.
+        }
+        if (!HexapodApp_RlDrainComplete(handle))
+        {
+            handle->priority.active_mode = handle->rl.drain_mode;  // 현재 착지까지 기존 제어 경로를 유지한다.
+            handle->priority.throttle = 0;                         // 새 전후 명령을 차단한다.
+            handle->priority.yaw = 0;                              // 새 회전 명령을 차단한다.
+            handle->priority.roll = 0;                             // 자세 복귀 중 조종 입력을 차단한다.
+            handle->priority.pitch = 0;                            // 자세 복귀 중 조종 입력을 차단한다.
+            handle->priority.reset_command = false;                // 현재 발 위치의 즉시 초기화를 막는다.
+            handle->rl.state = HEXAPOD_RL_STOPPING;                // 착지 대기 상태를 기록한다.
+            return;
+        }
+        handle->rl.stopping = false;                                     // 현재 발 착지와 자세 복귀를 완료한다.
+        handle->rl.hold_after_exit = true;                               // READY에서도 착지 위치를 보존한다.
+        WorkspaceLimiter_SetRlEnabled(&handle->workspace_limiter, false);  // 종료한 RL 검사 상태를 제거한다.
+        GaitManager_SetStopAfterLanding(&handle->gait_manager, false);    // 다음 명시적 운용을 허가한다.
+    }
+
+    if (handle->priority.active_mode == ROBOT_MODE_RL)
+    {
+        if (!handle->rl.input.session_active)
+        {
+            handle->rl.session_counter++;                              // 현재 부팅 안에서 세션을 새로 발급한다.
+            if (handle->rl.session_counter == 0U)
+            {
+                handle->rl.session_counter++;                          // 비활성 예약값 0을 건너뛴다.
+            }
+            RlController_BeginSession(&handle->rl.input, handle->rl.session_counter);  // 이전 관측과 출력을 폐기한다.
+            HexapodApp_CancelRlCandidate(handle);                       // 이전 명령원의 대기 계획을 제거한다.
+            handle->rl.observation.pose_ack_valid = false;              // 이전 자세 수락 이력을 제거한다.
+            handle->rl.observation.leg_ack_valid = false;               // 이전 다리 적용 이력을 제거한다.
+            handle->foot_trajectory.active_plan_valid = false;          // 이전 세션의 적용 표식을 제거한다.
+            handle->rl.has_leg_attempt = false;                         // 새 세션의 첫 다리 후보를 허가한다.
+        }
+        handle->rl.hold_after_exit = false;                             // 정상 RL 제어로 발 유지를 넘긴다.
+        WorkspaceLimiter_SetRlEnabled(&handle->workspace_limiter, true);  // 기본 계획을 공개하는 경로를 활성화한다.
+        handle->rl.state = RlController_GetAction(&handle->rl.input, &action, now_ms) ?
+            HEXAPOD_RL_ACTIVE : HEXAPOD_RL_WAITING;                     // 첫 정상 정책을 기다린다.
+    }
+    else
+    {
+        RlController_EndSession(&handle->rl.input);                      // RL 밖에서는 정책 입력을 거부한다.
+        WorkspaceLimiter_SetRlEnabled(&handle->workspace_limiter, false);  // 기존 보행 경로를 사용한다.
+        handle->rl.state = handle->rl.rearm_required ?
+            HEXAPOD_RL_BLOCKED : HEXAPOD_RL_DISABLED;                   // 재진입 요구 상태를 구분한다.
+    }
+}
+
+/* 자세 목표와 다음 다리 후보를 제어 경계에서 소비한다. */
+static void HexapodApp_ApplyRlAction(HexapodApp_Handle_t *handle, uint32_t now_ms)
+{
+    RobotRlAction_t action;  // 이번 주기에서 사용할 정책 스냅샷을 저장한다.
+
+    if (handle->rl.stopping)
+    {
+        handle->drone.tripod_enable = false;                         // 새로운 발 들기를 차단한다.
+        handle->drone.vx_user_mps = 0.0f;                            // 정지 목표 속도를 지정한다.
+        handle->drone.vy_user_mps = 0.0f;                            // 정지 목표 횡속도를 지정한다.
+        handle->drone.wz_user_radps = 0.0f;                          // 정지 목표 회전속도를 지정한다.
+        handle->drone.gait_pattern = handle->rl.drain_pattern;       // 기존 위상의 다리 순서를 유지한다.
+        handle->drone.posture_return = true;                        // 자세 명령을 연속적으로 영점 복귀시킨다.
+        handle->drone.reset_command = false;                        // 현재 발 목표를 유지한다.
+        return;
+    }
+    if (handle->rl.hold_after_exit)
+    {
+        handle->drone.hold_feet = (handle->priority.active_mode == ROBOT_MODE_READY) ||
+                                  (handle->priority.active_mode == ROBOT_MODE_ARM);  // 종료 후 대기 자세를 보존한다.
+        handle->rl.hold_after_exit = handle->drone.hold_feet;         // 다음 동작에서 기본 제어로 넘긴다.
+    }
+    if (!handle->drone.rl_enable)
+    {
+        return;
+    }
+
+    if (!handle->drone.tripod_enable && !handle->gait_manager.stop_after_landing)
+    {
+        HexapodApp_CancelRlCandidate(handle);                              // 중립 입력에서 대기 중인 이륙을 취소한다.
+        WorkspaceLimiter_SetRlEnabled(&handle->workspace_limiter, false);  // 이전 이동 명령의 기본 계획을 폐기한다.
+        WorkspaceLimiter_SetRlEnabled(&handle->workspace_limiter, true);   // 다음 이동 요청에서 새 계획을 공개한다.
+    }
+    GaitManager_SetStopAfterLanding(&handle->gait_manager,
+                                     !handle->drone.tripod_enable);  // 중립에서는 현재 착지까지만 허가한다.
+
+    if (handle->rl.candidate_valid &&
+        (((uint32_t)(now_ms - handle->rl.candidate_received_ms) > ROBOT_RL_ACTION_TIMEOUT_MS) ||
+         ((uint32_t)(now_ms - handle->rl.candidate_observation_ms) > ROBOT_RL_OBSERVATION_MAX_AGE_MS)))
+    {
+        HexapodApp_CancelRlCandidate(handle);                 // 오래된 후보가 다음 위상을 시작하지 못하게 한다.
+        handle->rl.input.last_result = RL_SUBMIT_OBSERVATION;  // 새 후보가 필요한 이유를 기록한다.
+    }
+    if (!RlController_GetAction(&handle->rl.input, &action, now_ms))
+    {
+        return;  // 기본 계획만 공개하며 첫 정상 출력을 기다린다.
+    }
+
+    handle->drone.posture_reference_rad.roll = action.posture_reference_rad.roll;    // 정책의 절대 Roll 목표를 전달한다.
+    handle->drone.posture_reference_rad.pitch = action.posture_reference_rad.pitch;  // 정책의 절대 Pitch 목표를 전달한다.
+    handle->rl.observation.pose_sequence = action.sequence;                         // 자세 목표 소비 순번을 기록한다.
+    handle->rl.observation.pose_ack_valid = true;                                   // 자세 소비 이력을 활성화한다.
+    if (handle->drone.tripod_enable && action.leg_plan_valid && !handle->rl.candidate_valid &&
+        (!handle->rl.has_leg_attempt || (action.sequence != handle->rl.last_leg_attempt_sequence)) &&
+        ((uint32_t)(now_ms - handle->rl.input.action_observation_ms) <= ROBOT_RL_OBSERVATION_MAX_AGE_MS) &&
+        WorkspaceLimiter_SubmitRlResidual(&handle->workspace_limiter,
+                                            action.plan_id, action.swing_mask, action.residual))
+    {
+        handle->rl.candidate_valid = true;                                      // 이번 검사에 사용할 후보를 고정한다.
+        handle->rl.candidate_sequence = action.sequence;                        // 자세 갱신과 별도로 다리 순번을 고정한다.
+        handle->rl.last_leg_attempt_sequence = action.sequence;                 // 거부한 후보를 자동 재사용하지 않는다.
+        handle->rl.has_leg_attempt = true;                                      // 다리 후보의 소비 이력을 남긴다.
+        handle->rl.candidate_plan_id = action.plan_id;                          // 후보의 기준 계획을 고정한다.
+        handle->rl.candidate_received_ms = handle->rl.input.last_action_ms;      // 후보 수신 시각을 고정한다.
+        handle->rl.candidate_observation_ms = handle->rl.input.action_observation_ms;  // 원관측의 나이를 유지한다.
+    }
+}
+
+/* 현재 제어 상태를 패킷과 독립된 정책 관측으로 캡처한다. */
+static void HexapodApp_CaptureRlObservation(HexapodApp_Handle_t *handle, uint32_t now_ms)
+{
+    HexapodApp_RlObservation_t *observation = &handle->rl.observation;  // 공개할 관측 저장소를 선택한다.
+    FootTrajectory_Plan_t plan;                                        // 공개 중인 기본 계획을 저장한다.
+    const bool plan_valid = handle->rl.input.session_active &&
+        WorkspaceLimiter_GetRlPlan(&handle->workspace_limiter, &plan);  // 현재 계획의 존재를 확인한다.
+
+    RlController_SetPlan(&handle->rl.input,
+                          plan_valid ? plan.plan_id : 0U,
+                          plan_valid ? plan.swing_mask : 0U, plan_valid);  // 다음 정책 출력의 기준을 등록한다.
+    if (handle->rl.candidate_valid &&
+        (!plan_valid || (handle->rl.candidate_plan_id != plan.plan_id)))
+    {
+        handle->rl.candidate_valid = false;                  // 새 기본 계획에서 이전 후보를 제거한다.
+        FootTrajectory_CancelPlan(&handle->foot_trajectory);  // 이전 계획의 대기 이륙을 취소한다.
+    }
+    observation->sensor = handle->sensor_snapshot;                // 같은 주기의 센서를 복사한다.
+    observation->gait = handle->gait;                             // 같은 주기의 다리 상태를 복사한다.
+    memset(&observation->plan, 0, sizeof(observation->plan));      // 계획 없는 관측을 초기화한다.
+    if (plan_valid)
+    {
+        observation->plan = plan;                                // 고정된 기본 계획을 공개한다.
+    }
+    observation->applied_twist = handle->foot_trajectory.phase_twist;  // 실제 위상 속도를 공개한다.
+    observation->vx_command_mps = handle->drone.vx_user_mps;       // 전처리한 전후 명령을 공개한다.
+    observation->wz_command_radps = handle->drone.wz_user_radps;   // 전처리한 회전 명령을 공개한다.
+    observation->session_id = handle->rl.input.session_id;        // 관측이 속한 세션을 공개한다.
+    observation->timestamp_ms = now_ms;                           // 센서·계획 캡처 시각을 고정한다.
+    observation->sequence = handle->rl.observation_sequence++;    // 새 제어 관측 순번을 발급한다.
+    observation->state = handle->rl.state;                        // 운용 상태를 공개한다.
+}
+
+/* 메인 루프에서 제공할 관측을 복사하고 원시각을 기록한다. */
+bool HexapodApp_GetRlObservation(HexapodApp_Handle_t *handle,
+                                  HexapodApp_RlObservation_t *observation)
+{
+    if ((handle == NULL) || (observation == NULL) || !handle->initialized ||
+        !handle->rl.input.session_active ||
+        (handle->rl.observation.session_id != handle->rl.input.session_id))
+    {
+        return false;
+    }
+    *observation = handle->rl.observation;  // 한 제어 주기의 완성된 관측을 복사한다.
+    RlController_RecordObservation(&handle->rl.input, observation->sequence,
+                                     observation->timestamp_ms);  // 읽기 지연으로 원관측 나이가 줄지 않게 한다.
+    return true;
+}
+
+/* 메인 루프에서 전달한 정책 출력을 다음 제어용으로 검증한다. */
+RlController_SubmitResult_t HexapodApp_SubmitRlAction(HexapodApp_Handle_t *handle,
+                                                     const RobotRlAction_t *action)
+{
+    if ((handle == NULL) || !handle->initialized)
+    {
+        return RL_SUBMIT_INVALID_ARGUMENT;
+    }
+    return RlController_Submit(&handle->rl.input, action, HAL_GetTick());  // SPI Payload 해석 없이 내부 명령만 받는다.
 }
 
 /* 저속 보행 단계의 선속도와 회전속도를 제한한다. */
@@ -450,6 +732,7 @@ HAL_StatusTypeDef HexapodApp_Init(HexapodApp_Handle_t *handle,
     UserCommand_Init(&handle->user_command);                 // 조종기 기본 보정표를 준비한다.
 
     ControlPriority_Init(&handle->priority_control);         // 운용 상태를 착지로 초기화한다.
+    RlController_Init(&handle->rl.input);                    // 통신과 독립적인 정책 입력을 초기화한다.
     DroneController_Init(&handle->drone_control);            // 조종 제어 상태를 초기화한다.
     BodyPositionEstimator_Init(&handle->position_estimator); // FK 추정 상태를 초기화한다.
     GaitPoseController_Init(&handle->gait_pose_control);     // 보행 PI 상태를 초기화한다.
@@ -641,7 +924,7 @@ static void HexapodApp_ProcessTouchdownLatch(HexapodApp_Handle_t *handle)
     uint32_t leg;                                                                    // 처리할 다리 번호를 저장한다.
 
     handle->touchdown_control_mask |= contact_mask;  // 다음 5 ms 제어까지 접촉을 유지한다.
-    if (!handle->drone.manual_enable ||
+    if (!(handle->drone.manual_enable || handle->drone.locomotion_enable) ||
         (handle->drone.tripod_mode != ROBOT_TRIPOD_NORMAL))
     {
         return;
@@ -755,15 +1038,22 @@ static void HexapodApp_ControlStep(HexapodApp_Handle_t *handle)
                                             handle->drone.stand_done,
                                             handle->drone.landing_done,
                                             &handle->safety);       // 안전 상태를 포함해 운용 모드를 결정한다.
+    HexapodApp_SelectRlMode(handle, &limited_user, sensor_updated, now_ms);  // RL 명령원 전환과 착지 정지를 연결한다.
     if ((handle->startup_zero_state == HEXAPOD_STARTUP_ZERO_READY) &&
         (handle->priority.active_mode == ROBOT_MODE_STAND))
     {
         handle->startup_zero_state = HEXAPOD_STARTUP_ZERO_COMPLETE;  // 릴레이를 유지한 채 기존 서기로 넘긴다.
     }
+    if (handle->rl.hold_after_exit &&
+        (handle->priority.active_mode == ROBOT_MODE_LANDING))
+    {
+        handle->drone_control.gait_was_active = true;  // 보존한 발 위치를 복구 Swing으로 정리한 뒤 하강한다.
+    }
     handle->drone = DroneController_Step(&handle->drone_control,
                                          &handle->priority,
                                          handle->sensor_snapshot.foot_contact,
                                          handle->sensor_snapshot.imu.attitude_rad.yaw);  // 조종 입력을 제어 명령으로 바꾼다.
+    HexapodApp_ApplyRlAction(handle, now_ms);  // 검증한 자세와 다리 후보를 제어 경계에서 소비한다.
     if ((ROBOT_BRINGUP_STAGE == 3U) &&
         (ROBOT_BRINGUP_PRESSURE_CALIBRATION != 0U))
     {
@@ -792,7 +1082,7 @@ static void HexapodApp_ControlStep(HexapodApp_Handle_t *handle)
     GaitManager_SetPattern(&handle->gait_manager, handle->drone.gait_pattern);  // 착지 후 적용할 보행 패턴을 요청한다.
     handle->gait = GaitManager_StepContacts(
         &handle->gait_manager,
-        handle->drone.manual_enable,
+        handle->drone.manual_enable || handle->drone.locomotion_enable,
         handle->drone.tripod_enable,
         handle->workspace_limiter.phase_result_valid,
         handle->workspace_limiter.phase_result_accepted,
@@ -804,12 +1094,13 @@ static void HexapodApp_ControlStep(HexapodApp_Handle_t *handle)
         &handle->foot_trajectory,
         &handle->gait,
         (ROBOT_COMMON_Z_RECOVERY_ENABLE != 0U) &&
-        handle->drone.manual_enable &&
+        (handle->drone.manual_enable || handle->drone.locomotion_enable) &&
         (handle->drone.tripod_mode == ROBOT_TRIPOD_NORMAL));  // 활성 시 확정 접촉의 공통 Z 오차를 수집한다.
     handle->touchdown_control_mask = 0U;  // Gait가 소비한 접촉 Latch를 비운다.
     gait_user_command = gait_pose.twist;                  // 위치 보정을 포함한 보행 후보를 복사한다.
     gait_user_command.wz = handle->drone.wz_user_radps;   // Heading 보정을 두 걸음 기억에서 분리한다.
-    if (handle->drone.manual_enable && (handle->drone.gait_pattern == ROBOT_GAIT_WAVE))
+    if ((handle->drone.manual_enable || handle->drone.locomotion_enable) &&
+        (handle->drone.gait_pattern == ROBOT_GAIT_WAVE))
     {
         gait_user_command.vx *= ROBOT_WAVE_SPEED_SCALE;       // 다섯 지지 위상의 전후 보폭을 제한한다.
         gait_user_command.vy *= ROBOT_WAVE_SPEED_SCALE;       // 위치 보정의 횡방향 보폭을 제한한다.
@@ -823,16 +1114,36 @@ static void HexapodApp_ControlStep(HexapodApp_Handle_t *handle)
     twist = WorkspaceLimiter_Gait(&handle->workspace_limiter,
                                   &gait_user_command,
                                   gait_pose.yaw_feedback_radps,
-                                  handle->drone.manual_enable,
+                                  handle->drone.manual_enable || handle->drone.locomotion_enable,
                                   &handle->gait,
                                   &handle->posture_control.command_rad,
                                   handle->drone.reset_command,
                                   &gait_accepted);                   // 미래 검증을 마친 보행 속도를 적용한다.
+    if (handle->rl.candidate_valid && handle->workspace_limiter.rl_plan_rejected)
+    {
+        handle->rl.candidate_valid = false;                           // 거부한 후보는 새 순번이 올 때까지 폐기한다.
+        handle->rl.input.last_result = RL_SUBMIT_VALUE;              // 경로 검사 거부를 기록한다.
+        FootTrajectory_CancelPlan(&handle->foot_trajectory);          // 거부된 대기 궤적을 제거한다.
+    }
+    if (handle->rl.candidate_valid && handle->workspace_limiter.phase_result_accepted)
+    {
+        (void)FootTrajectory_SetPlan(&handle->foot_trajectory,
+                                      &handle->workspace_limiter.rl_plan);  // 검사와 동일한 계획을 다음 Swing에 예약한다.
+    }
     feet = FootTrajectory_Step(&handle->foot_trajectory,
                                &twist,
                                &handle->drone,
                                &handle->gait,
                                &handle->posture_control.command_rad);      // 연속 발 궤적을 계산한다.
+    if (handle->rl.candidate_valid && handle->foot_trajectory.active_plan_valid &&
+        (handle->foot_trajectory.active_plan_id == handle->rl.candidate_plan_id))
+    {
+        handle->rl.observation.leg_sequence = handle->rl.candidate_sequence;          // 실제 위상 시작의 정책 순번을 기록한다.
+        handle->rl.observation.leg_plan_id = handle->foot_trajectory.active_plan_id;  // 실제 적용한 기본 계획을 기록한다.
+        handle->rl.observation.leg_mask = handle->foot_trajectory.active_plan_mask;  // 실제 잔차 적용 다리를 기록한다.
+        handle->rl.observation.leg_ack_valid = true;                                 // 실제 다리 적용 이력을 활성화한다.
+        handle->rl.candidate_valid = false;                                         // 현재 Swing에 반영한 후보를 소비한다.
+    }
     StandLanding_Calculate(handle->drone.stand_enable,
                            handle->drone.landing_enable,
                            handle->drone.posture_progress,
@@ -927,6 +1238,7 @@ static void HexapodApp_ControlStep(HexapodApp_Handle_t *handle)
                     ((handle->priority.active_mode == ROBOT_MODE_STAND) ||
                       (handle->priority.active_mode == ROBOT_MODE_READY) ||
                       (handle->priority.active_mode == ROBOT_MODE_MANUAL) ||
+                      (handle->priority.active_mode == ROBOT_MODE_RL) ||
                       (handle->priority.active_mode == ROBOT_MODE_CORRECTION) ||
                       (handle->priority.active_mode == ROBOT_MODE_ARM) ||
                       ((handle->priority.active_mode == ROBOT_MODE_LANDING) &&
@@ -940,6 +1252,7 @@ static void HexapodApp_ControlStep(HexapodApp_Handle_t *handle)
                       handle->safety.rollover_fault ||
                       handle->safety.controller_fault);                // Kill과 Fault에서 릴레이를 즉시 끈다.
     handle->bringup.relay_enabled = (Relay_GetStateMask() != 0U);       // 실제 릴레이 출력 여부를 기록한다.
+    HexapodApp_CaptureRlObservation(handle, now_ms);                    // 완성한 제어 상태를 내부 정책 관측으로 공개한다.
     handle->control_count++;                                           // 완료 제어 주기를 기록한다.
     output_end_cycle = ControlTimingDebug_ReadCycle();                  // IK와 출력 종료 시각을 읽는다.
     ControlTimingDebug_RecordBreakdown(sensor_end_cycle - sensor_start_cycle,

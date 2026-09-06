@@ -28,6 +28,18 @@ void ControlPriority_Init(ControlPriority_Handle_t *handle)
     handle->motion_mode = ROBOT_MODE_READY;           // SC 미사용 위치의 초기 상태를 READY로 둔다.
 }
 
+/* 동작 허가를 지워 다음 진입에서 중립을 다시 확인한다. */
+void ControlPriority_DisarmMotion(ControlPriority_Handle_t *handle)
+{
+    if (handle == NULL)
+    {
+        return;
+    }
+
+    handle->motion_armed = false;   // 이전 동작 허가를 제거한다.
+    handle->neutral_time_s = 0.0f;  // 중립 유지 시간을 초기화한다.
+}
+
 /* 사용자 스위치와 Fault 우선순위로 현재 모드를 결정한다. */
 RobotPriorityOutput_t ControlPriority_Step(ControlPriority_Handle_t *handle,
                                            const RobotUserCommand_t *user,
@@ -38,6 +50,8 @@ RobotPriorityOutput_t ControlPriority_Step(ControlPriority_Handle_t *handle,
     RobotPriorityOutput_t output;  // 현재 Priority 출력을 저장한다.
     bool stand_request;            // SB 서기 요청을 저장한다.
     bool landing_request;          // SB 착지 요청을 저장한다.
+    bool rl_request;               // SB 강화학습 요청을 저장한다.
+    bool rl_input_ready;           // 강화학습 진입 입력 허가를 저장한다.
     bool manual_request;           // SC 수동 요청을 저장한다.
     bool correction_request;       // SC 보정 요청을 저장한다.
     bool arm_request;              // SC 매니퓰레이터 요청을 저장한다.
@@ -55,11 +69,14 @@ RobotPriorityOutput_t ControlPriority_Step(ControlPriority_Handle_t *handle,
 
     stand_request = (user->sb == 1U);       // SB 가운데를 서기로 해석한다.
     landing_request = (user->sb == 2U);     // SB 끝을 착지로 해석한다.
+    rl_request = (user->sb == 0U);          // SB 첫 위치를 강화학습으로 해석한다.
     manual_request = (user->sc == 0U);      // SC 첫 위치를 수동으로 해석한다.
     arm_request = (user->sc == 1U);         // SC 가운데를 ARM 모드로 해석한다.
     correction_request = (user->sc == 2U);  // SC 끝 위치를 보정으로 해석한다.
     ready_request = (user->se != 0U);       // SE 활성화를 READY로 해석한다.
     kill_request = (user->sd != 0U);        // SD 활성화를 Kill로 해석한다.
+
+    rl_input_ready = user->connected && user->motion_armed && stand_done;  // 연결·입력 무장·서기 완료를 확인한다.
 
     if (kill_request)
     {
@@ -125,10 +142,10 @@ RobotPriorityOutput_t ControlPriority_Step(ControlPriority_Handle_t *handle,
         }
     }
 
-    if (handle->supervisor != CONTROL_SUPERVISOR_READY)
+    if ((handle->supervisor != CONTROL_SUPERVISOR_READY) ||
+        (rl_request && (!handle->previous_rl_request || !rl_input_ready)))
     {
-        handle->motion_armed = false;  // READY 밖에서는 동작 허가를 해제한다.
-        handle->neutral_time_s = 0.0f; // 중립 유지 시간을 초기화한다.
+        ControlPriority_DisarmMotion(handle);  // RL 진입과 입력 차단 후 중립을 다시 확인한다.
     }
     else if (!handle->motion_armed)
     {
@@ -143,6 +160,7 @@ RobotPriorityOutput_t ControlPriority_Step(ControlPriority_Handle_t *handle,
             handle->neutral_time_s = 0.0f;  // 중립이 깨지면 다시 측정한다.
         }
     }
+    handle->previous_rl_request = rl_request;  // 다음 주기에 SB 강화학습 진입을 검출한다.
 
     switch (handle->supervisor)
     {
@@ -160,6 +178,10 @@ RobotPriorityOutput_t ControlPriority_Step(ControlPriority_Handle_t *handle,
             output.active_mode = ROBOT_MODE_READY;  // SE 활성화 중 조종 명령을 차단한다.
             output.reset_command = true;            // SE 활성화 중 기본 자세로 복귀한다.
         }
+        else if (rl_request)
+        {
+            output.active_mode = rl_input_ready ? ROBOT_MODE_RL : ROBOT_MODE_READY;  // SB 첫 위치를 SC보다 우선한다.
+        }
         else if (arm_request)
         {
             output.active_mode = ROBOT_MODE_ARM;  // SC 가운데에서 6족 자세를 고정한다.
@@ -173,10 +195,17 @@ RobotPriorityOutput_t ControlPriority_Step(ControlPriority_Handle_t *handle,
             handle->motion_mode = ROBOT_MODE_CORRECTION;  // SC 끝 위치에서 보정을 선택한다.
         }
 
-        if (!arm_request && !ready_request)
+        if (!rl_request && !arm_request && !ready_request)
         {
             output.active_mode = handle->motion_mode;  // SC 첫·끝 위치의 동작 모드를 적용한다.
         }
+    }
+
+    if (output.active_mode == ROBOT_MODE_RL)
+    {
+        output.throttle = user->throttle;       // 강화학습의 전후 속도 입력을 전달한다.
+        output.yaw = user->yaw;                 // 강화학습의 회전 속도 입력을 전달한다.
+        output.s1 = ROBOT_WALK_TRIPOD_TURN;      // 학습 조건에 맞게 Tripod 회전을 고정한다.
     }
 
     if ((output.active_mode == ROBOT_MODE_MANUAL) ||
