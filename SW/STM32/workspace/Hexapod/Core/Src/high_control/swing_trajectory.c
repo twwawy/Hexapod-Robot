@@ -33,3 +33,27 @@ RobotVec3_t SwingTrajectory_Calculate(float progress,
     output.y += radial_bulge * sinf(leg_angle_rad);  // 다리 바깥 방향 Y를 추가한다.
     return output;
 }
+
+static float AdaptiveQuintic(float x)
+{
+    x = fminf(fmaxf(x, 0.0f), 1.0f);
+    return x*x*x*(10.0f + x*(-15.0f + 6.0f*x));
+}
+
+RobotVec3_t SwingTrajectory_CalculateAdaptive(float progress,
+    const RobotVec3_t *start, const RobotVec3_t *end, float clearance,
+    float apex_phase, float transfer_phase)
+{
+    RobotVec3_t out = {0};
+    if (!start || !end) return out;
+    const float apex = fminf(fmaxf(apex_phase, 0.3f), 0.7f);
+    const float transfer = fminf(fmaxf(transfer_phase, 0.35f), 0.65f);
+    const float xy = AdaptiveQuintic((progress - (transfer - 0.25f))/0.5f);
+    const float up = AdaptiveQuintic(progress/(apex - 0.2f));
+    const float down = AdaptiveQuintic((progress - (apex + 0.2f))/(0.8f-apex));
+    const float top = fmaxf(start->z, end->z) + clearance;
+    out.x = start->x + xy*(end->x-start->x);
+    out.y = start->y + xy*(end->y-start->y);
+    out.z = start->z + up*(top-start->z) + down*(end->z-top);
+    return out;
+}

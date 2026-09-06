@@ -203,6 +203,7 @@ RlController_SubmitResult_t RlController_Submit(RlController_Handle_t *handle,
         return RlController_Reject(handle, RL_SUBMIT_VALUE);
     }
 
+    handle->execution_valid = false; /* legacy submission supersedes pending execution */
     handle->action = *action;                                   // 검증을 마친 전체 출력을 교체한다.
     handle->last_action_ms = now_ms;                            // 정상 출력의 수락 시각을 저장한다.
     handle->action_observation_ms = observation->timestamp_ms;  // 고정 다리 계획의 원관측 시각을 전달한다.
@@ -239,5 +240,61 @@ bool RlController_GetAction(const RlController_Handle_t *handle,
         action->swing_mask = 0U;                                // 자세 전용 출력의 이륙 다리를 제거한다.
         memset(action->residual, 0, sizeof(action->residual));  // 검증한 자세만 계속 전달한다.
     }
+    return true;
+}
+
+bool RlController_ExecutionValuesValid(const RobotAdaptiveExecutionPlan_t *p)
+{
+    if (!p || (p->requested_gait_pattern != ROBOT_GAIT_TRIPOD &&
+               p->requested_gait_pattern != ROBOT_GAIT_WAVE)) return false;
+    const float tmin = p->requested_gait_pattern == ROBOT_GAIT_WAVE ?
+        ROBOT_ADAPTIVE_WAVE_MIN_S : ROBOT_ADAPTIVE_TRIPOD_MIN_S;
+    if (!isfinite(p->phase_duration_s) || p->phase_duration_s < tmin ||
+        p->phase_duration_s > ROBOT_ADAPTIVE_PHASE_MAX_S ||
+        !RlController_ValueValid(p->body_height_offset_m, ROBOT_ADAPTIVE_HEIGHT_MAX_M) ||
+        !RlController_ValueValid(p->posture_reference_rad.roll, ROBOT_RL_MAX_ROLL_RAD) ||
+        !RlController_ValueValid(p->posture_reference_rad.pitch, ROBOT_RL_MAX_PITCH_RAD) ||
+        !RlController_ValueValid(p->posture_reference_rad.yaw, 0.0f) ||
+        !RlController_ValueValid(p->applied_twist.vx, ROBOT_MAX_LINEAR_SPEED_MPS) ||
+        !RlController_ValueValid(p->applied_twist.vy, ROBOT_MAX_LATERAL_SPEED_MPS) ||
+        !RlController_ValueValid(p->applied_twist.vz, 0.0f) ||
+        !RlController_ValueValid(p->applied_twist.wz, ROBOT_MAX_YAW_RATE_RADPS)) return false;
+    for (unsigned i=0; i<ROBOT_LEG_COUNT; ++i) {
+        const RobotAdaptiveLegPlan_t *l=&p->leg[i];
+        if (!RlController_ValueValid(l->landing.x, 0.75f) ||
+            !RlController_ValueValid(l->landing.y, 0.75f) ||
+            !RlController_ValueValid(l->landing.z, 0.75f) ||
+            !isfinite(l->clearance_m) || l->clearance_m < ROBOT_ADAPTIVE_SWING_MIN_M ||
+            l->clearance_m > ROBOT_ADAPTIVE_SWING_MAX_M ||
+            !isfinite(l->apex_phase) || l->apex_phase < ROBOT_ADAPTIVE_APEX_MIN ||
+            l->apex_phase > ROBOT_ADAPTIVE_APEX_MAX ||
+            !isfinite(l->transfer_phase) || l->transfer_phase < ROBOT_ADAPTIVE_TRANSFER_MIN ||
+            l->transfer_phase > ROBOT_ADAPTIVE_TRANSFER_MAX) return false;
+    }
+    return true;
+}
+
+RlController_SubmitResult_t RlController_SubmitExecution(RlController_Handle_t *h,
+    const RobotAdaptiveExecutionPlan_t *p, uint32_t now_ms)
+{
+    if (!h || !p) return RlController_Reject(h, RL_SUBMIT_INVALID_ARGUMENT);
+    if (!RlController_ExecutionValuesValid(p)) return RlController_Reject(h, RL_SUBMIT_VALUE);
+    RobotRlAction_t guard = {0};
+    guard.session_id=p->session_id; guard.observation_sequence=p->observation_sequence;
+    guard.sequence=p->sequence; guard.plan_id=p->plan_id; guard.swing_mask=p->swing_mask;
+    guard.leg_plan_valid=true;
+    /* Reuse ALL existing history/session/sequence/plan guards, never residual decoding. */
+    RlController_SubmitResult_t result=RlController_Submit(h, &guard, now_ms);
+    if (result == RL_SUBMIT_ACCEPTED) { h->execution=*p; h->execution_valid=true; }
+    return result;
+}
+
+bool RlController_GetExecution(const RlController_Handle_t *h,
+    RobotAdaptiveExecutionPlan_t *p, uint32_t now_ms)
+{
+    RobotRlAction_t guard;
+    if (!p || !h || !h->execution_valid || !RlController_GetAction(h,&guard,now_ms) ||
+        !guard.leg_plan_valid) return false;
+    *p=h->execution;
     return true;
 }

@@ -10,6 +10,10 @@ typedef struct
     uint32_t phase_index;                        // 현재 보행 패턴의 위상 번호를 저장한다.
     uint32_t start_wait_count;                   // 첫 보행 입력 대기 주기를 저장한다.
     uint32_t phase_cycle_count;                  // 현재 위상 제어 주기를 저장한다.
+    RobotGaitPattern_t adaptive_preview_pattern;
+    bool adaptive_enabled;
+    float pending_duration_s;
+    float active_duration_s;
     float phase_time_s;                          // 현재 위상 경과 시간을 저장한다.
     float late_landing_time_s[ROBOT_LEG_COUNT];  // 다리별 Late Landing 탐색 시간을 저장한다.
     uint8_t support_recovery_mask;               // 재접촉을 기다리는 기존 지지발을 저장한다.
@@ -55,4 +59,5 @@ RobotGaitPhase_t GaitManager_StepContacts(
     const bool contact[ROBOT_LEG_COUNT],
     const bool contact_raw[ROBOT_LEG_COUNT]);  // 접촉 후보와 확정값으로 다리 상태를 갱신한다.
 
+void GaitManager_SetAdaptiveTiming(GaitManager_Handle_t *handle, bool enabled, float duration_s);
 #endif

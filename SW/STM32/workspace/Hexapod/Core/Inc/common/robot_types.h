@@ -235,4 +235,30 @@ typedef struct
     bool controller_fault;  // 제어기 Fault를 저장한다.
 } RobotSafetyOutput_t;
 
+/* Final targets in phase-entry controller frame (pre-posture, metres).
+ * Z is geometry-owned. No neural action vector crosses this API. */
+typedef struct
+{
+    RobotVec3_t landing;
+    float clearance_m;
+    float apex_phase;
+    float transfer_phase;
+} RobotAdaptiveLegPlan_t;
+
+typedef struct
+{
+    uint32_t session_id;
+    uint16_t observation_sequence;
+    uint16_t sequence;
+    uint16_t plan_id;
+    uint8_t swing_mask;
+    RobotGaitPattern_t requested_gait_pattern;
+    float phase_duration_s;
+    RobotEuler_t posture_reference_rad;
+    float body_height_offset_m;
+    RobotBodyTwist_t applied_twist;
+    bool execute; /* false: gait negotiation / HOLD, never launch this plan */
+    RobotAdaptiveLegPlan_t leg[ROBOT_LEG_COUNT];
+} RobotAdaptiveExecutionPlan_t;
+
 #endif

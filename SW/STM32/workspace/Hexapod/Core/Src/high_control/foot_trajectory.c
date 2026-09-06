@@ -101,6 +101,8 @@ void FootTrajectory_BuildPlan(FootTrajectory_Plan_t *plan,
 
     memset(plan, 0, sizeof(*plan));   // 이전 잔차와 목표를 제거한다.
     LegKinematics_GetBaseFeet(base);  // 여섯 기본 발 위치를 준비한다.
+    plan->phase_duration_s = ROBOT_GAIT_PHASE_TIME_S;
+    plan->gait_pattern = pattern;
     plan->twist = *twist;             // 기본 끝점을 만든 속도를 고정한다.
     plan->swing_mask = swing_mask;    // 잔차 적용 대상을 고정한다.
     for (leg = 0U; leg < ROBOT_LEG_COUNT; ++leg)
@@ -434,13 +436,17 @@ static RobotVec3_t FootTrajectory_AdaptiveLeg(FootTrajectory_Handle_t *handle,
         }
 
         handle->landing_target_z[leg] = front.z;  // 이번 Swing의 정상 착지 Z를 저장한다.
-        output = SwingTrajectory_Calculate(swing_progress,
+        if (handle->active_plan.valid && handle->active_plan.adaptive) {
+            output = SwingTrajectory_CalculateAdaptive(swing_progress, &swing_start,
+                &front, swing_height, handle->active_plan.apex_phase[leg],
+                handle->active_plan.transfer_phase[leg]);
+        } else output = SwingTrajectory_Calculate(swing_progress,
                                            &swing_start,
                                            &front,
                                            swing_height,
                                            ROBOT_SWING_RADIAL_OFFSET_M,
                                            foot_leg_angle[leg]);  // 정상 Swing 궤적을 계산한다.
-        if ((progress >= ROBOT_EARLY_LANDING_PROGRESS) &&
+        if (!handle->active_plan.adaptive && (progress >= ROBOT_EARLY_LANDING_PROGRESS) &&
             (output.z <= (handle->landing_target_z[leg] +
                           ROBOT_SWING_LANDING_APPROACH_M)) &&
             (output.z < handle->memory[leg].z))
@@ -472,7 +478,7 @@ static RobotVec3_t FootTrajectory_AdaptiveLeg(FootTrajectory_Handle_t *handle,
             else if (gait->gait_pattern == ROBOT_GAIT_WAVE)
             {
                 const float phase_delta = fmaxf(progress - handle->previous_progress[leg], 0.0f);  // 멈춘 위상의 중복 적분을 막는다.
-                const float duration_s = fminf(phase_delta * ROBOT_GAIT_PHASE_TIME_S,
+                const float duration_s = fminf(phase_delta * (handle->active_plan.adaptive ? handle->active_plan.phase_duration_s : ROBOT_GAIT_PHASE_TIME_S),
                                                ROBOT_CONTROL_PERIOD_S) *
                                          (gait->startup_phase ? 0.5f : 1.0f);  // 첫 순회에서 아직 들지 않은 발의 이동량을 줄인다.
 
@@ -563,6 +569,7 @@ bool FootTrajectory_LatchTouchdown(FootTrajectory_Handle_t *handle,
 
     commanded_trajectory = FootTrajectory_RotateForward(commanded_foot_body,
                                                          posture_rad);  // PWM 명령 발을 궤적 좌표로 변환한다.
+    commanded_trajectory.z += handle->adaptive_height_applied_m;
     FootTrajectory_SaveTouchdown(handle,
                                  leg,
                                  &commanded_trajectory);  // 변환한 접촉 위치를 고정한다.
@@ -581,6 +588,7 @@ bool FootTrajectory_LatchCommandedTouchdown(FootTrajectory_Handle_t *handle,
     }
 
     commanded_trajectory = handle->memory[leg];  // 접촉 전 마지막 명령 위치를 복사한다.
+    commanded_trajectory.z += handle->adaptive_height_applied_m;
     FootTrajectory_SaveTouchdown(handle,
                                  leg,
                                  &commanded_trajectory);  // 지연 없는 궤적 위치를 고정한다.
@@ -694,6 +702,7 @@ RobotFootTargets_t FootTrajectory_Step(FootTrajectory_Handle_t *handle,
         }
         else if (new_swing_mask != 0U)
         {
+            handle->active_plan.adaptive = false;
             handle->active_plan.valid = false;  // 이전 다리 잔차를 새 위상에 재사용하지 않는다.
             if (handle->pending_plan.valid &&
                 (handle->pending_plan.swing_mask == swing_mask))
@@ -703,6 +712,8 @@ RobotFootTargets_t FootTrajectory_Step(FootTrajectory_Handle_t *handle,
                 handle->active_plan_id = handle->active_plan.plan_id;  // 실제 이륙 계획 번호를 기록한다.
                 handle->active_plan_mask = swing_mask;            // 실제 잔차 적용 다리를 기록한다.
                 handle->active_plan_valid = true;                 // 실제 적용 이력을 활성화한다.
+                if (handle->active_plan.adaptive)
+                    for (unsigned i=0;i<ROBOT_LEG_COUNT;++i) handle->adapted_stance[i]=true;
                 applied_twist = handle->active_plan.twist;        // 기본 계획과 같은 속도로 움직인다.
             }
             handle->pending_plan.valid = false;  // 위상이 달라진 오래된 후보도 폐기한다.
@@ -734,7 +745,7 @@ RobotFootTargets_t FootTrajectory_Step(FootTrajectory_Handle_t *handle,
     hold_stance = (drone->tripod_mode != ROBOT_TRIPOD_NORMAL) ||
                   gait->waiting_start || manual_stance_hold;  // 특수 착지·수동 정지 중 Stance를 유지한다.
     common_z_enable = (drone->locomotion_enable || drone->manual_enable) && gait->enabled_internal &&
-                      !gait->waiting_start &&
+                      !gait->waiting_start && !handle->active_plan.adaptive &&
                       (gait->gait_pattern == ROBOT_GAIT_TRIPOD) &&
                       (drone->tripod_mode == ROBOT_TRIPOD_NORMAL);  // 실제 보행 중에만 공통 Z를 적용한다.
 
@@ -820,4 +831,33 @@ RobotFootTargets_t FootTrajectory_Step(FootTrajectory_Handle_t *handle,
     }
 
     return output;
+}
+
+void FootTrajectory_ApplyAdaptiveHeight(FootTrajectory_Handle_t *h,
+    RobotFootTargets_t *feet, const RobotEuler_t *posture, bool enabled, bool returning)
+{
+    if (!h || !feet || !posture) return;
+    if (!enabled) {
+        /* Rebase persistent memory on adaptive exit, preserving the last physical target. */
+        for (unsigned i=0;i<ROBOT_LEG_COUNT;++i) {
+            feet->foot[i].z -= h->adaptive_height_applied_m;
+            h->memory[i].z -= h->adaptive_height_applied_m;
+            h->swing_start[i].z -= h->adaptive_height_applied_m;
+            h->landing_target_z[i] -= h->adaptive_height_applied_m;
+        }
+        h->adaptive_height_applied_m=0.0f;
+        h->active_plan.adaptive=false;
+        return;
+    }
+    float target=returning ? 0.0f : h->active_plan.body_height_offset_m;
+    float delta=fminf(fmaxf(target-h->adaptive_height_applied_m,
+        -ROBOT_ADAPTIVE_HEIGHT_RATE_MPS*ROBOT_CONTROL_PERIOD_S),
+         ROBOT_ADAPTIVE_HEIGHT_RATE_MPS*ROBOT_CONTROL_PERIOD_S);
+    float height=h->adaptive_height_applied_m+delta;
+    RobotVec3_t candidate[ROBOT_LEG_COUNT];
+    for (unsigned i=0;i<ROBOT_LEG_COUNT;++i) {
+        candidate[i]=feet->foot[i]; candidate[i].z-=height;
+    }
+    if (WorkspaceLimiter_AllFeetValid(candidate,posture)) h->adaptive_height_applied_m=height;
+    for (unsigned i=0;i<ROBOT_LEG_COUNT;++i) feet->foot[i].z-=h->adaptive_height_applied_m;
 }
