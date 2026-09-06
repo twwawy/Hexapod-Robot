@@ -1,8 +1,5 @@
 #!/usr/bin/env python3
-"""Keyboard pose navigation, rolling LiDAR map and six-leg foothold inspection.
-
-Kinematic preview only: no physics stepping, learned policy or hardware commands.
-"""
+"""Keyboard terrain exploration with trained PPO or nominal kinematic control."""
 from __future__ import annotations
 
 import argparse
@@ -28,15 +25,24 @@ from continuous_foothold_gait import ContinuousFootholdGait
 class Preview:
     def __init__(self, args):
         self.args = args
-        scene, self.manifest = build_scene(args.output, args.revision, args.terrain,
-                                          args.lidar_frame, args.lidar_tf_source, args.robot_display)
-        self.model = mujoco.MjModel.from_xml_path(str(scene))
-        self.data = mujoco.MjData(self.model)
-        mujoco.mj_resetDataKeyframe(self.model, self.data, self.model.key('home').id)
-        mujoco.mj_forward(self.model, self.data)
+        self.policy_mode = args.controller == 'trained'
+        self.backend = None
+        if self.policy_mode:
+            from foothold_policy_adapter import PolicyProcess, LearnedFootholdGait
+            self.backend = PolicyProcess(args)
+            self.model, self.data, self.manifest = self.backend.model, self.backend.data, self.backend.manifest
+            self.gait = LearnedFootholdGait(self.backend)
+            (args.output/'scene_manifest.json').write_text(json.dumps(self.manifest, indent=2)+'\n')
+        else:
+            scene, self.manifest = build_scene(args.output, args.revision, args.terrain,
+                                              args.lidar_frame, args.lidar_tf_source, args.robot_display)
+            self.model = mujoco.MjModel.from_xml_path(str(scene))
+            self.data = mujoco.MjData(self.model)
+            mujoco.mj_resetDataKeyframe(self.model, self.data, self.model.key('home').id)
+            mujoco.mj_forward(self.model, self.data)
+            self.gait = ContinuousFootholdGait(self.model, self.data, args.gait_swing_duration)
         self.initial_home = self.data.qpos.copy()
         self.rest = self.initial_home.copy()
-        self.gait = ContinuousFootholdGait(self.model, self.data, args.gait_swing_duration)
         self.in_place = False
         self.target_height = float(self.rest[2])
         self.worker = PerceptionWorker(self.model, args, self.rest)
@@ -64,12 +70,20 @@ class Preview:
     def handle_keys(self, viewer):
         while not self.keys.empty():
             key = self.keys.get()
+            if self.policy_mode and key == glfw.KEY_ENTER:
+                self.gait.paused = not self.gait.paused
+                continue
+            if self.policy_mode and key in (ord('A'), ord('D')):
+                self.gait.status = 'Stage31 command supports forward/yaw; use Left/Right to turn'
+                continue
             if key in (glfw.KEY_UP, ord('W'), glfw.KEY_DOWN, ord('S')):
                 delta = 0.04 if key in (glfw.KEY_UP, ord('W')) else -0.04
-                self.command[0] = np.clip(self.command[0] + delta, -0.16, 0.16)
+                limit = 0.12 if self.policy_mode else 0.16
+                self.command[0] = np.clip(self.command[0] + delta, -limit, limit)
             elif key in (glfw.KEY_LEFT, ord('Q'), glfw.KEY_RIGHT, ord('E')):
                 delta = 0.15 if key in (glfw.KEY_LEFT, ord('Q')) else -0.15
-                self.command[2] = np.clip(self.command[2] + delta, -0.6, 0.6)
+                limit = 0.3 if self.policy_mode else 0.6
+                self.command[2] = np.clip(self.command[2] + delta, -limit, limit)
             elif key in (ord('A'), ord('D')):
                 self.command[1] = np.clip(self.command[1] + (0.04 if key == ord('A') else -0.04), -0.12, 0.12)
             elif key == glfw.KEY_SPACE:
@@ -88,15 +102,19 @@ class Preview:
             elif key in (glfw.KEY_PAGE_UP, glfw.KEY_PAGE_DOWN):
                 self.target_height = float(np.clip(
                     self.target_height + (0.02 if key == glfw.KEY_PAGE_UP else -0.02),
-                    self.initial_home[2] - 0.12, self.initial_home[2] + 0.6))
+                    self.initial_home[2] - (0.05 if self.policy_mode else 0.12),
+                    self.initial_home[2] + (0.10 if self.policy_mode else 0.6)))
                 self.gait.retry()
                 self.last_submit = -np.inf
             elif key == ord('H'):
                 self.command[:] = 0
                 self.yaw = 0
-                self.rest = self.initial_home.copy()
-                self.target_height = float(self.rest[2])
-                self.stop_swing()
+                self.target_height = float(self.initial_home[2])
+                if self.policy_mode:
+                    self.gait.reset()
+                else:
+                    self.rest = self.initial_home.copy()
+                    self.stop_swing()
                 self.generation += 1
                 self.result = None
                 self.last_submit = -np.inf
@@ -171,7 +189,12 @@ class Preview:
                        robot_model=self.args.robot_display, stats=result['stats'],
                        scan_ms=result['scan_ms'], plan_ms=result['plan_ms'],
                        near_valid_fraction=result['near_valid_fraction'],
-                       snapshot_age_s=now - result['stamp'], physics_stepped=False, rl_residual=0,
+                       snapshot_age_s=now - result['stamp'], physics_stepped=self.policy_mode,
+                       controller=self.args.controller, policy=self.manifest.get('policy'),
+                       rl_action=self.gait.action.tolist() if self.policy_mode else [0.0]*18,
+                       policy_targets_odom=(self.gait.targets.tolist() if self.policy_mode
+                                            and self.gait.targets is not None else None),
+                       lidar_foothold_feedback=not self.policy_mode,
                        gait_status=self.gait.status, active_tripod=list(self.gait.plans),
                        completed_swings=self.gait.completed_swings,
                        phase_progress=self.gait.elapsed/self.gait.duration,
@@ -199,6 +222,9 @@ class Preview:
     def draw(self, viewer, now):
         scene = viewer.user_scn
         scene.ngeom = 0
+        if self.policy_mode and self.gait.targets is not None:
+            for leg, target in zip(LEG_PREFIXES, self.gait.targets):
+                add_sphere(scene, target, 0.012, (1, 1, 1, 1), f'{leg} cmd')
         sensor = self.model.site('lidar_origin').id
         origin = self.data.site_xpos[sensor]
         rotation = self.data.site_xmat[sensor].reshape(3, 3)
@@ -269,15 +295,23 @@ class Preview:
                            f'Near-foot coverage {result["near_valid_fraction"]:.0%} | snapshot age {now-result["stamp"]:.1f}s\n'
                            f'Scan {result["scan_ms"]:.0f} ms | six-leg plan {result["plan_ms"]:.0f} ms')
         applied = self.gait.applied_command
-        text = (f'FOOTHOLD EXPLORER | {self.manifest["commit"][:7]} | KINEMATIC / RL=0 | {self.args.robot_display.upper()}\n'
+        mode = 'PPO stage31 / DYNAMICS' if self.policy_mode else 'KINEMATIC / RL=0'
+        controls = ('Arrows: forward/back + turn | SPACE velocity zero | ENTER pause | PgUp/PgDn height trim\n'
+                    'PPO white dots: current foot commands | LiDAR colored candidates: display only\n'
+                    if self.policy_mode else
+                    'Arrows: forward/back + turn | A/D strafe | SPACE STOP | PgUp/PgDn height\n'
+                    'Continuous tripod | Enter in-place toggle\n')
+        text = (f'FOOTHOLD EXPLORER | {self.manifest["commit"][:7]} | {mode} | {self.args.robot_display.upper()}\n'
                 f'{self.status}\n'
                 f'x={self.rest[0]:.2f} y={self.rest[1]:.2f} yaw={np.rad2deg(self.yaw):.0f}deg '
                 f'| vx={self.command[0]:+.2f} vy={self.command[1]:+.2f} wz={self.command[2]:+.2f}\n'
                 f'Applied vx={applied[0]:+.2f} vy={applied[1]:+.2f} wz={applied[2]:+.2f} '
                 f'| completed swings={self.gait.completed_swings}\n'
+                + (f'PPO action norm={np.linalg.norm(self.gait.action):.3f} | simulation={self.data.time:.2f}s\n'
+                   if self.policy_mode else '') +
                 f'{diagnostics}\n' + '\n'.join(rows) + '\n'
-                'Arrows: forward/back + turn | A/D strafe | SPACE STOP | PgUp/PgDn height\n'
-                'Continuous tripod | 1..6 detail only | Enter in-place toggle | R retry | P save | H home | C clear map\n'
+                + controls +
+                '1..6 detail only | R retry | P save | H home | C clear map\n'
                 'M height tiles | L raw points | G MID360 FOV | K scan | F follow | T top | V course\n'
                 'MID360 FOV: H360 V[-7,+52]deg | wires: angular boundary, not returns\n'
                 'Orange: unseen nominal | Blue: geometric | Cyan: endpoint known, path partly unknown\n'
@@ -289,6 +323,11 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--revision', default='origin/main')
     parser.add_argument('--terrain', choices=('flat', 'steps'), default='steps')
+    parser.add_argument('--controller', choices=('trained', 'nominal'), default='trained',
+                        help='trained stage31 PPO dynamics (default), or nominal kinematic planning')
+    parser.add_argument('--policy-package', type=Path,
+                        default=Path(__file__).resolve().parent/'policies/progress-v2-stage31-level6')
+    parser.add_argument('--policy-seed', type=int, default=20040)
     parser.add_argument('--robot-model', '--robot-display', dest='robot_display',
                         choices=('skeleton', 'mesh'), default='skeleton',
                         help='legacy MJX training primitives (default) or full CAD model')
@@ -312,6 +351,8 @@ def main():
     parser.add_argument('--lidar-point-alpha', type=float, default=0.22)
     parser.add_argument('--output', type=Path, default=Path(__file__).resolve().parent / 'generated/foothold_preview')
     args = parser.parse_args()
+    if args.controller == 'trained' and args.robot_display != 'skeleton':
+        parser.error('trained policy uses its training link model; use --controller nominal for CAD comparison')
     if (min(args.scan_hz, args.azimuth_samples, args.gait_swing_duration, args.map_resolution,
             args.map_half_extent, args.map_max_age, args.lidar_range, args.map_draw_budget,
             args.fov_display_radius) <= 0
@@ -329,7 +370,8 @@ def main():
                 viewer.opt.geomgroup[1] = 1
                 viewer.opt.geomgroup[5] = int(args.robot_display == 'mesh')
                 viewer.cam.distance, viewer.cam.azimuth, viewer.cam.elevation = 3.2, 135, -50
-            print('Arrow keys start continuous tripod motion; SPACE finishes swing and stops. No physics / hardware control.', flush=True)
+            print('Arrows move the robot; '+('stage31 PPO + dynamics + LiDAR overlays.' if preview.policy_mode
+                                             else 'nominal kinematic control.'), flush=True)
             print(f'Artifacts: {args.output}', flush=True)
             previous = time.monotonic()
             while viewer.is_running():
@@ -346,6 +388,8 @@ def main():
                 time.sleep(0.01)
     finally:
         preview.executor.shutdown(wait=False, cancel_futures=True)
+        if preview.backend is not None:
+            preview.backend.close()
 
 
 if __name__ == '__main__':

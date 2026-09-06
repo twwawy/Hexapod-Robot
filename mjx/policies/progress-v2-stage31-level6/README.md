@@ -4,6 +4,18 @@
 로컬 `mjx/runs/terrain/`에 있던 실제 Brax/Orbax checkpoint를 이 패키지에 포함했다.
 W&B 로그나 GIF를 정책으로 사용하는 것이 아니라, 저장된 가중치와 관측 정규화 통계를 복원한다.
 
+**착지점 뷰어 안에서 이 정책을 쓰는 기본 실행 명령:**
+
+```bash
+cd /home/huro/Hexapod-Robot
+source /home/huro/.venvs/hexapod-mjx/bin/activate
+bash scripts/view_foothold_planner.sh --terrain steps
+```
+
+이 명령은 기존 넓은 코스·LiDAR 높이 지도·착지 후보 화면 안에서 stage31 정책으로 움직인다.
+자세한 조작법과 관측/제어의 구분은 [착지점 뷰어 안내](../../../docs/HEXAPOD_FOOTHOLD_PREVIEW_USAGE.md)를 따른다.
+아래는 별도 `view_trained_policy.sh`의 run 지형 재현 모드 설명이다.
+
 ```bash
 cd /home/huro/Hexapod-Robot
 bash scripts/view_trained_policy.sh

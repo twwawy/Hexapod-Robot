@@ -57,7 +57,7 @@ def prepare_source(manifest, output):
     return destination
 
 
-def load_environment(source, package, manifest, terrain):
+def load_environment(source, package, manifest, terrain, factory=None):
     # Insert before importing ANY robot modules so local v4/controller edits do
     # not leak into this v3 policy, and generated models stay in the snapshot.
     sys.path.insert(0, str(source/'mjx'))
@@ -79,7 +79,10 @@ def load_environment(source, package, manifest, terrain):
     from ml_collections import config_dict
     config = module.default_config()
     config.update(config_dict.ConfigDict(json.loads((package/manifest['environment']).read_text())))
-    return module.HexapodRoughTerrainEnv(config=config, terrain_level=0 if terrain == 'flat' else level)
+    selected_level = 0 if terrain == 'flat' else level
+    if factory is not None:
+        return factory(module, config, selected_level)
+    return module.HexapodRoughTerrainEnv(config=config, terrain_level=selected_level)
 
 
 def load_policy(package, manifest):

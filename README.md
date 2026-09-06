@@ -14,115 +14,76 @@ foothold correction → RL residual → Safety / IK**다. D435IF RGB는 후속 �
 구현 단계와 인터페이스는
 [LiDAR 착지점·residual 설계](docs/HEXAPOD_LIDAR_FOOTHOLD_RESIDUAL_PLAN.md)를 따른다.
 
-## 선택한 W&B 학습 정책 실행
+## 착지점 뷰어에서 학습 정책으로 이동
 
-`progress-v2-stage31-level6_20260828-111825_seed40`의 **최고 점수 checkpoint
-000001703936**과 관측 정규화 정보를 저장소에 포함했다. 아래 명령은 저장된 PPO 가중치를
-불러와 학습용 링크 모델과 STM32 기반 제어기·MJX 동역학으로 실행한다.
+기존 착지점 뷰어의 기본 제어는 **stage31 학습 정책 + MJX 동역학**이다.
+`progress-v2-stage31-level6_20260828-111825_seed40`의 최고 점수 checkpoint
+`000001703936`과 관측 정규화 통계를 불러온다.
 
 ```bash
 cd /home/huro/Hexapod-Robot
+source /home/huro/.venvs/hexapod-mjx/bin/activate
+bash scripts/view_foothold_planner.sh --terrain steps
+```
+
+같은 창 안에서 학습용 링크 로봇을 방향키로 조종하며 12×12 m 코스의 계단·경사로·플랫폼·
+징검다리를 지나고, LiDAR 점군·높이 지도·착지 후보를 살펴볼 수 있도록 구성했다.
+HUD에 **`PPO stage31 / DYNAMICS`**가 표시된다. 처음에는 이동 명령 0으로 시작한다.
+
+| 키 | 기본 학습 정책 모드의 동작 |
+|---|---|
+| ↑ / ↓ | 전후진 command ±0.04 m/s; 범위 ±0.12 m/s |
+| ← / → | yaw command ±0.15 rad/s; 범위 ±0.3 rad/s |
+| Space | 이동 command 0; 물리와 자세 제어는 계속 실행 |
+| Enter | 동역학 일시정지 / 재개 |
+| PageUp / PageDown | 몸체 높이 보정 ±2 cm; 범위 -5~+10 cm |
+| H | 로봇·정책·지도 초기화 |
+| 1~6 | 다리별 LiDAR 후보 상세 선택 |
+| M / L / G | 높이 지도 / 점군 / MID-360 FOV 표시 |
+| P / C / K | 지도·계획 저장 / 지도 초기화 / LiDAR scan 전환 |
+| F / T / V | 추적 카메라 / 위에서 보기 / 전체 코스 |
+
+**흰 점은 학습 제어기의 현재 발 목표**, 큰 색상 점과 경로는 LiDAR 기반 착지 후보다.
+LiDAR 지도는 함께 갱신하지만, 이 checkpoint의 146-D 관측에는 학습 방식에 맞춘
+시뮬레이터 지형 높이를 넣는다. LiDAR 착지 후보가 PPO 보행을 직접 수정하는 피드백은
+아직 연결하지 않았다. 후진·회전은 이 run의 학습 command 범위 밖이며, 횡이동 A/D는 지원하지 않는다.
+
+센서는 밑면 중심에서 높이 **215 mm**, 전방 **13.529 mm**, 위를 향해 전방으로 **45°** 기울어진
+TF를 사용한다. MID-360 FOV는 수평 360°, 수직 -7°~+52°다. 지도는 8×8 m, 4 cm 셀,
+60초 관측 유지이며 기본 불투명도는 지도 16%, 점군 22%다.
+
+기본 모드의 넓은 지형은 기존 장애물 배치에서 만든 **2 cm heightfield**다.
+물리 접촉과 LiDAR가 같은 표면을 사용하고, 정책에는 이 표면의 높이를 보간해 제공한다.
+정면은 기존 탐색 코스의 4 cm 계단 6단이며, 별도 run 재현 환경의 6.5 cm 계단 7단과 구분한다.
+
+### 환경과 비교 모드
+
+가상환경은 `~/.venvs/hexapod-mjx`이며 스크립트가 직접 사용하므로 activate는 선택 사항이다.
+**JAX/MJX/Brax가 설치된 기존 학습 환경**이 필요하다. 첫 실행에는 JAX 컴파일 시간이 걸린다.
+GPU 계산은 별도 프로세스에서 수행하며, CPU 뷰어와 LiDAR worker는 같은 로봇 자세를 받아 표시한다.
+실제 하드웨어로 명령을 보내지는 않는다.
+
+```bash
+# 기존 LiDAR 후보 기반 기구학 제어와 비교
+bash scripts/view_foothold_planner.sh --terrain steps --controller nominal
+
+# 평지에서 학습 정책 확인
+bash scripts/view_foothold_planner.sh --terrain flat
+
+# 지도와 점군을 더 옅게 표시
+bash scripts/view_foothold_planner.sh --terrain steps --map-alpha 0.10 --lidar-point-alpha 0.15
+
+# 별도 창에서 run에 기록된 6.5 cm 계단 7단 재현
 bash scripts/view_trained_policy.sh
 ```
 
-가상환경은 `~/.venvs/hexapod-mjx`이며, 기존 JAX/MJX/Brax 학습 환경을 사용한다.
-기본 지형은 해당 run에 기록된 **7단 × 6.5 cm 계단**, seed는 best 영상 기준 `20040`이다.
-Space는 시뮬레이션 일시정지/재개, R은 reset이다. 첫 실행에는 JAX 컴파일 시간이 필요하다.
+학습 정책 모드의 로봇/제어기는 기록된 v3 코드 버전을 별도로 추출해 사용한다.
+`--revision`과 CAD 외형 비교는 `--controller nominal`에만 적용한다.
+학습 당시 미커밋 소스가 없어 W&B 영상과 완전히 같은 재현은 미확인이며,
+사용자 요청에 따라 이번 통합본의 실행·정책 추론·계단 보행 검증은 수행하지 않았다.
 
-이 정책은 146-D 관측·18-D 출력의 **v3**다. 기록된 코드 버전을 별도 경로에 추출해 사용하며,
-현재 v4 학습 코드나 아래 LiDAR 착지점 제어기에 가중치를 바로 끼워 넣지 않는다.
-학습 당시 미커밋 코드가 없어 W&B 영상과 완전히 같은 재현은 미확인이다.
-사용자 요청에 따라 정책 로딩·추론·보행 실행 검증은 수행하지 않았다.
-선택 기준·파일 구성·조작법은 [학습 정책 안내](mjx/policies/progress-v2-stage31-level6/README.md)를 참고한다.
-
-## MuJoCo 착지점 탐색과 연속 tripod swing
-
-방향키로 넓은 장애물 코스를 이동하면서 MID-360 점군, 누적 높이 지도와 여섯 다리의
-착지 후보를 확인하는 **기구학 미리보기**다. 이동 명령을 주면
-`RF/RB/LM ↔ RM/LF/LB` 순서로 연속 swing한다. 다리 번호를 누를 필요는 없다.
-로봇은 기본적으로 **예전 MJX 학습용 링크 모델**을 사용한다. 박스 몸체, 다리별
-coxa/femur/tibia 캡슐과 구형 발로 구성되며, CAD 메시를 런타임 모델에서 제거한다.
-
-### 시작
-
-이 기능과 루트 `mjx/` 실행 코드는 `codex/cartesian-residual-rl` 브랜치에 있다.
-기존 작업 파일이 있는 경우 브랜치 전환 전에 변경 상태를 확인한다.
-
-```bash
-git clone --branch codex/cartesian-residual-rl https://github.com/twwawy/Hexapod-Robot.git
-cd Hexapod-Robot
-python3 -m venv ~/.venvs/hexapod-mjx
-~/.venvs/hexapod-mjx/bin/python -m pip install 'mujoco==3.12.0' numpy glfw
-bash scripts/view_foothold_planner.sh --terrain steps
-```
-
-현재 개발 PC에서는 기존 가상환경을 사용해 바로 실행한다.
-
-```bash
-cd /home/huro/Hexapod-Robot
-bash scripts/view_foothold_planner.sh --terrain steps
-```
-
-가상환경 경로는 `~/.venvs/hexapod-mjx`이며 활성화 없이 실행 가능하다. 다른 Python을
-사용하려면 `HEXAPOD_PYTHON=/path/to/python`을 지정한다. 평지 비교는 `--terrain flat`이다.
-모델은 **로컬 `origin/main`**의 URDF·메시 snapshot을 읽는다. 새 URDF를 올렸다면
-`git fetch origin main` 후 다시 실행한다. `--revision d67abc1`처럼 커밋을 고정할 수도 있다.
-기본 `--robot-model skeleton`은 `mjx/prepare_rl_scene.py`의 기존 학습용 primitive
-형상을 재사용한다. URDF 변환 중에는 CAD를 읽고, 최종 모델의 화면·LiDAR 가림 계산에는
-링크 형상을 사용한다. 발 접지점은 반지름 32 mm인 발 구의 밑면이다.
-CAD 모델 비교는 `--robot-model mesh`이며, 이전 `--robot-display` 옵션도 별칭으로 받는다.
-
-### 조작법
-
-방향키는 목표 속도를 증감한다. **키를 놓아도 이동하며 Space로 정지한다.**
-
-| 키 | 동작 |
-|---|---|
-| ↑ / ↓ | 전후진 속도 변경, 연속 tripod swing 시작 |
-| ← / → | 좌우 회전 속도 변경 |
-| A / D | 좌우 평행이동 |
-| Space | 몸체 이동 명령 0, 진행 중 swing을 착지까지 마친 뒤 정지 |
-| Enter | 제자리 연속 swing 켜기/끄기 |
-| PageUp / PageDown | 몸체 목표 높이 조절; 발 IK 가능 범위에서 적용 |
-| 1~6 | RF/RM/RB/LF/LM/LB의 후보 상세 표시만 선택 |
-| M / L / G | 높이 지도 / LiDAR 점군 / MID-360 FOV 표시 전환 |
-| F / T / V | 추적 카메라 / 위에서 보기 / 전체 코스 |
-| R / P / H | hold 재시도·갱신 / 지도·계획 저장 / 출발 pose 초기화 |
-| K / C | LiDAR scan 전환 / 지도 초기화 |
-
-### 지도·센서·착지점
-
-- `steps`: 12×12 m 공간의 계단, 경사로, 플랫폼, 징검다리, 좁은 돌출물, 요철과 바위.
-- 높이 지도: 8×8 m rolling ROI, 4 cm 셀, odom 좌표에 관측을 60초 유지.
-- LiDAR: 몸체 밑면 중심에서 **높이 215 mm, 전방 13.529 mm, 전방 기울기 45°**.
-  센서 +Z는 위를 향한다. `base_link` 기준 위치는 `(0, -0.013529, 0.1642) m`이다.
-- MID-360 FOV: 수평 360°, 수직 -7°~+52°. raycast와 센서에 부착된 FOV 경계선이
-  같은 각도 설정을 사용한다. [Livox 공식 사양](https://www.livoxtech.com/mid-360/specs)
-- 높이 셀은 16%, LiDAR 점은 22% 불투명도로 표시하고, 착지 목표는 크게 불투명하게 표시한다.
-- 주황색 목표: 미관측 nominal fallback. 파란색: geometric 목표.
-  청록색: 착지 patch는 관측됐지만 경로 일부는 미관측. 빨간 X: 실행 가능한 목표 없음.
-
-```bash
-# 표시를 더 옅게 / swing 속도를 느리게
-bash scripts/view_foothold_planner.sh --terrain steps \
-  --map-alpha 0.10 --lidar-point-alpha 0.15 --gait-swing-duration 1.2
-```
-
-지지 발은 odom에 고정하고, swing 목표는 시작 시 결정해 착지까지 유지한다. 유효한
-후보가 없으면 미관측 영역에서 nominal을 사용하되, 관측된 장애물·IK 실패는 무시하지 않는다.
-각 swing 시작 전에 **몸체 이동을 포함한 지지 다리 3개와 swing 다리 3개의 전체 경로**를
-샘플 IK로 검사한다. 회전 이동을 포함해 한 tripod의 이동량을 최대 4 cm로 제한하고,
-도달 범위가 부족하면 보폭을 더 줄인다. 입력 속도·높이 변경은 다음 tripod부터 적용하며
-Space는 몸체를 즉시 멈춘다. 화면의 `Applied`와 `completed swings`로 적용 속도와 반복 횟수를 확인한다.
-지형 검사나 IK에 실패하면 몸체와 swing을 hold하므로 이 경우에는 R로 재시도하거나 H로 초기화한다.
-
-**현재 범위:** `mj_step` 없는 기구학 제어이며 실제 STM32 접촉 제어기, LIO, 동역학 보행,
-RGB 또는 RL 추론은 연결 전이다. LiDAR는 angular raycast proxy이며 Livox 비반복 패턴과
-동일하지 않다. 연속 swing·지도·skeleton 확장본의 실행·렌더링·보행 검증은 사용자 요청에 따라
-수행하지 않았다.
-
-자세한 구성·확인 순서·저장 파일은
-[착지점 미리보기 사용 안내](docs/HEXAPOD_FOOTHOLD_PREVIEW_USAGE.md)를 참고한다.
+자세한 구성·조작·확인 항목은 [착지점 뷰어 안내](docs/HEXAPOD_FOOTHOLD_PREVIEW_USAGE.md),
+가중치 출처는 [학습 정책 안내](mjx/policies/progress-v2-stage31-level6/README.md)를 참고한다.
 
 ## 현재 MJX 기준
 
