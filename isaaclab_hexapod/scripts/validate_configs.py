@@ -20,6 +20,7 @@ simulation_app = launcher.app
 import torch
 import gymnasium as gym
 
+from hexapod_isaaclab.assets import USD_PATH
 from hexapod_isaaclab.contracts.observation_contract import (
     ACTOR_OBSERVATION_SIZE,
     CRITIC_OBSERVATION_SIZE,
@@ -29,10 +30,17 @@ from hexapod_isaaclab.contracts.observation_contract import (
     build_actor_observation,
     build_critic_observation,
 )
+from hexapod_isaaclab.contracts.training_handoff import load_training_handoff
 from hexapod_isaaclab.perception import DEFAULT_ELEVATION_MAP_CFG, TerrainEncoder, rasterize_elevation_map
 from hexapod_isaaclab.sensors import (
     DEPTH_EXTRINSIC_CONFIRMED,
     Hexapod15PointPatternCfg,
+    MID360_CHANNELS,
+    MID360_FRAME_RATE_HZ,
+    MID360_MAX_RANGE_M,
+    MID360_POINT_RATE_HZ,
+    MID360_POSITION_BODY,
+    MID360_VERTICAL_FOV_DEG,
     body_imu_cfg,
     depth_raycast_cfg,
     foot_contact_cfg,
@@ -65,6 +73,8 @@ def main() -> None:
     flat_cfg = HexapodEnvCfg()
     perceptive_cfg = HexapodPerceptiveEnvCfg()
     runner_cfg = HexapodPerceptivePPORunnerCfg()
+    handoff = load_training_handoff()
+    handoff_contracts = handoff["contracts"]
     sensor_cfgs = {
         "legacy_height_scanner": legacy_height_scanner_cfg(),
         "lidar": mid360_raycast_cfg(),
@@ -72,6 +82,7 @@ def main() -> None:
         "imu": body_imu_cfg(),
         "foot_contact": foot_contact_cfg(),
     }
+    lidar_cfg = sensor_cfgs["lidar"]
     report = {
         "schema_version": 1,
         "checks": {
@@ -87,7 +98,43 @@ def main() -> None:
             "perceptive_observation_groups": perceptive_cfg.observation_space == {"policy": 195, "critic": 225},
             "rsl_asymmetric_groups": runner_cfg.obs_groups == {"policy": ["policy"], "critic": ["critic"]},
             "sensor_configs_construct": len(sensor_cfgs) == 5,
+            "mid360_current_urdf_mount": tuple(lidar_cfg.offset.pos)
+            == MID360_POSITION_BODY,
+            "mid360_published_fov": (
+                lidar_cfg.pattern_cfg.channels == MID360_CHANNELS
+                and tuple(lidar_cfg.pattern_cfg.vertical_fov_range)
+                == MID360_VERTICAL_FOV_DEG
+            ),
+            "mid360_published_rate_range": (
+                lidar_cfg.update_period == 1.0 / MID360_FRAME_RATE_HZ
+                and lidar_cfg.max_distance == MID360_MAX_RANGE_M
+            ),
+            "mid360_rtx_proxy_contract": (
+                MID360_CHANNELS == 40
+                and MID360_POINT_RATE_HZ == 200_000
+                and MID360_MAX_RANGE_M == 40.0
+            ),
             "depth_extrinsic_safety_gate": DEPTH_EXTRINSIC_CONFIRMED is False,
+            "full_mesh_usd_selected": (
+                USD_PATH.name == "hexapod_full_mesh_mjx_parity.usd"
+                and USD_PATH.is_file()
+            ),
+            "mjx_handoff_action_contract": (
+                handoff_contracts["action"]["size"] == 18
+                and handoff_contracts["action"]["residual_scale_m"]
+                == [0.1, 0.1, 0.1]
+            ),
+            "mjx_handoff_observation_contract": (
+                handoff_contracts["observation"]["size"] == LEGACY_SIZE
+            ),
+            "mjx_handoff_reward_contract": (
+                handoff_contracts["reward"]["version"]
+                == "commanded_progress_motion_gate_v1"
+            ),
+            "unsafe_latest_weights_not_autoloaded": (
+                handoff["isaac_transfer_gate"]["load_mjx_weights_by_default"]
+                is False
+            ),
             "flat_task_registered": "Hexapod-Firmware-Flat-Direct-v0" in gym.registry,
             "perceptive_task_registered": "Hexapod-Perceptive-Direct-v0" in gym.registry,
         },
@@ -97,6 +144,7 @@ def main() -> None:
             "critic": CRITIC_OBSERVATION_SIZE,
             "elevation_map": list(map_cfg.shape),
             "terrain_latent": int(latent.shape[-1]),
+            "latest_mjx_terrain_level": handoff["latest_attempt"]["terrain_level"],
         },
     }
     report["passed"] = all(report["checks"].values())

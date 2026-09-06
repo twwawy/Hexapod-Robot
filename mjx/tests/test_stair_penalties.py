@@ -16,6 +16,7 @@ from rough_terrain_env import (
     _foot_clearance_terrain_cost,
     _scale_reward_terms,
     _touchdown_impact_cost,
+    _update_progress_watchdog,
     default_config,
 )
 from servo_model import SERVO_STALL_TORQUE_NM
@@ -69,7 +70,8 @@ class StairPenaltyTest(unittest.TestCase):
             "yaw": 1.0,
             "upright": 1.0,
             "height": 1.0,
-            "progress": 0.2,
+            "progress": 1.0,
+            "under_speed": 0.0,
             "stability": 1.0,
             "joint_margin": 1.0,
             "action_rate": 0.0,
@@ -132,13 +134,14 @@ class StairPenaltyTest(unittest.TestCase):
         self._assert_terms(
             _base_reward_terms(**kwargs),
             {
-                "velocity": math.exp(-4.0),
-                "yaw": math.exp(-1.0),
-                "upright": 1.0,
-                "height": math.exp(-1.0),
+                "velocity": math.exp(-25.0),
+                "yaw": 0.0,
+                "upright": 0.0,
+                "height": 0.0,
                 "progress": 0.0,
-                "stability": math.exp(-1.0),
-                "joint_margin": 0.5,
+                "under_speed": 1.0,
+                "stability": 0.0,
+                "joint_margin": 0.0,
                 "action_rate": 1.0,
                 "residual": 1.0,
                 "swing_height": 0.25,
@@ -212,6 +215,52 @@ class StairPenaltyTest(unittest.TestCase):
             -0.04,
             places=7,
         )
+
+    def test_stationary_return_is_negative_and_target_speed_is_best(self) -> None:
+        config = default_config()
+        stationary = self._base_kwargs()
+        stationary["command"] = jp.asarray((0.08, 0.0, 0.0, 0.0, 0.0))
+        stationary["forward_velocity"] = jp.asarray(0.0)
+        half_speed = dict(stationary, forward_velocity=jp.asarray(0.04))
+        target_speed = dict(stationary, forward_velocity=jp.asarray(0.08))
+
+        returns = []
+        for kwargs in (stationary, half_speed, target_speed):
+            scaled = _scale_reward_terms(_base_reward_terms(**kwargs), config.reward)
+            returns.append(sum(float(value) for value in scaled.values()))
+
+        self.assertLess(returns[0], 0.0)
+        self.assertLess(returns[0], returns[1])
+        self.assertLess(returns[1], returns[2])
+
+    def test_progress_watchdog_credits_forward_or_upward_motion(self) -> None:
+        anchor = jp.asarray(0.0)
+        steps = jp.asarray(149, dtype=jp.int32)
+        anchor, steps, timed_out = _update_progress_watchdog(
+            potential=jp.asarray(0.019),
+            anchor=anchor,
+            stagnant_steps=steps,
+            command_active=jp.asarray(True),
+            success=jp.asarray(False),
+            dt=0.02,
+            min_delta=0.02,
+            timeout=3.0,
+        )
+        self.assertTrue(bool(timed_out))
+
+        anchor, steps, timed_out = _update_progress_watchdog(
+            potential=jp.asarray(0.02),
+            anchor=jp.asarray(0.0),
+            stagnant_steps=jp.asarray(149, dtype=jp.int32),
+            command_active=jp.asarray(True),
+            success=jp.asarray(False),
+            dt=0.02,
+            min_delta=0.02,
+            timeout=3.0,
+        )
+        self.assertAlmostEqual(float(anchor), 0.02, places=7)
+        self.assertEqual(int(steps), 0)
+        self.assertFalse(bool(timed_out))
 
 
 if __name__ == "__main__":

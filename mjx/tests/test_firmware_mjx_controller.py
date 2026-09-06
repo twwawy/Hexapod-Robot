@@ -17,7 +17,7 @@ class FirmwareMjxControllerTest(unittest.TestCase):
     def test_policy_y_authority_and_workspace_margin_are_conservative(self) -> None:
         np.testing.assert_allclose(
             np.asarray(firmware_mjx.RESIDUAL_SCALE),
-            np.asarray((0.04, 0.02, 0.02)),
+            np.asarray((0.10, 0.10, 0.10)),
             atol=1.0e-8,
         )
         self.assertAlmostEqual(firmware_mjx.WORKSPACE_MARGIN, 0.001)
@@ -86,8 +86,8 @@ class FirmwareMjxControllerTest(unittest.TestCase):
         self.assertAlmostEqual(heights[2], 0.155, places=6)
         self.assertAlmostEqual(residual[0, 2], 0.19, places=6)
         self.assertAlmostEqual(residual[1, 2], -0.02, places=6)
-        self.assertAlmostEqual(residual[2, 2], 0.01, places=6)
-        self.assertAlmostEqual(residual[3, 2], -0.01, places=6)
+        self.assertAlmostEqual(residual[2, 2], 0.05, places=6)
+        self.assertAlmostEqual(residual[3, 2], -0.05, places=6)
         np.testing.assert_allclose(residual[4], np.zeros(3), atol=1.0e-8)
         self.assertAlmostEqual(residual[5, 2], 0.0, places=7)
 
@@ -100,11 +100,31 @@ class FirmwareMjxControllerTest(unittest.TestCase):
             np.asarray(endpoint_residual)[:, 2], np.zeros(6), atol=1.0e-7
         )
 
+    def test_terrain_swing_floor_overrides_a_low_policy_command(self) -> None:
+        low_action = jp.tile(jp.asarray((0.0, 0.0, -1.0)), 6)
+        residual, commanded_height = firmware_mjx._phase_gated_policy_residual(
+            low_action,
+            jp.full(6, firmware_mjx.LEG_SWING),
+            jp.full(6, 0.5),
+            swing_height_floor=jp.asarray(0.13),
+        )
+        np.testing.assert_allclose(np.asarray(commanded_height), 0.13, atol=1.0e-7)
+        np.testing.assert_allclose(
+            np.asarray(residual[:, 2]),
+            0.13 - firmware_mjx.SWING_HEIGHT,
+            atol=1.0e-7,
+        )
+
     def test_initial_model_targets_match_home_pose(self) -> None:
         output = firmware_mjx.initial_output()
         expected_servo = np.tile(np.deg2rad((0.0, 30.0, 50.0)), (6, 1))
+        expected_servo[0:3, 1] *= -1.0
+        expected_servo[3:6, 2] *= -1.0
         np.testing.assert_allclose(
             np.asarray(output.servo_joint_targets), expected_servo, atol=1.0e-5
+        )
+        np.testing.assert_allclose(
+            np.asarray(output.model_joint_targets), expected_servo, atol=1.0e-5
         )
         self.assertTrue(np.all(np.asarray(output.ik_valid)))
 
@@ -132,7 +152,10 @@ class FirmwareMjxControllerTest(unittest.TestCase):
 
             np.testing.assert_allclose(
                 np.asarray(jax_output.servo_joint_targets).reshape(18),
-                native_output.joint_angles,
+                (
+                    native_output.joint_angles.reshape(6, 3)
+                    * np.asarray(firmware_mjx.MODEL_SIGNS)
+                ).reshape(18),
                 atol=2.0e-5,
             )
             np.testing.assert_allclose(

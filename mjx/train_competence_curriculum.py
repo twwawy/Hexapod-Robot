@@ -44,7 +44,12 @@ def _arguments() -> tuple[argparse.Namespace, list[str]]:
         help="Stage label offset used when continuing from an earlier run.",
     )
     parser.add_argument(
-        "--stages", type=int, default=44, help="Maximum competence attempts."
+        "--stages",
+        type=int,
+        default=44,
+        help=(
+            "Maximum total competence attempts across the requested levels."
+        ),
     )
     parser.add_argument("--stage-timesteps", type=int, default=5_000_000)
     parser.add_argument("--stage-0-timesteps", type=int, default=None)
@@ -71,14 +76,14 @@ def _arguments() -> tuple[argparse.Namespace, list[str]]:
         choices=("competence", "sequential"),
         default="competence",
     )
-    parser.add_argument("--promote-threshold", type=float, default=0.80)
+    parser.add_argument("--promote-threshold", type=float, default=0.50)
     parser.add_argument(
         "--max-stages-per-level",
         type=int,
         default=None,
         help=(
             "Override the default per-level cap (levels 0-3: 2 attempts, "
-            "levels 4-12: 4 attempts)."
+            f"levels 4-{MAX_TERRAIN_LEVEL}: 4 attempts)."
         ),
     )
     parser.add_argument(
@@ -217,6 +222,53 @@ def _selected_checkpoint(run_dir: Path, selection: str) -> Path:
     if not checkpoint.is_dir() or not (checkpoint / "ppo_network_config.json").exists():
         raise RuntimeError(f"invalid best checkpoint in {pointer}: {checkpoint}")
     return checkpoint
+
+
+def _stage_checkpoint(
+    run_dir: Path,
+    selection: str,
+    *,
+    level: int,
+    previous_safe_checkpoint: Path | None,
+) -> tuple[Path, bool, str]:
+    """Select this stage's checkpoint or apply the terrain-aware safe fallback."""
+    pointer = run_dir / "monitor" / "best_checkpoint.json"
+    if selection != "best" or pointer.exists():
+        return _selected_checkpoint(run_dir, selection), True, "selected"
+
+    if previous_safe_checkpoint is None:
+        # Preserve the original, actionable error when there is no known-safe
+        # checkpoint that can be carried forward or retried.
+        return _selected_checkpoint(run_dir, selection), False, "unreachable"
+    previous_safe_checkpoint = previous_safe_checkpoint.expanduser().resolve()
+    if (
+        not previous_safe_checkpoint.is_dir()
+        or not (previous_safe_checkpoint / "ppo_network_config.json").exists()
+    ):
+        raise RuntimeError(
+            f"invalid previous safe checkpoint: {previous_safe_checkpoint}"
+        )
+
+    if terrain_level(level).kind == "stairs":
+        return previous_safe_checkpoint, False, "stair_best_retry"
+    return previous_safe_checkpoint, False, "pre_stair_safe_carry_forward"
+
+
+def _next_restore_value(current: bool, checkpoint_updated: bool) -> bool:
+    """Restore the critic only after a checkpoint from this reward contract exists."""
+    return current or checkpoint_updated
+
+
+def _stair_retry_attempt(
+    level_attempt: int, max_stages_per_level: int | None
+) -> tuple[int, bool]:
+    """Count an unsafe stair retry and report whether its per-level cap is met."""
+    next_attempt = level_attempt + 1
+    limit_reached = (
+        max_stages_per_level is not None
+        and next_attempt >= max_stages_per_level
+    )
+    return next_attempt, limit_reached
 
 
 def _level_transition(
@@ -479,6 +531,7 @@ def main() -> None:
         if args.init_checkpoint is not None
         else None
     )
+    restore_value = args.init_value_function
     level = args.start_level
     level_attempt = 0
 
@@ -519,6 +572,7 @@ def main() -> None:
             ),
         )
         init_checkpoint = _selected_checkpoint(run_dir, args.checkpoint_selection)
+        restore_value = True
         latest = json.loads(
             (run_dir / "monitor" / "latest_metrics.json").read_text(
                 encoding="utf-8"
@@ -587,7 +641,12 @@ def main() -> None:
             level_attempt = 0
         level = next_level
 
-    for attempt_index in range(args.stages):
+    # Physical run labels always advance.  Unsafe staircase retries retain the
+    # previous checkpoint but still consume both the global and per-level cap.
+    attempt_index = 0
+    stage_budget_used = 0
+    checkpoint_retry = 0
+    while stage_budget_used < args.stages:
         stage = args.start_stage + attempt_index
         timesteps = (
             args.stage_0_timesteps
@@ -606,11 +665,7 @@ def main() -> None:
             level=level,
             stage=stage,
             init_checkpoint=init_checkpoint,
-            restore_value=(
-                attempt_index > 0
-                or level_attempt > 0
-                or args.init_value_function
-            ),
+            restore_value=restore_value,
             terrain_root=terrain_root,
             teacher_args=_teacher_trainer_args(
                 args,
@@ -622,26 +677,54 @@ def main() -> None:
             (run_dir / "monitor" / "latest_metrics.json").read_text(encoding="utf-8")
         )
         success = float(latest.get("metrics", {}).get("eval/episode_terrain_success", 0.0))
-        checkpoint = _selected_checkpoint(run_dir, args.checkpoint_selection)
-        level_attempt += 1
+        checkpoint, checkpoint_updated, checkpoint_reason = _stage_checkpoint(
+            run_dir,
+            args.checkpoint_selection,
+            level=level,
+            previous_safe_checkpoint=init_checkpoint,
+        )
         stage_limit = _max_stages_for_level(level, args.max_stages_per_level)
-        next_level, completed, promotion_reason = _level_transition(
-            level=level,
-            max_level=args.max_level,
-            progression=args.level_progression,
-            success=success,
-            threshold=args.promote_threshold,
-            level_attempt=level_attempt,
-            max_stages_per_level=stage_limit,
-        )
-        next_level, completed, promotion_reason = _guard_teacher_attempt_limit(
-            args,
-            level=level,
-            success=success,
-            next_level=next_level,
-            completed=completed,
-            reason=promotion_reason,
-        )
+        if checkpoint_reason == "stair_best_retry":
+            checkpoint_retry += 1
+            level_attempt, retry_limit_reached = _stair_retry_attempt(
+                level_attempt, stage_limit
+            )
+            stage_budget_used += 1
+            next_level = level
+            completed = False
+            promotion_reason = (
+                "best_checkpoint_retry_limit"
+                if retry_limit_reached
+                else "best_checkpoint_retry"
+            )
+        elif checkpoint_reason == "pre_stair_safe_carry_forward":
+            level_attempt += 1
+            stage_budget_used += 1
+            checkpoint_retry = 0
+            next_level = min(args.max_level, level + 1)
+            completed = level == args.max_level
+            promotion_reason = "safe_checkpoint_carry_forward"
+        else:
+            level_attempt += 1
+            stage_budget_used += 1
+            checkpoint_retry = 0
+            next_level, completed, promotion_reason = _level_transition(
+                level=level,
+                max_level=args.max_level,
+                progression=args.level_progression,
+                success=success,
+                threshold=args.promote_threshold,
+                level_attempt=level_attempt,
+                max_stages_per_level=stage_limit,
+            )
+            next_level, completed, promotion_reason = _guard_teacher_attempt_limit(
+                args,
+                level=level,
+                success=success,
+                next_level=next_level,
+                completed=completed,
+                reason=promotion_reason,
+            )
         if level == 0 and next_level != 0:
             next_level = max(next_level, args.start_level)
         spec = terrain_level(level)
@@ -658,6 +741,10 @@ def main() -> None:
                 "level_attempt": level_attempt,
                 "max_stages_per_level": stage_limit,
                 "promotion_reason": promotion_reason,
+                "checkpoint_updated": checkpoint_updated,
+                "checkpoint_reason": checkpoint_reason,
+                "checkpoint_retry": checkpoint_retry,
+                "restore_value_used": restore_value,
                 "next_level": next_level,
                 "curriculum_complete": completed,
                 "run_dir": str(run_dir),
@@ -670,21 +757,27 @@ def main() -> None:
         print(
             f"complete stage={stage} success={success:.3f} "
             f"level={level}->{next_level} attempt={level_attempt}/{stage_limit} "
-            f"reason={promotion_reason} checkpoint={checkpoint}"
+            f"checkpoint_retry={checkpoint_retry} reason={promotion_reason} "
+            f"checkpoint={checkpoint}"
         )
         init_checkpoint = checkpoint
+        restore_value = _next_restore_value(restore_value, checkpoint_updated)
         if next_level != level:
             level_attempt = 0
         level = next_level
         if completed:
             print(f"CURRICULUM_COMPLETE level={level} success={success:.3f}")
             break
-        if promotion_reason == "attempt_limit_stop":
+        if promotion_reason in {
+            "attempt_limit_stop",
+            "best_checkpoint_retry_limit",
+        }:
             print(
                 f"CURRICULUM_STOPPED level={level} success={success:.3f} "
-                "reason=teacher_attempt_limit"
+                f"reason={promotion_reason}"
             )
             break
+        attempt_index += 1
 
     print(f"CURRICULUM_HISTORY={state_path}")
 

@@ -1,5 +1,9 @@
 # STM32 제어기 기반 MuJoCo GT base
 
+2026-09-06 경로 구분: 이 문서는 현재 루트 MJX v4 기반이다. stage31 viewer는 가중치에 대응하는
+격리된 v3 펌웨어 step을 사용하며, nominal gait를 유지하고 residual 입력 크기만 조절한다.
+[실행 및 비교 방법](../docs/HEXAPOD_FOOTHOLD_PREVIEW_USAGE.md)을 참고한다.
+
 ## 목적
 
 강화학습 residual을 붙이기 전에 pull한 STM32 제어기만으로 평지와 단차에서
@@ -49,12 +53,12 @@ RL scene은 원본 링크 질량과 관성을 비례 스케일해 로봇 전체�
 - `firmware_controller.py`: C 소스 변경 감지, 공유 라이브러리 빌드, ctypes 연결
 - `run_firmware_base.py`: MuJoCo GT 어댑터, actuator 좌우 부호 변환, 뷰어
 - `firmware_mjx_controller.py`: 위 C 제어기를 GPU 병렬 학습용 JAX 상태로 옮긴 구현
-- `terrain_curriculum.py`: level 0~12의 지형 치수·목표 위치를 한 곳에서 정의
+- `terrain_curriculum.py`: level 0~16의 지형 치수·목표 위치를 한 곳에서 정의
 - `servo_model.py`: DS51150 사양과 교체 가능한 calibration prior를 한 곳에서 정의
 - `rough_terrain_env.py`: 펌웨어 base 위 18-D 발끝 residual과 안전 종료/계단 보상
 
 기본 Swing 높이는 평지 기준 6 cm다. RL Z action은 Swing에서 4~25 cm 높이를
-선택하지만 이륙·착지점 Z는 바꾸지 않는다. Stance에서는 ±20 mm만 허용하며
+선택하지만 이륙·착지점 Z는 바꾸지 않는다. Stance에서는 ±100 mm까지 요청할 수 있으며
 Late Landing은 정책 개입 없이 펌웨어가 처리한다.
 
 생성되는 `generated/libhexapod_firmware_controller.so`는 빌드 산출물이므로 Git에

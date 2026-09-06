@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import math
 from pathlib import Path
 import sys
 import unittest
@@ -63,19 +62,41 @@ class CommandSpaceTest(unittest.TestCase):
                     self._sample(terrain_kind, 0.0, seed), np.zeros(3)
                 )
 
-    def test_ramp_and_stair_curriculum_bounds(self) -> None:
+    def test_terrain_curriculum_does_not_double_count_pitch_feedforward(self) -> None:
         for seed in range(100):
             ramp = self._sample("ramp", 15.0, seed)
             self.assertGreaterEqual(ramp[0], -0.05)
             self.assertLessEqual(ramp[0], 0.0)
-            self.assertAlmostEqual(ramp[1], math.radians(-15.0), places=6)
+            self.assertEqual(ramp[1], 0.0)
             self.assertEqual(ramp[2], 0.0)
             stairs = self._sample("stairs", 0.0, seed)
             self.assertGreaterEqual(stairs[0], -0.05)
             self.assertLessEqual(stairs[0], 0.0)
-            self.assertGreaterEqual(stairs[1], math.radians(-25.0))
-            self.assertLessEqual(stairs[1], math.radians(-5.0))
+            self.assertEqual(stairs[1], 0.0)
             self.assertEqual(stairs[2], 0.0)
+
+        command = jp.asarray((0.1, 0.0, 0.0, 0.0, 0.0))
+        terrain_pitch = jp.deg2rad(jp.asarray(-15.0))
+        target = _effective_posture_target(command, terrain_pitch)
+        self.assertAlmostEqual(float(target[1]), float(terrain_pitch), places=7)
+
+    def test_explicit_pitch_command_is_an_additive_offset_range(self) -> None:
+        config = default_config().command
+        config.pitch_min_deg = -4.0
+        config.pitch_max_deg = 6.0
+        for seed in range(100):
+            key_a, key_b = jax.random.split(jax.random.PRNGKey(seed))
+            command = np.asarray(
+                _terrain_posture_command(
+                    height_key=key_a,
+                    pitch_key=key_b,
+                    terrain_kind="stairs",
+                    slope_degrees=0.0,
+                    command_config=config,
+                )
+            )
+            self.assertGreaterEqual(command[1], np.deg2rad(-4.0))
+            self.assertLessEqual(command[1], np.deg2rad(6.0))
 
     def test_effective_target_reward_height_and_success_kernels(self) -> None:
         command = jp.asarray((0.2, 0.0, 0.05, -0.30, 0.10))

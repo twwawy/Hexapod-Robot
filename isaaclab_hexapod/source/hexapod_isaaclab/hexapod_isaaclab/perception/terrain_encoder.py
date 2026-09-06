@@ -4,6 +4,22 @@ from __future__ import annotations
 
 import torch
 from torch import nn
+from torch.nn import functional as F
+
+
+def deterministic_terrain_features(elevation_map: torch.Tensor) -> torch.Tensor:
+    """Compress the fused map to 64 policy features without frozen random weights.
+
+    The PPO actor can learn from these stable inputs directly: 48 local-height
+    samples plus eight confidence and eight roughness samples.
+    """
+    if elevation_map.ndim != 4 or elevation_map.shape[1:] != (32, 24, 3):
+        raise ValueError("elevation map must have shape [N, 32, 24, 3]")
+    channels = elevation_map.permute(0, 3, 1, 2).contiguous()
+    height = F.adaptive_avg_pool2d(channels[:, 0:1], (8, 6)).flatten(1)
+    confidence = F.adaptive_avg_pool2d(channels[:, 1:2], (4, 2)).flatten(1)
+    roughness = F.adaptive_max_pool2d(channels[:, 2:3], (4, 2)).flatten(1)
+    return torch.cat((height, confidence, roughness), dim=-1)
 
 
 class TerrainEncoder(nn.Module):

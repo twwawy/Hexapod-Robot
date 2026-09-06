@@ -1,0 +1,394 @@
+{
+  "contracts": {
+    "action": {
+      "leg_order": [
+        "RF",
+        "RM",
+        "RB",
+        "LF",
+        "LM",
+        "LB"
+      ],
+      "normalized_range": [
+        -1.0,
+        1.0
+      ],
+      "per_leg_order": [
+        "x",
+        "y",
+        "z"
+      ],
+      "residual_scale_m": [
+        0.1,
+        0.1,
+        0.1
+      ],
+      "size": 18,
+      "swing_height_m": {
+        "action_minus_one": 0.04,
+        "action_plus_one": 0.25,
+        "action_zero": 0.06
+      },
+      "version": "stm32_firmware_adaptive_swing_residual_100mm_v4"
+    },
+    "network": {
+      "activation": "silu",
+      "actor_hidden_layers": [
+        256,
+        256,
+        128
+      ],
+      "critic_hidden_layers": [
+        256,
+        256,
+        128
+      ],
+      "distribution": "tanh_normal",
+      "normalize_observations": true
+    },
+    "observation": {
+      "size": 146,
+      "version": "firmware_state_collision_terrain_command5_pitch_v3"
+    },
+    "reward": {
+      "failure_penalty": -30.0,
+      "success_bonus": 30.0,
+      "version": "commanded_progress_motion_gate_v1",
+      "weights": {
+        "action_rate": -0.02,
+        "body_contact": -2.0,
+        "early_swing_contact": -1.0,
+        "edge_margin": -0.5,
+        "foot_clearance_terrain": -2.0,
+        "foot_limited": -2.0,
+        "gait_rejected": -0.5,
+        "height": 0.6,
+        "joint_margin": 1.0,
+        "joint_velocity": -0.04,
+        "lateral_velocity": -0.1,
+        "policy_rejected": -2.0,
+        "posture_rejected": -0.5,
+        "progress": 2.0,
+        "residual": -0.005,
+        "self_collision": -0.5,
+        "stability": 0.5,
+        "swing_height": -0.1,
+        "torque": -0.03,
+        "torque_saturation": -0.25,
+        "touchdown_impact": -0.05,
+        "under_speed": -2.0,
+        "upright": 1.0,
+        "velocity": 2.5,
+        "vertical_velocity": -0.1,
+        "yaw": 0.25
+      }
+    },
+    "terrain_geometry": {
+      "half_width_m": 0.6,
+      "plateau_depth_m": 0.5,
+      "ramp_length_m": 1.2,
+      "stair_depth_m": 0.25,
+      "start_x_m": 0.55
+    },
+    "terrain_levels": [
+      {
+        "final_height_m": 0.0,
+        "goal_x_m": 1.0,
+        "kind": "flat",
+        "level": 0,
+        "name": "flat",
+        "rough_amplitude_m": 0.0,
+        "slope_degrees": 0.0,
+        "stair_count": 0,
+        "stair_riser_m": 0.0
+      },
+      {
+        "final_height_m": 0.0,
+        "goal_x_m": 2.31,
+        "kind": "rough",
+        "level": 1,
+        "name": "rough",
+        "rough_amplitude_m": 0.025,
+        "slope_degrees": 0.0,
+        "stair_count": 0,
+        "stair_riser_m": 0.0
+      },
+      {
+        "final_height_m": 0.0,
+        "goal_x_m": 2.31,
+        "kind": "rough",
+        "level": 2,
+        "name": "rough_hard",
+        "rough_amplitude_m": 0.05,
+        "slope_degrees": 0.0,
+        "stair_count": 0,
+        "stair_riser_m": 0.0
+      },
+      {
+        "final_height_m": 0.16864900164286975,
+        "goal_x_m": 2.0,
+        "kind": "ramp",
+        "level": 3,
+        "name": "ramp",
+        "rough_amplitude_m": 0.0,
+        "slope_degrees": 8.0,
+        "stair_count": 0,
+        "stair_riser_m": 0.0
+      },
+      {
+        "final_height_m": 0.3215390309173472,
+        "goal_x_m": 2.0,
+        "kind": "ramp",
+        "level": 4,
+        "name": "ramp_steep",
+        "rough_amplitude_m": 0.0,
+        "slope_degrees": 15.0,
+        "stair_count": 0,
+        "stair_riser_m": 0.0
+      },
+      {
+        "final_height_m": 0.35000000000000003,
+        "goal_x_m": 2.55,
+        "kind": "stairs",
+        "level": 5,
+        "name": "stairs_7x5cm",
+        "rough_amplitude_m": 0.0,
+        "slope_degrees": 0.0,
+        "stair_count": 7,
+        "stair_riser_m": 0.05
+      },
+      {
+        "final_height_m": 0.455,
+        "goal_x_m": 2.55,
+        "kind": "stairs",
+        "level": 6,
+        "name": "stairs_7x6p5cm",
+        "rough_amplitude_m": 0.0,
+        "slope_degrees": 0.0,
+        "stair_count": 7,
+        "stair_riser_m": 0.065
+      },
+      {
+        "final_height_m": 0.56,
+        "goal_x_m": 2.55,
+        "kind": "stairs",
+        "level": 7,
+        "name": "stairs_7x8cm",
+        "rough_amplitude_m": 0.0,
+        "slope_degrees": 0.0,
+        "stair_count": 7,
+        "stair_riser_m": 0.08
+      },
+      {
+        "final_height_m": 0.7000000000000001,
+        "goal_x_m": 2.55,
+        "kind": "stairs",
+        "level": 8,
+        "name": "stairs_7x10cm",
+        "rough_amplitude_m": 0.0,
+        "slope_degrees": 0.0,
+        "stair_count": 7,
+        "stair_riser_m": 0.1
+      },
+      {
+        "final_height_m": 1.05,
+        "goal_x_m": 2.55,
+        "kind": "stairs",
+        "level": 9,
+        "name": "stairs_7x15cm",
+        "rough_amplitude_m": 0.0,
+        "slope_degrees": 0.0,
+        "stair_count": 7,
+        "stair_riser_m": 0.15
+      },
+      {
+        "final_height_m": 1.4000000000000001,
+        "goal_x_m": 2.55,
+        "kind": "stairs",
+        "level": 10,
+        "name": "stairs_7x20cm",
+        "rough_amplitude_m": 0.0,
+        "slope_degrees": 0.0,
+        "stair_count": 7,
+        "stair_riser_m": 0.2
+      },
+      {
+        "final_height_m": 0.5,
+        "goal_x_m": 3.3,
+        "kind": "stairs",
+        "level": 11,
+        "name": "stairs_10x5cm",
+        "rough_amplitude_m": 0.0,
+        "slope_degrees": 0.0,
+        "stair_count": 10,
+        "stair_riser_m": 0.05
+      },
+      {
+        "final_height_m": 0.65,
+        "goal_x_m": 3.3,
+        "kind": "stairs",
+        "level": 12,
+        "name": "stairs_10x6p5cm",
+        "rough_amplitude_m": 0.0,
+        "slope_degrees": 0.0,
+        "stair_count": 10,
+        "stair_riser_m": 0.065
+      },
+      {
+        "final_height_m": 0.8,
+        "goal_x_m": 3.3,
+        "kind": "stairs",
+        "level": 13,
+        "name": "stairs_10x8cm",
+        "rough_amplitude_m": 0.0,
+        "slope_degrees": 0.0,
+        "stair_count": 10,
+        "stair_riser_m": 0.08
+      },
+      {
+        "final_height_m": 1.0,
+        "goal_x_m": 3.3,
+        "kind": "stairs",
+        "level": 14,
+        "name": "stairs_10x10cm",
+        "rough_amplitude_m": 0.0,
+        "slope_degrees": 0.0,
+        "stair_count": 10,
+        "stair_riser_m": 0.1
+      },
+      {
+        "final_height_m": 1.5,
+        "goal_x_m": 3.3,
+        "kind": "stairs",
+        "level": 15,
+        "name": "stairs_10x15cm",
+        "rough_amplitude_m": 0.0,
+        "slope_degrees": 0.0,
+        "stair_count": 10,
+        "stair_riser_m": 0.15
+      },
+      {
+        "final_height_m": 2.0,
+        "goal_x_m": 3.3,
+        "kind": "stairs",
+        "level": 16,
+        "name": "stairs_10x20cm",
+        "rough_amplitude_m": 0.0,
+        "slope_degrees": 0.0,
+        "stair_count": 10,
+        "stair_riser_m": 0.2
+      }
+    ],
+    "timing": {
+      "firmware_dt_s": 0.005,
+      "firmware_ticks_per_policy_step": 4,
+      "physics_dt_s": 0.0025,
+      "physics_steps_per_policy_step": 8,
+      "policy_dt_s": 0.02
+    }
+  },
+  "isaac_transfer_gate": {
+    "load_mjx_weights_by_default": false,
+    "reason": "The newest run uses the prior residual-v3 action scaling, while current source uses the 100 mm residual-v4 contract; retrain before loading any checkpoint."
+  },
+  "latest_attempt": {
+    "action_contract_version": "stm32_firmware_adaptive_swing_residual_v3",
+    "curriculum_stage": 48,
+    "has_local_checkpoint": false,
+    "init_checkpoint": "mjx/runs/terrain/progress-v3-stage47-level9_20260829-010411_seed56/checkpoints/000005111808",
+    "latest_evaluation": {
+      "best_safe": false,
+      "best_safe_reasons": [
+        "eval/gait_policy_rejection_rate=0.170118>0.010000",
+        "eval/gait_foot_limited_rate=0.172877>0.010000",
+        "eval/gait_failure_rate=1.000000>0.050000"
+      ],
+      "episode_reward": -12.255610466003418,
+      "failure_rate": 1.0,
+      "foot_limited_rate": 0.17287703442723304,
+      "forward_progress_ratio": 0.23034081854506014,
+      "policy_rejection_rate": 0.17011787888088203,
+      "step": 0,
+      "terrain_success": 0.0,
+      "updated_at_utc": "2026-08-29T02:00:19.717462+00:00"
+    },
+    "observation_contract_version": "firmware_state_collision_terrain_command5_pitch_v3",
+    "reward_contract_version": "commanded_progress_motion_gate_v1",
+    "run_dir": "mjx/runs/terrain/progress-v3-stage48-level9_20260829-015645_seed57",
+    "run_id": "progress-v3-stage48-level9_20260829-015645_seed57",
+    "seed": 57,
+    "terrain_description": "7 stairs x 15.00cm = 105.0cm",
+    "terrain_level": 9,
+    "terrain_name": "stairs_7x15cm",
+    "training_source_commit": "0805164a5db4e85f1039637c829b760e5bc3d87b"
+  },
+  "latest_attempt_compatibility": {
+    "action": false,
+    "fully_compatible": false,
+    "observation": true
+  },
+  "latest_historical_safety_gated_checkpoint": {
+    "actor_contract_compatible": true,
+    "checkpoint": "mjx/runs/terrain/firmware-terrain-command5-teacher-student-v1-stage01-level2_20260826-194710_seed10/checkpoints/000001703936",
+    "critic_contract_compatible": false,
+    "reward_contract": null,
+    "run_dir": "mjx/runs/terrain/firmware-terrain-command5-teacher-student-v1-stage01-level2_20260826-194710_seed10",
+    "run_id": "firmware-terrain-command5-teacher-student-v1-stage01-level2_20260826-194710_seed10",
+    "score": 188.7029266357422,
+    "step": 1703936,
+    "terrain_level": 2
+  },
+  "latest_lineage_checkpoint": {
+    "action_contract_compatible": false,
+    "checkpoint": "mjx/runs/terrain/progress-v3-stage47-level9_20260829-010411_seed56/checkpoints/000005111808",
+    "deployment_eligible": false,
+    "network_config": {
+      "action_size": 18,
+      "network_factory_kwargs": {
+        "activation": "silu",
+        "distribution_type": "tanh_normal",
+        "init_noise_std": 1.0,
+        "mean_clip_scale": null,
+        "mean_kernel_init_fn": null,
+        "mean_kernel_init_kwargs": null,
+        "noise_std_type": "scalar",
+        "policy_hidden_layer_sizes": [
+          256,
+          256,
+          128
+        ],
+        "policy_network_kernel_init_fn": "lecun_uniform",
+        "policy_network_kernel_init_kwargs": null,
+        "policy_obs_key": "state",
+        "state_dependent_std": false,
+        "value_hidden_layer_sizes": [
+          256,
+          256,
+          128
+        ],
+        "value_network_kernel_init_fn": "lecun_uniform",
+        "value_network_kernel_init_kwargs": null,
+        "value_obs_key": "state"
+      },
+      "normalize_observations": true,
+      "observation_size": {
+        "dtype": "unserializable object: float32",
+        "shape": [
+          146
+        ]
+      }
+    },
+    "observation_contract_compatible": true,
+    "source": "latest_attempt.init_checkpoint"
+  },
+  "latest_safety_gated_checkpoint": null,
+  "purpose": "MJX-to-IsaacLab current training handoff",
+  "schema_version": 1,
+  "source_files_sha256": {
+    "mjx/firmware_mjx_controller.py": "3c67f08bdb8557e00d42e848a8f43c087f536b74a154baf93cc3ae215bb4130f",
+    "mjx/rough_terrain_env.py": "45effd90fdd3600ab9fc63dc76b0c78424392bb00ed04f0e3afa735b02ec14c1",
+    "mjx/terrain_curriculum.py": "c30a158fd66b5c97a1ceb0319b8997dd29d28fd238313da49a052eed9ad40caf",
+    "mjx/train_rough_terrain.py": "ecb814a22415716e5a4f39ba4bf556aca3c5942751d290005040e127b4c6b0a0"
+  },
+  "source_repository_commit": "5a7a3b46b2b65933bbddae0adc3f1644617f9192"
+}

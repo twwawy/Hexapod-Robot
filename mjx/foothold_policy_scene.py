@@ -47,9 +47,9 @@ def make_explorer_environment(module, config, level, request, source):
     """Called after archived robot imports, inside the isolated policy process."""
     import terrain_curriculum as curriculum
     import firmware_mjx_controller as firmware
-    from foothold_policy_controller import extend_state, step as foothold_step
+    from foothold_policy_controller import extend_state, step as residual_step
     # This process has imported the packaged v3 snapshot, never the working v4.
-    firmware.step = foothold_step
+    firmware.step = residual_step
     field = course_heightfield(request['terrain'])
     # One heightfield keeps the MJX contact graph bounded across the wide arena.
     # Its 2 cm raster is used for both the physical surface and LiDAR raycasts.
@@ -118,7 +118,7 @@ def make_explorer_environment(module, config, level, request, source):
             return jp.zeros(())
 
         def _terrain_swing_boost(self, data, support_height):
-            # The observed planner path supplies clearance instead.
+            # Swing height is owned by the original nominal/residual controller.
             return jp.zeros(())
 
         def _support_height(self, data, contacts):

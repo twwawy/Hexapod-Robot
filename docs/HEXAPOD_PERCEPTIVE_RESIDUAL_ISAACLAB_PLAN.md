@@ -1,9 +1,10 @@
 # Hexapod Perceptive Residual Locomotion 구현 계획
 
-> 2026-09-06 구조 변경: 최신 결정은
-> [LiDAR·IMU → geometric foothold correction → RL residual 계획](HEXAPOD_LIDAR_FOOTHOLD_RESIDUAL_PLAN.md)을 따른다.
-> 첫 단계는 LiDAR 기반 elevation map과 착지 후보 선택이며, D435IF RGB는 후속 후보 점수에 사용한다.
-> 아래 LiDAR+Depth 동시 fusion과 기존 actor 차원은 이전 계획 기록이며 새 구현의 확정 계약이 아니다.
+> 2026-09-06 최신 결정: [펌웨어 연속 보행 + LiDAR 기반 residual](HEXAPOD_LIDAR_FOOTHOLD_RESIDUAL_PLAN.md)을 따른다.
+> 현재 MuJoCo 뷰어는 후보 경로 직접 주입을 제거하고, v3 기본 제어기에 residual만 더한다.
+> LiDAR/GT 비교는 진단용이며 sensor student 학습은 후속 작업이다. D435IF RGB도 후속 단계다.
+> 아래는 이전 Isaac 계획 기록이다. LiDAR+Depth 동시 fusion, 제안된 actor 차원, phase/gate를
+> 현재 뷰어의 완료 상태로 해석하지 않는다. [현재 상태와 문서 안내](README.md)를 먼저 본다.
 
 작성일: 2026-08-27 (Asia/Seoul)  
 대상 브랜치: `codex/cartesian-residual-rl`  

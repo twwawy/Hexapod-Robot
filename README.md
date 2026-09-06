@@ -1,24 +1,10 @@
 # Hexapod-Robot
 
-6족 로봇의 하드웨어 자산과 MuJoCo MJX 기반 보행 실험을 함께 관리하는 저장소다. 현재 강화학습의 기준 경로는 **classical tripod gait + Cartesian residual RL**이다.
+6족 로봇의 CAD/URDF, MuJoCo MJX 보행 학습, LiDAR 높이 지도 뷰어와 Isaac Lab 이식 코드를 관리한다.
+**현재 뷰어 제어는 펌웨어 기본 보행 + 학습된 residual + Safety/IK**다. 기본 제어기는 관측 여부와
+무관하게 gait·접촉·자세를 계속 처리한다. LiDAR 착지 후보를 발의 절대 경로로 주입하는 전환은 제거했다.
 
-> 이 작업 브랜치의 STM32 펌웨어 직접 이식 기반 지형 curriculum 학습은 루트
-> `mjx/`에 있다. 실제 펌웨어의 gait/contact/posture/IK를 base controller로
-> 고정하고 안전-gated 18-D 발끝 residual만 학습한다. 실행 명령, W&B,
-> 평지→울퉁불퉁→경사면→10×20cm 최종 계단, best/stage/progress 영상과 checkpoint 규칙은
-> [mjx/RL_DESIGN.md](mjx/RL_DESIGN.md)를 따른다.
-
-최신 인식·보행 구조는 **LiDAR + IMU 상태 추정 → local elevation map → geometric
-foothold correction → RL residual → Safety / IK**다. D435IF RGB는 후속 단계에서
-지도 위 traversability/semantic score로 착지 후보를 평가하는 데 추가한다.
-구현 단계와 인터페이스는
-[LiDAR 착지점·residual 설계](docs/HEXAPOD_LIDAR_FOOTHOLD_RESIDUAL_PLAN.md)를 따른다.
-
-## 착지점 뷰어에서 학습 정책으로 이동
-
-기존 착지점 뷰어의 기본 제어는 **stage31 학습 정책 + MJX 동역학**이다.
-`progress-v2-stage31-level6_20260828-111825_seed40`의 최고 점수 checkpoint
-`000001703936`과 관측 정규화 통계를 불러온다.
+## 바로 실행
 
 ```bash
 cd /home/huro/Hexapod-Robot
@@ -26,117 +12,141 @@ source /home/huro/.venvs/hexapod-mjx/bin/activate
 bash scripts/view_foothold_planner.sh --terrain steps
 ```
 
-같은 창 안에서 학습용 링크 로봇을 방향키로 조종하며 12×12 m 코스의 계단·경사로·플랫폼·
-징검다리를 지나고, LiDAR 점군·높이 지도·착지 후보를 살펴볼 수 있도록 구성했다.
-처음에는 이동 명령 0, **`NOMINAL / RL=0`**으로 시작한다. 첫걸음의 착지 구간이 미관측이면
-펌웨어 기본 gait로 걷는다. 관측된 착지점이 확보된 다리는 다음 스윙 시작 때
-**`FOOTHOLD + RL`**로 전환한다. 공중에 있는 발의 목표는 지도 갱신만으로 바꾸지 않는다.
+기존 창을 닫고 다시 실행한다. MuJoCo/MJX·JAX·Brax·Orbax가 있는 `~/.venvs/hexapod-mjx`를 사용한다.
+스크립트가 해당 Python을 직접 선택하므로 activate는 선택 사항이다. 첫 실행에는 JAX 컴파일 시간이 필요하다.
 
-| 키 | 기본 학습 정책 모드의 동작 |
+기본 가중치는 `progress-v2-stage31-level6_20260828-111825_seed40`의 checkpoint `000001703936`이다.
+학습용 skeleton 모델을 사용하고, 같은 창에서 방향키로 12×12 m 코스의 계단·경사·플랫폼을 살펴본다.
+
+| 키 | 기본 동역학 모드 |
 |---|---|
-| ↑ / ↓ | 전후진 command ±0.04 m/s; 범위 ±0.12 m/s |
-| ← / → | yaw command ±0.15 rad/s; 범위 ±0.3 rad/s |
-| Space | 이동 command 0; 물리와 자세 제어는 계속 실행 |
-| Enter | 동역학 일시정지 / 재개 |
-| PageUp / PageDown | 몸체 높이 보정 ±2 cm; 범위 -5~+10 cm |
-| H | 로봇·정책·지도 초기화 |
-| 1~6 | 다리별 LiDAR 후보 상세 선택 |
+| ↑ / ↓ | 전후진 속도 ±0.04 m/s, 범위 ±0.12 m/s |
+| ← / → | 회전 속도 ±0.15 rad/s, 범위 ±0.3 rad/s |
+| Space / Enter | 속도 0 / 물리 일시정지·재개 |
+| PageUp / PageDown | 몸체 높이 trim ±2 cm, 범위 -5~+10 cm |
+| H / R | 상태·지도 초기화 / 인식 재시도·종료 상태 reset |
+| 1~6 | 다리별 후보 상세 표시 |
 | M / L / G | 높이 지도 / 점군 / MID-360 FOV 표시 |
-| P / C / K | 지도·계획 저장 / 지도 초기화 / LiDAR scan 전환 |
-| F / T / V | 추적 카메라 / 위에서 보기 / 전체 코스 |
+| K / C / P | scan 전환 / 지도 초기화·속도 0 / 진단 저장 |
+| F / T / V | 추적 / 위에서 보기 / 전체 코스 |
 
-**흰 점은 현재 발 제어 목표**, 큰 색상 점과 경로는 착지 계획이다. 스윙 시작 때 선택한
-관측 경로를 고정한다. 주황 경로는 nominal 예측이다. 미관측 다리는 기존 펌웨어 궤적과 **RL=0**, 관측 다리는
-**nominal gait → LiDAR 착지점 보정 → 제한된 stage31 residual → Safety/IK → MJX 동역학**을 사용한다.
-알려진 장애물이나 도달 불가능한 착지점은 다음 스윙을 hold한다. 단순 미관측은 hold 사유가 아니다.
-146-D 관측 중 지형 15개 항목은 LiDAR 관측 셀만 사용한다. 미관측 값은 중립값 0이며,
-지도 자체를 채우지 않는다. 시뮬레이터 지형 기반 pitch feedforward/swing boost는 끈다.
-이 결합은 원래 학습 정책 그대로의 재생과 다르며, 실행·계단 등반 검증은 사용자가 수행한다.
-후진·회전은 이 run의 학습 command 범위 밖이며, 횡이동 A/D는 지원하지 않는다.
+방향키는 속도를 증감하므로 키를 놓아도 계속 걷는다. 흰 점은 실제 제어 목표, 색상 점과 경로는
+LiDAR 착지 후보다. **후보를 못 찾아도 기본 gait가 계속 진행하며, 후보가 실제 착지 목표를 뜻하지 않는다.**
 
-센서는 밑면 중심에서 높이 **215 mm**, 전방 **13.529 mm**, 위를 향해 전방으로 **45°** 기울어진
-TF를 사용한다. MID-360 FOV는 수평 360°, 수직 -7°~+52°다. 지도는 8×8 m, 4 cm 셀,
-60초 관측 유지이며 기본 불투명도는 지도 16%, 점군 22%다.
+## 현재 보행과 센서 입력
 
-기본 모드의 넓은 지형은 기존 장애물 배치에서 만든 **2 cm heightfield**다.
-물리 접촉과 LiDAR가 같은 표면을 사용하고, 정책에는 이 표면의 높이를 보간해 제공한다.
-정면은 기존 탐색 코스의 4 cm 계단 6단이며, 별도 run 재현 환경의 6.5 cm 계단 7단과 구분한다.
+```text
+명령 + 몸체/접촉 상태 → 펌웨어 nominal gait ─┐
+                                           ├→ Safety / IK → MJX 동역학
+LiDAR 높이 지도 + proprioception → RL residual ┘
 
-### 환경과 비교 모드
+LiDAR 지도 → 착지 후보 표시
+LiDAR 샘플 ↔ simulator GT → 오차 비교/저장, 후속 학습의 정답
+```
 
-가상환경은 `~/.venvs/hexapod-mjx`이며 스크립트가 직접 사용하므로 activate는 선택 사항이다.
-**JAX/MJX/Brax가 설치된 기존 학습 환경**이 필요하다. 첫 실행에는 JAX 컴파일 시간이 걸린다.
-GPU 계산은 별도 프로세스에서 수행하며, CPU 뷰어와 LiDAR worker는 같은 로봇 자세를 받아 표시한다.
-실제 하드웨어로 명령을 보내지는 않는다.
+- 첫걸음에서 정책의 15개 높이 샘플이 모두 미관측이면 **NOMINAL / RL=0**으로 걷는다.
+- 관측이 생기면 **NOMINAL + RL RESIDUAL**이다. 목표 gain은 `residual-scale × 관측 비율`이며 0.5초 시정수로 변화를 완화한다. 이 비율은 임시 가용성 기준이다.
+- 미관측 입력은 중립값 0이며 지도에 관측으로 채우지 않는다. 관측이 모두 사라지면 residual/filter를 0으로 지운다.
+- 원래 v3 펌웨어의 swing/stance/late landing, residual 의미, foot memory, IK·관절 속도 제한을 유지한다. 외부 경로·odom stance anchor를 넣지 않는다.
+- GT 기반 pitch feedforward/swing boost는 끈다. 지형 GT 비교값은 actor나 제어 보정에 입력하지 않는다.
+
+기존 가중치는 GT 높이 입력으로 학습됐다. LiDAR 공백/오차에 적응한 새 정책을 학습한 것은 아니며,
+현재 입력 교체와 gain 조절은 통합 실험이다. 실제 등반 성공은 사용자가 검증한다.
+LiDAR+IMU odometry 대신 현재 뷰어의 몸체 상태는 MuJoCo 상태를 사용한다.
+
+## 비교 실행과 확인
 
 ```bash
-# 기존 LiDAR 후보 기반 기구학 제어와 비교
-bash scripts/view_foothold_planner.sh --terrain steps --controller nominal
+# 같은 MJX 동역학에서 기본 제어기만 실행
+bash scripts/view_foothold_planner.sh --terrain steps --residual-scale 0
 
-# 평지에서 학습 정책 확인
+# residual을 줄여 비교
+bash scripts/view_foothold_planner.sh --terrain steps --residual-scale 0.25
+
+# 평지
 bash scripts/view_foothold_planner.sh --terrain flat
 
-# 지도와 점군을 더 옅게 표시
-bash scripts/view_foothold_planner.sh --terrain steps --map-alpha 0.10 --lidar-point-alpha 0.15
+# 이전 기구학 착지 경로 모드; 동역학 비교와 구분
+bash scripts/view_foothold_planner.sh --terrain steps --controller nominal
 
-# 별도 창에서 run에 기록된 6.5 cm 계단 7단 재현
+# 별도 v3 정책 재생: 저장된 지형 설정과 GT 입력
 bash scripts/view_trained_policy.sh
 ```
 
-학습 정책 모드의 로봇/제어기는 기록된 v3 코드 버전을 별도로 추출해 사용한다.
-`--revision`과 CAD 외형 비교는 `--controller nominal`에만 적용한다.
-학습 당시 미커밋 소스가 없어 W&B 영상과 완전히 같은 재현은 미확인이며,
-사용자 요청에 따라 이번 통합본의 실행·정책 추론·계단 보행 검증은 수행하지 않았다.
+사용자는 먼저 scale 0에서 연속 스윙을 보고, residual 적용 후 `IK valid`, `residual IK valid`,
+`reach limited`, 흰 목표와 실제 발을 비교한다. K/C로 입력을 비웠을 때도 보행이 이어지는지 확인한다.
+이번 수정은 코드 문법·diff만 확인했으며, GUI·추론·보행 테스트와 재학습은 실행하지 않았다.
 
-자세한 구성·조작·확인 항목은 [착지점 뷰어 안내](docs/HEXAPOD_FOOTHOLD_PREVIEW_USAGE.md),
-가중치 출처는 [학습 정책 안내](mjx/policies/progress-v2-stage31-level6/README.md)를 참고한다.
+P로 `mjx/generated/foothold_preview/`에 다음 자료를 저장한다.
 
-## 현재 MJX 기준
-
-현재 학습 경로는 루트 `mjx/`이며 다음 물리 계약을 사용한다.
-
-| 항목 | 현재 값 |
+| 파일 | 내용 |
 |---|---|
-| RL 로봇 총질량 | 정확히 `10.0 kg` (`prepare_rl_scene.py`에서 원본 링크 질량·관성을 비례 스케일) |
-| 액추에이터 | DS51150-270, 12.6 V 기준 geared position servo |
-| 정격 모델 | 357:1, 150 kgf·cm = `14.709975 Nm`, 0.19 s/60° = `315.8 deg/s` |
-| MuJoCo servo prior | `kp=500`, `kv=10`, armature `0.02 kg·m²`, damping `0.15 Nms/rad`, friction loss `0.8 Nm` |
-| 정책 계약 | 18-D adaptive-swing foot residual v3 / 142-D observation |
+| `latest_plan.json` | 제어 모드·gain·action·IK 상태·후보·현재 목표·LiDAR/GT 오차 |
+| `latest_map.npz` | 높이·valid·시각·점군 |
+| `latest_lidar_gt_pair.npz` | 동일 XY의 15개 LiDAR/GT 높이·valid·age·입력 pose/시각 |
+| `scene_manifest.json` | 모델·checkpoint·센서·제어 설정 |
 
-토크·기어비·무부하 속도는 DS51150 제조사 사양을 사용한다. `kp`, `kv`, armature,
-damping, friction loss는 제조사가 제공한 식별값이 아니라 실기 벤치시험 전 사용하는
-명시적 초기값이다. 실제 로봇 자체의 실측 질량을 10 kg로 단정하는 값도 아니다.
+GT 오차는 관측된 샘플만 비교하며, 없으면 `n/a`다. 기준은 2 cm 코스 raster의 bilinear 높이라
+물리 표면 모서리의 삼각형 보간과 차이가 날 수 있다. P는 최근 샘플을 덮어쓰며 대규모 학습 데이터셋 수집은 별도다.
 
-기본 Swing은 6 cm이며 정책의 다리별 Z action이 Swing 중간 높이를 4~25 cm로
-조절한다. 위상 envelope 때문에 이륙점과 착지점의 Z는 바뀌지 않는다. Stance Z는
-±20 mm로 제한하고 Late Landing은 펌웨어가 단독으로 제어한다.
+## 센서·지형·모델
 
-기존 v2 Level 4 actor는 Z 출력이 Cartesian 위치 offset이라 v3 높이 명령과 의미가
-다르므로 직접 restore하지 않는다. 새 동역학과 adaptive swing은 level 0부터 새로
-학습한다. 환경 생성 시 `mjx/generated/hexapod_rl.xml`은 자동 재생성된다.
+| 항목 | 뷰어 기본값 |
+|---|---|
+| LiDAR measured TF | 밑면 중심에서 높이 215 mm, 전방 13.529 mm, 위를 향해 전방 45° |
+| base→LiDAR | XYZ `(0,-0.013529,0.1642) m`, RPY `(0,45°,-90°)` |
+| MID-360 proxy | 수평 360°, 수직 -7°~+52°, 거리 0.1~8 m, 720×64 angular rays |
+| 높이 지도 | odom 정렬 8×8 m rolling map, 4 cm 셀, 60초 유지 |
+| 불투명도 | 지도 16%, 점군 22%, 후보 마커 불투명 |
+| 코스 | 12×12 m, 정면 4 cm 계단 6단·경사·플랫폼·돌출물·바위 |
+| 로봇 | 학습 box/capsule/sphere skeleton; 구형 발 반지름 32 mm |
+
+measured TF는 CAD의 URDF 장착 chain과 별도다. Livox 비반복 스캔 패턴을 정확히 재현하지 않는다.
+물리·raycast는 같은 2 cm heightfield를 사용한다. 별도 정책 재생기의 기록 지형은 6.5 cm 계단 7단이다.
+CAD 비교는 `--controller nominal --robot-model mesh`로 열 수 있다.
+
+## 코드·가중치 버전 구분
+
+| 경로 | 역할·계약 |
+|---|---|
+| `scripts/view_foothold_planner.sh` 기본 모드 | 격리된 v3/18-D action·146-D observation + LiDAR 입력과 residual gain |
+| `scripts/view_trained_policy.sh` | stage31 가중치와 저장 설정으로 v3 재생, GT 입력 사용 |
+| 루트 `mjx/` 학습 | v4/18-D action·146-D observation, swing X/Y·stance Z 최대 ±100 mm, curriculum 0~16 |
+| `isaaclab_hexapod/` | v4 Torch 제어기·센서·지형·학습 scaffold와 USD 이식 |
+| `SW/mjx/` | 과거 24-D/113-D 실험; 아래 레거시 설명 참고 |
+
+v3와 v4는 차원이 같아도 residual scale이 달라 직접 checkpoint를 공유하지 않는다.
+뷰어는 `0805164` 코드/URDF를 격리해 사용한다. 당시 미커밋 소스가 저장되지 않아 W&B 영상의 정확한 재현은 미확인이다.
+Isaac handoff의 과거 안전 평가와 최신 v4 호환성은 별도로 기록하며, 기존 MJX 가중치를 자동 로드하지 않는다.
+
+현재 루트 MJX 모델의 물리 기준은 10 kg 질량 정규화, DS51150-270 12.6 V servo,
+14.709975 Nm 정격 모델, 315.8 deg/s 관절 속도 제한이다. `kp=500`, `kv=10`, armature 0.02,
+damping 0.15, friction loss 0.8은 실측 식별 전 사용하는 모델 prior다.
 
 ```bash
-cd /home/huro/Hexapod-Robot
+# 루트 MJX의 v4 새 학습 예시; stage31 v3 재생과 구분
 /home/huro/bin/hexapod-mjx-python mjx/train_competence_curriculum.py \
-  --run-name firmware-terrain-adaptive-swing \
-  --seed 8 \
-  --flat-baseline-timesteps 262144 \
-  --start-level 1 --max-level 12 \
-  --stages 44 --stage-timesteps 5000000 \
-  --level-progression competence \
-  --checkpoint-selection best \
-  --wandb --wandb-project hexapod-firmware-terrain \
+  --run-name firmware-terrain-residual-v4 --seed 8 \
+  --flat-baseline-timesteps 262144 --start-level 1 --max-level 16 \
+  --stages 44 --stage-timesteps 5000000 --level-progression competence \
+  --checkpoint-selection best --wandb --wandb-project hexapod-firmware-terrain \
   -- --num-envs 1024 --num-evals 4 --num-eval-envs 32
 ```
 
-자세한 active contract, curriculum, 테스트와 실행 옵션은
-[mjx/RL_DESIGN.md](mjx/RL_DESIGN.md)와 [mjx/FIRMWARE_BASE.md](mjx/FIRMWARE_BASE.md)를
-기준으로 한다.
+## 문서와 업데이트 기록
+
+- [문서 안내·최신 상태](docs/README.md)
+- [뷰어 실행·환경·사용자 확인 순서](docs/HEXAPOD_FOOTHOLD_PREVIEW_USAGE.md)
+- [LiDAR 입력, GT 정답, residual 학습 구조](docs/HEXAPOD_LIDAR_FOOTHOLD_RESIDUAL_PLAN.md)
+- [2026-09-06 수정 및 미커밋 업데이트 정리](docs/HEXAPOD_UPDATE_2026-09-06.md)
+- [현재 MJX 학습 계약](mjx/RL_DESIGN.md), [기본 펌웨어 설명](mjx/FIRMWARE_BASE.md)
+- [Isaac Lab 실행 안내](isaaclab_hexapod/README.md), [이식 기록](isaaclab_hexapod/PORT_RESULT_AND_USAGE.md)
+- [stage31 가중치 출처](mjx/policies/progress-v2-stage31-level6/README.md)
 
 ## 레거시 `SW/mjx/` 경로
 
 아래 24-D/113-D `SW/mjx/` 설명은 과거 classical whole-body residual 실험을
-재현하기 위한 참고 자료다. 현재 루트 `mjx/`의 18-D/142-D firmware residual이나
+재현하기 위한 참고 자료다. 현재 루트 `mjx/`의 18-D/146-D v4 firmware residual이나
 10 kg/DS51150 동역학 계약과 checkpoint를 섞어 사용하지 않는다.
 
 Canonical contract: `classical_wbc_cartesian_body6d_residual_v1` action(24-D) +

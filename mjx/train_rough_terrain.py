@@ -30,6 +30,7 @@ from rough_terrain_env import (
     ACTION_SIZE,
     OBSERVATION_CONTRACT_VERSION,
     OBSERVATION_SIZE,
+    REWARD_CONTRACT_VERSION,
     HexapodRoughTerrainEnv,
     default_config,
 )
@@ -47,8 +48,11 @@ WANDB_ESSENTIAL_METRICS = (
     "eval/gait_failure_rate",
     "eval/gait_policy_rejection_rate",
     "eval/gait_foot_limited_rate",
+    "eval/gait_forward_progress_ratio",
     "eval/episode_reward/progress",
     "eval/episode_reward/velocity",
+    "eval/episode_reward/under_speed",
+    "eval/episode_reward/no_progress",
     "eval/episode_reward/stability",
     "eval/episode_reward/upright",
     "eval/episode_reward/height",
@@ -84,6 +88,8 @@ class ScoreMonitor:
         self.history_path = directory / "metrics_history.jsonl"
         self.best_score = -math.inf
         self.level_best_score = -math.inf
+        self.best_rank = (-1, -math.inf, -math.inf, -math.inf)
+        self.level_best_rank = (-1, -math.inf, -math.inf, -math.inf)
         self.last_level_best = False
         self.max_policy_rejection_rate = max_policy_rejection_rate
         self.max_foot_limited_rate = max_foot_limited_rate
@@ -131,9 +137,16 @@ class ScoreMonitor:
                 "clearance",
                 "body_contact",
                 "nonfinite",
+                "no_progress",
             )
         )
         numeric["eval/gait_failure_rate"] = failure_rate
+        progress_total = numeric.get(
+            "eval/episode_forward_progress_ratio",
+            numeric.get("eval/episode_reward/progress", 0.0),
+        )
+        progress_ratio = progress_total / episode_length
+        numeric["eval/gait_forward_progress_ratio"] = progress_ratio
         self.last_metrics = numeric
         safe_reasons: list[str] = []
         for key, limit in (
@@ -146,6 +159,13 @@ class ScoreMonitor:
         safe = not safe_reasons
         self.last_safe = safe
         score = numeric.get(self.score_key, float("nan"))
+        success = numeric.get("eval/episode_terrain_success", 0.0)
+        rank = (
+            int(safe),
+            success if math.isfinite(success) else -math.inf,
+            progress_ratio if math.isfinite(progress_ratio) else -math.inf,
+            score if math.isfinite(score) else -math.inf,
+        )
         payload = {
             "score_key": self.score_key,
             "score": score,
@@ -154,6 +174,12 @@ class ScoreMonitor:
             "metrics": numeric,
             "best_safe": safe,
             "best_safe_reasons": safe_reasons,
+            "selection_rank": {
+                "safe": bool(rank[0]),
+                "terrain_success": rank[1],
+                "forward_progress_ratio": rank[2],
+                "score": rank[3],
+            },
         }
         self.write_json(self.latest_path, payload)
         with self.history_path.open("a", encoding="utf-8") as history:
@@ -161,21 +187,21 @@ class ScoreMonitor:
         # Step 0 is the untrained policy and already has a dedicated 0%
         # progress video.  Best artifacts begin after at least one PPO update,
         # where Brax has also written the matching regular checkpoint.
-        is_level_best = (
-            step > 0 and math.isfinite(score) and score > self.level_best_score
-        )
+        is_level_best = step > 0 and math.isfinite(score) and rank > self.level_best_rank
         self.last_level_best = is_level_best
         if is_level_best:
             self.level_best_score = score
+            self.level_best_rank = rank
             self.write_json(self.level_best_path, payload)
         is_best = (
             step > 0
             and safe
             and math.isfinite(score)
-            and score > self.best_score
+            and rank > self.best_rank
         )
         if is_best:
             self.best_score = score
+            self.best_rank = rank
             self.write_json(self.best_path, payload)
         return score, is_best
 
@@ -244,7 +270,7 @@ def _arguments(argv: list[str] | None = None) -> argparse.Namespace:
         "--episode-length",
         type=int,
         default=None,
-        help="Default: 1000 for flat, 2500 for levels 1-8, 5000 for levels 9-12.",
+        help="Default: 1000 flat, 2500 through seven-step stairs, 5000 for ten-step stairs.",
     )
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--run-name", default=None)
@@ -267,15 +293,25 @@ def _arguments(argv: list[str] | None = None) -> argparse.Namespace:
         type=int,
         choices=range(MAX_TERRAIN_LEVEL + 1),
         default=0,
-        help="0 flat, 1-2 rough, 3-4 ramps, 5-12 stairs.",
+        help=f"0 flat, 1-2 rough, 3-4 ramps, 5-{MAX_TERRAIN_LEVEL} stairs.",
     )
     parser.add_argument("--command-min-speed", type=float, default=0.06)
     parser.add_argument("--command-max-speed", type=float, default=0.12)
     parser.add_argument("--command-delay", type=float, default=1.0)
     parser.add_argument("--height-cmd-min", type=float, default=-0.05)
     parser.add_argument("--height-cmd-max", type=float, default=0.10)
-    parser.add_argument("--pitch-cmd-deg-min", type=float, default=-25.0)
-    parser.add_argument("--pitch-cmd-deg-max", type=float, default=25.0)
+    parser.add_argument(
+        "--pitch-cmd-deg-min",
+        type=float,
+        default=0.0,
+        help="Minimum explicit pitch offset added to terrain pitch_ff.",
+    )
+    parser.add_argument(
+        "--pitch-cmd-deg-max",
+        type=float,
+        default=0.0,
+        help="Maximum explicit pitch offset added to terrain pitch_ff.",
+    )
     parser.add_argument("--roll-cmd-deg-max", type=float, default=15.0)
     parser.add_argument(
         "--dr-bank-size",
@@ -475,6 +511,22 @@ def _resolve_checkpoint(path: Path, network_layers: tuple[int, ...]) -> Path:
     return resolved
 
 
+def _validate_critic_reward_contract(checkpoint: Path, restore_critic: bool) -> None:
+    """Reject critic restoration across incompatible reward definitions."""
+    if not restore_critic:
+        return
+    metadata = json.loads(
+        (checkpoint.parent.parent / "run_metadata.json").read_text(encoding="utf-8")
+    )
+    saved_contract = metadata.get("reward_contract_version")
+    if saved_contract != REWARD_CONTRACT_VERSION:
+        raise SystemExit(
+            "checkpoint critic was trained under reward contract "
+            f"{saved_contract!r}; restart this reward migration with "
+            "--no-init-value-function"
+        )
+
+
 def _git_commit() -> str:
     try:
         result = subprocess.run(
@@ -570,6 +622,7 @@ def _write_metadata(args: argparse.Namespace, env: HexapodRoughTerrainEnv) -> No
             "controller": "STM32 firmware base + safety-gated 18D Cartesian foot residual",
             "action_contract_version": ACTION_CONTRACT_VERSION,
             "observation_contract_version": OBSERVATION_CONTRACT_VERSION,
+            "reward_contract_version": REWARD_CONTRACT_VERSION,
             "action_size": env.action_size,
             "observation_size": env.observation_size,
             "curriculum_stage": args.curriculum_stage,
@@ -684,6 +737,7 @@ def _wandb_config(args: argparse.Namespace, env: HexapodRoughTerrainEnv) -> dict
             "observation_size": env.observation_size,
             "action_contract_version": ACTION_CONTRACT_VERSION,
             "observation_contract_version": OBSERVATION_CONTRACT_VERSION,
+            "reward_contract_version": REWARD_CONTRACT_VERSION,
             "terrain_name": env.terrain_name,
             "terrain_kind": env.terrain_kind,
             "terrain_description": env.terrain_description,
@@ -703,7 +757,9 @@ def main() -> None:
     spec = terrain_level_spec(args.terrain_level)
     if args.episode_length is None:
         args.episode_length = (
-            1000 if spec.level == 0 else (2500 if spec.level <= 8 else 5000)
+            1000
+            if spec.level == 0
+            else (5000 if spec.kind == "stairs" and spec.stair_count == 10 else 2500)
         )
     if args.curriculum_stage is None:
         args.curriculum_stage = _infer_stage(args.run_name)
@@ -771,6 +827,9 @@ def main() -> None:
     network_layers = tuple(args.network_layers)
     if args.init_checkpoint is not None:
         args.init_checkpoint = _resolve_checkpoint(args.init_checkpoint, network_layers)
+        _validate_critic_reward_contract(
+            args.init_checkpoint, args.init_value_function
+        )
     config = default_config()
     config.episode_length = args.episode_length
     config.command_min_speed = args.command_min_speed
@@ -1260,6 +1319,7 @@ def main() -> None:
                 "clearance",
                 "body_contact",
                 "nonfinite",
+                "no_progress",
             )
         )
         marker = (

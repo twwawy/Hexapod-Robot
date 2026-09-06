@@ -56,12 +56,14 @@ class LearnedFootholdGait:
         self.model, self.data = backend.model, backend.data
         self.ik = SiteIK(self.model, self.data.qpos)
         self.home_height = float(self.data.qpos[2])
-        self.duration, self.elapsed, self.phase_scale = 0.8, 0.0, 1.0
+        self.duration, self.elapsed, self.phase_scale = 0.5, 0.0, 1.0
         self.plans = {}
         self.control_mode = 'NOMINAL / RL=0'
-        self.mapped_legs = np.zeros(6, dtype=bool)
         self.swing = np.zeros(6, dtype=bool)
-        self.landing_targets = None
+        self.residual_gain = 0.0
+        self.terrain_comparison = self.terrain_samples = None
+        self.ik_valid = self.policy_valid = np.ones(6, dtype=bool)
+        self.foot_limited = np.zeros(6, dtype=bool)
         self.last_map_stamp = None
         self.targets = None
         self.action = np.zeros(18)
@@ -90,10 +92,11 @@ class LearnedFootholdGait:
                 self.data.time = message['time']
                 mujoco.mj_forward(self.model, self.data)
                 self.targets, self.action = message['targets'], message['action']
-                self.plans = message['plans']
-                self.control_mode, self.mapped_legs = message['control_mode'], message['mapped_legs']
+                self.control_mode, self.residual_gain = message['control_mode'], message['residual_gain']
+                self.terrain_comparison, self.terrain_samples = message['terrain_comparison'], message['terrain_samples']
+                self.ik_valid, self.policy_valid = message['ik_valid'], message['policy_valid']
+                self.foot_limited = message['foot_limited']
                 self.swing = message['swing']
-                self.landing_targets = message['landing_targets']
                 self.anchors = self.ik.positions(self.data)
                 self.completed_swings = message['completed_swings']
                 self.terminal, self.status = message['terminal'], message['status']

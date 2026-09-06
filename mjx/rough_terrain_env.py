@@ -40,8 +40,9 @@ from servo_model import (
 
 ACTION_SIZE = 18
 OBSERVATION_SIZE = 146
-ACTION_CONTRACT_VERSION = "stm32_firmware_adaptive_swing_residual_v3"
+ACTION_CONTRACT_VERSION = "stm32_firmware_adaptive_swing_residual_100mm_v4"
 OBSERVATION_CONTRACT_VERSION = "firmware_state_collision_terrain_command5_pitch_v3"
+REWARD_CONTRACT_VERSION = "commanded_progress_motion_gate_v1"
 LEGACY_OBSERVATION_CONTRACT_VERSION = "firmware_state_collision_contact_stairs_v1"
 MODEL_FORWARD = jp.array((0.0, -1.0, 0.0))
 MODEL_LATERAL = jp.array((1.0, 0.0, 0.0))
@@ -52,6 +53,13 @@ PITCH_FF_FILTER_TAU_S = 0.15
 EFFECTIVE_PITCH_MAX_RAD = 0.5585
 SWING_BOOST_RISE_M = 0.20
 SWING_BOOST_MAX_M = 0.06
+STAIR_ASSIST_MIN_RISER_M = 0.10
+STAIR_SWING_CLEARANCE_M = 0.03
+VELOCITY_TRACKING_SIGMA_MPS = 0.04
+FORWARD_VELOCITY_FILTER_TAU_S = 0.50
+MOTION_GATE_COMMAND_FRACTION = 0.50
+PROGRESS_COMMAND_FLOOR_MPS = 0.05
+TERRAIN_PROGRESS_HEIGHT_CREDIT = 0.50
 SUCCESS_POSTURE_TOLERANCE_RAD = jp.deg2rad(12.0)
 FOOT_CLEARANCE_RADIUS_M = 0.05
 FOOT_CLEARANCE_MIN_M = 0.02
@@ -84,6 +92,7 @@ def _pitch_ff(
     support_height: jax.Array,
     previous_ff: jax.Array,
     dt: float,
+    uphill_pitch_target: jax.Array = jp.asarray(0.0),
 ) -> jax.Array:
     """Estimate a forward-lean feedforward angle from relative terrain rise.
 
@@ -96,6 +105,16 @@ def _pitch_ff(
     mean_ahead = jp.nan_to_num(jp.mean(forward_heights), nan=0.0)
     relative_rise = mean_ahead - jp.nan_to_num(support_height, nan=0.0)
     raw_ff = -jp.arctan2(relative_rise, PITCH_FF_LOOKAHEAD_M)
+    target_magnitude = jp.abs(uphill_pitch_target)
+    uphill_fraction = jp.clip(
+        -raw_ff / jp.maximum(target_magnitude, 1.0e-6), 0.0, 1.0
+    )
+    assisted_ff = uphill_pitch_target * jp.sqrt(uphill_fraction)
+    raw_ff = jp.where(
+        (raw_ff < 0.0) & (uphill_pitch_target < 0.0),
+        jp.minimum(raw_ff, assisted_ff),
+        raw_ff,
+    )
     deadbanded = jp.where(
         jp.abs(relative_rise) < PITCH_FF_DEADBAND_M,
         0.0,
@@ -104,6 +123,28 @@ def _pitch_ff(
     bounded = jp.clip(deadbanded, -PITCH_FF_MAX_RAD, PITCH_FF_MAX_RAD)
     alpha = jp.exp(-dt / PITCH_FF_FILTER_TAU_S)
     return alpha * jp.nan_to_num(previous_ff, nan=0.0) + (1.0 - alpha) * bounded
+
+
+def _coupled_swing_height_floor(
+    pitch_ff: jax.Array,
+    uphill_pitch_target: jax.Array,
+    stair_riser: float,
+) -> jax.Array:
+    """Raise the swing floor in lockstep with the filtered uphill pitch."""
+    target_magnitude = jp.abs(uphill_pitch_target)
+    assist_fraction = jp.where(
+        target_magnitude > 1.0e-6,
+        jp.clip(-pitch_ff / target_magnitude, 0.0, 1.0),
+        0.0,
+    )
+    target_height = jp.clip(
+        stair_riser + STAIR_SWING_CLEARANCE_M,
+        firmware.SWING_HEIGHT,
+        firmware.SWING_HEIGHT_MAX,
+    )
+    return firmware.SWING_HEIGHT_MIN + assist_fraction * (
+        target_height - firmware.SWING_HEIGHT_MIN
+    )
 
 
 def _swing_boost(
@@ -155,7 +196,13 @@ def _terrain_posture_command(
     slope_degrees: float,
     command_config: config_dict.ConfigDict,
 ) -> jax.Array:
-    """Sample [h_cmd, pitch_cmd, roll_cmd] from the fixed terrain curriculum."""
+    """Sample [h_cmd, pitch_cmd, roll_cmd] from the fixed terrain curriculum.
+
+    Terrain pitch is already a complete, local target in ``pitch_ff``.  Keep
+    the automatic pitch command at zero so ramp/stair angle is not counted a
+    second time by ``pitch_cmd + pitch_ff``.  The controller still supports an
+    explicit pitch command as an additive offset outside this sampler.
+    """
     if terrain_kind in {"flat", "rough"}:
         return jp.zeros(3)
     height = jax.random.uniform(
@@ -164,25 +211,18 @@ def _terrain_posture_command(
         minval=command_config.height_min,
         maxval=0.0,
     )
-    if terrain_kind == "ramp":
-        pitch = jp.deg2rad(
-            jp.clip(
-                -slope_degrees,
-                command_config.pitch_min_deg,
-                0.0,
-            )
+    pitch_offset = jp.deg2rad(
+        jax.random.uniform(
+            pitch_key,
+            (),
+            minval=command_config.pitch_min_deg,
+            maxval=command_config.pitch_max_deg,
         )
-    else:
-        stair_pitch_max = min(-5.0, float(command_config.pitch_max_deg))
-        pitch = jp.deg2rad(
-            jax.random.uniform(
-                pitch_key,
-                (),
-                minval=command_config.pitch_min_deg,
-                maxval=stair_pitch_max,
-            )
-        )
-    return jp.stack((height, pitch, jp.asarray(0.0)))
+    )
+    # Retain slope_degrees for the sampler API; the local terrain angle itself
+    # is supplied dynamically by pitch_ff rather than duplicated here.
+    _ = slope_degrees
+    return jp.stack((height, pitch_offset, jp.asarray(0.0)))
 
 
 def _absolute_tilt_failure(attitude: jax.Array, max_tilt: float) -> jax.Array:
@@ -218,6 +258,31 @@ def _touchdown_impact_cost(
     )
 
 
+def _update_progress_watchdog(
+    *,
+    potential: jax.Array,
+    anchor: jax.Array,
+    stagnant_steps: jax.Array,
+    command_active: jax.Array,
+    success: jax.Array,
+    dt: float,
+    min_delta: float,
+    timeout: float,
+) -> tuple[jax.Array, jax.Array, jax.Array]:
+    """Advance the windowed terrain-progress watchdog."""
+    made_progress = potential - anchor >= min_delta
+    next_steps = jp.where(
+        (~command_active) | made_progress,
+        jp.zeros((), dtype=jp.int32),
+        stagnant_steps + 1,
+    )
+    next_anchor = jp.where(made_progress, potential, anchor)
+    timed_out = (
+        command_active & (next_steps * dt >= timeout) & (~success)
+    )
+    return next_anchor, next_steps, timed_out
+
+
 def _base_reward_terms(
     *,
     forward_velocity: jax.Array,
@@ -246,20 +311,52 @@ def _base_reward_terms(
     foot_limited: jax.Array,
     body_contact: jax.Array,
     self_collision: jax.Array,
+    command_active: jax.Array = jp.asarray(True),
 ) -> dict[str, jax.Array]:
-    """Compute the reward terms that predate stair-contact penalties."""
+    """Compute locomotion rewards with no profitable stationary solution."""
+    speed_command = jp.maximum(command[0], PROGRESS_COMMAND_FLOOR_MPS)
+    active_speed_command = jp.where(command_active, command[0], 0.0)
+    motion_gate = jp.where(
+        command_active,
+        jp.clip(
+            forward_velocity
+            / (MOTION_GATE_COMMAND_FRACTION * speed_command),
+            0.0,
+            1.0,
+        ),
+        1.0,
+    )
+    progress = jp.where(
+        command_active,
+        jp.clip(forward_velocity / speed_command, -1.0, 1.5),
+        0.0,
+    )
+    under_speed = jp.where(
+        command_active,
+        jp.square(
+            jp.maximum(speed_command - forward_velocity, 0.0) / speed_command
+        ),
+        0.0,
+    )
     return {
         "velocity": jp.exp(
-            -jp.square(forward_velocity - command[0]) / 0.01
+            -jp.square(
+                (forward_velocity - active_speed_command)
+                / VELOCITY_TRACKING_SIGMA_MPS
+            )
         ),
-        "yaw": jp.exp(-jp.square(yaw_velocity - command[1]) / 0.09),
-        "upright": _upright_reward(attitude, posture_target),
-        "height": jp.exp(
+        "progress": progress,
+        "under_speed": under_speed,
+        "yaw": motion_gate
+        * jp.exp(-jp.square(yaw_velocity - command[1]) / 0.09),
+        "upright": motion_gate * _upright_reward(attitude, posture_target),
+        "height": motion_gate
+        * jp.exp(
             -jp.square(clearance - (target_clearance + height_command)) / 0.01
         ),
-        "progress": jp.clip(forward_velocity, -0.20, 0.25),
-        "stability": jp.exp(-jp.square(root_angular_speed / 2.0)),
-        "joint_margin": 1.0 - jp.mean(joint_proximity),
+        "stability": motion_gate
+        * jp.exp(-jp.square(root_angular_speed / 2.0)),
+        "joint_margin": motion_gate * (1.0 - jp.mean(joint_proximity)),
         "action_rate": jp.mean(jp.square(action - last_action)),
         "residual": jp.mean(jp.square(action)),
         "swing_height": swing_height_cost,
@@ -298,11 +395,14 @@ def default_config() -> config_dict.ConfigDict:
         command_max_speed=0.12,
         command_max_yaw_rate=0.0,
         command_delay=1.0,
+        no_progress_timeout=3.0,
+        no_progress_min_delta=0.02,
+        no_progress_penalty=-10.0,
         command=config_dict.create(
             height_min=-0.05,
             height_max=0.10,
-            pitch_min_deg=-25.0,
-            pitch_max_deg=25.0,
+            pitch_min_deg=0.0,
+            pitch_max_deg=0.0,
             roll_max_deg=15.0,
         ),
         dr_enabled=False,
@@ -317,10 +417,11 @@ def default_config() -> config_dict.ConfigDict:
         ),
         reward=config_dict.create(
             velocity=2.5,
+            progress=2.0,
+            under_speed=-2.0,
             yaw=0.25,
             upright=1.0,
             height=0.6,
-            progress=1.0,
             stability=0.5,
             joint_margin=1.0,
             action_rate=-0.02,
@@ -456,6 +557,16 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
         self._terrain_total_rise = spec.final_height
         self._terrain_step_height = spec.stair_riser
         self._terrain_goal_x = spec.goal_x
+        if (
+            spec.kind == "stairs"
+            and spec.stair_riser >= STAIR_ASSIST_MIN_RISER_M
+        ):
+            self._stair_assist_pitch_target = -min(
+                float(np.arctan2(spec.stair_riser, STAIR_DEPTH)),
+                PITCH_FF_MAX_RAD,
+            )
+        else:
+            self._stair_assist_pitch_target = 0.0
         super().__init__(config, config_overrides)
         ratio = self.dt / firmware.FIRMWARE_CONTROL_DT
         if abs(ratio - round(ratio)) > 1.0e-9:
@@ -828,6 +939,7 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
             support_height,
             previous_ff,
             self.dt,
+            jp.asarray(self._stair_assist_pitch_target),
         )
 
     def _terrain_swing_boost(
@@ -979,7 +1091,12 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
             "support_height": support_height,
             "pitch_ff": jp.zeros(()),
             "swing_boost": jp.zeros(()),
+            "forward_velocity_ema": jp.zeros(()),
             "max_terrain_height": support_height,
+            "progress_anchor_potential": (
+                data.qpos[0] + TERRAIN_PROGRESS_HEIGHT_CREDIT * support_height
+            ),
+            "no_progress_steps": jp.zeros((), dtype=jp.int32),
             "previous_root_x": data.qpos[0],
             "controller_rejection_steps": jp.zeros((), dtype=jp.int32),
         }
@@ -991,6 +1108,7 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
                 "reward/ascent": jp.zeros(()),
                 "reward/success": jp.zeros(()),
                 "reward/failure": jp.zeros(()),
+                "reward/no_progress": jp.zeros(()),
                 "terrain_level": jp.zeros(()),
                 "terrain_success": jp.zeros(()),
                 "controller_rejection_steps": jp.zeros(()),
@@ -1004,6 +1122,8 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
                 "swing_height_max_m": jp.asarray(firmware.SWING_HEIGHT),
                 "swing_height_boost_fraction": jp.zeros(()),
                 "early_swing_contact_fraction": jp.zeros(()),
+                "forward_progress_ratio": jp.zeros(()),
+                "forward_velocity_ema_mps": jp.zeros(()),
                 "termination/controller_invalid": jp.zeros(()),
                 "termination/joint_limit": jp.zeros(()),
                 "termination/dynamics": jp.zeros(()),
@@ -1011,6 +1131,7 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
                 "termination/clearance": jp.zeros(()),
                 "termination/body_contact": jp.zeros(()),
                 "termination/nonfinite": jp.zeros(()),
+                "termination/no_progress": jp.zeros(()),
             }
         )
         obs = self._get_obs(data, info)
@@ -1057,6 +1178,10 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
             state.data,
             state.info["support_height"],
         )
+        # Keep the experimental forced swing floor out of the training path.
+        # It doubled IK/reach rejection at the 10 cm transition.  Terrain
+        # clearance remains policy-controlled through swing_boost/action Z.
+        swing_height_floor = jp.asarray(firmware.SWING_HEIGHT_MIN)
         command_active = (
             state.info["policy_steps"] * self.dt >= self._config.command_delay
         )
@@ -1080,6 +1205,7 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
                 pitch_cmd=firmware_command[3],
                 height_offset=firmware_command[2],
                 swing_boost=swing_boost,
+                swing_height_floor=swing_height_floor,
             )
 
         controller_state, controller_history = jax.lax.scan(
@@ -1097,6 +1223,11 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
         attitude = self._relative_attitude(data)
         raw_local_velocity = _quat_rotate_inverse(data.qpos[3:7], data.qvel[:3])
         forward_velocity = jp.dot(raw_local_velocity, MODEL_FORWARD)
+        velocity_alpha = jp.exp(-self.dt / FORWARD_VELOCITY_FILTER_TAU_S)
+        filtered_forward_velocity = (
+            velocity_alpha * state.info["forward_velocity_ema"]
+            + (1.0 - velocity_alpha) * forward_velocity
+        )
         lateral_velocity = jp.dot(raw_local_velocity, MODEL_LATERAL)
         contacts = self._foot_contacts(data)
         support_height = self._support_height(data, contacts)
@@ -1126,7 +1257,7 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
             & jp.all(jp.isfinite(data.qvel))
             & jp.all(jp.isfinite(controller.servo_joint_targets))
         )
-        failure = (
+        hard_failure = (
             controller_invalid
             | joint_limit_failure
             | dynamics_failure
@@ -1135,17 +1266,36 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
             | body_contact
             | (~finite)
         )
+        terrain_progress_potential = (
+            data.qpos[0] + TERRAIN_PROGRESS_HEIGHT_CREDIT * support_height
+        )
         final_height_ready = (
             support_height >= self._terrain_total_rise - 1.0e-3
             if self._terrain_spec.requires_final_height
             else jp.ones((), dtype=jp.bool_)
         )
-        success = (
+        success_candidate = (
             (data.qpos[0] >= self._terrain_goal_x)
             & final_height_ready
             & _posture_success(attitude, posture_target)
-            & (~failure)
+            & (~hard_failure)
         )
+        (
+            progress_anchor_potential,
+            no_progress_steps,
+            no_progress_failure,
+        ) = _update_progress_watchdog(
+            potential=terrain_progress_potential,
+            anchor=state.info["progress_anchor_potential"],
+            stagnant_steps=state.info["no_progress_steps"],
+            command_active=command_active,
+            success=success_candidate,
+            dt=self.dt,
+            min_delta=self._config.no_progress_min_delta,
+            timeout=self._config.no_progress_timeout,
+        )
+        failure = hard_failure | no_progress_failure
+        success = success_candidate & (~no_progress_failure)
         terminated = failure | success
 
         torque_limit = SERVO_STALL_TORQUE_NM
@@ -1218,7 +1368,7 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
         )
         feet_world = data.site_xpos[self._foot_site_ids]
         reward_terms = _base_reward_terms(
-            forward_velocity=forward_velocity,
+            forward_velocity=filtered_forward_velocity,
             command=state.info["command"],
             yaw_velocity=data.qvel[5],
             attitude=attitude,
@@ -1244,6 +1394,7 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
             foot_limited=controller.foot_limited,
             body_contact=body_contact,
             self_collision=self_collision,
+            command_active=command_active,
         )
         reward_terms.update(
             {
@@ -1276,9 +1427,18 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
             else jp.zeros(())
         )
         success_bonus = jp.where(success, self._config.success_bonus, 0.0)
-        failure_penalty = jp.where(failure, self._config.failure_penalty, 0.0)
+        failure_penalty = jp.where(
+            hard_failure, self._config.failure_penalty, 0.0
+        )
+        no_progress_penalty = jp.where(
+            no_progress_failure, self._config.no_progress_penalty, 0.0
+        )
         reward = jp.clip(
-            running_reward + ascent_bonus + success_bonus + failure_penalty,
+            running_reward
+            + ascent_bonus
+            + success_bonus
+            + failure_penalty
+            + no_progress_penalty,
             -50.0,
             50.0,
         )
@@ -1294,7 +1454,10 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
         state.info["support_height"] = support_height
         state.info["pitch_ff"] = pitch_ff
         state.info["swing_boost"] = swing_boost
+        state.info["forward_velocity_ema"] = filtered_forward_velocity
         state.info["max_terrain_height"] = max_terrain_height
+        state.info["progress_anchor_potential"] = progress_anchor_potential
+        state.info["no_progress_steps"] = no_progress_steps
         state.info["previous_root_x"] = data.qpos[0]
         state.info["controller_rejection_steps"] = rejection_steps
         obs = self._get_obs(data, state.info)
@@ -1303,6 +1466,7 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
         state.metrics["reward/ascent"] = ascent_bonus
         state.metrics["reward/success"] = success_bonus
         state.metrics["reward/failure"] = failure_penalty
+        state.metrics["reward/no_progress"] = no_progress_penalty
         state.metrics["terrain_level"] = jp.asarray(float(self._terrain_level))
         state.metrics["terrain_success"] = success.astype(jp.float32)
         state.metrics["controller_rejection_steps"] = rejection_steps.astype(jp.float32)
@@ -1316,6 +1480,15 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
         state.metrics["swing_height_max_m"] = swing_height_max
         state.metrics["swing_height_boost_fraction"] = swing_height_boost
         state.metrics["early_swing_contact_fraction"] = early_swing_contact
+        speed_command = jp.maximum(
+            state.info["command"][0], PROGRESS_COMMAND_FLOOR_MPS
+        )
+        state.metrics["forward_progress_ratio"] = jp.where(
+            command_active,
+            jp.clip(filtered_forward_velocity / speed_command, -1.0, 1.5),
+            0.0,
+        )
+        state.metrics["forward_velocity_ema_mps"] = filtered_forward_velocity
         state.metrics["termination/controller_invalid"] = controller_invalid.astype(jp.float32)
         state.metrics["termination/joint_limit"] = joint_limit_failure.astype(jp.float32)
         state.metrics["termination/dynamics"] = dynamics_failure.astype(jp.float32)
@@ -1323,6 +1496,9 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
         state.metrics["termination/clearance"] = clearance_failure.astype(jp.float32)
         state.metrics["termination/body_contact"] = body_contact.astype(jp.float32)
         state.metrics["termination/nonfinite"] = (~finite).astype(jp.float32)
+        state.metrics["termination/no_progress"] = no_progress_failure.astype(
+            jp.float32
+        )
         return state.replace(
             data=data,
             obs=obs,

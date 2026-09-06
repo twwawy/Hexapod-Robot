@@ -25,3 +25,8 @@ class HexapodEnvCfg(DirectRLEnvCfg):
     firmware_ticks_per_policy_step = 4
     default_command = (0.0, 0.0, 0.0, 0.0, 0.0)
     contact_force_threshold = 1.0
+    terrain = None
+    command_speed_range = (0.06, 0.12)
+    target_clearance = 0.316
+    maximum_tilt_rad = 0.7853981633974483
+    minimum_clearance = 0.14

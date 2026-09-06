@@ -53,38 +53,44 @@ joint armature/damping/friction과 5초 powered-home 자세 유지를 회귀 검
 
 | 범위 | 의미 | 한계 |
 |---|---|---|
-| `0:18` | 다리별 local XYZ action | Swing X ±40 mm, Y ±20 mm; Z는 높이 4~25 cm |
+| `0:18` | 다리별 local XYZ action | Swing X/Y ±100 mm; Z는 높이 4~25 cm |
 
 - Swing X/Y는 Cartesian residual로 적용한다.
 - Swing Z는 `-1/0/+1 → 4/6/25 cm` 높이 명령이며, phase envelope를 곱해
   이륙점과 착지점의 Z offset은 항상 0이다.
-- Stance Z는 ±20 mm만 허용하고 XY는 0이다.
+- Stance Z는 ±100 mm까지 요청할 수 있고 XY는 0이다. 최종 workspace/IK gate는 그대로다.
 - Late-Landing에는 RL residual을 적용하지 않고 펌웨어 하강 탐색만 사용한다.
 - residual은 0.10초 low-pass filter를 지난다.
 - IK 2-link 작업공간은 경계 안쪽 1 mm에서 제한한다.
 - 도달 불가능한 residual은 다리별로 거부되고 펌웨어 nominal 목표를 사용한다.
-- 정책은 4~25 cm 범위 안에서 다리별 Swing 높이만 선택할 수 있다. gait
+- 정책은 범위 내 swing X/Y·높이 및 stance Z residual을 선택할 수 있다. gait
   phase/frequency, radial offset 0.07 m, contact state machine, 자세 PI, IK 또는
   관절 속도 제한은 바꿀 수 없다.
 
-계약 이름은 `stm32_firmware_adaptive_swing_residual_v3`이다. tensor 크기는 계속
+계약 이름은 `stm32_firmware_adaptive_swing_residual_100mm_v4`이다. tensor 크기는 계속
 18-D지만 v2의 Z는 Cartesian endpoint offset이고 v3의 Z는 phase-gated 높이 명령이라
-의미가 다르다. 따라서 v1/v2 및 과거 22-D checkpoint는 직접 복원하지 않는다.
+의미가 다르다. v4는 v3보다 XY/stance Z scale이 커졌다. 따라서 v1/v2/v3 및 과거 22-D checkpoint는 현재 v4로 직접 복원하지 않는다.
 
-## Observation 142-D
+## Observation 146-D
 
-- 목표 전진 속도와 yaw rate
-- 몸체 선속도·각속도·중력 방향과 펌웨어 좌표계 roll/pitch
-- 18개 관절 위치·속도
-- 여섯 발의 controller-body 위치와 실제 collision contact
-- heading 기준 전방 15개 지형 높이
-- 펌웨어 gait progress/state와 실제 적용 twist
-- IK valid, residual valid, foot projection, gait/posture acceptance
-- 이전 action
+현재 계약은 `firmware_state_collision_terrain_command5_pitch_v3`이다.
 
-계약 이름은 `firmware_state_collision_terrain_curriculum_v2`이다. 관측 배열의
-위치와 크기는 기존 stairs v1과 같다. 다만 adaptive swing v3에서는 action 의미가
-달라졌으므로 전체 checkpoint 직접 복원은 action contract 검사에서 차단한다.
+| slice | 내용 |
+|---|---|
+| `0:5` | 전진·yaw·height·pitch·roll command |
+| `5:16` | 몸체 속도·각속도·중력·상대 roll/pitch |
+| `16:52` | 18개 관절 위치·속도 |
+| `52:76` | 발 controller-body 위치·collision contact |
+| `76:91` | heading 기준 지형 높이 15개 |
+| `91:103` | gait progress/state |
+| `103:107` | 적용 twist |
+| `107:127` | IK valid·policy valid·projection·gait/posture acceptance |
+| `127:145` | 이전 action |
+| `145:146` | pitch feedforward |
+
+루트 학습 환경은 GT 지형을 쓰는 teacher/개발 경로다. LiDAR 입력 뷰어는 격리된 v3 소스에서
+`76:91`을 센서 값으로 바꾸고 GT feedforward를 끈다. v4 학습과 stage31 v3 재생을 구분한다.
+142-D 관측은 아래 이전 teacher 이관 설명의 레거시 계약이다.
 
 ## 제어기 발산 종료 조건
 
@@ -117,13 +123,13 @@ failure로 종료하며 **시간 간격을 곱하지 않은 -30**을 준다.
 | 2 | 강한 울퉁불퉁 | 최대 5 cm 높이 타일 |
 | 3 | 경사면 | 8° 연속 경사 |
 | 4 | 가파른 경사면 | 15° 연속 경사 |
-| 5~8 | 7단 계단 | 한 riser 5/10/15/20 cm |
-| 9~12 | 연속 10단 계단 | 한 riser 5/10/15/20 cm |
+| 5~10 | 7단 계단 | 한 riser 5/6.5/8/10/15/20 cm |
+| 11~16 | 연속 10단 계단 | 한 riser 5/6.5/8/10/15/20 cm |
 
-최종 level 12는 **20 cm riser가 10번 연속**되며 최상단은 바닥에서 2 m다.
+최종 level 16은 **20 cm riser가 10번 연속**되며 최상단은 바닥에서 2 m다.
 Level 0은 기본 262,144 step(기본 PPO 설정의 4 update) baseline으로 시작하고,
 competence 미달이면 한 번 더 시도한다. Level 0~3(평지, 두 rough, 8° 경사)은
-level당 최대 2회, Level 4~12(15° 경사부터 최종 계단)는 최대 4회 시도한다.
+level당 최대 2회, Level 4~16(15° 경사부터 최종 계단)는 최대 4회 시도한다.
 각 stage의 `eval/episode_terrain_success`가 기본 0.80 이상이면 제한에 닿기 전에도
 즉시 다음 level로 올라간다. `--max-stages-per-level N`을 명시하면 이 2/4 규칙을
 전체 level 공통 N회로 override한다. stage 사이에 최고 평가 checkpoint를
@@ -131,7 +137,18 @@ level당 최대 2회, Level 4~12(15° 경사부터 최종 계단)는 최대 4회
 
 ## 보상과 성공
 
-- 목표 속도 추종, upright, 지형 기준 몸체 높이, 낮은 각속도와 관절 여유를 보상한다.
+- 자동 ramp/계단 curriculum의 pitch command는 0이고, 전방 0.40/0.65/0.90 m
+  지형 높이로 계산한 `pitch_ff`만 지형 자세 목표로 사용한다. 명시적 pitch command는
+  외부 명령을 위한 additive offset으로 남겨 두며, 자동 curriculum에서 같은 경사를
+  `pitch_cmd + pitch_ff`로 두 번 더하지 않는다.
+- 0.5초 EMA 전진속도를 `0.04 m/s` 폭으로 엄격하게 목표 속도에 추종시키고,
+  `vx / vcmd`로 정규화한 전진 progress를 직접 보상한다. 목표 미달 속도는 별도
+  제곱 페널티를 받는다.
+- upright, 지형 기준 몸체 높이, 낮은 각속도와 관절 여유 같은 양의 보조 보상은
+  전진속도 gate를 통과한 만큼만 지급한다. 따라서 제자리 보행은 생존 보상을
+  누적할 수 없다.
+- command 활성화 후 3초 동안 `root_x + 0.5 * support_height`가 2 cm 이상
+  증가하지 않으면 no-progress 실패로 종료하고 시간 간격을 곱하지 않은 -10을 준다.
 - 관절 한계 근접 보상 가중치를 높이고 policy residual 거부와 workspace projection은
   각각 더 강하게 감점해, 제한에 걸리는 동작보다 작은 안전 residual을 우선 학습한다.
 - torque/saturation, joint velocity, lateral/vertical velocity, residual 크기와 변화,
@@ -142,7 +159,7 @@ level당 최대 2회, Level 4~12(15° 경사부터 최종 계단)는 최대 4회
   보상을 반복 획득할 수 없게 한다.
 - 지형 끝을 몸체가 통과하고 경사면/계단의 최종 높이 지지가 확인되며 roll/pitch가 20°
   이내이면 success 종료와 +30 보너스를 준다.
-- episode는 평지 20초, level 1~8은 50초, 연속 10단 level 9~12는 100초가 기본이다.
+- episode는 평지 20초, rough/ramp/7단 계단은 50초, 연속 10단 계단은 100초가 기본이다.
 
 ## 실행
 
@@ -153,12 +170,12 @@ PY=/home/huro/.venvs/hexapod-mjx/bin/python
 # 환경/계약만 검증
 $PY mjx/train_rough_terrain.py --terrain-level 1 --smoke
 $PY mjx/train_rough_terrain.py --terrain-level 4 --smoke
-$PY mjx/train_rough_terrain.py --terrain-level 12 --smoke
+$PY mjx/train_rough_terrain.py --terrain-level 16 --smoke
 
 # 한 난이도만 직접 학습
 $PY mjx/train_rough_terrain.py \
   --run-name firmware-final-stairs \
-  --terrain-level 12 \
+  --terrain-level 16 \
   --timesteps 50000000 --num-envs 2048 \
   --num-evals 10 --num-eval-envs 32 \
   --wandb --wandb-project hexapod-firmware-terrain
@@ -176,7 +193,7 @@ $PY mjx/train_competence_curriculum.py \
   --run-name firmware-terrain-final-stairs \
   --flat-baseline-timesteps 262144 \
   --stages 44 --stage-timesteps 5000000 \
-  --start-level 1 --max-level 12 \
+  --start-level 1 --max-level 16 \
   --level-progression competence \
   --wandb --wandb-project hexapod-firmware-terrain \
   -- --num-envs 2048 --num-evals 10 --num-eval-envs 32
@@ -198,18 +215,17 @@ episode evaluation과 렌더링을 건너뛸 수 있다. Curriculum 실행에는
 미달하면 같은 level을 반복한다. 매 stage를 무조건 올리려면
 `--level-progression sequential`을 쓴다. 기존 checkpoint에서 시작할 때는 launcher에
 `--init-checkpoint mjx/runs/terrain/<run>/checkpoints`를 지정한다. 로더는 18-D,
-142-D, network layer 및 semantic contract가 모두 맞을 때만 승계를 허용한다.
+146-D, network layer 및 action/observation semantic contract가 모두 맞을 때만 승계를 허용한다.
 이전 run의 stage 번호까지 이어 표시하려면 다음 stage 번호를 `--start-stage`로
 지정한다. 첫 stage는 기본적으로 actor만 복원하고 critic은 새 지형에서 다시 학습한다.
 
-adaptive swing v3는 Z action 의미가 바뀌므로 기존 level 4 actor를 직접 이어받지
-않고 level 0부터 새 run을 시작한다.
+현재 v4는 residual scale이 바뀌므로 기존 v3 actor를 직접 이어받지 않고 새 run을 시작한다.
 
 ```bash
 /home/huro/bin/hexapod-mjx-python mjx/train_competence_curriculum.py \
   --run-name firmware-terrain-adaptive-swing \
   --seed 8 --flat-baseline-timesteps 262144 \
-  --start-level 1 --max-level 12 \
+  --start-level 1 --max-level 16 \
   --stages 44 --stage-timesteps 5000000 \
   --level-progression competence \
   --checkpoint-selection best \
@@ -217,7 +233,11 @@ adaptive swing v3는 Z action 의미가 바뀌므로 기존 level 4 actor를 직
   -- --num-envs 1024 --num-evals 4 --num-eval-envs 32
 ```
 
-### Teacher-student 보행 보존 학습
+### Teacher-student 보행 보존 학습 — 이전 v3 이관 기록
+
+아래는 142-D→146-D 및 v2/v3 teacher 이관 경로의 기록이다. 현재 v4에 이전 가중치를 바로 적용하는
+명령으로 해석하지 않는다. v4와 호환되는 teacher/변환 계약을 마련해야 한다. LiDAR sensor student와
+GT supervision의 후속 구조는 [최신 설계](../docs/HEXAPOD_LIDAR_FOOTHOLD_RESIDUAL_PLAN.md)를 따른다.
 
 Command5/posture 조건을 유지하면서 기존 142-D 보행을 보존할 때는 frozen teacher
 manifest를 launcher에 전달한다. Adaptive-swing v3 teacher는 18-D 전체 action을,
@@ -231,7 +251,7 @@ Cartesian v2 teacher는 의미가 호환되는 다리별 X/Y 12개 action만 지
   --run-root /home/huro/Hexapod-Robot/mjx/runs \
   --seed 8 \
   --flat-baseline-timesteps 262144 \
-  --start-level 1 --max-level 12 \
+  --start-level 1 --max-level 16 \
   --stages 44 --stage-timesteps 5000000 \
   --level-progression competence --promote-threshold 0.80 \
   --checkpoint-selection best \

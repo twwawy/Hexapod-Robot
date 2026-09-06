@@ -10,11 +10,16 @@ import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from rough_terrain_env import ACTION_CONTRACT_VERSION, default_config
+from rough_terrain_env import (
+    ACTION_CONTRACT_VERSION,
+    REWARD_CONTRACT_VERSION,
+    default_config,
+)
 from train_rough_terrain import (
     _apply_reward_weights,
     _arguments,
     _resolve_checkpoint,
+    _validate_critic_reward_contract,
 )
 
 
@@ -92,6 +97,24 @@ class CliAndCheckpointGateTest(unittest.TestCase):
         self._assert_legacy_checkpoint_rejected(
             143, "firmware_state_collision_terrain_pitch_v3"
         )
+
+    def test_old_reward_critic_requires_fresh_value_function(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            run_dir = Path(directory) / "run"
+            checkpoint = run_dir / "checkpoints" / "000000000001"
+            checkpoint.mkdir(parents=True)
+            metadata_path = run_dir / "run_metadata.json"
+            metadata_path.write_text("{}", encoding="utf-8")
+
+            _validate_critic_reward_contract(checkpoint, False)
+            with self.assertRaisesRegex(SystemExit, "no-init-value-function"):
+                _validate_critic_reward_contract(checkpoint, True)
+
+            metadata_path.write_text(
+                json.dumps({"reward_contract_version": REWARD_CONTRACT_VERSION}),
+                encoding="utf-8",
+            )
+            _validate_critic_reward_contract(checkpoint, True)
 
 
 if __name__ == "__main__":

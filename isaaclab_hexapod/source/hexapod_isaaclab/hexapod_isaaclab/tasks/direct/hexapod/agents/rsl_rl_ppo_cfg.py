@@ -16,11 +16,13 @@ class HexapodPerceptivePPORunnerCfg(RslRlOnPolicyRunnerCfg):
     save_interval = 100
     experiment_name = "hexapod_perceptive_residual"
     logger = "wandb"
-    wandb_project = "hexapod-isaac-perceptive"
+    wandb_project = "hexapod-isaac-lidar-depth-curriculum"
     clip_actions = 1.0
     obs_groups = {"policy": ["policy"], "critic": ["critic"]}
     policy = RslRlPpoActorCriticCfg(
-        init_noise_std=0.5,
+        # A unit action requests up to 100 mm Cartesian residual.  Keep the
+        # initial exploration near the stable firmware gait (about 10 mm).
+        init_noise_std=0.1,
         actor_obs_normalization=True,
         critic_obs_normalization=True,
         actor_hidden_dims=[256, 256, 128],
@@ -31,7 +33,7 @@ class HexapodPerceptivePPORunnerCfg(RslRlOnPolicyRunnerCfg):
         value_loss_coef=1.0,
         use_clipped_value_loss=True,
         clip_param=0.2,
-        entropy_coef=0.01,
+        entropy_coef=0.005,
         num_learning_epochs=4,
         num_mini_batches=8,
         learning_rate=3.0e-4,

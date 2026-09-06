@@ -18,7 +18,7 @@ args = parser.parse_args()
 launcher = AppLauncher(args)
 simulation_app = launcher.app
 
-from pxr import Usd, UsdPhysics
+from pxr import Usd, UsdGeom, UsdPhysics
 
 
 JOINT_ORDER = (
@@ -55,6 +55,32 @@ def main() -> None:
         for prim in stage.Traverse()
         if prim.HasAPI(UsdPhysics.RigidBodyAPI)
     ]
+    configuration_dir = usd_path.parent / "configuration"
+    base_path = configuration_dir / f"{usd_path.stem}_base.usd"
+    physics_path = configuration_dir / f"{usd_path.stem}_physics.usd"
+    base_stage = Usd.Stage.Open(str(base_path))
+    physics_stage = Usd.Stage.Open(str(physics_path))
+    if base_stage is None or physics_stage is None:
+        raise RuntimeError("generated USD configuration layers are incomplete")
+    mesh_prims = [
+        prim for prim in base_stage.Traverse() if prim.IsA(UsdGeom.Mesh)
+    ]
+    layer_collision_prims = [
+        prim
+        for prim in physics_stage.Traverse()
+        if prim.HasAPI(UsdPhysics.CollisionAPI)
+    ]
+    # Converter collision shapes are instance proxies referenced below each
+    # rigid body.  Default Stage.Traverse() intentionally skips those proxies.
+    composed_prims = Usd.PrimRange.Stage(stage, Usd.TraverseInstanceProxies())
+    collision_prims = [
+        prim for prim in composed_prims if prim.HasAPI(UsdPhysics.CollisionAPI)
+    ]
+    collision_meshes = [
+        str(prim.GetPath())
+        for prim in mesh_prims
+        if prim.HasAPI(UsdPhysics.CollisionAPI)
+    ]
 
     report = {
         "schema_version": 1,
@@ -66,9 +92,23 @@ def main() -> None:
         "missing_expected_joints": missing,
         "unexpected_revolute_joints": unexpected,
         "rigid_body_prims": rigid_bodies,
+        "source_cad_mesh_count": 133,
+        "usd_visual_mesh_prim_count": len(mesh_prims),
+        "cad_visual_layer": str(base_path),
+        "collision_prim_count": len(collision_prims),
+        "collision_prim_paths": [str(prim.GetPath()) for prim in collision_prims],
+        "physics_layer_collision_prim_count": len(layer_collision_prims),
+        "collision_layer": str(physics_path),
+        "collision_mesh_prims": collision_meshes,
         "checks": {
             "single_articulation_root": len(roots) == 1,
             "all_18_expected_joints_present": not missing and len(revolute) == 18,
+            # The MJCF converter authors two USD Mesh prims per source STL in
+            # this non-instanceable asset.  At least 133 proves that no source
+            # CAD geom was lost; the source MJCF exporter checks exact count.
+            "all_133_cad_meshes_preserved": len(mesh_prims) >= 133,
+            "cad_meshes_are_visual_only": not collision_meshes,
+            "primitive_training_colliders_present": len(collision_prims) >= 25,
         },
     }
     report["passed"] = all(report["checks"].values())

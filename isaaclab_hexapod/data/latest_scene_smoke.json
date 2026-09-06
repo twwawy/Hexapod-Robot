@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "passed": true,
+  "terrain_level": 9,
+  "terrain_name": "stairs_7x15cm",
+  "latest_run": "progress-v3-stage48-level9_20260829-015645_seed57",
+  "full_mesh_usd": "/home/huro/Hexapod-Robot/isaaclab_hexapod/data/usd/hexapod_full_mesh_mjx_parity.usd",
+  "completed_physics_steps": 1,
+  "device": "cuda:0",
+  "mjx_weight_autoload": false
+}

@@ -17,6 +17,10 @@ updated: 2026-08-26
 canonical_source: /home/huro/Hexapod-Robot/mjx/RL_DESIGN.md
 ---
 
+2026-09-06 최신 실행/설계는 [문서 안내](README.md)를 따른다. 이 노트의 과거 계약과 평가 기록은
+현재 stage31 residual viewer 및 v4 학습 코드의 구현/검증 상태와 구분한다.
+
+
 # Hexapod MJX Residual RL Study Guide
 
 > [!abstract]
@@ -43,7 +47,7 @@ canonical_source: /home/huro/Hexapod-Robot/mjx/RL_DESIGN.md
 | RL collider | torso box, leg capsule, foot sphere, 선택된 terrain primitive |
 | Base controller | STM32 제어 순서와 상수를 옮긴 JAX firmware controller |
 | Policy | Swing XY + adaptive height, Stance Z-only, Late-Landing residual 차단 |
-| Action contract | `stm32_firmware_adaptive_swing_residual_v3` |
+| Action contract | `stm32_firmware_adaptive_swing_residual_100mm_v4` |
 | Observation contract | `firmware_state_collision_terrain_curriculum_v2` |
 | Action / observation | `18 / 142` |
 | Servo | DS51150-270, 12.6 V, 357:1, ±14.709975 Nm, 315.8 deg/s |

@@ -1,5 +1,9 @@
 # Hexapod MJX → Isaac Sim / Isaac Lab parity-first 이식 계획
 
+2026-09-06 상태: 이식 소스/asset/handoff의 기존 미커밋 변경을 반영했다.
+현재 보행 뷰어의 최종 구조는 [연속 펌웨어 gait + LiDAR residual](HEXAPOD_LIDAR_FOOTHOLD_RESIDUAL_PLAN.md)이다.
+아래 계획과 과거 gate 기록은 이번 수정의 새 검증 결과가 아니다. [업데이트 목록](HEXAPOD_UPDATE_2026-09-06.md)을 참고한다.
+
 작성일: 2026-08-27 (Asia/Seoul)  
 대상 저장소: `/home/huro/Hexapod-Robot`  
 대상 브랜치: `codex/cartesian-residual-rl`  
@@ -26,7 +30,10 @@
 3. **CAD collision을 학습에 사용하지 않는다.** Visual mesh와 primitive training collision을 분리한다.
 4. **firmware gait/IK/state machine을 재설계하지 않는다.** `firmware_mjx_controller.py`의 수식, 상태, 연산 순서를 Torch로 옮긴다.
 5. **parity 전에 RL과 DR을 켜지 않는다.** Randomization은 모델링 오류를 숨긴다.
-6. **현재 동작의 문제도 우선 복제한다.** 현재 ramp/stairs pitch와 pitch feedforward는 음수이고 roll command는 0이다. 뒤로 기울이기/roll curriculum 개선은 parity 후 새 contract version으로 한다.
+6. **현재 동작을 정확히 복제한다.** 자동 ramp/stairs pitch command는 0이고,
+   terrain-rise `pitch_ff`만 음수 uphill 목표를 만든다. 명시적 pitch command만
+   additive offset으로 더한다. 과거처럼 자동 음수 command와 `pitch_ff`를 함께
+   더해 경사각을 두 번 반영하면 안 된다.
 
 ### 금지 사항
 
@@ -100,7 +107,7 @@ Isaac Lab에서는 `_pre_physics_step()`에서 firmware tick 4회와 q_des 계�
 ### 3.2 contract와 canonical order
 
 ```text
-ACTION_CONTRACT_VERSION = stm32_firmware_adaptive_swing_residual_v3
+ACTION_CONTRACT_VERSION = stm32_firmware_adaptive_swing_residual_100mm_v4
 OBSERVATION_CONTRACT_VERSION = firmware_state_collision_terrain_command5_pitch_v3
 ```
 
@@ -320,12 +327,14 @@ Failure/success는 `terminated`, episode length는 `truncated`로 분리한다.
 
 ```text
 flat/rough: height=0, pitch=0, roll=0
-ramp: height∈[-0.05,0], pitch=-slope, roll=0
-stairs: height∈[-0.05,0], pitch∈[-25°,-5°], roll=0
-terrain-rise pitch_ff: negative
+ramp/stairs: height∈[-0.05,0], automatic pitch=0, roll=0
+terrain-rise pitch_ff: negative local uphill target
+explicit pitch command: additive offset to pitch_ff
 ```
 
-현재 주석 기준 음수 pitch는 uphill forward lean이다. Backward lean/roll 학습은 parity 후 observation/action contract version을 올리고 MJX golden부터 다시 만든다.
+현재 주석 기준 음수 pitch는 uphill forward lean이다. 자동 curriculum의 pitch를 0으로
+바꾼 것은 5-D command 의미가 아니라 sampler의 중복 목표 버그를 고친 것이므로 tensor
+contract는 유지한다. Isaac 구현도 같은 sampler와 합성 규칙을 사용해야 한다.
 
 ---
 
@@ -795,7 +804,10 @@ flat -> rough 0.025 -> rough 0.050 -> ramp 8 -> ramp 15
 
 각 level에서 확인할 것은 geometry snapshot, 15 ray 값, support height, foot clearance, terrain pitch feedforward, reward/done이다. 이 단계에서도 PPO와 DR은 끈다.
 
-주의: 현재 command contract는 ramp에서 `height in [-0.05, 0]`, `pitch=-slope`, stairs에서 `height in [-0.05, 0]`, `pitch in [-25,-5] deg`, roll=0이며 uphill pitch feedforward도 음수다. 이것이 사용자가 기대하는 “뒤로 기울기”와 직관적으로 다르더라도 이식 중에 바꾸지 않는다. 먼저 현재 MJX와 parity를 만든 뒤 별도의 contract version에서 명령 부호와 범위를 바꾸고 golden을 다시 생성한다.
+주의: 현재 자동 command sampler는 ramp/stairs에서 `height in [-0.05, 0]`,
+`pitch=0`, `roll=0`을 만들고, 음수 uphill `pitch_ff`가 local terrain target 전체를
+담당한다. `pitch_cmd + pitch_ff` 합성은 명시적 외부 pitch offset을 위해 유지하지만
+자동 sampler가 같은 경사를 pitch command에 다시 넣어서는 안 된다.
 
 ---
 

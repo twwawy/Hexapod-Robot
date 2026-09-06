@@ -80,9 +80,10 @@ class TerrainLevel:
 
 
 def _stairs(level: int, stair_count: int, stair_riser: float) -> TerrainLevel:
+    riser_cm = f"{100.0 * stair_riser:g}".replace(".", "p")
     return TerrainLevel(
         level,
-        f"stairs_{stair_count}x{int(round(100 * stair_riser))}cm",
+        f"stairs_{stair_count}x{riser_cm}cm",
         "stairs",
         stair_count=stair_count,
         stair_riser=stair_riser,
@@ -96,13 +97,17 @@ TERRAIN_LEVELS = (
     TerrainLevel(3, "ramp", "ramp", slope_degrees=8.0),
     TerrainLevel(4, "ramp_steep", "ramp", slope_degrees=15.0),
     _stairs(5, 7, 0.05),
-    _stairs(6, 7, 0.10),
-    _stairs(7, 7, 0.15),
-    _stairs(8, 7, 0.20),
-    _stairs(9, 10, 0.05),
-    _stairs(10, 10, 0.10),
-    _stairs(11, 10, 0.15),
-    _stairs(12, 10, 0.20),
+    _stairs(6, 7, 0.065),
+    _stairs(7, 7, 0.08),
+    _stairs(8, 7, 0.10),
+    _stairs(9, 7, 0.15),
+    _stairs(10, 7, 0.20),
+    _stairs(11, 10, 0.05),
+    _stairs(12, 10, 0.065),
+    _stairs(13, 10, 0.08),
+    _stairs(14, 10, 0.10),
+    _stairs(15, 10, 0.15),
+    _stairs(16, 10, 0.20),
 )
 MAX_TERRAIN_LEVEL = len(TERRAIN_LEVELS) - 1
 

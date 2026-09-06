@@ -28,8 +28,11 @@ from train_competence_curriculum import (  # noqa: E402
     _guard_teacher_attempt_limit,
     _level_transition,
     _max_stages_for_level,
+    _next_restore_value,
     _replace_trainer_arg,
     _selected_checkpoint,
+    _stage_checkpoint,
+    _stair_retry_attempt,
     _trainer_int_arg,
 )
 from train_rough_terrain import (  # noqa: E402
@@ -124,12 +127,61 @@ class TrainingArtifactTest(unittest.TestCase):
             level_payload = json.loads(
                 monitor.level_best_path.read_text(encoding="utf-8")
             )
-            self.assertEqual(level_payload["step"], 100)
-            self.assertFalse(level_payload["best_safe"])
+            self.assertEqual(level_payload["step"], 200)
+            self.assertTrue(level_payload["best_safe"])
+
+    def test_level_best_ranks_success_then_progress_before_reward(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            monitor = ScoreMonitor(Path(directory), "eval/episode_reward")
+            common = {"eval/avg_episode_length": 100.0}
+            monitor.record(
+                100,
+                {
+                    **common,
+                    "eval/episode_reward": 200.0,
+                    "eval/episode_terrain_success": 0.0,
+                    "eval/episode_forward_progress_ratio": 80.0,
+                },
+            )
+            monitor.record(
+                200,
+                {
+                    **common,
+                    "eval/episode_reward": 50.0,
+                    "eval/episode_terrain_success": 0.5,
+                    "eval/episode_forward_progress_ratio": 40.0,
+                },
+            )
+            monitor.record(
+                300,
+                {
+                    **common,
+                    "eval/episode_reward": 300.0,
+                    "eval/episode_terrain_success": 0.5,
+                    "eval/episode_forward_progress_ratio": 20.0,
+                },
+            )
+            monitor.record(
+                400,
+                {
+                    **common,
+                    "eval/episode_reward": 40.0,
+                    "eval/episode_terrain_success": 0.5,
+                    "eval/episode_forward_progress_ratio": 60.0,
+                },
+            )
+
+            payload = json.loads(
+                monitor.level_best_path.read_text(encoding="utf-8")
+            )
+            self.assertEqual(payload["step"], 400)
+            self.assertEqual(
+                payload["selection_rank"]["forward_progress_ratio"], 0.6
+            )
 
     def test_curriculum_order_and_final_ten_by_twenty_centimeter_stairs(self) -> None:
-        self.assertEqual(MAX_TERRAIN_LEVEL, 12)
-        self.assertEqual(tuple(spec.level for spec in TERRAIN_LEVELS), tuple(range(13)))
+        self.assertEqual(MAX_TERRAIN_LEVEL, 16)
+        self.assertEqual(tuple(spec.level for spec in TERRAIN_LEVELS), tuple(range(17)))
         self.assertEqual(
             tuple(spec.kind for spec in TERRAIN_LEVELS[:5]),
             ("flat", "rough", "rough", "ramp", "ramp"),
@@ -139,19 +191,21 @@ class TrainingArtifactTest(unittest.TestCase):
         self.assertAlmostEqual(TERRAIN_LEVELS[3].slope_degrees, 8.0)
         self.assertAlmostEqual(TERRAIN_LEVELS[4].slope_degrees, 15.0)
         self.assertTrue(all(spec.kind == "stairs" for spec in TERRAIN_LEVELS[5:]))
-        seven_step = TERRAIN_LEVELS[5:9]
-        self.assertEqual(tuple(spec.stair_count for spec in seven_step), (7,) * 4)
+        seven_step = TERRAIN_LEVELS[5:11]
+        self.assertEqual(tuple(spec.stair_count for spec in seven_step), (7,) * 6)
         self.assertEqual(
             tuple(spec.stair_riser for spec in seven_step),
-            (0.05, 0.10, 0.15, 0.20),
+            (0.05, 0.065, 0.08, 0.10, 0.15, 0.20),
         )
-        for spec, expected in zip(seven_step, (0.35, 0.70, 1.05, 1.40)):
+        for spec, expected in zip(
+            seven_step, (0.35, 0.455, 0.56, 0.70, 1.05, 1.40)
+        ):
             self.assertAlmostEqual(spec.final_height, expected)
-        ten_step = TERRAIN_LEVELS[9:13]
-        self.assertEqual(tuple(spec.stair_count for spec in ten_step), (10,) * 4)
+        ten_step = TERRAIN_LEVELS[11:17]
+        self.assertEqual(tuple(spec.stair_count for spec in ten_step), (10,) * 6)
         self.assertEqual(
             tuple(spec.stair_riser for spec in ten_step),
-            (0.05, 0.10, 0.15, 0.20),
+            (0.05, 0.065, 0.08, 0.10, 0.15, 0.20),
         )
         final = TERRAIN_LEVELS[-1]
         self.assertEqual(final.stair_count, 10)
@@ -160,6 +214,19 @@ class TrainingArtifactTest(unittest.TestCase):
         self.assertEqual(STEP_COUNT, 10)
         self.assertAlmostEqual(STEP_HEIGHT, 0.20)
         self.assertAlmostEqual(STAIR_TOTAL_RISE, 2.0)
+
+    def test_teacher_manifest_covers_intermediate_stair_levels(self) -> None:
+        manifest = json.loads(
+            (MJX_DIR / "teacher_manifests" / "walking-teachers-v1.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        levels = manifest["levels"]
+        self.assertEqual(
+            {int(level) for level in levels}, set(range(MAX_TERRAIN_LEVEL + 1))
+        )
+        self.assertEqual(levels["6"]["v3_weight"], 0.3)
+        self.assertEqual(levels[str(MAX_TERRAIN_LEVEL)]["v3_weight"], 0.0)
 
     def test_flat_eval_count_is_replaced_without_touching_other_args(self) -> None:
         extras = ["--num-envs", "2048", "--num-evals", "20", "--best-video"]
@@ -242,6 +309,75 @@ class TrainingArtifactTest(unittest.TestCase):
                 json.dumps({"path": str(checkpoint), "score": 1.0, "step": 123})
             )
             self.assertEqual(_selected_checkpoint(run_dir, "best"), checkpoint)
+
+    def test_pre_stair_missing_best_carries_previous_safe_checkpoint(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            run_dir = root / "run"
+            (run_dir / "monitor").mkdir(parents=True)
+            previous = root / "previous" / "checkpoints" / "000000000123"
+            previous.mkdir(parents=True)
+            (previous / "ppo_network_config.json").write_text("{}")
+
+            selected = _stage_checkpoint(
+                run_dir,
+                "best",
+                level=4,
+                previous_safe_checkpoint=previous,
+            )
+
+            self.assertEqual(
+                selected,
+                (previous.resolve(), False, "pre_stair_safe_carry_forward"),
+            )
+
+    def test_stair_missing_best_retries_from_previous_safe_checkpoint(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            run_dir = root / "run"
+            (run_dir / "monitor").mkdir(parents=True)
+            previous = root / "previous" / "checkpoints" / "000000000123"
+            previous.mkdir(parents=True)
+            (previous / "ppo_network_config.json").write_text("{}")
+
+            selected = _stage_checkpoint(
+                run_dir,
+                "best",
+                level=5,
+                previous_safe_checkpoint=previous,
+            )
+
+            self.assertEqual(
+                selected,
+                (previous.resolve(), False, "stair_best_retry"),
+            )
+
+    def test_reward_migration_retry_does_not_restore_legacy_critic(self) -> None:
+        self.assertFalse(_next_restore_value(False, checkpoint_updated=False))
+        self.assertTrue(_next_restore_value(False, checkpoint_updated=True))
+        self.assertTrue(_next_restore_value(True, checkpoint_updated=False))
+
+    def test_stair_retry_honors_per_level_attempt_cap(self) -> None:
+        attempt = 0
+        for expected in range(1, 6):
+            attempt, limit_reached = _stair_retry_attempt(attempt, 5)
+            self.assertEqual(attempt, expected)
+            self.assertEqual(limit_reached, expected == 5)
+
+    def test_missing_best_without_previous_safe_checkpoint_still_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            run_dir = Path(directory)
+            (run_dir / "monitor").mkdir()
+
+            with self.assertRaisesRegex(
+                RuntimeError, "best checkpoint pointer was not produced"
+            ):
+                _stage_checkpoint(
+                    run_dir,
+                    "best",
+                    level=5,
+                    previous_safe_checkpoint=None,
+                )
 
     def test_rough_heightfield_replaces_box_grid_without_losing_pattern(self) -> None:
         grid = rough_heightfield_grid(0.025)

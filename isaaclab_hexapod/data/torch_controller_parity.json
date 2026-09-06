@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
-  "golden": "/home/huro/Hexapod-Robot-isaac/mjx/golden/isaac_contract_v1_flat_seed0.npz",
+  "golden": "/home/huro/Hexapod-Robot/mjx/golden/isaac_contract_v1_flat_seed0.npz",
   "policy_steps": 500,
   "firmware_ticks": 2000,
   "absolute_tolerance": 2.5e-05,
   "max_absolute_error": {
-    "model_joint_targets": 3.6954879760742188e-06,
+    "model_joint_targets": 7.82310962677002e-06,
     "foot_targets_body": 4.172325134277344e-07,
     "applied_twist": 4.76837158203125e-07,
     "gait_progress": 0.0,

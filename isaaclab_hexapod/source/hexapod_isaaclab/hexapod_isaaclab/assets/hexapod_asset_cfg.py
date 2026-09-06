@@ -10,7 +10,10 @@ from .joint_contract import HOME_ROOT_POS, HOME_ROOT_QUAT_WXYZ, JOINT_ORDER
 
 
 REPO_ROOT = Path(__file__).resolve().parents[5]
-USD_PATH = REPO_ROOT / "isaaclab_hexapod/data/usd/hexapod_mjx_parity.usd"
+USD_PATH = (
+    REPO_ROOT
+    / "isaaclab_hexapod/data/usd/hexapod_full_mesh_mjx_parity.usd"
+)
 HEXAPOD_CFG = ArticulationCfg(
     prim_path="/World/envs/env_.*/Robot",
     spawn=sim_utils.UsdFileCfg(

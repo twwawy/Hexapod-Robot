@@ -4,7 +4,6 @@ import argparse
 from multiprocessing.connection import Connection
 from pathlib import Path
 import traceback
-from dataclasses import replace
 
 from view_trained_policy import read_package, prepare_source, load_environment, load_policy
 
@@ -30,31 +29,32 @@ def run(connection):
     from mujoco import mjx
     import numpy as np
     import firmware_mjx_controller as firmware
-    from foothold_policy_planning import TakeoffPlanner
-    from foothold_planner import Plan
+    from foothold_policy_observation import LidarPolicyObservation, compare_with_reference
     jax.config.update('jax_compilation_cache_dir', str(output/'jax_cache'))
     model_path = output/'explorer_policy.mjb'
     mujoco.mj_saveModel(env.mj_model, str(model_path), None)
     connection.send(dict(kind='ready', model=str(model_path), home=np.asarray(env._home_qpos),
                          manifest=dict(commit=manifest['git_commit'], policy=manifest['run_id'],
                                        checkpoint_step=manifest['checkpoint_step'],
-                                       robot_model='skeleton', mode='nominal fallback + LiDAR footholds + gated PPO dynamics',
+                                       robot_model='skeleton', mode='continuous firmware gait + stage31 residual',
                                        T_base_lidar=sensor.tolist(), terrain=request['terrain'],
                                        terrain_raster_resolution_m=0.02,
                                        source_fidelity=manifest['source_fidelity'],
-                                       foothold_feedback=True,
-                                       terrain_observation='LiDAR only; unknown feature=0, unknown leg RL=0',
-                                       handoff='per-leg, latched at takeoff')))
+                                       foothold_feedback=False,
+                                       residual_scale=request['residual_scale'],
+                                       terrain_observation='LiDAR only; unknown feature=0; no observations => RL=0',
+                                       gt_usage='post-action comparison only',
+                                       controller_source='archived v3 step; residual input scaled only')))
     print('Foothold explorer: compiling JAX; the viewer remains responsive.', flush=True)
     policy = load_policy(package, manifest)
 
     @jax.jit
-    def advance(state, key, command, paths, modes, rotation, feet, features):
+    def advance(state, key, command, features, coverage):
         info = dict(state.info)
         info['command'] = command
         info['controller_state'] = info['controller_state']._replace(
-            proposal_path=paths, proposal_mode=modes, body_rotation=rotation,
-            actual_feet_world=feet, terrain_features=features)
+            terrain_features=features, observation_fraction=coverage,
+            residual_scale=jp.asarray(request['residual_scale'], dtype=jp.float32))
         state = state.replace(info=info, obs=env._get_obs(state.data, info))
         key, sample_key = jax.random.split(key)
         action, _ = policy(state.obs, sample_key)
@@ -73,13 +73,15 @@ def run(connection):
     touchdowns = 0
     action = np.zeros(18)
     host = mujoco.MjData(env.mj_model)
-    planner = TakeoffPlanner(env, request['require_observed'])
+    perception = LidarPolicyObservation(env)
+    reference_field = np.asarray(env._course_grid)
+    terrain_comparison, terrain_samples = None, None
 
     def snapshot():
         nonlocal last_swing, touchdowns
         mjx.get_data_into(host, env.mj_model, state.data)
         control = jax.device_get(state.info['controller_output'])
-        handoff = jax.device_get(state.info['controller_state'])
+        residual = jax.device_get(state.info['controller_state'])
         swing = np.asarray(control.gait_state) == firmware.LEG_SWING
         touchdowns += int(np.count_nonzero(last_swing & ~swing))
         last_swing = swing
@@ -91,30 +93,18 @@ def run(connection):
         reasons = [name.removeprefix('termination/') for name, value in state.metrics.items()
                    if name.startswith('termination/') and float(np.asarray(value)) > 0]
         twist = np.asarray(control.applied_twist)
-        mapped = np.asarray(handoff.active_mode) == 1
-        mode = 'FOOTHOLD + RL' if np.any(mapped) else 'NOMINAL / RL=0'
-        if bool(handoff.blocked):
-            mode = 'HOLD: observed hazard / unreachable target'
-        plans = {}
-        for leg, path in enumerate(np.asarray(handoff.active_path)):
-            if np.any(path):
-                template = planner.plans.get(leg)
-                if template is None:
-                    template = Plan(path[-1], np.empty((0, 3)), np.empty(0, dtype=bool), [],
-                                    path[-1], path, '', 0)
-                plans[leg] = replace(template, selected=path[-1].copy(), path=path.copy(),
-                                     mode='geometric' if mapped[leg] else 'nominal',
-                                     status='latched_observed' if mapped[leg] else 'firmware_nominal_RL_zero')
-        if bool(handoff.blocked):
-            plans.update({leg: plan for leg, plan in planner.plans.items() if plan.mode == 'hold'})
+        gain = float(np.asarray(residual.residual_gain))
+        mode = 'NOMINAL + RL RESIDUAL' if gain > 1e-6 else 'NOMINAL / RL=0'
         return dict(kind='state', qpos=host.qpos.copy(), qvel=host.qvel.copy(), ctrl=host.ctrl.copy(),
                     time=float(host.time), action=np.asarray(action), targets=targets,
                     swing=swing, progress=np.asarray(control.gait_progress),
                     command=np.asarray(state.info['command']), applied=np.array((twist[0], twist[1], twist[3])),
                     terminal=terminal, status=('Stopped: '+(', '.join(reasons) or 'episode ended')+'; H resets'
                                                if terminal else mode),
-                    control_mode=mode, mapped_legs=mapped, plans=plans,
-                    landing_targets=np.asarray(handoff.active_path)[:, -1].copy(),
+                    control_mode=mode, residual_gain=gain,
+                    terrain_comparison=terrain_comparison, terrain_samples=terrain_samples,
+                    ik_valid=np.asarray(control.ik_valid), policy_valid=np.asarray(control.policy_valid),
+                    foot_limited=np.asarray(control.foot_limited),
                     completed_swings=touchdowns//3, dt=float(env.dt))
 
     connection.send(snapshot())
@@ -128,20 +118,21 @@ def run(connection):
             terminal, steps, touchdowns = False, 0, 0
             last_swing[:] = False
             action = np.zeros(18)
-            planner.grid, planner.plans = None, {}
+            perception.grid = None
+            terrain_comparison, terrain_samples = None, None
         elif message['kind'] == 'step' and not terminal:
             # One 20 ms policy tick per request; no blocking GPU calls in the UI.
             command = jp.asarray(message['command'], dtype=jp.float32)
             if 'grid' in message:
-                planner.grid = message['grid']
-            handoff = jax.device_get(state.info['controller_state'])
-            paths, modes = planner.proposals(host, handoff, message['command'])
-            rotation = host.xmat[env.mj_model.body('hexapod').id].reshape(3, 3)
-            feet = planner.ik.positions(host)
-            features = planner.terrain_features(host, float(np.asarray(state.info['support_height'])))
-            inputs = [jp.asarray(value, dtype=jp.float32) for value in (paths, rotation, feet, features)]
-            state, key, action = advance(state, key, command, inputs[0], jp.asarray(modes), *inputs[1:])
+                perception.grid = message['grid']
+            sample = perception.sample(host, float(np.asarray(state.info['support_height'])))
+            features = jp.asarray(sample['features'], dtype=jp.float32)
+            coverage = jp.asarray(sample['valid'].mean(), dtype=jp.float32)
+            state, key, action = advance(state, key, command, features, coverage)
             state.obs.block_until_ready()
+            # GT is queried only after the action/physics step. The comparison
+            # accompanies its input pose/time and is never fed back into advance.
+            terrain_comparison, terrain_samples = compare_with_reference(sample, reference_field)
             steps += 1
             terminal = bool(np.asarray(state.done))
             if np.max(np.abs(np.asarray(state.data.qpos[:2]))) > 5.7:

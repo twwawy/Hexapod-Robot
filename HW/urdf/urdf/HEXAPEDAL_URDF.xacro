@@ -1119,19 +1119,19 @@
 
 <link name="livox_mid_360_1">
   <inertial>
-    <origin xyz="-0.024 0.018 -0.016243934732367332" rpy="0 0 0"/>
+    <origin xyz="-0.024 -0.018 0.016243934732367332" rpy="0 0 0"/>
     <mass value="1.055789101972525"/>
-    <inertia ixx="0.00044310323098749614" iyy="0.000443" izz="0.0006948967690125037" ixy="0.0" iyz="0.0" ixz="5.9600438419613695e-8"/>
+    <inertia ixx="0.00044310323098749614" iyy="0.000443" izz="0.0006948967690125037" ixy="0.0" iyz="0.0" ixz="-5.9600438419613695e-8"/>
   </inertial>
   <visual>
-    <origin xyz="-0.18415863546375527 0.01807071078348564 -0.24554431588256895" rpy="-0.5235987755982988 0 -1.5707963267948966"/>
+    <origin xyz="-0.18415863546375527 -0.01807071078348564 0.24554431588256895" rpy="2.6179938779914944 0 1.5707963267948966"/>
     <geometry>
       <mesh filename="package://HEXAPEDAL_URDF_description/meshes/livox_mid_360_1.stl" scale="0.001 0.001 0.001"/>
     </geometry>
     <material name="silver"/>
   </visual>
   <collision>
-    <origin xyz="-0.18415863546375527 0.01807071078348564 -0.24554431588256895" rpy="-0.5235987755982988 0 -1.5707963267948966"/>
+    <origin xyz="-0.18415863546375527 -0.01807071078348564 0.24554431588256895" rpy="2.6179938779914944 0 1.5707963267948966"/>
     <geometry>
       <mesh filename="package://HEXAPEDAL_URDF_description/meshes/livox_mid_360_1.stl" scale="0.001 0.001 0.001"/>
     </geometry>
@@ -3110,8 +3110,8 @@
 </joint>
 
 <joint name="강체 202" type="fixed">
-  <!-- Fusion joint geometryOne: red X, green Y, blue Z. -->
-  <origin xyz="0.03799971078348564 0.0567848986966054 -0.03037306695894683" rpy="0 -0.5235987755982988 1.5707963267948966"/>
+  <!-- Fusion mount with the physical MID-360 inverted about its local X axis. -->
+  <origin xyz="0.03799971078348564 0.0567848986966054 -0.03037306695894683" rpy="3.141592653589793 -0.5235987755982988 1.5707963267948966"/>
   <parent link="M_column_3_1"/>
   <child link="livox_mid_360_1"/>
 </joint>
@@ -3286,7 +3286,7 @@
 
 <joint name="강체 201" type="fixed">
   <!-- Counter-transform keeps the FOV mesh at its original world pose. -->
-  <origin xyz="-0.024 0.018 -0.035047" rpy="-0.5235987755982988 0 -1.5707963267948966"/>
+  <origin xyz="-0.024 -0.018 0.035047" rpy="2.6179938779914944 0 1.5707963267948966"/>
   <parent link="livox_mid_360_1"/>
   <child link="mid-360-fov-asm_ver.ksh_MID-360_4_1_1_1"/>
 </joint>

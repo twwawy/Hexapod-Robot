@@ -33,6 +33,7 @@ STEP_DEPTH = 0.25
 STEP_COUNT = MAX_STAIR_COUNT
 STEP_HEIGHT = TERRAIN_LEVELS[-1].stair_riser
 STAIR_TOTAL_RISE = TERRAIN_LEVELS[-1].final_height
+FOOT_COLLISION_RADIUS_M = 0.032
 
 
 def _numbers(values) -> str:
@@ -100,7 +101,63 @@ def _strip_cad_meshes(root: ET.Element) -> None:
                 body.remove(geom)
 
 
-def _add_robot_colliders(root: ET.Element) -> None:
+def _quat_rotate_vectors(quaternion: np.ndarray, vectors: np.ndarray) -> np.ndarray:
+    """Rotate row vectors by one WXYZ quaternion."""
+
+    xyz = quaternion[1:]
+    return vectors + 2.0 * (
+        quaternion[0] * np.cross(xyz, vectors)
+        + np.cross(xyz, np.cross(xyz, vectors))
+    )
+
+
+def _mesh_foot_tip_local(model, prefix: str, outward: np.ndarray) -> np.ndarray:
+    """Return the CAD foot assembly's outer support point in distal-body axes."""
+
+    import mujoco
+
+    body_id = mujoco.mj_name2id(
+        model, mujoco.mjtObj.mjOBJ_BODY, f"{prefix}_motor_horn_3_1"
+    )
+    if body_id < 0:
+        raise ValueError(f"Missing distal body for {prefix}")
+
+    vertices: list[np.ndarray] = []
+    for geom_id in range(model.ngeom):
+        if int(model.geom_bodyid[geom_id]) != body_id:
+            continue
+        if int(model.geom_type[geom_id]) != int(mujoco.mjtGeom.mjGEOM_MESH):
+            continue
+        mesh_id = int(model.geom_dataid[geom_id])
+        mesh_name = model.mesh(mesh_id).name or ""
+        if not mesh_name.startswith(f"{prefix}_foot_"):
+            continue
+        vertex_start = int(model.mesh_vertadr[mesh_id])
+        vertex_count = int(model.mesh_vertnum[mesh_id])
+        mesh_vertices = np.asarray(
+            model.mesh_vert[vertex_start : vertex_start + vertex_count]
+        )
+        vertices.append(
+            _quat_rotate_vectors(model.geom_quat[geom_id], mesh_vertices)
+            + model.geom_pos[geom_id]
+        )
+    if not vertices:
+        raise ValueError(f"Missing merged CAD foot meshes for {prefix}")
+
+    foot_vertices = np.concatenate(vertices, axis=0)
+    support = foot_vertices @ outward
+    support_max = float(np.max(support))
+    # The support set is normally one CAD vertex.  Averaging tied vertices
+    # gives a stable center if a future foot terminates in a flat face.
+    tip = np.mean(
+        foot_vertices[np.isclose(support, support_max, rtol=0.0, atol=1.0e-6)],
+        axis=0,
+    )
+    # Preserve the exact maximum projection after averaging a flat support set.
+    return tip + (support_max - float(tip @ outward)) * outward
+
+
+def _add_robot_colliders(root: ET.Element, source_model) -> None:
     robot = root.find("./worldbody/body[@name='hexapod']")
     if robot is None:
         raise ValueError("Missing hexapod body")
@@ -136,7 +193,8 @@ def _add_robot_colliders(root: ET.Element) -> None:
         outward = origin.copy()
         outward[2] = 0.0
         outward /= np.linalg.norm(outward)
-        segment3 = outward * 0.230
+        foot_tip = _mesh_foot_tip_local(source_model, prefix, outward)
+        foot_center = foot_tip - FOOT_COLLISION_RADIUS_M * outward
 
         body1.append(
             ET.Element(
@@ -168,7 +226,7 @@ def _add_robot_colliders(root: ET.Element) -> None:
                 {
                     "name": f"{prefix}_tibia_collision",
                     "type": "capsule",
-                    "fromto": f"0 0 0 {_numbers(segment3)}",
+                    "fromto": f"0 0 0 {_numbers(foot_center)}",
                     "size": "0.023",
                     "rgba": "0.40 0.50 0.60 1",
                 },
@@ -180,8 +238,8 @@ def _add_robot_colliders(root: ET.Element) -> None:
                 {
                     "name": f"{prefix}_foot_collision",
                     "type": "sphere",
-                    "pos": _numbers(segment3),
-                    "size": "0.032",
+                    "pos": _numbers(foot_center),
+                    "size": f"{FOOT_COLLISION_RADIUS_M:.9g}",
                     "friction": "1.2 0.01 0.001",
                     "rgba": "0.85 0.45 0.12 1",
                 },
@@ -192,7 +250,7 @@ def _add_robot_colliders(root: ET.Element) -> None:
                 "site",
                 {
                     "name": f"{prefix}_foot_site",
-                    "pos": _numbers(segment3),
+                    "pos": _numbers(foot_tip),
                     "size": "0.012",
                     "rgba": "1 0.2 0.1 1",
                 },
@@ -314,7 +372,7 @@ def prepare_rl_scene(output: Path = RL_SCENE_OUTPUT) -> Path:
 
     _replace_inertials(root, source_model)
     _strip_cad_meshes(root)
-    _add_robot_colliders(root)
+    _add_robot_colliders(root, source_model)
     _add_terrain_pool(root)
 
     output.parent.mkdir(parents=True, exist_ok=True)

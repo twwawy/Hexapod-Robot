@@ -1,5 +1,5 @@
 {
-  "action_contract": "stm32_firmware_adaptive_swing_residual_v3",
+  "action_contract": "stm32_firmware_adaptive_swing_residual_100mm_v4",
   "action_source": "deterministic_scripted_v1_zero_first_1s",
   "canonical_leg_order": [
     "RB",
@@ -140,6 +140,12 @@
         ]
       },
       "done_reason/joint_limit": {
+        "dtype": "bool",
+        "shape": [
+          500
+        ]
+      },
+      "done_reason/no_progress": {
         "dtype": "bool",
         "shape": [
           500
@@ -669,6 +675,12 @@
           500
         ]
       },
+      "reward_raw/under_speed": {
+        "dtype": "float32",
+        "shape": [
+          500
+        ]
+      },
       "reward_raw/upright": {
         "dtype": "float32",
         "shape": [
@@ -819,6 +831,12 @@
           500
         ]
       },
+      "reward_scaled/under_speed": {
+        "dtype": "float32",
+        "shape": [
+          500
+        ]
+      },
       "reward_scaled/upright": {
         "dtype": "float32",
         "shape": [
@@ -863,7 +881,7 @@
       }
     },
     "path": "isaac_contract_v1_flat_seed0.npz",
-    "sha256": "2f323a4b9becef80e095972a98dcaf24be480702fc98a5e525f659c5b8408a76"
+    "sha256": "43033fbe87ed69750b30fa5994f1dfa1d50dbf23af19bfb488552fc26a41a4db"
   },
   "observation_contract": "firmware_state_collision_terrain_command5_pitch_v3",
   "policy_steps": 500,
@@ -873,12 +891,55 @@
     "devices": [
       "TFRT_CPU_0"
     ],
-    "git_commit": "74d7d9e6bd14215048cf15ae77af8dcc728a783a",
+    "git_commit": "0805164a5db4e85f1039637c829b760e5bc3d87b",
     "git_dirty": true,
     "git_status": [
-      "?? mjx/export_asset_manifest.py",
-      "?? mjx/export_isaac_contract.py",
-      "?? mjx/golden/"
+      "M docs/HEXAPOD_MJX_TO_ISAACLAB_PORT_PLAN.md",
+      " M isaaclab_hexapod/PORT_RESULT_AND_USAGE.md",
+      " M isaaclab_hexapod/README.md",
+      " M isaaclab_hexapod/data/config_validation.json",
+      " M isaaclab_hexapod/data/torch_controller_parity.json",
+      " M isaaclab_hexapod/data/usd/.asset_hash",
+      " M isaaclab_hexapod/data/usd/asset_inspection.json",
+      " M isaaclab_hexapod/data/usd/config.yaml",
+      " M isaaclab_hexapod/scripts/build_asset.sh",
+      " M isaaclab_hexapod/scripts/inspect_asset.py",
+      " M isaaclab_hexapod/scripts/inspect_asset.sh",
+      " M isaaclab_hexapod/scripts/validate_configs.py",
+      " M isaaclab_hexapod/scripts/validate_configs.sh",
+      " M isaaclab_hexapod/source/hexapod_isaaclab/hexapod_isaaclab/assets/__init__.py",
+      " M isaaclab_hexapod/source/hexapod_isaaclab/hexapod_isaaclab/assets/hexapod_asset_cfg.py",
+      " M isaaclab_hexapod/source/hexapod_isaaclab/hexapod_isaaclab/assets/joint_contract.py",
+      " M isaaclab_hexapod/source/hexapod_isaaclab/hexapod_isaaclab/contracts/__init__.py",
+      " M isaaclab_hexapod/source/hexapod_isaaclab/hexapod_isaaclab/controllers/firmware_controller_torch.py",
+      " M mjx/FIRMWARE_BASE.md",
+      " M mjx/RL_DESIGN.md",
+      " M mjx/export_isaac_asset_mjcf.py",
+      " M mjx/firmware_mjx_controller.py",
+      " M mjx/golden/isaac_contract_v1_flat_seed0.npz",
+      " M mjx/rough_terrain_env.py",
+      " M mjx/teacher_manifests/walking-teachers-v1.json",
+      " M mjx/terrain_curriculum.py",
+      " M mjx/tests/test_cli_and_gate.py",
+      " M mjx/tests/test_command_space.py",
+      " M mjx/tests/test_firmware_mjx_controller.py",
+      " M mjx/tests/test_pitch_ff.py",
+      " M mjx/tests/test_stair_penalties.py",
+      " M mjx/tests/test_training_artifacts.py",
+      " M mjx/tests/verify_plan_anchors.py",
+      " M mjx/train_competence_curriculum.py",
+      " M mjx/train_rough_terrain.py",
+      "?? isaaclab_hexapod/data/latest_scene_smoke.json",
+      "?? isaaclab_hexapod/data/training/",
+      "?? isaaclab_hexapod/data/usd/configuration/hexapod_full_mesh_mjx_parity_base.usd",
+      "?? isaaclab_hexapod/data/usd/configuration/hexapod_full_mesh_mjx_parity_physics.usd",
+      "?? isaaclab_hexapod/data/usd/configuration/hexapod_full_mesh_mjx_parity_robot.usd",
+      "?? isaaclab_hexapod/data/usd/configuration/hexapod_full_mesh_mjx_parity_sensor.usd",
+      "?? isaaclab_hexapod/data/usd/hexapod_full_mesh_mjx_parity.usd",
+      "?? isaaclab_hexapod/scripts/launch_latest_scene.py",
+      "?? isaaclab_hexapod/scripts/launch_latest_scene.sh",
+      "?? isaaclab_hexapod/scripts/sync_latest_mjx_training.py",
+      "?? isaaclab_hexapod/source/hexapod_isaaclab/hexapod_isaaclab/contracts/training_handoff.py"
     ],
     "isaaclab_commit": "cbf51abb5e98d1b3d497c8c73dc989e9f3628b89",
     "isaaclab_status": [

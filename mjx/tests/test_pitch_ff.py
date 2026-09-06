@@ -10,7 +10,12 @@ import jax.numpy as jp
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import firmware_mjx_controller as firmware
-from rough_terrain_env import PITCH_FF_MAX_RAD, _pitch_ff
+from rough_terrain_env import (
+    PITCH_FF_MAX_RAD,
+    STAIR_SWING_CLEARANCE_M,
+    _coupled_swing_height_floor,
+    _pitch_ff,
+)
 
 
 class PitchFeedforwardTest(unittest.TestCase):
@@ -70,6 +75,41 @@ class PitchFeedforwardTest(unittest.TestCase):
         self.assertAlmostEqual(
             float(next_state.posture_command[1]), float(expected_step), places=7
         )
+
+    def test_level6_pitch_and_swing_floor_rise_together(self) -> None:
+        target = -jp.arctan2(jp.asarray(0.10), jp.asarray(0.25))
+        half_pitch = 0.5 * target
+        half_floor = _coupled_swing_height_floor(half_pitch, target, 0.10)
+        full_floor = _coupled_swing_height_floor(target, target, 0.10)
+
+        expected_full = 0.10 + STAIR_SWING_CLEARANCE_M
+        self.assertAlmostEqual(float(full_floor), expected_full, places=7)
+        self.assertAlmostEqual(
+            float(half_floor),
+            firmware.SWING_HEIGHT_MIN
+            + 0.5 * (expected_full - firmware.SWING_HEIGHT_MIN),
+            places=7,
+        )
+
+    def test_disabled_stair_assist_keeps_nominal_swing_height(self) -> None:
+        floor = _coupled_swing_height_floor(
+            jp.asarray(-0.2), jp.asarray(0.0), 0.10
+        )
+        self.assertAlmostEqual(float(floor), firmware.SWING_HEIGHT_MIN, places=7)
+
+    def test_uphill_target_strengthens_but_does_not_exceed_pitch_cap(self) -> None:
+        target = -jp.arctan2(jp.asarray(0.10), jp.asarray(0.25))
+        feedforward = jp.zeros(())
+        for _ in range(500):
+            feedforward = _pitch_ff(
+                jp.full((9,), 0.10),
+                jp.asarray(0.0),
+                feedforward,
+                0.02,
+                target,
+            )
+        self.assertLess(float(feedforward), -0.20)
+        self.assertGreaterEqual(float(feedforward), -PITCH_FF_MAX_RAD)
 
 
 if __name__ == "__main__":

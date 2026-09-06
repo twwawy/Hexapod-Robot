@@ -32,6 +32,15 @@ BASE_FOOT_Z = -0.287006
 WORKSPACE_MARGIN = 0.001
 EFFECTIVE_PITCH_MAX_RAD = 0.5585
 HEIGHT_OFFSET_MAX_M = 0.10
+RESIDUAL_SCALE = (0.10, 0.10, 0.10)
+JETSON_TX_SIGN_PATTERN = (
+    (1.0, -1.0, 1.0),
+    (1.0, -1.0, 1.0),
+    (1.0, -1.0, 1.0),
+    (1.0, 1.0, -1.0),
+    (1.0, 1.0, -1.0),
+    (1.0, 1.0, -1.0),
+)
 
 LEG_STANCE, LEG_SWING, LEG_LATE_LANDING = 0, 1, 2
 
@@ -76,6 +85,21 @@ class FirmwareOutput(NamedTuple):
     gait_enabled: torch.Tensor
     gait_accepted: torch.Tensor
     posture_accepted: torch.Tensor
+
+
+def apply_joint_sign_pattern(joint_targets: torch.Tensor) -> torch.Tensor:
+    """Apply the shared leg-major sign convention used by training and simulation."""
+    if joint_targets.shape[-2:] != (6, 3):
+        raise ValueError(
+            "joint targets must end with the leg-major shape (6, 3), "
+            f"got {tuple(joint_targets.shape)}"
+        )
+    return joint_targets * joint_targets.new_tensor(JETSON_TX_SIGN_PATTERN)
+
+
+def jetson_tx_joint_targets(joint_targets: torch.Tensor) -> torch.Tensor:
+    """Apply the shared sign convention at the Jetson transmit boundary."""
+    return apply_joint_sign_pattern(joint_targets)
 
 
 def _geometry(like: torch.Tensor) -> tuple[torch.Tensor, ...]:
@@ -186,19 +210,31 @@ def _swing(progress: torch.Tensor, start: torch.Tensor, end: torch.Tensor) -> to
 
 
 def _phase_gated_residual(action_flat: torch.Tensor, gait_state: torch.Tensor,
-                          progress: torch.Tensor, swing_boost: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+                          progress: torch.Tensor, swing_boost: torch.Tensor,
+                          swing_height_floor: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
     action = action_flat.reshape(-1, 6, 3)
     swing, stance = gait_state == LEG_SWING, gait_state == LEG_STANCE
     az = action[..., 2].clamp(-1.0, 1.0)
     height = torch.where(az >= 0, SWING_HEIGHT + az * (SWING_HEIGHT_MAX - SWING_HEIGHT),
                          SWING_HEIGHT + az * (SWING_HEIGHT - SWING_HEIGHT_MIN))
+    height = torch.maximum(height, swing_height_floor[..., None]).clamp(
+        SWING_HEIGHT_MIN, SWING_HEIGHT_MAX
+    )
     envelope = 4.0 * _quintic(progress) * (1.0 - _quintic(progress))
-    xy = action[..., :2] * action.new_tensor((0.04, 0.02))
+    xy = action[..., :2] * action.new_tensor(RESIDUAL_SCALE[:2])
     xy = torch.where(swing[..., None], xy, torch.zeros_like(xy))
     boost = swing_boost.clamp(0.0, 0.06).unsqueeze(-1)
     swing_z = torch.minimum((height - SWING_HEIGHT + boost) * envelope,
                             torch.full_like(height, SWING_HEIGHT_MAX - SWING_HEIGHT))
-    z = torch.where(swing, swing_z, torch.where(stance, action[..., 2] * 0.02, torch.zeros_like(height)))
+    z = torch.where(
+        swing,
+        swing_z,
+        torch.where(
+            stance,
+            action[..., 2] * RESIDUAL_SCALE[2],
+            torch.zeros_like(height),
+        ),
+    )
     return torch.cat((xy, z[..., None]), -1), height
 
 
@@ -237,15 +273,15 @@ def initial_state(num_envs: int, device: str | torch.device, dtype: torch.dtype 
 
 def initial_output(state: FirmwareState) -> FirmwareOutput:
     """Build the source controller's valid standing output for a batch."""
-    _, _, base_single, signs = _geometry(state.previous_joint)
+    _, _, base_single, _ = _geometry(state.previous_joint)
     base = base_single.expand(state.first_step.shape[0], -1, -1).clone()
     zeros6 = torch.zeros_like(state.airborne_seen)
     ones6 = torch.ones_like(state.airborne_seen)
     zeros = torch.zeros_like(state.first_step)
     ones = torch.ones_like(state.first_step)
     return FirmwareOutput(
-        state.previous_joint * signs,
-        state.previous_joint,
+        apply_joint_sign_pattern(state.previous_joint),
+        jetson_tx_joint_targets(state.previous_joint),
         base,
         torch.zeros_like(state.previous_twist),
         torch.zeros_like(state.phase_time[:, None].expand(-1, 6)),
@@ -336,7 +372,8 @@ def step(state: FirmwareState, *, target_velocity: torch.Tensor, body_position_w
          attitude_rpy: torch.Tensor, contacts: torch.Tensor, policy_action: torch.Tensor,
          pitch_ff: torch.Tensor | None = None, roll_cmd: torch.Tensor | None = None,
          pitch_cmd: torch.Tensor | None = None, height_offset: torch.Tensor | None = None,
-         swing_boost: torch.Tensor | None = None) -> tuple[FirmwareState, FirmwareOutput]:
+         swing_boost: torch.Tensor | None = None,
+         swing_height_floor: torch.Tensor | None = None) -> tuple[FirmwareState, FirmwareOutput]:
     """Advance every environment by one 5 ms firmware tick."""
     n = target_velocity.shape[0]
     zero = target_velocity.new_zeros(n)
@@ -345,6 +382,11 @@ def step(state: FirmwareState, *, target_velocity: torch.Tensor, body_position_w
     pitch_cmd = zero if pitch_cmd is None else pitch_cmd
     height_offset = zero if height_offset is None else height_offset
     swing_boost = zero if swing_boost is None else swing_boost
+    swing_height_floor = (
+        torch.full_like(zero, SWING_HEIGHT_MIN)
+        if swing_height_floor is None
+        else swing_height_floor
+    )
     target_velocity = torch.maximum(torch.minimum(target_velocity, target_velocity.new_tensor((MAX_LINEAR_SPEED, MAX_YAW_RATE))),
                                     target_velocity.new_tensor((-MAX_LINEAR_SPEED, -MAX_YAW_RATE)))
     alpha = torch.exp(target_velocity.new_tensor(-2.0 * torch.pi * 5.0 * DT))
@@ -389,7 +431,13 @@ def step(state: FirmwareState, *, target_velocity: torch.Tensor, body_position_w
     nominal_posture = _rotate_inverse(accepted, posture)
     residual_alpha = torch.exp(target_velocity.new_tensor(-DT / 0.10))
     residual_filter = residual_alpha * state.residual_filter + (1 - residual_alpha) * policy_action.clamp(-1.0, 1.0)
-    residual_local, swing_height = _phase_gated_residual(residual_filter, gait["state"], gait["progress"], swing_boost)
+    residual_local, swing_height = _phase_gated_residual(
+        residual_filter,
+        gait["state"],
+        gait["progress"],
+        swing_boost,
+        swing_height_floor,
+    )
     residual_feet = _rotate_inverse(_leg_to_body(_body_to_leg(accepted) + residual_local), posture)
     policy_valid = _solve_ik(residual_feet)[1]
     safe = torch.where(policy_valid[..., None], residual_feet, nominal_posture)
@@ -398,12 +446,11 @@ def step(state: FirmwareState, *, target_velocity: torch.Tensor, body_position_w
     last_ik = torch.where(ik_valid[..., None], ik_candidate, state.last_ik)
     joint_step = JOINT_RATE * DT
     previous_joint = (state.previous_joint + (last_ik - state.previous_joint).clamp(-joint_step, joint_step)).clamp(-JOINT_LIMIT, JOINT_LIMIT)
-    _, _, _, signs = _geometry(previous_joint)
     next_state = state._replace(first_step=torch.zeros_like(state.first_step), throttle_filter=throttle_filter,
                                 yaw_filter=yaw_filter, yaw_reference=yaw_reference, position_reference=position_reference,
                                 previous_twist=candidate, gait_applied=gait_applied, posture_command=posture,
                                 last_ik=last_ik, previous_joint=previous_joint, residual_filter=residual_filter,
                                 **gait_updates, **foot_updates)
-    output = FirmwareOutput(previous_joint * signs, previous_joint, limited, gait_applied, gait["progress"], gait["state"],
+    output = FirmwareOutput(apply_joint_sign_pattern(previous_joint), jetson_tx_joint_targets(previous_joint), limited, gait_applied, gait["progress"], gait["state"],
                             swing_height, ik_valid, policy_valid, foot_limited, gait["enabled"], gait_accepted, posture_accepted)
     return next_state, output

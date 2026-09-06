@@ -75,10 +75,12 @@ MODEL_SIGNS = jp.array(
         (1.0, 1.0, -1.0),
     )
 )
-# Local Cartesian residual limits.  Swing X/Y remain Cartesian offsets, while
-# Z has phase-dependent semantics: swing Z selects a 4--25 cm arc height,
-# stance Z is limited to 2 cm and late-landing Z is controller-owned.
-RESIDUAL_SCALE = jp.array((0.04, 0.02, 0.02))
+# Local Cartesian residual limits.  The filtered action is an absolute request
+# with previous-controller-state smoothing, not an accumulated position delta.
+# Swing X/Y and stance Z can request up to 100 mm per axis.  Swing Z keeps its
+# phase-dependent 4--25 cm arc-height semantics and late-landing remains
+# controller-owned.
+RESIDUAL_SCALE = jp.array((0.10, 0.10, 0.10))
 EFFECTIVE_PITCH_MAX_RAD = 0.5585
 HEIGHT_OFFSET_MAX_M = 0.10
 
@@ -123,6 +125,16 @@ class FirmwareOutput(NamedTuple):
     gait_enabled: jax.Array
     gait_accepted: jax.Array
     posture_accepted: jax.Array
+
+
+def apply_joint_sign_pattern(joint_targets: jax.Array) -> jax.Array:
+    """Apply the shared leg-major sign convention used by training and simulation."""
+    if joint_targets.shape[-2:] != (6, 3):
+        raise ValueError(
+            "joint targets must end with the leg-major shape (6, 3), "
+            f"got {joint_targets.shape}"
+        )
+    return joint_targets * MODEL_SIGNS
 
 
 def _body_to_leg(feet_body: jax.Array) -> jax.Array:
@@ -291,12 +303,17 @@ def _phase_gated_policy_residual(
     gait_state: jax.Array,
     gait_progress: jax.Array,
     swing_boost: jax.Array = 0.0,
+    swing_height_floor: jax.Array = SWING_HEIGHT_MIN,
 ) -> tuple[jax.Array, jax.Array]:
     """Return local residuals without moving swing takeoff or touchdown Z."""
     action = filtered_action.reshape(6, 3)
     swing = gait_state == LEG_SWING
     stance = gait_state == LEG_STANCE
-    swing_height = _adaptive_swing_height(action[:, 2])
+    swing_height = jp.clip(
+        jp.maximum(_adaptive_swing_height(action[:, 2]), swing_height_floor),
+        SWING_HEIGHT_MIN,
+        SWING_HEIGHT_MAX,
+    )
     scaled_progress = _quintic(gait_progress)
     swing_envelope = 4.0 * scaled_progress * (1.0 - scaled_progress)
 
@@ -369,8 +386,8 @@ def initial_state() -> FirmwareState:
 def initial_output() -> FirmwareOutput:
     state = initial_state()
     return FirmwareOutput(
-        model_joint_targets=state.previous_joint * MODEL_SIGNS,
-        servo_joint_targets=state.previous_joint,
+        model_joint_targets=apply_joint_sign_pattern(state.previous_joint),
+        servo_joint_targets=apply_joint_sign_pattern(state.previous_joint),
         foot_targets_body=BASE_FEET,
         applied_twist=jp.zeros(4),
         gait_progress=jp.zeros(6),
@@ -561,6 +578,7 @@ def step(
     pitch_cmd: jax.Array = 0.0,
     height_offset: jax.Array = 0.0,
     swing_boost: jax.Array = 0.0,
+    swing_height_floor: jax.Array = SWING_HEIGHT_MIN,
 ) -> tuple[FirmwareState, FirmwareOutput]:
     """Advance the source-equivalent controller by one 5 ms firmware tick."""
     target_velocity = jp.clip(
@@ -676,6 +694,7 @@ def step(
         gait["state"],
         gait["progress"],
         swing_boost,
+        swing_height_floor,
     )
     candidate_local = _body_to_leg(accepted_nominal_feet) + residual_local
     residual_feet = _rotate_inverse(_leg_to_body(candidate_local), posture_command)
@@ -710,8 +729,8 @@ def step(
         **foot_updates,
     )
     output = FirmwareOutput(
-        model_joint_targets=previous_joint * MODEL_SIGNS,
-        servo_joint_targets=previous_joint,
+        model_joint_targets=apply_joint_sign_pattern(previous_joint),
+        servo_joint_targets=apply_joint_sign_pattern(previous_joint),
         foot_targets_body=limited_feet,
         applied_twist=gait_applied,
         gait_progress=gait["progress"],

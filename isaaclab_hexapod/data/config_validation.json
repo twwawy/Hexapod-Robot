@@ -13,7 +13,16 @@
     "perceptive_observation_groups": true,
     "rsl_asymmetric_groups": true,
     "sensor_configs_construct": true,
+    "mid360_current_urdf_mount": true,
+    "mid360_published_fov": true,
+    "mid360_published_rate_range": true,
+    "mid360_rtx_proxy_contract": true,
     "depth_extrinsic_safety_gate": true,
+    "full_mesh_usd_selected": true,
+    "mjx_handoff_action_contract": true,
+    "mjx_handoff_observation_contract": true,
+    "mjx_handoff_reward_contract": true,
+    "unsafe_latest_weights_not_autoloaded": true,
     "flat_task_registered": true,
     "perceptive_task_registered": true
   },
@@ -26,7 +35,8 @@
       24,
       3
     ],
-    "terrain_latent": 64
+    "terrain_latent": 64,
+    "latest_mjx_terrain_level": 9
   },
   "passed": true
 }

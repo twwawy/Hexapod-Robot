@@ -13,7 +13,8 @@ bash scripts/view_foothold_planner.sh --terrain steps
 ```
 
 이 명령은 기존 넓은 코스에서 미관측 첫걸음을 펌웨어 nominal/RL=0으로 시작한다.
-관측된 착지점이 있으면 다리별 다음 스윙부터 착지 경로와 제한된 stage31 residual을 적용한다.
+관측이 생겨도 기본 제어기는 계속 보행하고 stage31 residual의 크기만 부드럽게 조절한다.
+착지 후보는 참고 표시이며 실제 경로로 주입하지 않는다. `--residual-scale 0`은 같은 동역학의 기본 제어기 비교다.
 이 모드의 지형 입력은 LiDAR 관측이며, 아래 별도 재생기의 원래 정책/시뮬레이터 관측 구성과 다르다.
 자세한 조작법과 관측/제어의 구분은 [착지점 뷰어 안내](../../../docs/HEXAPOD_FOOTHOLD_PREVIEW_USAGE.md)를 따른다.
 아래는 별도 `view_trained_policy.sh`의 run 지형 재현 모드 설명이다.

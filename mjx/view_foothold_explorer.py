@@ -152,9 +152,9 @@ class Preview:
                 viewer.cam.distance, viewer.cam.elevation = 12, -75
 
     def navigate(self, dt):
-        if self.worker_failed:
+        if self.worker_failed and not self.policy_mode:
             return
-        self.gait.tick(self.result, self.command, dt, self.target_height,
+        self.gait.tick(None if self.worker_failed else self.result, self.command, dt, self.target_height,
                        in_place=self.in_place, allow_unknown=not self.args.require_observed)
         self.rest = self.data.qpos.copy()
         w, x, y, z = self.rest[3:7]
@@ -194,11 +194,13 @@ class Preview:
                        rl_action=self.gait.action.tolist() if self.policy_mode else [0.0]*18,
                        policy_targets_odom=(self.gait.targets.tolist() if self.policy_mode
                                             and self.gait.targets is not None else None),
-                       lidar_foothold_feedback=True,
+                       lidar_foothold_feedback=not self.policy_mode,
                        control_mode=self.gait.control_mode if self.policy_mode else 'nominal_kinematic',
-                       mapped_legs=self.gait.mapped_legs.tolist() if self.policy_mode else None,
-                       landing_targets_odom=(self.gait.landing_targets.tolist() if self.policy_mode
-                                             and self.gait.landing_targets is not None else None),
+                       residual_gain=self.gait.residual_gain if self.policy_mode else 0.0,
+                       terrain_comparison=self.gait.terrain_comparison if self.policy_mode else None,
+                       ik_valid=self.gait.ik_valid.tolist() if self.policy_mode else None,
+                       policy_valid=self.gait.policy_valid.tolist() if self.policy_mode else None,
+                       foot_limited=self.gait.foot_limited.tolist() if self.policy_mode else None,
                        gait_status=self.gait.status,
                        active_tripod=(np.flatnonzero(self.gait.swing).tolist() if self.policy_mode
                                       else list(self.gait.plans)),
@@ -217,6 +219,8 @@ class Preview:
                                        reasons=dict(Counter(plan.reasons)))
         (self.args.output / 'latest_plan.json').write_text(json.dumps(summary, indent=2) + '\n')
         if save_map:
+            if self.policy_mode and self.gait.terrain_samples is not None:
+                np.savez_compressed(self.args.output/'latest_lidar_gt_pair.npz', **self.gait.terrain_samples)
             grid = result['grid']
             np.savez_compressed(self.args.output / 'latest_map.npz', height=grid.height,
                                 valid=grid.valid(now), timestamp=grid.timestamp, center_odom=grid.center,
@@ -300,10 +304,16 @@ class Preview:
             diagnostics = (f'Ground hits {stats["ground_hits"]} / rays {stats["rays"]} | body hits {stats["body_hits"]}\n'
                            f'Near-foot coverage {result["near_valid_fraction"]:.0%} | snapshot age {now-result["stamp"]:.1f}s\n'
                            f'Scan {result["scan_ms"]:.0f} ms | six-leg plan {result["plan_ms"]:.0f} ms')
+        if self.policy_mode and self.gait.terrain_comparison is not None:
+            comparison = self.gait.terrain_comparison
+            error = comparison['rmse_m']
+            error_text = 'n/a' if error is None else f'{error*1000:.1f} mm'
+            diagnostics += (f'\nLiDAR policy samples {comparison["observed_count"]}/15 '
+                            f'| GT raster RMSE={error_text} (diagnostic only)')
         applied = self.gait.applied_command
         mode = f'{self.gait.control_mode} / DYNAMICS' if self.policy_mode else 'KINEMATIC / RL=0'
         controls = ('Arrows: forward/back + turn | SPACE velocity zero | ENTER pause | PgUp/PgDn height trim\n'
-                    'White: current commands | blue: latched observed path | orange: nominal prediction / RL=0\n'
+                    'White: firmware + residual targets | colored footholds: diagnostic candidates only\n'
                     if self.policy_mode else
                     'Arrows: forward/back + turn | A/D strafe | SPACE STOP | PgUp/PgDn height\n'
                     'Continuous tripod | Enter in-place toggle\n')
@@ -314,7 +324,9 @@ class Preview:
                 f'Applied vx={applied[0]:+.2f} vy={applied[1]:+.2f} wz={applied[2]:+.2f} '
                 f'| completed swings={self.gait.completed_swings}\n'
                 + (f'Gated stage31 action norm={np.linalg.norm(self.gait.action):.3f} '
-                   f'| mapped legs={int(self.gait.mapped_legs.sum())}/6 | simulation={self.data.time:.2f}s\n'
+                   f'| residual gain={self.gait.residual_gain:.3f} | simulation={self.data.time:.2f}s\n'
+                   f'IK valid={int(self.gait.ik_valid.sum())}/6 | residual IK valid={int(self.gait.policy_valid.sum())}/6 '
+                   f'| reach limited={int(self.gait.foot_limited.sum())}/6\n'
                    if self.policy_mode else '') +
                 f'{diagnostics}\n' + '\n'.join(rows) + '\n'
                 + controls +
@@ -322,7 +334,7 @@ class Preview:
                 'M height tiles | L raw points | G MID360 FOV | K scan | F follow | T top | V course\n'
                 'MID360 FOV: H360 V[-7,+52]deg | wires: angular boundary, not returns\n'
                 'Orange: unseen nominal | Blue: geometric | Cyan: endpoint known, path partly unknown\n'
-                'Height: green low -> yellow/red high | Red X: no executable target')
+                'Height: green low -> yellow/red high | Red X: no candidate path')
         return [(mujoco.mjtFontScale.mjFONTSCALE_100, mujoco.mjtGridPos.mjGRID_TOPLEFT, text, '')]
 
 
@@ -331,7 +343,9 @@ def main():
     parser.add_argument('--revision', default='origin/main')
     parser.add_argument('--terrain', choices=('flat', 'steps'), default='steps')
     parser.add_argument('--controller', choices=('trained', 'nominal'), default='trained',
-                        help='nominal fallback + LiDAR footholds + gated stage31 PPO dynamics (default), or kinematic planning')
+                        help='continuous firmware gait + stage31 residual dynamics (default), or kinematic planning')
+    parser.add_argument('--residual-scale', type=float, default=1.0,
+                        help='policy action scale [0,1], additionally faded by LiDAR coverage; 0 = firmware-only dynamics')
     parser.add_argument('--policy-package', type=Path,
                         default=Path(__file__).resolve().parent/'policies/progress-v2-stage31-level6')
     parser.add_argument('--policy-seed', type=int, default=20040)
@@ -360,6 +374,10 @@ def main():
     args = parser.parse_args()
     if args.controller == 'trained' and args.robot_display != 'skeleton':
         parser.error('trained policy uses its training link model; use --controller nominal for CAD comparison')
+    if not 0 <= args.residual_scale <= 1:
+        parser.error('residual-scale must be between 0 and 1')
+    if args.controller == 'trained' and args.require_observed:
+        parser.error('--require-observed applies to --controller nominal; trained mode keeps the firmware gait running')
     if (min(args.scan_hz, args.azimuth_samples, args.gait_swing_duration, args.map_resolution,
             args.map_half_extent, args.map_max_age, args.lidar_range, args.map_draw_budget,
             args.fov_display_radius) <= 0
@@ -377,7 +395,7 @@ def main():
                 viewer.opt.geomgroup[1] = 1
                 viewer.opt.geomgroup[5] = int(args.robot_display == 'mesh')
                 viewer.cam.distance, viewer.cam.azimuth, viewer.cam.elevation = 3.2, 135, -50
-            print('Arrows move the robot; '+('nominal fallback -> LiDAR footholds + gated stage31 PPO dynamics.' if preview.policy_mode
+            print('Arrows move the robot; '+('continuous firmware gait + stage31 residual; LiDAR candidates are diagnostics.' if preview.policy_mode
                                              else 'nominal kinematic control.'), flush=True)
             print(f'Artifacts: {args.output}', flush=True)
             previous = time.monotonic()
