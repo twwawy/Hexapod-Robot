@@ -18,7 +18,7 @@ typedef struct
     float common_z_recovery_total[2];                // 두 Tripod의 S-curve 전체 복구량을 저장한다.
     float common_z_recovery_progress[2];             // 두 Tripod의 S-curve 진행률을 저장한다.
     float swing_resume_progress[ROBOT_LEG_COUNT];    // 정지 후 Swing 재개 진행률을 저장한다.
-    RobotLegState_t previous_state[ROBOT_LEG_COUNT]; // 이전 다리 상태를 저장한다.
+    RobotLegState_t previous_state[ROBOT_LEG_COUNT];  // HOLD를 제외한 직전 다리 상태를 저장한다.
     uint8_t previous_swing_mask;                     // 직전 Swing 다리 비트를 저장한다.
 
     bool adapted_stance[ROBOT_LEG_COUNT];            // 접촉 적응 Stance 여부를 저장한다.

@@ -667,6 +667,138 @@ static bool GaitTest_CheckSupportRecovery(void)
            (gait.state[1] == ROBOT_LEG_STANCE);  // 같은 Swing·Stance 역할로 재개되는지 확인한다.
 }
 
+/* 조기 착지발의 반복 이탈 뒤 공중발이 기존 Swing 경로를 이어가는지 검사한다. */
+static bool GaitTest_CheckSupportRecoveryTrajectory(bool resume_before_hold,
+                                                    bool candidate_before_hold)
+{
+    GaitManager_Handle_t manager[2];        // 기준 보행과 일시정지 보행 상태를 저장한다.
+    FootTrajectory_Handle_t trajectory[2];  // 두 보행의 독립 궤적 상태를 저장한다.
+    RobotGaitPhase_t gait[2];               // 두 보행의 현재 위상을 저장한다.
+    RobotFootTargets_t targets[2];          // 같은 위상에서 비교할 발 위치를 저장한다.
+    RobotBodyTwist_t twist = {0};           // 고정 보폭과 회전 명령을 저장한다.
+    RobotDroneOutput_t drone = {0};         // 정상 수동 보행 명령을 저장한다.
+    RobotEuler_t posture = {0};             // 수평 몸체 자세를 저장한다.
+    bool contact[2][ROBOT_LEG_COUNT];       // 두 보행의 확정 접촉을 저장한다.
+    bool contact_raw[2][ROBOT_LEG_COUNT];   // 두 보행의 접촉 후보를 저장한다.
+    uint32_t run;                           // 기준 보행과 일시정지 보행을 선택한다.
+    uint32_t cycle;                         // 정지 시간을 제외한 위상 주기를 저장한다.
+    uint32_t leg;                           // 비교할 공중발 번호를 저장한다.
+    const uint32_t phase_cycles =
+        (uint32_t)(ROBOT_GAIT_PHASE_TIME_S / ROBOT_CONTROL_PERIOD_S);  // 한 위상의 전체 주기를 계산한다.
+    const uint32_t candidate_cycle = (phase_cycles * 55U) / 100U;      // 기존 접촉 취소 매핑을 만들 주기를 정한다.
+    const uint32_t landing_cycle = (phase_cycles * 65U) / 100U;        // 1번 발의 조기 착지 주기를 정한다.
+    const uint32_t first_hold_cycle = (phase_cycles * 82U) / 100U;     // 남은 공중발의 하강 중 첫 정지를 정한다.
+    const uint32_t second_hold_cycle = (phase_cycles * 91U) / 100U;    // 같은 하강 경로의 반복 정지를 정한다.
+
+    twist.vx = 0.04f;                         // X 경로 재생성을 검출할 전진 속도를 넣는다.
+    twist.vy = 0.02f;                         // Y 경로 재생성을 검출할 횡이동 속도를 넣는다.
+    twist.wz = 0.10f;                         // 회전 중 발 경로를 함께 검사한다.
+    drone.manual_enable = true;               // 위상 속도 고정을 활성화한다.
+    drone.body_control_enable = true;         // 발 궤적 계산을 활성화한다.
+    drone.tripod_enable = true;               // 정상 Tripod 보행을 활성화한다.
+    drone.tripod_mode = ROBOT_TRIPOD_NORMAL;  // 일반 재접촉 경로를 선택한다.
+
+    for (run = 0U; run < 2U; ++run)
+    {
+        GaitManager_Init(&manager[run]);        // 독립된 첫 위상을 준비한다.
+        FootTrajectory_Init(&trajectory[run]);  // 독립된 궤적 기억을 준비한다.
+        gait[run] = GaitTest_StartConfirmedNormal(&manager[run], contact[run],
+                                                  contact_raw[run]);  // 같은 접촉 입력으로 첫 위상을 시작한다.
+        targets[run] = FootTrajectory_Step(&trajectory[run], &twist, &drone,
+                                            &gait[run], &posture);  // 위상 시작점에서 Swing 기억을 만든다.
+        for (leg = 0U; leg < ROBOT_LEG_COUNT; leg += 2U)
+        {
+            contact[run][leg] = false;      // Swing 그룹의 이륙을 확정한다.
+            contact_raw[run][leg] = false;  // Swing 그룹의 접촉 후보를 제거한다.
+        }
+    }
+
+    for (cycle = 1U; cycle <= phase_cycles; ++cycle)
+    {
+        const RobotFootTargets_t previous = targets[1];  // 추가 상승과 HOLD 이동을 검사할 직전 위치를 보존한다.
+
+        for (run = 0U; run < 2U; ++run)
+        {
+            contact[run][0] = (cycle >= landing_cycle);  // 1번 발만 먼저 착지시킨다.
+            contact_raw[run][0] = contact[run][0];       // 조기 착지의 접촉 후보를 함께 넣는다.
+            contact_raw[run][2] =
+                (resume_before_hold && (cycle == candidate_cycle)) ||
+                (candidate_before_hold && (cycle == (first_hold_cycle - 1U)));  // 3번 발의 접촉 취소 시점을 선택한다.
+        }
+
+        if ((cycle == first_hold_cycle) || (cycle == second_hold_cycle))
+        {
+            const uint32_t frozen_cycle = manager[1].phase_cycle_count;  // 일시정지 직전 위상을 보존한다.
+            uint32_t hold_cycle;                                         // 확정 재접촉까지의 정지 주기를 저장한다.
+
+            if (!manager[1].landed[0])
+            {
+                return false;  // 조기 착지 확정 없이 재접촉 시험에 진입하는 오류를 검출한다.
+            }
+            contact[1][0] = false;  // 조기 착지한 1번 발을 다시 이탈시킨다.
+            for (hold_cycle = 0U; hold_cycle < 4U; ++hold_cycle)
+            {
+                contact_raw[1][0] = (hold_cycle == 3U);  // 마지막 정지 주기에 재접촉 후보만 넣는다.
+                gait[1] = GaitManager_StepContacts(&manager[1], true, true, false, false,
+                                                    ROBOT_TRIPOD_NORMAL, 0.0f,
+                                                    contact[1], contact_raw[1]);  // 한쪽 보행에만 지지 회복 대기를 삽입한다.
+                targets[1] = FootTrajectory_Step(&trajectory[1], &twist, &drone,
+                                                  &gait[1], &posture);  // 정지 위상에서 실제 발 궤적을 계산한다.
+                if (!gait[1].support_recovery_active ||
+                    (manager[1].phase_cycle_count != frozen_cycle) ||
+                    (gait[1].state[0] != ((hold_cycle == 3U) ?
+                        ROBOT_LEG_TOUCHDOWN_CANDIDATE : ROBOT_LEG_LATE_LANDING)))
+                {
+                    return false;  // 조기 착지발 이탈에서 재접촉 위상이 멈추지 않는 오류를 검출한다.
+                }
+                for (leg = 2U; leg < ROBOT_LEG_COUNT; leg += 2U)
+                {
+                    if ((gait[1].state[leg] != ROBOT_LEG_HOLD) ||
+                        (fabsf(targets[1].foot[leg].x - previous.foot[leg].x) > 1.0e-6f) ||
+                        (fabsf(targets[1].foot[leg].y - previous.foot[leg].y) > 1.0e-6f) ||
+                        (fabsf(targets[1].foot[leg].z - previous.foot[leg].z) > 1.0e-6f))
+                    {
+                        return false;  // 재접촉 대기 중 다른 공중발이 움직이는 오류를 검출한다.
+                    }
+                }
+            }
+            contact[1][0] = true;      // 조기 착지발의 재접촉을 확정한다.
+            contact_raw[1][0] = true;  // 재접촉 후보를 유지한 채 기존 위상을 재개한다.
+        }
+
+        for (run = 0U; run < 2U; ++run)
+        {
+            gait[run] = GaitManager_StepContacts(&manager[run], true, true, false, false,
+                                                 ROBOT_TRIPOD_NORMAL, 0.0f,
+                                                 contact[run], contact_raw[run]);  // 두 보행을 같은 다음 위상으로 진행한다.
+            targets[run] = FootTrajectory_Step(&trajectory[run], &twist, &drone,
+                                                &gait[run], &posture);  // 정지 이력만 다른 두 궤적을 계산한다.
+        }
+        if (gait[1].support_recovery_active ||
+            (manager[0].phase_cycle_count != manager[1].phase_cycle_count))
+        {
+            return false;  // 재접촉 후 위상이 기준 보행과 달라지는 오류를 검출한다.
+        }
+        for (leg = 2U; leg < ROBOT_LEG_COUNT; leg += 2U)
+        {
+            if ((fabsf(targets[1].foot[leg].x - targets[0].foot[leg].x) > 1.0e-6f) ||
+                (fabsf(targets[1].foot[leg].y - targets[0].foot[leg].y) > 1.0e-6f) ||
+                (fabsf(targets[1].foot[leg].z - targets[0].foot[leg].z) > 1.0e-6f))
+            {
+                return false;  // 재개 첫 주기부터 위상 끝까지 기존 XYZ 경로 이탈을 검출한다.
+            }
+            if ((cycle >= first_hold_cycle) &&
+                (!candidate_before_hold || (leg == 4U)) &&
+                (targets[1].foot[leg].z > previous.foot[leg].z + 1.0e-6f))
+            {
+                return false;  // 이미 하강하던 공중발이 HOLD 뒤 새 Swing으로 상승하는 오류를 검출한다.
+            }
+        }
+    }
+
+    return true;
+}
+
 /* 같은 최대 조종 입력이 감속 후 여러 위상을 끊김 없이 진행하는지 검사한다. */
 static bool GaitTest_CheckLimitedContinuousWalk(void)
 {
@@ -787,6 +919,9 @@ bool GaitTest_Run(void)
         !GaitTest_CheckTwoStepCommandLatch() ||
         !GaitTest_CheckTouchdownConfirmation() ||
         !GaitTest_CheckSupportRecovery() ||
+        !GaitTest_CheckSupportRecoveryTrajectory(false, false) ||
+        !GaitTest_CheckSupportRecoveryTrajectory(true, false) ||
+        !GaitTest_CheckSupportRecoveryTrajectory(false, true) ||
         !GaitTest_CheckLimitedContinuousWalk())
     {
         return false;

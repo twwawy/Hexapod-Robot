@@ -335,8 +335,7 @@ static RobotVec3_t FootTrajectory_AdaptiveLeg(FootTrajectory_Handle_t *handle,
             handle->custom_swing[leg] = true;                // 연속 시작점을 활성화한다.
             handle->adapted_stance[leg] = false;             // 새 Swing에서 적응 상태를 해제한다.
             handle->swing_resume_active[leg] =
-                (previous == ROBOT_LEG_TOUCHDOWN_CANDIDATE) ||
-                (previous == ROBOT_LEG_HOLD);  // 접촉 취소와 지지 회복 뒤 남은 Swing을 다시 매핑한다.
+                (previous == ROBOT_LEG_TOUCHDOWN_CANDIDATE);  // 접촉 후보 취소에서만 남은 Swing을 다시 매핑한다.
             handle->swing_resume_progress[leg] = progress;  // 재개 순간의 기존 위상 진행률을 저장한다.
         }
 
@@ -412,7 +411,10 @@ static RobotVec3_t FootTrajectory_AdaptiveLeg(FootTrajectory_Handle_t *handle,
         output = handle->memory[leg];  // 알 수 없는 상태에서 직전 위치를 유지한다.
     }
 
-    handle->previous_state[leg] = state;  // 다음 상태 전환을 위해 저장한다.
+    if (state != ROBOT_LEG_HOLD)
+    {
+        handle->previous_state[leg] = state;  // HOLD 전 상태를 보존해 기존 궤적을 이어간다.
+    }
     return output;
 }
 
