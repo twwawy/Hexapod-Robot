@@ -28,8 +28,10 @@ bash scripts/train_adaptive_gait.sh --perception lidar --terrain-level 0 \
   --num-envs 64 --timesteps 10000000 --output mjx/runs/adaptive-lidar-flat
 ```
 
-방향키로 계속 걷고, Space 정지, Enter 일시정지, H 초기화, C 지도 지우기, M 지도 표시, P trace 저장이다.
+방향키로 계속 걷고, Space 정지, Enter 일시정지, H 초기화, C 지도 지우기, M 지도 표시, G LiDAR FOV, P trace 저장이다.
 흐린 청록 점은 지도, 진한 녹색은 후보, 빨간 점은 수락한 목표다. 학습 가중치 없이도 LiDAR 기준값은 적용된다.
+FOV는 기본 표시되며 주황색 하단(-7°)·파란색 상단(+52°) 경계와 센서 원점을 그린다.
+`--fov-display-radius 1.2`로 표시 반경을 조절한다. 이는 실제 측정 거리가 아닌 시야각 안내선이다.
 기존 18-D stage31 가중치는 새 모드에 호환되지 않는다.
 
 [새 모드 실행·학습·환경 구성·확인 항목](docs/HEXAPOD_MJX_ADAPTIVE_GAIT_USAGE.md)에

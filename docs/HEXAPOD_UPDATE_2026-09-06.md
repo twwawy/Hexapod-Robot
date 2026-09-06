@@ -55,6 +55,8 @@ measured LiDAR TF(215 mm, 전방 45°로 복원)와 URDF CAD 장착 chain은 별
   checkpoint별 contract·정규화·소스 hash 저장을 추가했다.
 - `--controller adaptive`: 같은 MJX 지형에서 기본 action 0 또는 새 checkpoint를 방향키로 재생하고,
   지도·후보·수락 목표와 trace를 저장한다. stage31 18-D 재생은 기존 기본 모드다.
+- adaptive 뷰어에서 누락된 MID-360 FOV 표시를 추가했다. raycaster와 같은 TF로 센서 원점·수평 360°·
+  수직 -7°/+52° 경계를 기본 표시하며 G키로 전환한다. `--fov-display-radius`로 표시 반경을 바꾼다.
 
 새 학습/GUI/보행 검증은 실행하지 않았다. 사용자 확인 후 학습을 시작한다.
 자세한 명령·검증 항목·미구현 후속은 [23-D 사용 가이드](HEXAPOD_MJX_ADAPTIVE_GAIT_USAGE.md)를 따른다.

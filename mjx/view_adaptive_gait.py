@@ -3,6 +3,7 @@
 import argparse
 from collections import deque
 import json
+import math
 import os
 from pathlib import Path
 import queue
@@ -20,11 +21,15 @@ def main():
     parser.add_argument('--residual-scale', type=float, default=1.)
     parser.add_argument('--seed', type=int, default=40)
     parser.add_argument('--speed', type=float, default=0.)
+    parser.add_argument('--fov-display-radius', type=float, default=1.2,
+                        help='MID-360 FOV wire radius [m], independent of sensing range; G toggles')
     args = parser.parse_args()
     if not 0. <= args.residual_scale <= 1.:
         parser.error('--residual-scale must be in [0,1]')
     if args.terrain is not None and args.terrain_level is not None:
         parser.error('choose --terrain or --terrain-level')
+    if not math.isfinite(args.fov_display_radius) or args.fov_display_radius <= 0.:
+        parser.error('--fov-display-radius must be finite and positive')
     import jax
     import jax.numpy as jp
     import mujoco
@@ -34,6 +39,7 @@ def main():
     from adaptive_gait_env import AdaptiveGaitEnv, default_config, FOOT_RADIUS
     from adaptive_gait_perception import initial_map, GRID_N, RESOLUTION, MAX_AGE
     from adaptive_gait_policy import contract, load_policy
+    from foothold_preview_runtime import add_sphere, draw_mid360_fov
 
     policy, metadata = load_policy(args.checkpoint) if args.checkpoint else (None, None)
     perception = args.perception or (metadata['actor_source'] if metadata else 'lidar')
@@ -46,6 +52,10 @@ def main():
     sensor = metadata['lidar'] if metadata else dict(azimuths=90, elevations=8, dropout=.05, noise_m=.005)
     env = AdaptiveGaitEnv(terrain_level=level, perception=perception, config=cfg,
         azimuths=sensor['azimuths'], elevations=sensor['elevations'], dropout=sensor['dropout'], noise=sensor['noise_m'])
+    # Use the exact emitter transform held by the JAX raycaster, including the
+    # measured 45-degree mount. No separate CAD site or display-only TF is used.
+    lidar_tf = np.asarray(env.sensor.tf)
+    lidar_root = env.sensor.root_id
     print('Compiling MJX reset/step; the first frame can take time.', flush=True)
     reset, step = jax.jit(env.reset), jax.jit(env.step)
     observe = jax.jit(env._get_obs)
@@ -58,11 +68,13 @@ def main():
     model, display = env.mj_model, mujoco.MjData(env.mj_model)
     keys = queue.SimpleQueue()
     vx, wz, paused, show_map = float(np.clip(args.speed, -.12, .12)), 0., False, True
+    show_fov = True
     history = deque(maxlen=500)
     output = Path(__file__).resolve().parent/'generated/adaptive_gait'
     print(f'23-D adaptive | {perception} | {env.terrain_description} | '+
           ('NEW CHECKPOINT' if policy else 'ZERO ACTION, NO TRAINED POLICY'), flush=True)
-    print('Arrows: speed/yaw; Space: stop; Enter: pause; H: reset; C: clear map; M: map; P: save trace', flush=True)
+    print('Arrows: speed/yaw; Space: stop; Enter: pause; H: reset; C: clear map; M: map; G: LiDAR FOV; P: save trace', flush=True)
+    print('MID-360 FOV: H360 V[-7,+52]deg; orange=lower, blue=upper; wires show angular limits, not returns.', flush=True)
 
     def sphere(scene, position, radius, color):
         if scene.ngeom >= scene.maxgeom:
@@ -104,6 +116,8 @@ def main():
                     state.info['lidar_map'] = initial_map(state.data.qpos[:2])
                 elif code == ord('M'):
                     show_map = not show_map
+                elif code == ord('G'):
+                    show_fov = not show_fov
                 elif code == ord('P'):
                     save = True
             state.info['command'] = jp.array((vx, wz, 0., 0., 0.))
@@ -143,6 +157,12 @@ def main():
                 viewer.cam.lookat[:] = display.qpos[:3]
                 scene = viewer.user_scn
                 scene.ngeom = 0
+                if show_fov:
+                    root_rotation = display.xmat[lidar_root].reshape(3, 3)
+                    lidar_origin = display.xpos[lidar_root] + root_rotation @ lidar_tf[:3, 3]
+                    lidar_rotation = root_rotation @ lidar_tf[:3, :3]
+                    add_sphere(scene, lidar_origin, .014, (0., .9, 1., 1.), 'MID-360')
+                    draw_mid360_fov(scene, lidar_origin, lidar_rotation, args.fov_display_radius)
                 if show_map:
                     grid = jax.device_get(state.info['lidar_map'])
                     valid = (display.time-grid.timestamp <= MAX_AGE) & (display.time >= grid.timestamp)
