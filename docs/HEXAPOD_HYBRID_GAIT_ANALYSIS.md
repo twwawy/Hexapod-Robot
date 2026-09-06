@@ -1,3 +1,5 @@
+> 이 문서는 이전 개발 단계의 설계/사용 이력을 포함합니다. 현재 v4 contract, timing, 실행 경로는 [통합 문서](ADAPTIVE_INTEGRATION_V4.md)를 따릅니다.
+
 # 구현 전 분석: LiDAR foothold / Tripod–Wave supervisor
 
 기준: 작업 브랜치 `3c8f528`, 원격 main `90a8950` (2026-09-06 fetch).

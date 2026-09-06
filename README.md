@@ -16,11 +16,39 @@
 
 </div>
 
+## 통합 v4: 시작과 문서
+
+현재 작업 브랜치 `codex/adaptive-hybrid-rl-integration`은 최신 main에서 시작해 adaptive MJX를
+선택적으로 가져왔다. Full merge는 하지 않았다. **코드 통합과 portable 계약 검사까지 진행했으며,
+계단 등판·PPO·STM32 보드 동작은 아직 검증하지 않았다.**
+
+| 카테고리 | 문서 / 실행 경로 |
+|---|---|
+| 통합 architecture·24-D/관측·변경 내용·남은 위험 | [v4 통합 설명](docs/ADAPTIVE_INTEGRATION_V4.md) |
+| 브랜치 분석·파일 출처 | [사전 분석](docs/ADAPTIVE_INTEGRATION_ANALYSIS.md), [전체 변경 파일](docs/ADAPTIVE_INTEGRATION_FILES.md) |
+| Stage0 viewer·표시·조작 | [viewer 사용법](docs/HEXAPOD_MJX_ADAPTIVE_GAIT_USAGE.md) |
+| 학습 단계 | [학습 계획](docs/HEXAPOD_MJX_ADAPTIVE_GAIT_LEARNING_PLAN.md) |
+| Jetson ↔ STM32 wire | [SPI v3](docs/ADAPTIVE_SPI_V3.md) |
+| STM32 실제 contact/Wave 기준 | [Wave gait](SW/STM32/WAVE_GAIT.md) |
+| 기존 18-D replay | `scripts/view_trained_policy.sh`, 기존 `mjx/firmware_mjx_controller.py` |
+
+```bash
+cd /home/huro/Hexapod-Robot-integration
+source /home/huro/.venvs/hexapod-mjx/bin/activate
+bash scripts/view_foothold_planner.sh --controller adaptive --terrain flat --perception oracle
+bash scripts/view_foothold_planner.sh --controller adaptive --terrain steps --perception oracle
+bash scripts/view_foothold_planner.sh --controller adaptive --terrain steps --perception lidar --stage0
+```
+
+먼저 flat의 zero-action Tripod, 계단의 candidate/reference/selected/latched marker,
+short-step·Wave 전환과 unknown HOLD를 확인한다. 이후 학습/오프라인 Jetson/ARM 빌드는
+[순서별 명령](docs/ADAPTIVE_INTEGRATION_V4.md#사용자-실행-순서)을 사용한다.
+
 ## 프로젝트 소개
 
 본 프로젝트는 붕괴 구조물, 잔해, 경사면, 단차와 계단처럼 사람이 직접 접근하기 어려운 재난 현장을 선행 탐색하기 위한 6족 보행 로봇이다. 하나의 공통 보행 플랫폼 위에 센서와 작업 장비를 교체할 수 있는 모듈형 구조를 적용하여, 환경 매핑·자율 탐색·현장 조작·구호물품 전달 등 임무별 구성을 목표로 한다.
 
-6개의 독립적인 3자유도 다리와 총 18개의 관절을 사용하며, **수식 기반 Classical Controller가 안정적인 기본 보행과 안전 제한을 담당하고 강화학습이 제한된 발끝 보정량만 추가하는 계층형 제어 구조**를 채택하였다. Jetson은 SLAM·환경 인식·경로계획·강화학습 등 상위 연산을, STM32는 200 Hz 주기의 발끝 궤적·역기구학·서보 제어를 담당하도록 분리하였다.
+6개의 독립적인 3자유도 다리와 총 18개의 관절을 사용하며, **Geometry가 지형과 가능한 영역을 계산하고, 강화학습이 foothold·clearance·몸체 자세/높이·보폭·trajectory timing을 최적화하며 STM32가 접촉과 실행 안전을 담당하는 계층형 제어 구조**를 채택하였다. Jetson은 SLAM·환경 인식·경로계획·강화학습 등 상위 연산을, STM32는 200 Hz 주기의 발끝 궤적·역기구학·서보 제어를 담당하도록 분리하였다.
 
 > [!NOTE]
 > 이 저장소는 구현 코드, 설계 자료, 시뮬레이션 결과와 개발 문서를 함께 관리한다. 기능별 완성도와 검증 수준이 다르므로 아래의 **현재 구현 상태**와 각 문서의 검증 범위를 확인해야 한다.
@@ -33,7 +61,7 @@
 | **접촉 적응** | 6개 FSR 접촉 상태 기반 Early Landing·Late Landing 보정과 작업영역 제한 |
 | **계층형 Physical AI** | Classical Controller의 발끝 목표에 제한된 Cartesian Residual을 더하는 강화학습 구조 |
 | **환경 인식** | Livox MID-360, RealSense D435, IMU를 이용한 3차원 인식·SLAM·경로계획 구조 |
-| **분산 제어** | Jetson 상위 판단과 STM32 실시간 보행 제어 분리, 32바이트 SPI 상태 프레임 |
+| **분산 제어** | Jetson 상위 판단과 STM32 실시간 보행 제어 분리, 128바이트 SPI v3 실행/관측 프레임 |
 | **모듈형 임무 확장** | 센서 위치 변경, 열화상·가스 센서, 매니퓰레이터, 구급·적재 모듈 확장 고려 |
 | **원격 운용** | 위치·자세·통신·이동 경로 모니터링과 목적지·모드·비상 정지 명령 구조 |
 
@@ -62,13 +90,13 @@ STM32 NUCLEO-F446RE
 
 ### STM32 ↔ Jetson 통신
 
-STM32 측에는 SPI2 Slave DMA 기반 32바이트 센서 프레임 v2가 구현되어 있다. 프레임은 18개 관절각, 6개 발 접촉 상태, IMU Roll·Pitch·Yaw, Sequence와 CRC-16/CCITT-FALSE를 포함한다. Jetson은 `DRDY` 신호를 확인한 뒤 SPI Master로 한 프레임을 교환하는 구조다.
+통합 브랜치는 **SPI v3, 128 bytes**를 기본으로 사용한다. 최종 AdaptiveExecutionPlan을
+explicit little-endian fixed point로 전달하고 CRC·session·sequence·observation age·plan을 검증한다.
+상태와 계획 상세는 같은 시점의 두 observation page로 제공한다. 기존 v2 codec은 보존하지만
+v2 master와 기본 v3 app은 호환되지 않는다. 실제 DMA/DRDY 운용은 사용자 검증 대상이다.
 
-- 기준 주기: `5 ms` (`200 Hz`)
-- SPI: `Mode 0`, `8-bit`, `MSB First`
-- 프레임: `32 bytes`, Little Endian
-- 검증: Magic, Version/Type, Sequence, CRC-16/CCITT-FALSE
-- 상세 규격: [STM32–Jetson SPI 32바이트 패킷 프로토콜](SW/STM32/STM32-Jetson%20SPI%2032바이트%20패킷%20프로토콜.md)
+- [SPI v3 정확한 offset·단위·CRC](docs/ADAPTIVE_SPI_V3.md)
+- [기존 v2 문서](SW/STM32/STM32-Jetson%20SPI%2032바이트%20패킷%20프로토콜.md)
 
 ## 보행 및 지형 적응 제어
 
@@ -82,15 +110,13 @@ STM32 측에는 SPI2 Slave DMA 기반 32바이트 센서 프레임 v2가 구현�
 - **Late Landing:** 예정된 착지 시점에도 미접촉이면 발끝을 추가 하강하여 지면 탐색
 - **기준 높이 보정:** 접촉 보정이 반복되어 몸체 높이가 누적 변화하지 않도록 기준값 보정
 
-### 3. Residual Reinforcement Learning
+### 3. Adaptive residual policy 24-D v4
 
-강화학습이 18개 관절을 직접 제어하지 않고, Classical Controller가 생성한 발끝 목표에 제한된 Cartesian 보정량을 추가한다.
-
-```text
-p_command = p_classical + Δp_RL
-```
-
-Residual 출력이 비정상이거나 센서·통신 상태가 안전 기준을 벗어나면 보정을 차단하고 기본 보행 또는 정지 상태로 복귀하도록 설계하였다.
+Wide25 후보에서 safe reference를 찾고, 별도 local25 후보에서 RL의 **X ±6 cm / Y ±4 cm**
+요청을 안전한 endpoint로 projection한다. Terrain Z는 geometry가 결정한다.
+6개 clearance, roll/pitch/body height, stride 및 apex/transfer timing도 policy가 조절한다.
+Supervisor는 **Tripod normal → short-step → Wave → HOLD** 순서로 결정한다.
+UNKNOWN은 즉시 Wave로 보내지 않는다. 학습 가중치 없이 zero-action Stage0부터 확인한다.
 
 ## 모듈형 재난 대응 시나리오
 
@@ -117,10 +143,10 @@ Residual 출력이 비정상이거나 센서·통신 상태가 안전 기준을 
 | 6족 기구·18자유도 구동부 | 제작 | Fusion 360, 분리형 다리·몸체·센서 장착부 |
 | STM32 기본 보행 제어 | 구현 | Tripod Gait, Bézier 궤적, IK, Safety, FSR 접촉 처리 |
 | STM32 실시간 로깅 | 구현 | 접촉 상태, 보행 Phase, 발끝 목표, IK 결과, 관절 목표각 |
-| STM32–Jetson 상태 통신 | STM32 측 구현 | SPI v2 프레임, CRC, Sequence, DRDY 기반 DMA |
+| STM32–Jetson 상태 통신 | STM32 측 구현 | SPI v3 codec/app 연결, 실제 DMA/DRDY는 미검증 |
 | MATLAB/Simulink 제어 시험 | 실행·기록 | 몸체 고정 모델의 0–81 s 단일 시험, 실제 자유 보행 성능 아님 |
 | Isaac Sim·MuJoCo | 시뮬레이션 구성 | 보행·Residual-RL 학습 구조, 실물 성능과 별도 검증 필요 |
-| Jetson SLAM·자율주행 | 설계·통합 대상 | 현재 `SW/Jetson`에는 실행 코드가 아닌 범위·인터페이스 문서 수록 |
+| Jetson SLAM·자율주행 | 설계·통합 대상 | geometry bridge·zero-action·SPI codec 구현, live 센서/odom 연결은 별도 |
 | 원격 관제·LoRa | 시스템 설계 | 실시간 현장 운용 성능은 별도 검증 필요 |
 
 ### 공개된 Simulink 시험 결과

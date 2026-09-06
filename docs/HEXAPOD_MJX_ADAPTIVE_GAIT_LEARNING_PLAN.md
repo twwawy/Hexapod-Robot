@@ -1,3 +1,5 @@
+> 이 문서는 이전 개발 단계의 설계/사용 이력을 포함합니다. 현재 v4 contract, timing, 실행 경로는 [통합 문서](ADAPTIVE_INTEGRATION_V4.md)를 따릅니다.
+
 # MJX 지형 적응 residual 학습 설계
 
 업데이트: 2026-09-06. 이전 23-D 초안은 **24-D hybrid 계약**으로 대체한다.

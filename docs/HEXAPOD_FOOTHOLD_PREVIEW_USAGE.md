@@ -1,3 +1,5 @@
+> 이 문서는 이전 개발 단계의 설계/사용 이력을 포함합니다. 현재 v4 contract, timing, 실행 경로는 [통합 문서](ADAPTIVE_INTEGRATION_V4.md)를 따릅니다.
+
 # MuJoCo 보행·LiDAR 뷰어 사용법
 
 최종 갱신: 2026-09-06. 기본 모드는 **펌웨어 제어기 연속 보행 + stage31 RL residual + MJX 동역학**이다.

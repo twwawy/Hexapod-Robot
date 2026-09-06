@@ -1,3 +1,5 @@
+> 통합 브랜치의 실행/SPI 계약과 검증 범위는 [v4 통합 문서](ADAPTIVE_INTEGRATION_V4.md)가 기준입니다.
+
 # MJX hybrid residual 보행 사용 가이드
 
 업데이트: 2026-09-06. 브랜치 `codex/cartesian-residual-rl`.
@@ -91,15 +93,15 @@ Tripod는 다리별 top-3, 조합 27개에 대해 현재 stance와 다음 landin
 CoM 여유 12 mm를 검사한다. Wave는 현재 한 발 후보와 5발 stance를 검사한다.
 각 phase의 stance IK를 5개 미래 body pose에서도 검사한다. 정적 CoM 근사이며 동적 안정성 증명은 아니다.
 `Lmax_scale`은 `[1.3,1,.75,.5,.25,.125]` 중 통과한 최대 scale이다. 연속 최댓값이 아니다.
-이동 성분의 최대 phase 이동 거리는 `abs(v_command)*0.5*Lmax_scale` m이다.
+이동 성분의 최대 phase 이동 거리는 `abs(v_command)*1.0*Lmax_scale` m이다.
 
 ## action / observation 계약
 
-`adaptive_hybrid_geometry_residual_24_v3`. 다리 순서 RF RM RB LF LM LB.
+`adaptive_hybrid_geometry_residual_24_v4`. 다리 순서 RF RM RB LF LM LB.
 
 | index | semantic |
 |---|---|
-| 0:12 | 6다리 safe reference 기준 XY residual, 각각 ±4 cm; Z action 없음 |
+| 0:12 | 6다리 safe reference 기준 XY residual, X ±6 cm / Y ±4 cm; 별도 local25 후보, Z action 없음 |
 | 12:18 | path-required clearance 위의 여유 residual ±4 cm |
 | 18 / 19 / 20 | body roll ±5° / pitch ±10° / height ±3 cm |
 | 21 | 요청 stride scale 0.5–1.3; supervisor는 필요시 0.125까지 축소 |
@@ -118,25 +120,24 @@ Z plateau 중심이며 최종 범위 0.3–0.7, plateau 폭 0.4다.
 상승 시 앞당기고 하강 시 늦추는 geometry baseline을 사용한다.
 transfer 중심은 0.35–0.65, 이동 구간 폭 0.5다. 해당 변화도 같은 path/IK 검사를 통과해야 한다.
 
-phase duration action은 제거했다. Tripod `clip(0.5*scale,0.25,0.7)`초,
-Wave 기본 1초(설정 범위 0.6–1.4), speed scale 0.2, stance 5 phase다.
-속도에도 `scale*baseline_period/period`를 적용한다. Wave의 절대 속도 상한은 기존 MJX 명령 범위를
-따르므로 main 하드웨어의 상한과 완전히 동일하지 않다.
+phase duration action은 제거했다. Tripod `clip(1.0*scale,0.5,1.4)`초,
+Wave `clip(1.0*scale,0.6,1.4)`초, speed scale 0.2, stance 5 phase다.
+속도에도 `scale*baseline_period/period`를 적용한다. Adaptive 상한은 전후0.10 m/s, yaw18°/s로 main과 맞춘다.
 
-actor **4410-D** = proprio 157 + global 23 + reference 30 + 6×25×28 candidate.
-critic **4725-D** = actor + GT/error 300 + terrain 15.
+actor **4434-D** = proprio 157 + global 23 + reference 54 + 6×25×28 candidate.
+critic **4749-D** = actor + GT/error 300 + terrain 15.
 proprio는 기존 155 필드를 유지하고 accepted/previous action 증가로 157이 됐다.
 global에는 vy command(현재 0), roll/pitch, contact 기반 body clearance, slip 6,
 current gait, active swing mask 6, supervisor decision, maximum stride, Tripod/Wave feasibility,
-mean confidence, support margin이 들어간다. reference는 다리별 body XYZ·nominal까지 거리·valid다.
+mean confidence, support margin이 들어간다. reference는 다리별 body XYZ·nominal까지 거리·valid 및 local residual dx/dy extrema4개다.
 candidate 28개 필드의 순서/정규화는 `adaptive_foothold_estimator.CANDIDATE_FEATURES`와 feature 조립 코드가 기준이다.
 normal/slope는 world 축, candidate offset은 controller 축이다.
-새 shape/source SHA 계약은 이전 adaptive 23-D 및 stage31 18-D checkpoint 로드를 거절한다.
+새 shape/source SHA 계약은 이전 adaptive24-D v3, 23-D 및 stage31 18-D checkpoint 로드를 거절한다.
 기존 18-D controller/checkpoint 경로는 유지한다.
 
 ## main Wave 포팅과 전환
 
-참고 revision `origin/main`의 `90a8950`; 상세 파일은 [구현 전 분석](HEXAPOD_HYBRID_GAIT_ANALYSIS.md)에 있다.
+참고 revision `origin/main`의 `9752c760`; 상세 파일은 [구현 전 분석](HEXAPOD_HYBRID_GAIT_ANALYSIS.md)에 있다.
 순서는 **RF → LB → RM → LF → RB → LM**이다.
 첫 6 Wave phase는 stance 속도 절반, phase 시작 전 all-contact 100 ms 대기,
 airborne 확인 후 progress≥0.5의 Early Landing, raw contact 후보 동결,
