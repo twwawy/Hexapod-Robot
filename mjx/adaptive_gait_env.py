@@ -18,24 +18,23 @@ from rough_terrain_env import (
     _quat_rotate_inverse, default_config,
 )
 from terrain_curriculum import terrain_level as terrain_spec
+from adaptive_foothold_estimator import (
+    CANDIDATE_COUNT, CANDIDATE_OFFSETS, CANDIDATE_FEATURES, RESIDUAL_RADIUS,
+    FOOT_RADIUS, evaluate_candidates,
+)
 
-OBSERVATION_CONTRACT = 'adaptive_candidates_proprio_23_v1'
+OBSERVATION_CONTRACT = 'adaptive_reference_candidates25_proprio_23_v2'
 REWARD_CONTRACT = 'adaptive_command_progress_touchdown_v1'
-# Offsets use controller forward/left axes; candidate order is row-major.
-CANDIDATE_OFFSETS = jp.array([(x, y) for x in (-.04, 0., .04) for y in (-.04, 0., .04)])
-PATCH_OFFSETS = jp.array(((0., 0.), (.035, 0.), (-.035, 0.), (0., .035), (0., -.035)))
-CANDIDATE_FEATURES = ('dx', 'dy', 'relative_height', 'known', 'safe', 'spread', 'age', 'path_rise', 'path_known')
 PROPRIO_SIZE = 155
-ACTOR_SIZE = PROPRIO_SIZE + 6*9*len(CANDIDATE_FEATURES)
-CRITIC_SIZE = ACTOR_SIZE + 6*9*2 + 15
-FOOT_RADIUS = .032
+ACTOR_SIZE = PROPRIO_SIZE + 6*CANDIDATE_COUNT*len(CANDIDATE_FEATURES)
+CRITIC_SIZE = ACTOR_SIZE + 6*CANDIDATE_COUNT*2 + 15
 
 
 class AdaptiveGaitEnv(HexapodRoughTerrainEnv):
     def __init__(self, *, terrain_level=0, perception='lidar', config=None,
                  azimuths=90, elevations=8, dropout=.05, noise=.005):
-        if perception not in ('lidar', 'teacher', 'blind'):
-            raise ValueError('perception must be lidar, teacher or blind')
+        if perception not in ('lidar', 'teacher', 'blind', 'oracle'):
+            raise ValueError('perception must be lidar, teacher, blind or debug-only oracle')
         if terrain_spec(terrain_level).kind == 'rough':
             raise ValueError('MJX ray does not support hfields: use level 0, 3, 4 or 5..16')
         self.perception = perception
@@ -76,18 +75,22 @@ class AdaptiveGaitEnv(HexapodRoughTerrainEnv):
         info['controller_state'] = adaptive.initial_state()
         info['lidar_map'] = initial_map(data.qpos[:2])
         info['projection_m'] = jp.asarray(0.)
+        info['foothold_plan'] = self._landing_plan(data, info, jp.zeros(adaptive.ACTION_SIZE))
         return info
 
     def _query(self, grid, xy, now, *, privileged=False):
         height, known, age, spread = sample(grid, xy, now)
         if self.perception == 'blind':
             known = jp.zeros_like(known)
-        if privileged:
+        if privileged or self.perception in ('teacher', 'oracle'):
             height = self._terrain_height(xy.reshape(-1, 2)).reshape(xy.shape[:-1])
             spread = jp.zeros_like(height)
+        if self.perception == 'oracle':
+            known, age = jp.ones_like(known), jp.zeros_like(age)
         return height, known, age, spread
 
-    def _candidates(self, data, info, stride=1., period=.5, *, privileged=False):
+    def _candidates(self, data, info, stride=1., period=.5, *, lift=None, privileged=False):
+        lift = jp.zeros(6) if lift is None else lift
         rotation = data.xmat[self._root_id]
         cs = info['controller_state']
         # The same speed/phase relationship drives stance and predicts landing.
@@ -112,81 +115,78 @@ class AdaptiveGaitEnv(HexapodRoughTerrainEnv):
         nominal = data.qpos[:3] + translation + model @ (yaw_rot @ rotation).T
         basis = jp.stack((rotation @ MODEL_FORWARD, rotation @ MODEL_LATERAL))[:, :2]
         xy = nominal[:, None, :2] + CANDIDATE_OFFSETS[None, :, :] @ basis
-        patches = xy[:, :, None, :] + PATCH_OFFSETS
-        height, known, age, spread = self._query(info['lidar_map'], patches, data.time, privileged=privileged)
-        center_h, center_known = height[..., 0], known[..., 0]
-        high = jp.max(jp.where(known, height, -jp.inf), axis=-1)
-        low = jp.min(jp.where(known, height, jp.inf), axis=-1)
-        rough = jp.where(jp.any(known, axis=-1), high-low, 0.)
-        rough = jp.maximum(rough, jp.max(jp.where(known, spread, 0.), axis=-1))
-        # A partial patch remains unknown; an observed height discontinuity is
-        # hazardous even if the other cells have not returned points yet.
-        complete = jp.all(known, axis=-1)
-        unsafe = jp.any(known, axis=-1) & (rough > .025)
-        safe = complete & ~unsafe
-        feet = data.site_xpos[self._foot_site_ids]
-        fraction = jp.linspace(0., 1., 7)
-        path_xy = feet[:, None, None, :2] + fraction[None, None, :, None]*(xy[:, :, None, :]-feet[:, None, None, :2])
-        ph, pk, _, _ = self._query(info['lidar_map'], path_xy, data.time, privileged=privileged)
-        path_high = jp.max(jp.where(pk, ph, -jp.inf), axis=-1)
-        path_high = jp.where(jp.any(pk, axis=-1), path_high, center_h)
-        relative = center_h - (data.qpos[2] + fw.BASE_FOOT_Z - FOOT_RADIUS)
-        features = jp.concatenate((
-            jp.broadcast_to(CANDIDATE_OFFSETS, (6, 9, 2))/.04,
-            jp.stack((jp.where(center_known, relative/.2, 0.), complete.astype(jp.float32),
-                      safe.astype(jp.float32), jp.clip(rough/.05, 0., 5.),
-                      jp.clip(age[..., 0]/MAX_AGE, 0., 1.),
-                      jp.where(center_known, jp.maximum(path_high-center_h, 0.)/.2, 0.),
-                      jp.mean(pk.astype(jp.float32), axis=-1)), axis=-1)), axis=-1)
-        return dict(xy=xy, height=center_h, known=complete, unsafe=unsafe, safe=safe,
-                    path_height=path_high, features=features, nominal=nominal, basis=basis)
+        return evaluate_candidates(self, data, info, xy, nominal, basis, lift, privileged=privileged)
+
+    def _landing_plan(self, data, info, action):
+        xy_bias, lift, posture, stride, period = adaptive.decode(action)
+        baseline = self._candidates(data, info)
+        # Whole-body parameters still require usable references for all legs.
+        global_known = jp.all(jp.any(baseline['safe'], axis=1))
+        stride, period = jp.where(global_known, stride, 1.), jp.where(global_known, period, .5)
+        changed = self._candidates(data, info, stride, period)
+        global_known &= jp.all(jp.any(changed['safe'], axis=1))
+        reference_plan = jax.tree_util.tree_map(lambda new, old: jp.where(global_known, new, old), changed, baseline)
+        stride, period = jp.where(global_known, stride, 1.), jp.where(global_known, period, .5)
+        # p_ref is chosen BEFORE RL XY/lift; search and residual are separate.
+        reference_index = reference_plan['reference_index']
+        leg = jp.arange(6)
+        ref = reference_plan['world'][leg, jp.maximum(reference_index, 0)]
+        ref = jp.where((reference_index >= 0)[:, None], ref,
+                       reference_plan['nominal'].at[:, 2].add(-FOOT_RADIUS))
+        requested = ref[:, :2] + xy_bias @ reference_plan['basis']
+        refined = self._candidates(data, info, stride, period, lift=lift)
+        relative_xy = (refined['xy']-ref[:, None, :2]) @ jp.linalg.inv(reference_plan['basis'])
+        bounded = jp.all(jp.abs(relative_xy) <= RESIDUAL_RADIUS+1e-6, axis=-1)
+        eligible = refined['safe'] & bounded & (reference_index >= 0)[:, None]
+        distance = jp.linalg.norm(refined['xy']-requested[:, None, :], axis=-1)
+        residual_ok = jp.any(eligible, axis=1)
+        selected = jp.where(residual_ok, jp.argmin(jp.where(eligible, distance, jp.inf), axis=1), reference_index)
+        # If the lift request invalidates every nearby option, use the neutral
+        # reference path. A rejected residual cannot erase a safe reference.
+        plan = dict(refined)
+        for name in ('world', 'pre', 'clearance', 'required'):
+            values = refined[name][leg, jp.maximum(selected, 0)]
+            fallback = reference_plan[name][leg, jp.maximum(reference_index, 0)]
+            mask = residual_ok
+            while mask.ndim < values.ndim:
+                mask = mask[..., None]
+            plan['selected_'+name] = jp.where(mask, values, fallback)
+        known = selected >= 0
+        fallback_mask = (~residual_ok)[:, None] & (jp.arange(CANDIDATE_COUNT)[None, :] == reference_index[:, None])
+        for name in ('safe', 'ik_ok', 'path_ok', 'status'):
+            plan[name] = jp.where(fallback_mask, reference_plan[name], plan[name])
+        observed_hazard = jp.any(reference_plan['unsafe'] | reference_plan['terrain_ok'], axis=1)
+        proposal_safe = known | ~observed_hazard
+        # Partial observations alone are not filled with GT or treated as flat.
+        plan['selected_world'] = jp.where(known[:, None], plan['selected_world'],
+                                           reference_plan['nominal'].at[:, 2].add(-FOOT_RADIUS))
+        accepted_xy = (plan['selected_world'][:, :2]-ref[:, :2]) @ jp.linalg.inv(reference_plan['basis'])
+        accepted = action.at[:12].set(jp.where(known[:, None], jp.clip(accepted_xy/RESIDUAL_RADIUS, -1., 1.), 0.).reshape(-1))
+        effective_lift = plan['selected_clearance']-fw.SWING_HEIGHT-plan['selected_required']
+        accepted = accepted.at[12:18].set(jp.where(known, jp.clip(effective_lift/.04, -1., 1.), 0.))
+        accepted = accepted.at[18:].set(jp.where(global_known, action[18:], 0.))
+        forward = ref[:, :2] @ reference_plan['basis'][0]
+        centered = forward-jp.mean(forward)
+        slope = jp.sum(centered*(ref[:, 2]-jp.mean(ref[:, 2])))/jp.maximum(jp.sum(centered**2), 1e-6)
+        posture = posture.at[1].add(jp.clip(-jp.arctan(slope), -jp.deg2rad(12.), jp.deg2rad(12.)))
+        posture = jp.where(global_known, posture, jp.zeros(3))
+        projection = jp.where(known, jp.linalg.norm(plan['selected_world'][:, :2]-requested, axis=-1), 0.)
+        plan.update(time=data.time, reference_index=reference_index, reference_world=ref, selected_index=selected,
+                    requested_xy=requested, selected_known=known, proposal_safe=proposal_safe,
+                    residual_rejected=(reference_index >= 0) & ~residual_ok,
+                    projection=projection, accepted_action=accepted, posture=posture, stride=stride, period=period,
+                    reference_safe=reference_plan['safe'], reference_status=reference_plan['status'])
+        return plan
 
     def _prepare_controller_state(self, data, info, action):
-        cs = info['controller_state']
-        xy_bias, lift, posture, stride, period = adaptive.decode(action)
-        baseline = self._candidates(data, info, privileged=self.perception == 'teacher')
-        # Global parameters affect all legs, so require support for all six.
-        global_known = jp.all(jp.any(baseline['safe'], axis=1))
-        stride = jp.where(global_known, stride, 1.)
-        period = jp.where(global_known, period, .5)
-        candidates = self._candidates(data, info, stride, period, privileged=self.perception == 'teacher')
-        global_known = global_known & jp.all(jp.any(candidates['safe'], axis=1))
-        candidates = jax.tree_util.tree_map(lambda new, old: jp.where(global_known, new, old), candidates, baseline)
-        stride = jp.where(global_known, stride, 1.)
-        period = jp.where(global_known, period, .5)
-        requested = candidates['nominal'][:, :2] + xy_bias @ candidates['basis']
-        distance = jp.linalg.norm(candidates['xy']-requested[:, None, :], axis=-1)
-        index = jp.argmin(jp.where(candidates['safe'], distance, jp.inf), axis=1)
-        select = lambda values: values[jp.arange(6), index]
-        known = jp.any(candidates['safe'], axis=1)
-        observed_hazard = jp.any(candidates['unsafe'], axis=1)
-        world = jp.concatenate((select(candidates['xy']), select(candidates['height'])[:, None]), axis=-1)
-        # Missing complete support is a blind fallback unless a hazard was seen.
-        safe = known | ~observed_hazard
-        world = jp.where(known[:, None], world, candidates['nominal'].at[:, 2].add(-FOOT_RADIUS))
-        model = (world + jp.array((0., 0., FOOT_RADIUS))-data.qpos[:3]) @ data.xmat[self._root_id]
-        body = jp.stack((-model[:, 1], model[:, 0], model[:, 2]), axis=-1)
-        pre = body @ fw._rotation_matrix(cs.posture_command).T
-        pre = pre.at[:, 2].add(cs.height_applied)
-        feet = data.site_xpos[self._foot_site_ids]
-        required = jp.maximum(select(candidates['path_height'])-jp.maximum(feet[:, 2]-FOOT_RADIUS, world[:, 2]), 0.)
-        clearance = jp.clip(fw.SWING_HEIGHT + required + lift, .04, .18)
-        safe = safe & (~known | (clearance >= required+.02))
-        # Sensor-derived pitch baseline; GT is available here only in teacher mode.
-        forward = candidates['nominal'][:, :2] @ candidates['basis'][0]
-        centered = forward-jp.mean(forward)
-        heights = world[:, 2]-jp.mean(world[:, 2])
-        slope = jp.sum(centered*heights)/jp.maximum(jp.sum(centered**2), 1e-6)
-        posture = posture.at[1].add(jp.clip(-jp.arctan(slope), -jp.deg2rad(12.), jp.deg2rad(12.)))
-        posture = jp.where(global_known & jp.all(known), posture, jp.zeros(3))
-        accepted_xy = (select(candidates['xy'])-candidates['nominal'][:, :2]) @ jp.linalg.inv(candidates['basis'])
-        accepted = action.at[:12].set(jp.where(known[:, None], accepted_xy/.04, 0.).reshape(-1))
-        accepted = accepted.at[12:18].set(jp.where(known, (clearance-fw.SWING_HEIGHT-required)/.04, 0.))
-        accepted = accepted.at[18:].set(jp.where(global_known & jp.all(known), action[18:], 0.))
-        info['projection_m'] = jp.mean(jp.where(known, select(distance), 0.))
-        return cs._replace(request=accepted, proposal_end=pre, proposal_world=world,
-            proposal_known=known, proposal_safe=safe, proposal_clearance=clearance,
-            proposal_posture=posture, proposal_stride=stride, proposal_period=period,
+        plan = self._landing_plan(data, info, action)
+        info['foothold_plan'] = plan
+        info['projection_m'] = jp.mean(plan['projection'])
+        return info['controller_state']._replace(request=plan['accepted_action'],
+            proposal_end=plan['selected_pre'], proposal_world=plan['selected_world'],
+            proposal_known=plan['selected_known'], proposal_safe=plan['proposal_safe'],
+            proposal_clearance=plan['selected_clearance'], proposal_posture=plan['posture'],
+            proposal_stride=plan['stride'], proposal_period=plan['period'], proposal_index=plan['selected_index'],
             root_rotation=data.xmat[self._root_id], root_position=data.qpos[:3])
 
     def _controller_step(self, controller_state, **kwargs):
@@ -215,9 +215,9 @@ class AdaptiveGaitEnv(HexapodRoughTerrainEnv):
         actor = jp.concatenate((proprio, candidates['features'].reshape(-1)))
         # Privileged fields are a separate network input, never concatenated into actor.
         xy = candidates['xy'].reshape(-1, 2)
-        gt = self._terrain_height(xy).reshape(6, 9)
+        gt = self._terrain_height(xy).reshape(6, CANDIDATE_COUNT)
         mapped, valid, _, _ = sample(info['lidar_map'], xy, data.time)
-        error = jp.where(valid.reshape(6, 9), mapped.reshape(6, 9)-gt, 0.)
+        error = jp.where(valid.reshape(6, CANDIDATE_COUNT), mapped.reshape(6, CANDIDATE_COUNT)-gt, 0.)
         critic = jp.concatenate((actor, ((gt-data.qpos[2])/.3).reshape(-1),
                                  (error/.05).reshape(-1), self._terrain_features(data, info['support_height'])))
         assert actor.shape == (ACTOR_SIZE,) and critic.shape == (CRITIC_SIZE,)
@@ -228,7 +228,9 @@ class AdaptiveGaitEnv(HexapodRoughTerrainEnv):
         state.metrics.update({name: jp.asarray(0.) for name in (
             'map_known_fraction', 'map_mae_m', 'map_compared_count', 'lidar_returns',
             'plan_rejected', 'projection_m', 'touchdown_error_m', 'foot_slip',
-            'stride_scale', 'phase_duration_s', 'pitch_target_rad')})
+            'stride_scale', 'phase_duration_s', 'pitch_target_rad', 'foothold_center_known_fraction',
+            'foothold_coverage_fraction', 'foothold_terrain_fraction', 'foothold_ik_fraction',
+            'foothold_safe_fraction', 'foothold_selected_fraction', 'foothold_residual_rejected_fraction')})
         return state
 
     def step(self, state, action):
@@ -245,7 +247,7 @@ class AdaptiveGaitEnv(HexapodRoughTerrainEnv):
         result = super().step(state, action)
         # Publish the scan in the NEXT observation. The current action and its
         # landing projection must use the same map the actor actually received.
-        if self.perception != 'blind':
+        if self.perception in ('lidar', 'teacher'):
             grid, key = jax.lax.cond(result.info['policy_steps'] % SENSOR_PERIOD == 0,
                 lambda _: self.sensor.update(result.data, result.info['lidar_map'], result.info['rng'],
                                               result.info['policy_steps']//SENSOR_PERIOD),
@@ -270,7 +272,16 @@ class AdaptiveGaitEnv(HexapodRoughTerrainEnv):
             plan_rejected=cs.plan_rejected.astype(jp.float32), projection_m=result.info['projection_m'],
             touchdown_error_m=landing_error, foot_slip=slip, stride_scale=cs.stride_scale,
             phase_duration_s=cs.phase_duration, pitch_target_rad=cs.adapt_posture[1])
-        penalty = self.dt*(.5*result.info['projection_m']/.04 + .2*slip) + 2.*landing_error
+        plan = result.info['foothold_plan']
+        result.metrics.update(foothold_center_known_fraction=jp.mean(plan['center_known'].astype(jp.float32)),
+            foothold_coverage_fraction=jp.mean(plan['coverage_ok'].astype(jp.float32)),
+            foothold_terrain_fraction=jp.mean(plan['terrain_ok'].astype(jp.float32)),
+            foothold_ik_fraction=jp.mean((plan['terrain_ok'] & plan['ik_ok']).astype(jp.float32)),
+            foothold_safe_fraction=jp.mean(plan['safe'].astype(jp.float32)),
+            foothold_selected_fraction=jp.mean(plan['selected_known'].astype(jp.float32)),
+            foothold_residual_rejected_fraction=jp.mean(plan['residual_rejected'].astype(jp.float32)))
+        penalty = self.dt*(.5*result.info['projection_m']/.04 + .2*slip +
+                          .5*jp.mean(plan['residual_rejected'].astype(jp.float32))) + 2.*landing_error
         return result.replace(reward=result.reward-penalty, obs=self._get_obs(result.data, result.info))
 
     @property

@@ -9,6 +9,10 @@ from adaptive_gait_controller import ACTION_CONTRACT, ACTION_SIZE, LEG_ORDER
 from adaptive_gait_env import ACTOR_SIZE, CRITIC_SIZE, OBSERVATION_CONTRACT, REWARD_CONTRACT, CANDIDATE_FEATURES
 from adaptive_gait_perception import GRID_N, RESOLUTION, MAX_AGE, SENSOR_PERIOD
 from lidar_extrinsics import measurement_metadata
+from adaptive_foothold_estimator import (
+    CANDIDATE_COUNT, SEARCH_RADIUS, RESIDUAL_RADIUS, MIN_COVERAGE,
+    MAX_PLANE_RESIDUAL, MAX_SLOPE_RAD, EDGE_JUMP, EDGE_CLEARANCE, PATH_SAMPLES,
+)
 
 
 def network_factory():
@@ -21,6 +25,7 @@ def network_factory():
 def contract(env):
     root = Path(__file__).resolve().parent
     sources = ('adaptive_gait_controller.py', 'adaptive_gait_env.py', 'adaptive_gait_perception.py',
+               'adaptive_foothold_estimator.py',
                'adaptive_gait_policy.py', 'firmware_mjx_controller.py', 'rough_terrain_env.py',
                'prepare_rl_scene.py', 'servo_model.py', 'terrain_curriculum.py', 'lidar_extrinsics.py')
     revision = subprocess.check_output(['git', '-C', str(root.parent), 'rev-parse', 'HEAD'], text=True).strip()
@@ -43,7 +48,13 @@ def contract(env):
         lidar=dict(tf=measurement_metadata(), azimuths=env.sensor.azimuths, elevations=env.sensor.elevations,
                    horizontal_fov_deg=360, vertical_fov_deg=[-7, 52], range_m=[.1, 8.],
                    dropout=env.sensor.dropout, noise_m=env.sensor.noise),
-        candidates=dict(per_leg=9, features=CANDIDATE_FEATURES, patch_radius_m=.035, max_spread_m=.025),
+        candidates=dict(per_leg=CANDIDATE_COUNT, features=CANDIDATE_FEATURES,
+                        search_radius_m=SEARCH_RADIUS, residual_about_reference_m=RESIDUAL_RADIUS,
+                        patch_radius_m=RESOLUTION, min_coverage=MIN_COVERAGE,
+                        plane_residual_m=MAX_PLANE_RESIDUAL, max_slope_rad=MAX_SLOPE_RAD,
+                        edge_jump_m=EDGE_JUMP, edge_clearance_m=EDGE_CLEARANCE,
+                        path_samples=PATH_SAMPLES, path_check='observed swept foot samples; not whole-body collision'),
+        oracle_debug_only=env.perception == 'oracle',
         terrain_level=env.curriculum_level, terrain_description=env.terrain_description,
         episode_length=env.episode_length, config=env._config.to_dict(),
         source_sha256={name: hashlib.sha256((root/name).read_bytes()).hexdigest() for name in sources},

@@ -10,7 +10,7 @@ import jax.numpy as jp
 import firmware_mjx_controller as fw
 
 ACTION_SIZE = 23
-ACTION_CONTRACT = 'adaptive_tripod_foothold_parameters_23_v1'
+ACTION_CONTRACT = 'adaptive_tripod_reference_residual_23_v2'
 LEG_ORDER = ('RF', 'RM', 'RB', 'LF', 'LM', 'LB')
 AdaptiveState = namedtuple('AdaptiveState', fw.FirmwareState._fields + (
     'request', 'proposal_end', 'proposal_known', 'proposal_safe', 'proposal_clearance',
@@ -19,6 +19,7 @@ AdaptiveState = namedtuple('AdaptiveState', fw.FirmwareState._fields + (
     'adapt_posture', 'accepted_action', 'plan_rejected',
     'root_rotation', 'root_position', 'proposal_world', 'goal_world',
     'posture_target', 'height_applied',
+    'proposal_index', 'active_index',
 ))
 
 
@@ -29,7 +30,8 @@ def initial_state():
                          jp.asarray(.5), jp.asarray(1.), fw.BASE_FEET, jp.full(6, .06),
                          jp.zeros(6, dtype=jp.bool_), jp.zeros(3), jp.zeros(23), jp.asarray(False),
                          jp.eye(3), jp.zeros(3), jp.zeros((6, 3)), jp.zeros((6, 3)),
-                         jp.zeros(3), jp.asarray(0.))
+                         jp.zeros(3), jp.asarray(0.),
+                         jp.full(6, -1, dtype=jp.int32), jp.full(6, -1, dtype=jp.int32))
 
 
 def decode(action):
@@ -475,6 +477,7 @@ def step(
     next_state = state._replace(
         phase_duration=phase_duration, stride_scale=stride_scale,
         goal_world=goal_world,
+        active_index=jp.where(entering & ~blocked, state.proposal_index, state.active_index),
         posture_target=posture_target, height_applied=height_applied,
         adapt_posture=adapt_posture, plan_rejected=blocked,
         accepted_action=accepted_action,

@@ -16,7 +16,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--terrain', choices=('flat', 'steps', 'ramp'))
     parser.add_argument('--terrain-level', type=int)
-    parser.add_argument('--perception', choices=('lidar', 'teacher', 'blind'))
+    parser.add_argument('--perception', choices=('lidar', 'teacher', 'blind', 'oracle'),
+                        help='oracle is debug-only GT with 100%% known coverage')
     parser.add_argument('--checkpoint', type=Path, help='new adaptive run or exact checkpoint; stage31 is incompatible')
     parser.add_argument('--residual-scale', type=float, default=1.)
     parser.add_argument('--seed', type=int, default=40)
@@ -40,11 +41,15 @@ def main():
     from adaptive_gait_perception import initial_map, GRID_N, RESOLUTION, MAX_AGE
     from adaptive_gait_policy import contract, load_policy
     from foothold_preview_runtime import add_sphere, draw_mid360_fov
+    from adaptive_foothold_estimator import CANDIDATE_COUNT, STATUS_NAMES
+    from adaptive_gait_controller import LEG_ORDER
 
     policy, metadata = load_policy(args.checkpoint) if args.checkpoint else (None, None)
     perception = args.perception or (metadata['actor_source'] if metadata else 'lidar')
     if metadata and perception != metadata['actor_source']:
         parser.error('checkpoint perception must match training; use --init-teacher to train a LiDAR policy')
+    if perception == 'oracle' and policy is not None:
+        parser.error('oracle is a zero-action planner diagnostic; do not use a deployment checkpoint')
     level = args.terrain_level
     if level is None:
         level = {'flat': 0, 'steps': 5, 'ramp': 3}.get(args.terrain, metadata['terrain_level'] if metadata else 0)
@@ -59,7 +64,6 @@ def main():
     print('Compiling MJX reset/step; the first frame can take time.', flush=True)
     reset, step = jax.jit(env.reset), jax.jit(env.step)
     observe = jax.jit(env._get_obs)
-    candidates = jax.jit(env._candidates)
     inference = jax.jit(policy) if policy else None
     key = jax.random.PRNGKey(args.seed)
     key, reset_key = jax.random.split(key)
@@ -69,12 +73,16 @@ def main():
     keys = queue.SimpleQueue()
     vx, wz, paused, show_map = float(np.clip(args.speed, -.12, .12)), 0., False, True
     show_fov = True
+    show_rejected = True
     history = deque(maxlen=500)
     output = Path(__file__).resolve().parent/'generated/adaptive_gait'
     print(f'23-D adaptive | {perception} | {env.terrain_description} | '+
           ('NEW CHECKPOINT' if policy else 'ZERO ACTION, NO TRAINED POLICY'), flush=True)
-    print('Arrows: speed/yaw; Space: stop; Enter: pause; H: reset; C: clear map; M: map; G: LiDAR FOV; P: save trace', flush=True)
+    print('Arrows: speed/yaw; Space: stop; Enter: pause; H: reset; C: clear map; M: map; G: LiDAR FOV; B: rejected candidates; P: save trace', flush=True)
     print('MID-360 FOV: H360 V[-7,+52]deg; orange=lower, blue=upper; wires show angular limits, not returns.', flush=True)
+    print('Candidates: gray=unknown yellow=coverage orange=edge/rough blue=IK/path green=safe; white=reference red=selected/latched (labels distinguish).', flush=True)
+    if perception == 'oracle':
+        print('DEBUG GT ORACLE: terrain and path queries are 100% known; no LiDAR scans, no RL policy.', flush=True)
 
     def sphere(scene, position, radius, color):
         if scene.ngeom >= scene.maxgeom:
@@ -118,6 +126,8 @@ def main():
                     show_map = not show_map
                 elif code == ord('G'):
                     show_fov = not show_fov
+                elif code == ord('B'):
+                    show_rejected = not show_rejected
                 elif code == ord('P'):
                     save = True
             state.info['command'] = jp.array((vx, wz, 0., 0., 0.))
@@ -138,6 +148,9 @@ def main():
                     posture=np.asarray(cs.adapt_posture), height_applied=float(cs.height_applied),
                     stride_scale=float(cs.stride_scale), phase_duration=float(cs.phase_duration),
                     goal_world=np.asarray(cs.goal_world), contacts=np.asarray(state.info['contact_state']),
+                    reference_world=np.asarray(state.info['foothold_plan']['reference_world']),
+                    selected_index=np.asarray(state.info['foothold_plan']['selected_index']),
+                    active_index=np.asarray(cs.active_index),
                     phase=np.asarray(state.info['controller_output'].gait_progress),
                     done=float(state.done), next_qpos=np.asarray(state.data.qpos)))
                 # Idle inspection is allowed indefinitely. A terminal state during
@@ -151,7 +164,9 @@ def main():
             display.ctrl[:] = np.asarray(state.data.ctrl)
             display.time = float(state.data.time)
             mujoco.mj_forward(model, display)
-            plan = jax.device_get(candidates(state.data, state.info))
+            # Display the plan actually offered to the controller, not a separate
+            # zero-action re-plan that could hide why this action was rejected.
+            plan = jax.device_get(state.info['foothold_plan'])
             cs = jax.device_get(state.info['controller_state'])
             with viewer.lock():
                 viewer.cam.lookat[:] = display.qpos[:3]
@@ -172,22 +187,52 @@ def main():
                         xy = grid.center + (np.array((i, j))+.5-GRID_N/2)*RESOLUTION
                         sphere(scene, (*xy, grid.height[i, j]+.002), .009, (.1, .7, .85, .14))
                 for leg in range(6):
-                    for candidate in range(9):
-                        if plan['safe'][leg, candidate]:
+                    for candidate in range(CANDIDATE_COUNT):
+                        status = int(plan['status'][leg, candidate])
+                        if show_rejected or plan['safe'][leg, candidate]:
+                            colors = ((.5, .5, .5, .35), (1., .9, .05, .8),
+                                      (1., .4, .05, .9), (.15, .35, 1., .95), (.1, .9, .25, .9))
                             sphere(scene, (*plan['xy'][leg, candidate], plan['height'][leg, candidate]+.01),
-                                   .011, (.1, .9, .25, .9))
+                                   .009, colors[status])
+                    if plan['reference_index'][leg] >= 0:
+                        add_sphere(scene, plan['reference_world'][leg]+np.array((0., 0., .025)),
+                                   .011, (1., 1., 1., .9), f'{LEG_ORDER[leg]} ref')
+                    if plan['selected_index'][leg] >= 0:
+                        add_sphere(scene, plan['selected_world'][leg]+np.array((0., 0., .05)),
+                                   .012, (1., .15, .05, 1.), f'{LEG_ORDER[leg]} selected')
                     if cs.active_known[leg]:
-                        sphere(scene, cs.goal_world[leg]+np.array((0., 0., FOOT_RADIUS)), .019, (1., .15, .05, 1.))
+                        add_sphere(scene, cs.goal_world[leg]+np.array((0., 0., FOOT_RADIUS)),
+                                   .019, (.8, .03, .02, 1.), f'{LEG_ORDER[leg]} latched')
             viewer.sync()
             if display.time-last_log >= 1.:
                 last_log = display.time
                 m = state.metrics
                 compared = float(m['map_compared_count'])
                 error = f'{float(m["map_mae_m"])*1000:.1f}mm' if compared else 'n/a'
-                print(f't={display.time:.1f} v={vx:+.2f} yaw={wz:+.2f} '+
+                print(f't={display.time:.1f} plan_t={float(plan["time"]):.2f} source={perception} v={vx:+.2f} yaw={wz:+.2f} '+
                     f'known={float(m["map_known_fraction"]):.0%} map error={error} '+
                     f'IK={np.asarray(state.info["controller_output"].ik_valid).astype(int)} '+
                     f'reject={bool(cs.plan_rejected)} stride={float(cs.stride_scale):.2f} phase={float(cs.phase_duration):.2f}s', flush=True)
+                for leg, name in enumerate(LEG_ORDER):
+                    terrain_count = int(np.sum(plan['terrain_ok'][leg]))
+                    ik_count = int(np.sum(plan['terrain_ok'][leg] & plan['ik_ok'][leg]))
+                    safe_count = int(np.sum(plan['safe'][leg]))
+                    if safe_count:
+                        reason = 'READY'
+                    elif terrain_count:
+                        reason = 'IK' if not ik_count else 'PATH'
+                    elif np.any(plan['unsafe'][leg]):
+                        reason = 'EDGE_ROUGH'
+                    elif np.any(plan['any_known'][leg]):
+                        reason = 'LOW_COVERAGE'
+                    else:
+                        reason = 'UNKNOWN'
+                    print(f'  {name}: known={np.sum(plan["center_known"][leg]):2d}/{CANDIDATE_COUNT} '+
+                        f'complete={np.sum(plan["complete"][leg]):2d} support={np.sum(plan["coverage_ok"][leg]):2d} '+
+                        f'terrain={terrain_count:2d} ik={ik_count:2d} safe={safe_count:2d} '+
+                        f'ref={plan["reference_index"][leg]:2d} selected={plan["selected_index"][leg]:2d} '+
+                        f'active={cs.active_index[leg]:2d} phase={int(state.info["controller_output"].gait_state[leg])} '+
+                        f'residual_rejected={bool(plan["residual_rejected"][leg])} reason={reason}', flush=True)
             if save:
                 output.mkdir(parents=True, exist_ok=True)
                 (output/'.gitignore').write_text('*\n')
@@ -197,6 +242,14 @@ def main():
                 np.savez_compressed(output/'map.npz', height=grid.height, timestamp=grid.timestamp,
                                     center=grid.center, spread=grid.spread, time=display.time)
                 (output/'adaptive_contract.json').write_text(json.dumps(contract(env), indent=2)+'\n')
+                np.savez_compressed(output/'foothold_plan.npz', **plan)
+                diagnostic = dict(perception=perception, plan_time=float(plan['time']),
+                    display_time=display.time, status_names=STATUS_NAMES,
+                    plan_rejected=bool(cs.plan_rejected), active_index=cs.active_index.tolist(),
+                    active_known=cs.active_known.tolist(), goal_world=cs.goal_world.tolist(),
+                    controller_ik=np.asarray(state.info['controller_output'].ik_valid).tolist(),
+                    candidates={name: value.tolist() for name, value in plan.items()})
+                (output/'foothold_diagnostics.json').write_text(json.dumps(diagnostic, indent=2)+'\n')
                 mujoco.mj_saveLastXML(str(output/'model.xml'), model)
                 print(f'Saved trace/map/model/contract: {output}', flush=True)
             time.sleep(max(0., env.dt-(time.monotonic()-tick_start)))
