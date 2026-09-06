@@ -1,38 +1,45 @@
 # Hexapod-Robot
 
 6족 로봇의 CAD/URDF, MuJoCo MJX 보행 학습, LiDAR 높이 지도 뷰어와 Isaac Lab 이식 코드를 관리한다.
-**현재 뷰어 제어는 펌웨어 기본 보행 + 학습된 residual + Safety/IK**다. 기본 제어기는 관측 여부와
-무관하게 gait·접촉·자세를 계속 처리한다. LiDAR 착지 후보를 발의 절대 경로로 주입하는 전환은 제거했다.
+**새 adaptive 모드는 geometry baseline + RL residual + Safety/IK**다.
+기본 실행기의 기존 stage31 18-D 비교 경로와 새 adaptive 24-D 경로를 분리해 유지한다.
 
-다음 학습은 **MJX에서 보폭·주기·몸체 자세·스윙 높이의 residual을 학습하고 Isaac Lab으로 sim-to-sim 이전**하는 순서로 진행한다.
-[파라미터 학습 설계](docs/HEXAPOD_MJX_ADAPTIVE_GAIT_LEARNING_PLAN.md)에 따라 **23-D MJX 환경·LiDAR actor/GT critic PPO·재생기**를 추가했다.
+다음 학습은 **MJX에서 착지·보폭·몸체 자세·스윙 궤적의 residual을 학습하고 Isaac Lab으로 sim-to-sim 이전**하는 순서다.
+[학습 설계](docs/HEXAPOD_MJX_ADAPTIVE_GAIT_LEARNING_PLAN.md)에 따라 **24-D MJX 환경·LiDAR actor/GT critic PPO·재생기**를 추가했다.
 새 가중치는 아직 학습하지 않았으며 실행 검증은 사용자가 진행한다. 아래 기본 실행기는 기존 stage31 비교 모드다.
 
-## 새 23-D 보행 파라미터 모드
+## 새 24-D Tripod / Wave hybrid 모드
 
-LiDAR 기울기는 **45°로 롤백**했다. 새 모드는 기본 제어기를 유지하며 다리별 착지 XY·스윙 여유 높이,
-몸체 pitch/roll/height·보폭·주기를 조절한다. 미관측 다리는 기본 궤적으로 시작하고 관측된 목표는 스윙 시작에 고정한다.
+LiDAR는 높이 **215 mm / 위를 보는 45° / MID-360 FOV**를 유지한다.
+25개 후보에서 safe reference를 고르고 RL은 XY·apex·roll/pitch/height·보폭·궤적 timing만 조절한다.
+landing Z는 map이 소유한다. Supervisor 순서는 **Tripod normal → 잔발 → Wave → HOLD**다.
+UNKNOWN은 기본 hybrid에서 HOLD하며, Wave로 바로 보내지 않는다. 목표는 swing 시작에 고정한다.
+`main`의 Wave 순서·Early/Late contact·all-contact 전환을 참고했다.
+[변경 전 분석과 main 비교](docs/HEXAPOD_HYBRID_GAIT_ANALYSIS.md)를 먼저 작성하고 구현했다.
 
 ```bash
 cd /home/huro/Hexapod-Robot
 source /home/huro/.venvs/hexapod-mjx/bin/activate
 
-# 먼저 기본 제어기 반복 보행 확인 (새 정책 없이 action 0)
-bash scripts/view_foothold_planner.sh --controller adaptive --terrain flat --perception blind
+# Stage 0: GT 100% known으로 planner/controller 확인 (action 0)
+bash scripts/view_foothold_planner.sh --controller adaptive --terrain steps --perception oracle
 
 # LiDAR 기반 착지/단차 보정 확인 (5 cm × 7단, action 0)
-bash scripts/view_foothold_planner.sh --controller adaptive --terrain steps --perception lidar
+bash scripts/view_foothold_planner.sh --controller adaptive --terrain steps --perception lidar --stage0
 
 # 사용자 확인 후 새 LiDAR 정책 학습 시작
-bash scripts/train_adaptive_gait.sh --perception lidar --terrain-level 0 \
+bash scripts/train_adaptive_gait.sh --stage 1 --perception lidar --terrain-level 0 \
   --num-envs 64 --timesteps 10000000 --output mjx/runs/adaptive-lidar-flat
 ```
 
-방향키로 계속 걷고, Space 정지, Enter 일시정지, H 초기화, C 지도 지우기, M 지도 표시, G LiDAR FOV, P trace 저장이다.
-흐린 청록 점은 지도, 진한 녹색은 후보, 빨간 점은 수락한 목표다. 학습 가중치 없이도 LiDAR 기준값은 적용된다.
+방향키로 계속 걷고, Space 정지, Enter 일시정지, H 초기화, C 지도 지우기, M 지도 표시, G LiDAR FOV, B 거절 후보, P trace 저장이다.
+청록 반투명 map, 회색 unknown, 노랑 coverage 부족, 주황 edge/rough, 파랑 IK, 보라 path,
+초록 safe, 흰색 reference, 빨강 selected/latched다. 콘솔에 다리별 gate와 gait 결정 사유를 출력한다.
+`--gait-mode tripod|wave|hybrid`로 비교한다. 미관측 기본 보행은 `--perception blind` 명시적 debug 모드다.
 FOV는 기본 표시되며 주황색 하단(-7°)·파란색 상단(+52°) 경계와 센서 원점을 그린다.
 `--fov-display-radius 1.2`로 표시 반경을 조절한다. 이는 실제 측정 거리가 아닌 시야각 안내선이다.
-기존 18-D stage31 가중치는 새 모드에 호환되지 않는다.
+이전 adaptive 23-D와 기존 stage31 18-D 가중치는 새 모드에 호환되지 않는다.
+문법/CLI 등 최소 정적 확인만 진행했다. 보행·JIT rollout·학습 성능·회귀 테스트 실행 검증은 사용자에게 맡겼다.
 
 [새 모드 실행·학습·환경 구성·확인 항목](docs/HEXAPOD_MJX_ADAPTIVE_GAIT_USAGE.md)에
 checkpoint 재생, 계단 학습, teacher 이관, 관측 계약과 현재 제한을 정리했다.
@@ -144,7 +151,7 @@ CAD 비교는 `--controller nominal --robot-model mesh`로 열 수 있다.
 |---|---|
 | `scripts/view_foothold_planner.sh` 기본 모드 | 격리된 v3/18-D action·146-D observation + LiDAR 입력과 residual gain |
 | `scripts/view_trained_policy.sh` | stage31 가중치와 저장 설정으로 v3 재생, GT 입력 사용 |
-| `--controller adaptive` / `scripts/train_adaptive_gait.sh` | 신규 23-D 파라미터 action, actor 641-D / critic 764-D; 아직 새 학습 결과 없음 |
+| `--controller adaptive` / `scripts/train_adaptive_gait.sh` | 신규 24-D residual action, actor 4410-D / critic 4725-D; Tripod→short→Wave→HOLD; 아직 새 학습 결과 없음 |
 | 루트 `mjx/` 학습 | v4/18-D action·146-D observation, swing X/Y·stance Z 최대 ±100 mm, curriculum 0~16 |
 | `isaaclab_hexapod/` | v4 Torch 제어기·센서·지형·학습 scaffold와 USD 이식 |
 | `SW/mjx/` | 과거 24-D/113-D 실험; 아래 레거시 설명 참고 |

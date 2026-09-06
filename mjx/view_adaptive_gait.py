@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Keyboard MJX replay of the 23-D controller, with or without a new checkpoint."""
+"""Keyboard MJX replay of the 24-D hybrid controller, with or without a checkpoint."""
 import argparse
 from collections import deque
 import json
@@ -20,6 +20,8 @@ def main():
                         help='oracle is debug-only GT with 100%% known coverage')
     parser.add_argument('--checkpoint', type=Path, help='new adaptive run or exact checkpoint; stage31 is incompatible')
     parser.add_argument('--residual-scale', type=float, default=1.)
+    parser.add_argument('--gait-mode', choices=('hybrid', 'tripod', 'wave'))
+    parser.add_argument('--stage0', action='store_true', help='extra same-pose GT oracle comparison; no policy')
     parser.add_argument('--seed', type=int, default=40)
     parser.add_argument('--speed', type=float, default=0.)
     parser.add_argument('--fov-display-radius', type=float, default=1.2,
@@ -42,9 +44,12 @@ def main():
     from adaptive_gait_policy import contract, load_policy
     from foothold_preview_runtime import add_sphere, draw_mid360_fov
     from adaptive_foothold_estimator import CANDIDATE_COUNT, STATUS_NAMES
-    from adaptive_gait_controller import LEG_ORDER
+    from adaptive_gait_controller import LEG_ORDER, ACTION_SIZE
+    from hybrid_gait_supervisor import MODE_NAMES
 
     policy, metadata = load_policy(args.checkpoint) if args.checkpoint else (None, None)
+    if args.stage0 and policy is not None:
+        parser.error('--stage0 is planner-only; omit --checkpoint')
     perception = args.perception or (metadata['actor_source'] if metadata else 'lidar')
     if metadata and perception != metadata['actor_source']:
         parser.error('checkpoint perception must match training; use --init-teacher to train a LiDAR policy')
@@ -56,7 +61,8 @@ def main():
     cfg = config_dict.ConfigDict(metadata['config']) if metadata else default_config()
     sensor = metadata['lidar'] if metadata else dict(azimuths=90, elevations=8, dropout=.05, noise_m=.005)
     env = AdaptiveGaitEnv(terrain_level=level, perception=perception, config=cfg,
-        azimuths=sensor['azimuths'], elevations=sensor['elevations'], dropout=sensor['dropout'], noise=sensor['noise_m'])
+        azimuths=sensor['azimuths'], elevations=sensor['elevations'], dropout=sensor['dropout'], noise=sensor['noise_m'],
+        gait_mode=args.gait_mode or (metadata['gait_mode'] if metadata else 'hybrid'), diagnostics=args.stage0)
     # Use the exact emitter transform held by the JAX raycaster, including the
     # measured 45-degree mount. No separate CAD site or display-only TF is used.
     lidar_tf = np.asarray(env.sensor.tf)
@@ -76,11 +82,11 @@ def main():
     show_rejected = True
     history = deque(maxlen=500)
     output = Path(__file__).resolve().parent/'generated/adaptive_gait'
-    print(f'23-D adaptive | {perception} | {env.terrain_description} | '+
+    print(f'24-D adaptive | {perception} | {env.gait_mode} | {env.terrain_description} | '+
           ('NEW CHECKPOINT' if policy else 'ZERO ACTION, NO TRAINED POLICY'), flush=True)
     print('Arrows: speed/yaw; Space: stop; Enter: pause; H: reset; C: clear map; M: map; G: LiDAR FOV; B: rejected candidates; P: save trace', flush=True)
     print('MID-360 FOV: H360 V[-7,+52]deg; orange=lower, blue=upper; wires show angular limits, not returns.', flush=True)
-    print('Candidates: gray=unknown yellow=coverage orange=edge/rough blue=IK/path green=safe; white=reference red=selected/latched (labels distinguish).', flush=True)
+    print('Candidates: gray=unknown yellow=coverage orange=edge/rough blue=IK purple=path green=safe; white=reference red=selected/latched.', flush=True)
     if perception == 'oracle':
         print('DEBUG GT ORACLE: terrain and path queries are 100% known; no LiDAR scans, no RL policy.', flush=True)
 
@@ -134,7 +140,7 @@ def main():
             state = state.replace(obs=observe(state.data, state.info))
             if not paused:
                 key, action_key = jax.random.split(key)
-                action = inference(state.obs, action_key)[0] if inference else jp.zeros(23)
+                action = inference(state.obs, action_key)[0] if inference else jp.zeros(ACTION_SIZE)
                 action = action*args.residual_scale
                 before = state
                 state = step(state, action)
@@ -191,7 +197,7 @@ def main():
                         status = int(plan['status'][leg, candidate])
                         if show_rejected or plan['safe'][leg, candidate]:
                             colors = ((.5, .5, .5, .35), (1., .9, .05, .8),
-                                      (1., .4, .05, .9), (.15, .35, 1., .95), (.1, .9, .25, .9))
+                                      (1., .4, .05, .9), (.15, .35, 1., .95), (.7, .15, 1., .95), (.1, .9, .25, .9))
                             sphere(scene, (*plan['xy'][leg, candidate], plan['height'][leg, candidate]+.01),
                                    .009, colors[status])
                     if plan['reference_index'][leg] >= 0:
@@ -212,7 +218,16 @@ def main():
                 print(f't={display.time:.1f} plan_t={float(plan["time"]):.2f} source={perception} v={vx:+.2f} yaw={wz:+.2f} '+
                     f'known={float(m["map_known_fraction"]):.0%} map error={error} '+
                     f'IK={np.asarray(state.info["controller_output"].ik_valid).astype(int)} '+
-                    f'reject={bool(cs.plan_rejected)} stride={float(cs.stride_scale):.2f} phase={float(cs.phase_duration):.2f}s', flush=True)
+                    f'reject={bool(cs.plan_rejected)} stride={float(cs.stride_scale):.2f} phase={float(cs.phase_duration):.2f}s '+
+                    f'mode={MODE_NAMES[int(plan["decision"])]} active_gait={int(cs.scheduler.mode)} '+
+                    f'Lmax_scale={float(plan["max_feasible_stride"]):.3f} support={float(plan["support_margin"]):.3f}m '+
+                    f'fault={bool(cs.scheduler.fault)}', flush=True)
+                print(f'  stride_bank=[1.3,1,.75,.5,.25,.125] feasible={plan["tripod_feasible"].astype(int)} '+
+                      f'known_bad={plan["tripod_known_bad"].astype(int)} wave={bool(plan["wave_feasible"])} '+
+                      f'two_phase={bool(plan["two_tripod_phases"])} return_confirm={float(plan["return_time"]):.2f}s', flush=True)
+                if args.stage0:
+                    print('  Stage0: '+ ' '.join(f'{k}={float(v):.4f}' for k, v in m.items()
+                                                if k.startswith('oracle_')), flush=True)
                 for leg, name in enumerate(LEG_ORDER):
                     terrain_count = int(np.sum(plan['terrain_ok'][leg]))
                     ik_count = int(np.sum(plan['terrain_ok'][leg] & plan['ik_ok'][leg]))
@@ -220,16 +235,17 @@ def main():
                     if safe_count:
                         reason = 'READY'
                     elif terrain_count:
-                        reason = 'IK' if not ik_count else 'PATH'
+                        path_valid = plan['terrain_ok'][leg] & plan['ik_ok'][leg] & plan['path_ok'][leg]
+                        reason = 'IK' if not ik_count else ('LOW_PATH_COVERAGE' if np.any(path_valid) else 'PATH')
                     elif np.any(plan['unsafe'][leg]):
                         reason = 'EDGE_ROUGH'
                     elif np.any(plan['any_known'][leg]):
                         reason = 'LOW_COVERAGE'
                     else:
                         reason = 'UNKNOWN'
-                    print(f'  {name}: known={np.sum(plan["center_known"][leg]):2d}/{CANDIDATE_COUNT} '+
-                        f'complete={np.sum(plan["complete"][leg]):2d} support={np.sum(plan["coverage_ok"][leg]):2d} '+
-                        f'terrain={terrain_count:2d} ik={ik_count:2d} safe={safe_count:2d} '+
+                    print(f'  {name}: candidate_total={CANDIDATE_COUNT} known={np.sum(plan["center_known"][leg]):2d} '+
+                        f'complete={np.sum(plan["complete"][leg]):2d} coverage_pass={np.sum(plan["coverage_ok"][leg]):2d} '+
+                        f'surface_safe={terrain_count:2d} ik_safe={ik_count:2d} path_safe={safe_count:2d} '+
                         f'ref={plan["reference_index"][leg]:2d} selected={plan["selected_index"][leg]:2d} '+
                         f'active={cs.active_index[leg]:2d} phase={int(state.info["controller_output"].gait_state[leg])} '+
                         f'residual_rejected={bool(plan["residual_rejected"][leg])} reason={reason}', flush=True)

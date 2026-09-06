@@ -5,7 +5,7 @@ import sys
 
 def main():
     # Route before importing the legacy viewer and its archived policy modules.
-    # The adaptive replay uses the actual MJX training terrain and 23-D contract.
+    # The adaptive replay uses the actual MJX training terrain and 24-D contract.
     adaptive = '--controller=adaptive' in sys.argv
     if adaptive:
         sys.argv.remove('--controller=adaptive')

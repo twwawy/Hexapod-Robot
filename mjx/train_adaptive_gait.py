@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Train a new 23-D parameter policy with LiDAR-only actor and privileged critic."""
+"""Train a 24-D residual policy after user validation of Stage 0 geometry."""
 import argparse
 from datetime import datetime
 import functools
@@ -15,6 +15,8 @@ if not os.environ.get('DISPLAY'):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--perception', choices=('lidar', 'teacher', 'blind'), default='lidar')
+    parser.add_argument('--stage', type=int, choices=(1, 2, 3), default=1,
+                        help='1: Tripod, 2: Wave, 3: deterministic hybrid; validate Stage 0 first')
     parser.add_argument('--terrain-level', type=int, default=0)
     parser.add_argument('--timesteps', type=int, default=10_000_000)
     parser.add_argument('--num-envs', type=int, default=64)
@@ -28,8 +30,8 @@ def main():
     parser.add_argument('--dropout', type=float, default=.05)
     parser.add_argument('--range-noise', type=float, default=.005)
     parser.add_argument('--output', type=Path)
-    parser.add_argument('--restore', type=Path, help='same perception/23-D weights and normalizer; PPO optimizer restarts')
-    parser.add_argument('--init-teacher', type=Path, help='initialize lidar PPO from a new 23-D GT teacher; no legacy conversion')
+    parser.add_argument('--restore', type=Path, help='24-D weights and normalizer; PPO optimizer restarts; stage can change')
+    parser.add_argument('--init-teacher', type=Path, help='initialize lidar PPO from a new 24-D GT teacher; no legacy conversion')
     parser.add_argument('--wandb', action='store_true')
     parser.add_argument('--wandb-project', default='hexapod-adaptive-gait')
     args = parser.parse_args()
@@ -51,7 +53,8 @@ def main():
     cfg.episode_length = args.episode_length
     env = AdaptiveGaitEnv(terrain_level=args.terrain_level, perception=args.perception, config=cfg,
                           azimuths=args.azimuths, elevations=args.elevations,
-                          dropout=args.dropout, noise=args.range_noise)
+                          dropout=args.dropout, noise=args.range_noise,
+                          gait_mode={1: 'tripod', 2: 'wave', 3: 'hybrid'}[args.stage])
     restore = None
     if args.restore or args.init_teacher:
         restore, old = read_contract(args.restore or args.init_teacher)
@@ -92,7 +95,7 @@ def main():
             (path/'adaptive_contract.json').write_text(json.dumps(metadata, indent=2)+'\n')
         (output/'latest_checkpoint.json').write_text(json.dumps({'step': int(step), 'path': str(completed[0])})+'\n')
 
-    print(f'Output: {output}\nActor: {args.perception}, action=23, obs={env.observation_size}', flush=True)
+    print(f'Output: {output}\nActor: {args.perception}, gait={env.gait_mode}, action={env.action_size}, obs={env.observation_size}', flush=True)
     try:
         ppo.train(environment=env, num_timesteps=args.timesteps, num_envs=args.num_envs,
             episode_length=args.episode_length, action_repeat=1, learning_rate=3e-4,

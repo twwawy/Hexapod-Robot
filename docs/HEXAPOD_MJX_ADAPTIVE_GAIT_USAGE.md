@@ -1,205 +1,225 @@
-# MJX LiDAR 지형 적응 보행: 구현과 사용자 확인
+# MJX hybrid residual 보행 사용 가이드
 
-업데이트: 2026-09-06. LiDAR 기울기는 사용자 요청으로 **45°**로 복원했다.
-높이 215 mm, 전방 13.529 mm, MID-360 수평 360°/수직 -7°~+52°는 그대로다.
+업데이트: 2026-09-06. 브랜치 `codex/cartesian-residual-rl`.
+구현과 정적 확인까지 진행했다. GUI 보행, JIT rollout, PPO, 아래 테스트의 실행 검증은 사용자에게 맡겼다.
+새 24-D 학습 가중치는 없다. 계단 등판이나 안전한 gait 전환이 검증됐다는 뜻은 아니다.
 
-새 **23-D 파라미터 제어기·MJX 환경·PPO 학습 진입점·키보드 재생기**를 연결했다.
-이번 작업에서 학습, 추론, GUI 또는 동역학 보행 검증을 실행하지 않았다. 새 학습 가중치는 없다.
-아래 명령으로 사용자가 먼저 기본 보행과 관측 전환을 확인한 뒤 학습을 시작한다.
-
-## 경로와 가장 먼저 실행할 명령
+## 경로와 실행
 
 ```bash
 cd /home/huro/Hexapod-Robot
 source /home/huro/.venvs/hexapod-mjx/bin/activate
 
-# 1. 순수 기본 제어기: 미관측 조건에서 반복 스윙 확인
-bash scripts/view_foothold_planner.sh --controller adaptive --terrain flat --perception blind
+# Stage 0: RL 없이 GT 100% known으로 planner/controller 분리 확인
+bash scripts/view_foothold_planner.sh --controller adaptive --terrain flat --perception oracle
+bash scripts/view_foothold_planner.sh --controller adaptive --terrain steps --perception oracle
 
-# 2. action 0 + LiDAR 착지/단차 기준값: 계단 앞 관측 전환 확인
-bash scripts/view_foothold_planner.sh --controller adaptive --terrain steps --perception lidar
+# 동일 코드에서 LiDAR 입력으로 실행. 같은 자세의 GT 비교 지표도 출력
+bash scripts/view_foothold_planner.sh --controller adaptive --terrain steps --perception lidar --stage0
 ```
 
-가상환경은 `/home/huro/.venvs/hexapod-mjx`이며 JAX/MJX/Brax는 기존 설치를 사용한다.
-`--controller adaptive`를 생략하면 기존 stage31 비교 뷰어다. 새 모드는 학습 환경과 같은
-MJX 지형에서 실행한다. `steps`는 **5 cm × 7단(level 5)**, `ramp`는 8°(level 3),
-`flat`은 level 0이다. 기존 stage31 뷰어의 12×12 m 코스와 구분한다.
-`--terrain-level 6`으로 6.5 cm × 7단 등을 선택할 수 있다. `--terrain`과 동시에 지정하지 않는다.
+`--controller adaptive`가 새 구조를 선택한다. 생략하면 기존 stage31 비교 viewer다.
+스크립트가 가상환경 Python을 직접 선택하며 `HEXAPOD_PYTHON`으로 바꿀 수 있다.
+MuJoCo, MJX, JAX, mujoco-playground, Brax/Orbax가 있는 기존 `hexapod-mjx` 환경을 사용한다.
+새 의존성을 설치하지 않았다. 첫 화면까지 JAX 컴파일 시간이 필요하며 새 검색의 성능은 아직 측정하지 않았다.
 
-초기 속도는 0이다. 첫 reset/step 때 JAX 컴파일 대기가 발생할 수 있다.
-체크포인트가 없으면 콘솔에 `ZERO ACTION, NO TRAINED POLICY`가 표시된다.
-
-| 키/표시 | 기능 |
+| 키 | 동작 |
 |---|---|
-| ↑ / ↓ | 전진속도 ±0.02 m/s, 범위 ±0.12 m/s; 키를 놓아도 명령 유지 |
-| ← / → | yaw 속도 ±0.1 rad/s, 범위 ±0.3 rad/s |
-| Space | 속도와 회전 명령 0; 제어기가 현재 보행을 마무리 |
-| Enter | 물리 일시정지/재개 |
-| H | 로봇·지도·보행 상태 reset, 속도 0 |
-| C | 지도만 지움; 다음 센서 주기에 다시 관측 |
-| M | 반투명 지도 표시 전환 |
-| G | LiDAR FOV와 센서 원점 표시 전환; 기본 켜짐 |
-| P | 최근 최대 500 step trace, 지도, 모델, 계약 저장 |
-| 흐린 청록색 점 | 실제 LiDAR 반환점으로 누적한 지도, alpha 0.14 |
-| 진한 녹색 점 | 현재 관측으로 지지 patch 조건을 만족한 후보 |
-| 진한 빨간 점 | 제어기가 스윙 시작에 수락한 발 중심 목표 |
-| 주황색/파란색 FOV 선 | 센서 기준 수직 -7°/+52° 경계, 수평 360° |
+| ↑ / ↓ | 전진 속도 증가 / 감소; 입력 후 계속 보행 |
+| ← / → | yaw 명령 증가 / 감소 |
+| Space | 속도·yaw를 0으로; 진행 중 swing은 접촉까지 처리 |
+| Enter / H | 일시정지 / 환경 초기화 |
+| C / M | 지도 초기화 / 지도 표시 |
+| G / B | LiDAR FOV / 거절 후보 표시 |
+| P | 최근 trace, map, 후보 진단, 모델, contract 저장 |
 
-FOV와 `MID-360` 원점 마커는 raycaster의 측정 TF에 현재 몸체 pose를 합성해 그린다.
-따라서 45° 장착 기울기와 로봇 자세 변화를 함께 반영한다. `blind`에서도 장착 방향을 확인할 수 있다.
-기본 표시 반경은 1.2 m이며 `--fov-display-radius 2`처럼 바꿀 수 있다.
-안내선은 가려지기 전 시야각 경계로, 실제 반환점이나 8 m 측정 범위를 뜻하지 않는다.
+저장 위치: `mjx/generated/adaptive_gait/`. `foothold_diagnostics.json`에는 후보별 gate,
+선택 index, 실제 latch index, 궤적 parameter가 들어간다. trace는 최근 500 policy tick이다.
+`--gait-mode tripod`, `--gait-mode wave`, `--gait-mode hybrid`로 고정/혼합 비교한다. 기본은 hybrid다.
 
-빨간 점은 지면에서 발 반지름 32 mm 위에 표시한다. 녹색 후보와 지면 높이 기준이 다르다.
-종료 조건을 만나면 자동으로 새 에피소드로 넘기지 않고 일시정지한다. 콘솔의 종료 원인을 보고 H로 초기화한다.
-역주행/회전은 사용자가 조사할 수 있도록 열었으며 기본 PPO 명령 분포는 전진 0.06~0.12 m/s, yaw 0이다.
-따라서 그 외 명령에서 학습 성능을 보장하는 설정은 아니다.
+## 환경 구성과 데이터 흐름
 
-## 환경 구성
+학습에 쓰던 링크 collision skeleton을 사용한다. distal link 230 mm, foot sphere 반경 32 mm이며
+IK endpoint와 collision/site는 구의 중심으로 맞췄다. 메시 기반 CAD 표시와 구분한다.
+LiDAR는 기존 측정 TF를 유지한다: 기준 높이 215 mm, 전방 offset 13.529 mm, 위를 보는 45° mount.
+FOV는 MID-360 H360°, V[-7°, +52°], range 0.1–8 m. G로 표시하는 선은 시야각 경계다.
+policy 20 ms, firmware tick 5 ms, LiDAR 100 ms, 90×8 ray, dropout 5%, noise 5 mm,
+지도 cell 5 cm다. 시뮬레이터 pose/velocity/contact를 이상적인 state estimator로 사용하며 실제 LIO는 연결하지 않았다.
 
 ```text
-simulator 몸체·관절·접촉 상태 → 기본 보행 제어기
-                                    ↑
-MID-360 angular raycast → rolling map → 다리별 9개 후보
-                                    ↓
-LiDAR actor → 23개 보행 파라미터 요청 → 제어기 수락/궤적/접촉 처리 → IK → MJX
-
-지형 GT → privileged critic / 보상 / 관측된 높이 오차 비교
+LiDAR ray → rolling height map → support plane / edge / confidence
+command → nominal foothold → 25-candidate search → safe reference
+safe reference + RL XY → 같은 safe set으로 projection → terrain Z
+path maximum height + margin + RL clearance → sampled path / IK gate
+Tripod normal → short-step Tripod → known-infeasible이면 Wave → HOLD
+phase boundary + all contacts → 목표/높이/궤적 parameter latch → 단일 controller / IK
 ```
 
-로봇은 기존 학습용 box/capsule/sphere skeleton이며 distal link 230 mm와 발 구 반지름 32 mm를
-사용한다. IK 끝점과 foot site를 발 구 중심에 맞췄다. 높이 지도는 접촉 표면의 Z이며 제어기가
-발 반지름을 더한다. 현재 CAD 발끝에서 구 반지름을 빼던 루트 v4 형상과 새 adaptive 형상을 섞지 않는다.
-질량/관절/servo 물리는 루트 MJX 설정을 계승한다.
+`lidar`: actor와 planner에는 LiDAR만 사용한다. GT는 critic, reward/종료 판정, 비교 metric에만 사용한다.
+`oracle`: GT height와 100% known/age 0으로 같은 planner를 실행한다. debug 전용이며 checkpoint/PPO에 쓰지 않는다.
+`teacher`: GT 높이를 쓰되 LiDAR known mask는 유지한다. oracle과 다르다.
+`blind`: 관측 안전 gate를 우회하는 명시적 nominal controller 진단이다. 지형 적응·hybrid 안전 fallback이 아니다.
 
-- 제어기 5 ms, 정책 20 ms, 물리 2.5 ms. 정책 step에서 4개 제어기 tick 후 8개 물리 substep을 실행한다.
-  이 구조에서 접촉·몸체 입력은 해당 20 ms 동안 유지된다.
-- 새 GPU 지도: 64×64 셀, 5 cm 해상도, 3.2×3.2 m, 최대 60초 유지.
-  저속 보행에서 전방에 관측한 지면이 뒤 다리까지 이동할 시간을 확보한다.
-- 기본 센서: 100 ms마다 90×8=720개 ray, 거리 0.1~8 m, dropout 5%, 거리 noise 표준편차 5 mm.
-  하단 FOV에 샘플을 더 배정하며 스캔마다 각도를 옮긴다. 실제 Livox 비반복 패턴의 재현은 아니다.
-- ray는 로봇과 지형의 첫 교차를 계산한다. 로봇에 가려진 ray는 뒤쪽 지형을 지도에 쓰지 않는다.
-  지형 GT에 noise를 더해 LiDAR로 대체한 구현이 아니다.
-- 지도는 관측 시간/높이 분포를 저장하며 미관측 셀을 지면 0으로 채우지 않는다.
-  actor의 미관측 높이 입력만 중립값 0으로 마스킹하고 valid/age를 함께 준다.
-- 기존 뷰어의 CPU 지도(8×8 m, 4 cm, 720×64 ray)와 새 학습용 JAX 지도는 별도 설정이다.
-- 이 버전의 MJX ray는 heightfield 교차를 지원하지 않아 rough level 1·2는 명시적으로 거부한다.
-  평지·box 계단·box 경사(level 0, 3, 4, 5~16)를 사용한다.
+최신 설계에 맞춰 **UNKNOWN은 기본 hybrid에서 HOLD**한다. 첫걸음 주변이 관측되지 않으면
+자동으로 미관측 지형을 밟지 않는다. 초기 사각지대가 지속되면 그대로 정지할 수 있다.
+이전 요청의 무관측 첫걸음 자체만 비교하려면 아래 debug 명령을 쓴다.
 
-몸체 pose/velocity와 접촉은 아직 MuJoCo 상태를 이상적인 추정값으로 사용한다.
-실제 LiDAR+IMU odometry, odom/TF drift, 시간 지연 센서 모델은 후속 작업이다.
+```bash
+bash scripts/view_foothold_planner.sh --controller adaptive --terrain flat --perception blind
+```
 
-## 정책과 제어기의 역할
+## 후보·workspace·안전 조건
 
-| action | 범위와 의미 |
+각 다리의 nominal 주변 controller XY `[-8,-4,0,4,8] cm`의 25개 후보를 검사한다.
+search ±8 cm는 허용 residual ±4 cm와 별개다. IK 링크 길이는 74/121/230 mm,
+기본 발은 leg root에서 수평 218.728 mm, Z -287.006 mm다. ±8 cm 전부가 도달 가능하다는 뜻은 아니다.
+각 후보의 endpoint와 21개 궤적 sample에서 실제 link IK, reach 여유 1 mm, joint 여유 1°를 확인한다.
+
+support는 중심 known 필수 + coverage≥0.6 + 비공선 plane fit이 가능해야 한다.
+중심과 일직선 이웃 2개만 있는 3/5 관측은 거절한다. 관측된 cell만으로 plane을 맞추고,
+RMS 8 mm, slope 25°, 이웃 단차/cell spread 25 mm, foot-radius+5 mm edge 여유를 검사한다.
+주변 5×5 cell의 관측된 단차로 edge distance를 계산하며, 미관측 edge가 없다고 보증하지 않는다.
+normal/slope, coverage/confidence/age, 관측 support 폭·길이, path max/known fraction,
+IK/joint margin을 고정 shape로 계산한다. support 폭·길이는 world grid 축상의 연속 관측 길이다.
+
+경로는 21개 sample과 구형 발의 5점 footprint로 관측 장애물을 검사한다.
+path known fraction≥0.6이어야 SAFE다. full mesh/다리 링크/몸통 swept collision 검사는 아니다.
+RL XY는 reference 주변 ±4 cm 이내의 안전 후보로 projection하므로 결과는 4 cm grid에 양자화된다.
+요청 clearance/timing이 실패하면 neutral reference 궤적으로 복구하며, 그 reference도 없으면 HOLD다.
+
+Tripod는 다리별 top-3, 조합 27개에 대해 현재 stance와 다음 landing support polygon의
+CoM 여유 12 mm를 검사한다. Wave는 현재 한 발 후보와 5발 stance를 검사한다.
+각 phase의 stance IK를 5개 미래 body pose에서도 검사한다. 정적 CoM 근사이며 동적 안정성 증명은 아니다.
+`Lmax_scale`은 `[1.3,1,.75,.5,.25,.125]` 중 통과한 최대 scale이다. 연속 최댓값이 아니다.
+이동 성분의 최대 phase 이동 거리는 `abs(v_command)*0.5*Lmax_scale` m이다.
+
+## action / observation 계약
+
+`adaptive_hybrid_geometry_residual_24_v3`. 다리 순서 RF RM RB LF LM LB.
+
+| index | semantic |
 |---|---|
-| `0:12` | RF/RM/RB/LF/LM/LB 순서 XY, 각 축 ±4 cm 요청 |
-| `12:18` | 다리별 스윙 여유 높이 residual ±4 cm; 최종 여유 4~18 cm |
-| `18:21` | pitch ±10°, roll ±5°, 몸체 높이 ±3 cm |
-| `21` | 전진 보폭 배율 0.5~1.3 |
-| `22` | tripod 위상 시간 0.3~0.7초, 중립 0.5초 |
+| 0:12 | 6다리 safe reference 기준 XY residual, 각각 ±4 cm; Z action 없음 |
+| 12:18 | path-required clearance 위의 여유 residual ±4 cm |
+| 18 / 19 / 20 | body roll ±5° / pitch ±10° / height ±3 cm |
+| 21 | 요청 stride scale 0.5–1.3; supervisor는 필요시 0.125까지 축소 |
+| 22 | apex plateau 중심 phase residual ±0.15 |
+| 23 | XY transfer 중심 phase residual ±0.15 |
 
-action은 [-1,1], 0이 중립이다. **action 0 + LiDAR 모드도 관측 높이에 맞춘 착지 Z와
-경로 clearance, 센서 기반 pitch 기준값을 사용한다.** 학습 보정과 센서 기준값을 모두 끈
-기본 제어기 비교는 `--perception blind`로 실행한다.
+Z는 terrain surface + foot radius로 IK에 전달한다. 높이 기준은
+`required=max(path_max-max(start_surface_z,landing_surface_z),0)`;
+`clearance=clip(max(required+0.06+RL, required+0.02, 0.04),0.04,0.18)`이다.
+18 cm 제한으로 required+margin을 못 만족하면 거절한다.
+body normal 기반 roll/pitch baseline(각 ±12°) 위에 residual을 더하고 기존 자세/IK gate가 제한한다.
+action=0도 planner baseline을 사용한다. 비활성 leg action은 현재 swing에 적용하지 않는다.
 
-다리별 nominal 주변 3×3 후보에서 policy XY 요청에 가까운 지지 후보를 선택한다.
-지지 patch는 중심과 ±3.5 cm의 네 이웃 모두 관측되고 높이 분포가 2.5 cm 이내여야 한다.
-이는 edge/거칠기 판정의 초기 근사이며 전체 지지 다각형이나 연속 충돌 검사를 대신하지 않는다.
-후보 선택은 이산 projection이므로 매끄러운 XY 이동 전체를 표현하지 않는다.
+기존 quintic lift/transfer/lower를 유지했다. apex는 단일 Bézier 점이 아니라
+Z plateau 중심이며 최종 범위 0.3–0.7, plateau 폭 0.4다.
+상승 시 앞당기고 하강 시 늦추는 geometry baseline을 사용한다.
+transfer 중심은 0.35–0.65, 이동 구간 폭 0.5다. 해당 변화도 같은 path/IK 검사를 통과해야 한다.
 
-관측한 경로의 최대 높이를 스윙 기준에 반영하고 남는 clearance가 2 cm 미만이면 거부한다.
-스윙 경로 21개 표본에서 IK를 검사하고, 매 tick 전체 다리 자세/높이 gate와 관절 속도 제한을 적용한다.
-숨은 장애물과 표본 사이의 충돌까지 보장하는 검사는 아니다.
+phase duration action은 제거했다. Tripod `clip(0.5*scale,0.25,0.7)`초,
+Wave 기본 1초(설정 범위 0.6–1.4), speed scale 0.2, stance 5 phase다.
+속도에도 `scale*baseline_period/period`를 적용한다. Wave의 절대 속도 상한은 기존 MJX 명령 범위를
+따르므로 main 하드웨어의 상한과 완전히 동일하지 않다.
 
-해당 다리의 관측 후보가 없으면 기본 궤적으로 걷는다. 관측된 높이 불연속이 있는데 모든 후보가
-위험하면 단순 미관측으로 바꾸지 않고 해당 tripod의 새 시작을 보류한다. 요청이 바뀌면 재시도한다.
-관측된 후보가 모두 IK 불가능한 경우도 보류하고 거부 정보를 정책/로그에 제공한다.
+actor **4410-D** = proprio 157 + global 23 + reference 30 + 6×25×28 candidate.
+critic **4725-D** = actor + GT/error 300 + terrain 15.
+proprio는 기존 155 필드를 유지하고 accepted/previous action 증가로 157이 됐다.
+global에는 vy command(현재 0), roll/pitch, contact 기반 body clearance, slip 6,
+current gait, active swing mask 6, supervisor decision, maximum stride, Tripod/Wave feasibility,
+mean confidence, support margin이 들어간다. reference는 다리별 body XYZ·nominal까지 거리·valid다.
+candidate 28개 필드의 순서/정규화는 `adaptive_foothold_estimator.CANDIDATE_FEATURES`와 feature 조립 코드가 기준이다.
+normal/slope는 world 축, candidate offset은 controller 축이다.
+새 shape/source SHA 계약은 이전 adaptive 23-D 및 stage31 18-D checkpoint 로드를 거절한다.
+기존 18-D controller/checkpoint 경로는 유지한다.
 
-착지 XY/Z·clearance는 스윙 시작에 고정한다. 지도 갱신으로 진행 중 목표를 바꾸지 않는다.
-고정된 world 목표를 제어기 내부 궤적 좌표로 변환하며 foot memory는 제어기가 한 번만 갱신한다.
-접촉이 먼저 발생하면 접촉 위치에서 stance를 시작하고, 늦게 착지하면 제어기 접촉 탐색을 유지한다.
+## main Wave 포팅과 전환
 
-몸체 자세·보폭·주기는 모든 다리에 영향을 주므로 **6개 다리 모두 후보가 있을 때** 활성화한다.
-tripod 경계에서 목표를 수락하고 자세에는 15°/s, 높이에는 4 cm/s 제한을 적용한다.
-전진속도는 `명령 속도 × stride / (phase_time / 0.5)`로 보폭과 주기를 함께 반영한다.
-자세 기준 pitch는 센서 지면 추정으로 최대 ±12°이고 여기에 residual이 더해진다.
+참고 revision `origin/main`의 `90a8950`; 상세 파일은 [구현 전 분석](HEXAPOD_HYBRID_GAIT_ANALYSIS.md)에 있다.
+순서는 **RF → LB → RM → LF → RB → LM**이다.
+첫 6 Wave phase는 stance 속도 절반, phase 시작 전 all-contact 100 ms 대기,
+airborne 확인 후 progress≥0.5의 Early Landing, raw contact 후보 동결,
+Late Landing 0.12 m/s 아래·0.096 m/s 안쪽, 최대 10 cm 검색 후 fault HOLD를 포팅했다.
+support contact를 잃으면 phase를 멈추고 빠진 support만 검색한다. Late 동안 stance 적분도 멈춘다.
+fault는 명령 해제 후 재무장한다. 실제 접촉은 20 ms policy sample로 확인하므로 하드웨어 10 ms FSR와 시간 해상도가 다르다.
 
-actor observation은 **641-D**, critic observation은 **764-D**다.
-actor는 155-D 상태·명령·이전 action/수락 파라미터와 486-D 후보 특징을 받는다.
-critic만 후보 지형 GT, 유효 LiDAR-GT 차이, 15개 지형 샘플을 추가로 받는다.
-높이 MAE는 관측된 위치만 비교한다. 콘솔에서 비교 표본이 없으면 `n/a`다.
+모드 전환은 swing 완료 후 다음 all-contact phase 경계에서만 적용한다.
+Wave→Tripod는 다음 두 Tripod phase가 feasible인 상태를 0.5초 유지하고 Wave 체류 2초를 요구한다.
+두 번째 preview는 첫 착지의 가상 contact/발 위치와 root 직선 이동을 사용하며 yaw 연속 예측은 근사다.
+main의 Tripod 두 phase 명령 묶음 대신 안전 supervisor는 매 phase에서 재검토한다.
+현재 swing의 world landing Z/XY와 clearance/timing은 latch된다. 새 map이 목표를 이동시키지 않는다.
+새 장애물에 대한 mid-swing 재계획/abort는 아직 없고 contact recovery와 매 tick IK 제한을 사용한다.
 
-보상은 기존 명령 추종/progress/넘어짐/관절/충격 등을 계승하고, 수락한 자세 목표에 대한 안정성,
-착지 순간 목표 오차·stance slip·projection 비용을 추가한다. 몸체를 많이 기울이거나 발을 높게
-드는 행위 자체를 보상하지 않는다. 기본 제어기의 GT pitch feedforward와 GT swing boost는 0이다.
+## 화면에서 확인할 것
 
-## 사용자 확인 순서
+| 상황 | 기대 / 확인 |
+|---|---|
+| flat oracle | action 0, normal Tripod, 후보/목표 안정, 연속 swing |
+| steps 접근 | edge/거리 → short stride; terrain Z / apex / pitch 변화 |
+| Tripod 불가·Wave 가능 | known-bad + short 실패 로그 → all-contact 경계에서 한 발씩 |
+| 평지 복귀 | 두 phase feasibility와 hysteresis → Tripod |
+| 후보 없음 / map 지우기 | UNKNOWN 또는 unsafe 사유와 HOLD; 진행 중 swing은 기존 latch 유지 |
+| oracle도 실패 | workspace / IK / path / support / scheduler 로그 확인 |
+| oracle만 성공 | LiDAR density, TF, age, coverage, edge filter 확인 |
 
-1. `blind + flat`에서 ↑로 전진한다. tripod가 여러 차례 교대하고 모든 다리의 IK가 유지되는지 본다.
-2. `lidar + flat`에서 `known` 증가 전후를 본다. 관측되는 순간 발이 튀거나 stance가 미끄러지는지 본다.
-3. `lidar + steps`에서 첫걸음의 미관측 fallback, 후보 높이와 계단 높이, 실제 접촉을 비교한다.
-4. 빨간 수락 목표가 스윙 중 고정되는지, 접촉 뒤 다리를 다시 억지로 목표로 끌지 않는지 본다.
-5. `reject`, IK 배열, stride/phase를 확인한다. 반복 거부나 관절 꼬임이 있으면 P로 trace를 저장한다.
-6. 이 확인 후 새 정책을 학습하고 action 0과 동일 조건에서 비교한다.
+회색 UNKNOWN, 노랑 LOW_COVERAGE, 주황 EDGE/ROUGH, 파랑 IK, 보라 PATH, 초록 SAFE,
+흰색 reference, 빨강 selected/latched. 청록 map은 alpha 0.14다.
+콘솔은 다리별 candidate_total/known/coverage_pass/surface_safe/ik_safe/path_safe,
+ref/selected/active index와 residual rejection을 출력한다.
+초록이 있어도 support 조합·stance IK·contact·hysteresis가 실패하면 phase는 시작하지 않을 수 있다.
 
-P 산출물은 `mjx/generated/adaptive_gait/`에 저장한다.
-`trace.npz`는 step 전 observation/qpos/qvel/command, 요청 action, step 후 수락 action/관절 목표/
-착지 목표/contact/phase/done/next_qpos를 담는다. `accepted_action`은 경계에서 latch한 요청이며,
-자세 rate limit과 IK gate가 반영한 최종 모터 명령은 `targets`다.
-`map.npz`, `model.xml`, `adaptive_contract.json`도 저장한다.
+`--stage0`는 동일 pose·명령의 oracle 대비 safe recall, false-safe rate,
+unknown fraction, reference XYZ error, edge precision/recall을 추가 계산한다.
+reference error는 양쪽 reference가 있는 다리만 비교한다(`oracle_compared`).
+map MAE도 관측 cell만 비교한다(`map_compared_count`). 분모 0 지표를 성능 성공으로 해석하지 않는다.
+LiDAR 스캔 미실행인 oracle 화면의 map MAE는 n/a다. 이 지표들은 현재 sample 기반 oracle 기준이며 실제 접촉 성공률은 별도 확인해야 한다.
 
-## 학습 시작
+## 사용자 확인 후 학습
 
-사용자가 위 동작을 확인한 다음 실행한다. 출력 디렉터리는 매번 새 경로여야 한다.
+Stage 0에서 planner가 실패하면 PPO를 시작하지 않는다. 학습은 자동 실행하지 않았다.
 
 ```bash
-# LiDAR actor + GT critic으로 직접 학습 (새 23-D 정책)
-bash scripts/train_adaptive_gait.sh --perception lidar --terrain-level 0 \
-  --num-envs 64 --timesteps 10000000 --output mjx/runs/adaptive-lidar-flat
+# Stage 1: Tripod only / flat
+bash scripts/train_adaptive_gait.sh --stage 1 --perception lidar --terrain-level 0 \
+  --num-envs 64 --timesteps 10000000 --output mjx/runs/hybrid-s1-flat
 
-# 평지 정책으로 5 cm 계단 학습 시작; 가중치/정규화 복원, optimizer는 새로 시작
-bash scripts/train_adaptive_gait.sh --perception lidar --terrain-level 5 \
-  --restore mjx/runs/adaptive-lidar-flat \
-  --num-envs 64 --timesteps 20000000 --output mjx/runs/adaptive-lidar-steps
+# 같은 24-D checkpoint로 ramp → 5cm stairs 순차 이관 (각 실행은 별도 output)
+bash scripts/train_adaptive_gait.sh --stage 1 --terrain-level 3 \
+  --restore mjx/runs/hybrid-s1-flat --output mjx/runs/hybrid-s1-ramp
+bash scripts/train_adaptive_gait.sh --stage 1 --terrain-level 5 \
+  --restore mjx/runs/hybrid-s1-ramp --output mjx/runs/hybrid-s1-steps
 
-# 새 정책을 같은 MJX 환경에서 방향키로 재생
+# Stage 2: Wave only, 먼저 flat에서 contact/sequence 학습
+bash scripts/train_adaptive_gait.sh --stage 2 --terrain-level 0 \
+  --restore mjx/runs/hybrid-s1-steps --output mjx/runs/hybrid-s2-flat
+# 이후 Stage 2도 level 3 → 5 순차 학습. 완료한 run으로 Stage 3 시작
+bash scripts/train_adaptive_gait.sh --stage 3 --terrain-level 5 \
+  --restore mjx/runs/hybrid-s2-steps --output mjx/runs/hybrid-s3-steps
+
 bash scripts/view_foothold_planner.sh --controller adaptive --terrain steps \
-  --checkpoint mjx/runs/adaptive-lidar-steps
+  --checkpoint mjx/runs/hybrid-s3-steps
 ```
 
-`--wandb`를 추가하면 `hexapod-adaptive-gait` 프로젝트에 로그를 기록한다.
-64개 환경은 시작 설정이며 처리속도/메모리를 실측한 값이 아니다.
-`batch-size × num-minibatches`는 `num-envs`로 나누어떨어져야 한다.
+`--restore`는 같은 source 계약의 가중치/normalizer 초기화이고 optimizer 재시작이다.
+terrain/gait stage는 변경 가능하다. teacher는 `--perception teacher`, LiDAR 이관은
+`--init-teacher RUN`; 이는 weight transfer 후 PPO이며 별도 imitation trainer는 아니다.
+level 0 flat, 3/4 ramp 8°/15°, 5부터 stairs, tread 25 cm. hfield rough level 1/2는 ray 지원 때문에 거절한다.
+`--wandb`로 기존 계정의 새 run을 기록한다. 대규모 env 수/메모리/throughput은 측정 전이다.
 
-별도의 같은 action 공간 GT teacher를 먼저 만들 수도 있다.
+reward는 기존 진행/속도/자세/높이, residual/action rate, 충돌/IK/관절 제한 항목에
+landing error·slip·projection·residual rejection을 더한다. 속도 목표는 수락한 gait 속도에 맞춘다.
+Wave cost 0.005/s, mode switch cost 0.01로 안전 penalty보다 작게 둔다.
+불필요한 apex는 기존 swing-height cost, body tilt는 자세 목표 오차와 residual cost로 억제한다.
+별도 learned gait selector는 구현하지 않았다.
+
+추가한 단위 테스트는 사용자가 필요할 때 실행한다. 에이전트가 실행하지 않았다.
 
 ```bash
-bash scripts/train_adaptive_gait.sh --perception teacher --terrain-level 0 \
-  --output mjx/runs/adaptive-teacher-flat
-bash scripts/train_adaptive_gait.sh --perception teacher --terrain-level 5 \
-  --restore mjx/runs/adaptive-teacher-flat --output mjx/runs/adaptive-teacher-steps
-bash scripts/train_adaptive_gait.sh --perception lidar --terrain-level 5 \
-  --init-teacher mjx/runs/adaptive-teacher-steps --output mjx/runs/adaptive-student-steps
+python -m unittest discover -s mjx/tests -p test_adaptive_hybrid.py
+# legacy 회귀가 필요할 때
+python -m unittest discover -s mjx/tests -p test_firmware_mjx_controller.py
 ```
 
-teacher 모드는 LiDAR 관측 mask/age를 유지하고 관측 높이를 GT로 치환한다. 미관측 첫걸음의
-기본 보행 규칙은 동일하다. teacher checkpoint 자체를 LiDAR 배포 정책으로 간주하지 않는다.
-`--init-teacher`는 동일 23-D 네트워크/정규화 가중치 이관 후 asymmetric PPO이며,
-별도 행동 imitation loss나 높이 복원 auxiliary loss는 아직 구현하지 않았다.
-현재 GT 비교는 critic 입력·보상·진단에 사용한다. 기존 stage31 18-D checkpoint는 거부한다.
-
-각 checkpoint에는 `adaptive_contract.json`과 `ppo_network_config.json`, 네트워크/정규화가 저장된다.
-checkpoint 경로 대신 run 경로를 주면 가장 큰 step 번호를 선택하며 **best score 자동 선택은 아니다**.
-제어/관측/센서 소스 hash가 달라지면 계약 검사에서 중단한다. 변경 전 정책은 기록된 소스로 재생하거나
-명시적인 버전 이관을 구현해야 한다. 가중치가 있다고 계단 통과가 검증됐다는 뜻은 아니다.
-
-## 다음 단계와 Isaac Lab 이전
-
-이번 구현으로 MJX 기본 제어기→23-D 파라미터→LiDAR 관측→PPO→재생 경로를 마련했다.
-사용자 동작 확인과 실제 학습 결과를 바탕으로 보상·범위·지지 판정을 조정한다.
-held-out 지형, 센서/odom 지연·오차, teacher imitation/높이 복원 loss, 넓은 rough 코스 지원은 후속이다.
-
-Isaac Lab에는 아직 이 23-D 제어기/정책을 이식하지 않았다. 우선 MJX에서 사용자가 검증한
-checkpoint와 contract, 모델, 정규화, trace를 고정한 다음 같은 관절 순서·부호·단위·주기·TF·접촉 기준으로
-Torch 제어기를 구현하고 sim-to-sim 재생한다. 기존 Isaac v4/18-D 모드에 이 가중치를 직접 넣지 않는다.
+현재 확인 범위는 문법/CLI/정적 계약뿐이다. 전체 형상 collision, 센서 사각지대 대응,
+동적 support 안정성, JIT/batch 메모리, 실제 등판과 sim-to-sim은 사용자 검증 후 이어갈 항목이다.
