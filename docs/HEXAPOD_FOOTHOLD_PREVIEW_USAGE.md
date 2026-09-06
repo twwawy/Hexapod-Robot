@@ -108,11 +108,15 @@ bash scripts/view_foothold_planner.sh --terrain steps --residual-scale 0
 우측 8° 경사와 돌출물, 뒤쪽 요철·둥근 바위가 있다. 독립 재생기의 6.5 cm 계단 7단과 다른 코스다.
 2 cm heightfield는 원래 상자 모서리와 좁은 돌출물을 근사한다.
 
-기본 measured TF는 밑면 중심에서 높이 **215 mm**, 전방 **13.529 mm**다. 기존 전방 기울기
-45°에서 scan을 7° 위로 올려 현재 전방 기울기는 **38°**다.
-base 기준 XYZ `(0, -0.013529, 0.1642) m`, RPY `(0, 38°, -90°)`다.
+기본 measured TF는 밑면 중심에서 높이 **215 mm**, 전방 **13.529 mm**, 전방 기울기 **45°**다.
+38° 변경은 사용자 요청으로 롤백했다.
+base 기준 XYZ `(0, -0.013529, 0.1642) m`, RPY `(0, 45°, -90°)`다.
 MID-360 FOV는 수평 360°, 수직 -7°~+52°, 거리 0.1~8 m, 기본 720×64 angular rays다.
 실제 Livox 비반복 스캔 패턴의 재현은 아니다. URDF CAD 장착 chain과 measured override는 별도다.
+
+별도의 새 23-D 파라미터 제어/학습 모드는 같은 스크립트에 `--controller adaptive`를 붙인다.
+그 모드는 학습용 MJX 계단과 JAX 센서 지도를 사용하므로 이 문서의 stage31 코스·키·지도 설정과 구분한다.
+실행/학습/확인 항목은 [adaptive 사용 가이드](HEXAPOD_MJX_ADAPTIVE_GAIT_USAGE.md)를 따른다.
 
 지도는 odom 정렬 8×8 m rolling grid, 4 cm 셀, 60초 유지다. 몸체에 가린 지면은 채우지 않는다.
 지도 불투명도 16%, 점군 22%, 후보 마커는 불투명하다. M/L/G는 표시만, K/C는 정책의 센서 입력에도 영향을 준다.

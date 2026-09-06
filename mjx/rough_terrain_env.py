@@ -991,6 +991,22 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
         )
         return observation
 
+    def _initialize_controller_info(self, data, info):
+        """Extension point for parameter controllers; legacy defaults are unchanged."""
+        return info
+
+    def _prepare_controller_state(self, data, info, action):
+        return info["controller_state"]
+
+    def _controller_step(self, controller_state, **kwargs):
+        return firmware.step(controller_state, **kwargs)
+
+    def _reward_posture_target(self, info, controller_state, pitch_ff):
+        return _effective_posture_target(info["command"], pitch_ff)
+
+    def _reward_height_command(self, info, controller_state):
+        return info["command"][2]
+
     def reset(self, rng: jax.Array) -> mjx_env.State:
         if self._config.dr_enabled:
             (
@@ -1078,10 +1094,10 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
             # floating-point batch array.  Keep the controller/environment
             # clock separate so its integer dtype is stable under wrappers.
             "policy_steps": jp.zeros((), dtype=jp.int32),
-            "last_action": jp.zeros(ACTION_SIZE),
+            "last_action": jp.zeros(self.action_size),
             # The policy tick is 20 ms, so delays {0,1,2} mean {0,20,40} ms.
             "action_delay_buffer": jp.zeros(
-                (DR_MAX_ACTION_DELAY_TICKS + 1, ACTION_SIZE)
+                (DR_MAX_ACTION_DELAY_TICKS + 1, self.action_size)
             ),
             "action_delay_ticks": action_delay_ticks,
             "next_push_step": next_push_step,
@@ -1134,6 +1150,7 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
                 "termination/no_progress": jp.zeros(()),
             }
         )
+        info = self._initialize_controller_info(data, info)
         obs = self._get_obs(data, info)
         return mjx_env.State(data, obs, jp.zeros(()), jp.zeros(()), metrics, info)
 
@@ -1188,12 +1205,10 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
         firmware_command = jp.where(
             command_active, state.info["command"], jp.zeros(5)
         )
-        posture_target = _effective_posture_target(
-            state.info["command"], pitch_ff
-        )
+        prepared_controller = self._prepare_controller_state(state.data, state.info, action)
 
         def controller_tick(controller_state, _):
-            return firmware.step(
+            return self._controller_step(
                 controller_state,
                 target_velocity=firmware_command[:2],
                 body_position_world=state.data.qpos[:3],
@@ -1210,11 +1225,12 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
 
         controller_state, controller_history = jax.lax.scan(
             controller_tick,
-            state.info["controller_state"],
+            prepared_controller,
             xs=None,
             length=self._firmware_steps,
         )
         controller = jax.tree_util.tree_map(lambda value: value[-1], controller_history)
+        posture_target = self._reward_posture_target(state.info, controller_state, pitch_ff)
         targets = self._home_ctrl.at[self._actuator_ids].set(
             controller.model_joint_targets.reshape(18)
         )
@@ -1373,7 +1389,7 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
             yaw_velocity=data.qvel[5],
             attitude=attitude,
             posture_target=posture_target,
-            height_command=state.info["command"][2],
+            height_command=self._reward_height_command(state.info, controller_state),
             clearance=clearance,
             target_clearance=self._config.target_clearance,
             root_angular_speed=root_angular_speed,

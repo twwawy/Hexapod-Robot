@@ -1,8 +1,9 @@
 # MJX에서 학습하는 지형 적응 보행 파라미터
 
 작성: 2026-09-06. 사용자 결정은 **MJX에서 보행을 먼저 만든 뒤 Isaac Lab으로 sim-to-sim 이식**이다.
-이 문서는 다음 학습의 설계 기준이다. 현재 실행 중인 stage31 viewer가 아래 action을 이미 출력하거나,
-새 정책/학습기가 구현·학습·검증됐다는 의미는 아니다.
+이 문서는 학습의 설계 기준이다. 1차 23-D 제어기·MJX 환경·PPO·재생기를 추가했으며,
+구현 상태와 실행 명령은 [사용 가이드](HEXAPOD_MJX_ADAPTIVE_GAIT_USAGE.md)에 정리했다.
+아직 새 가중치 학습이나 동작 검증은 하지 않았다. 기존 stage31 viewer 기본 모드는 18-D다.
 
 ## 목표와 현재 코드의 차이
 
@@ -45,7 +46,7 @@ posture/contact 처리의 이중 적용을 금지한다. policy는 parameter req
 
 ## 1차 action 제안: 23-D
 
-다음은 구현 전 제안 계약이다. 범위는 로봇의 모든 상태에서 안전하다고 검증한 값이 아니며,
+다음은 1차 구현에 사용하는 계약이다. 범위는 로봇의 모든 상태에서 안전하다고 검증한 값이 아니며,
 MJX 기구학/보행 확인 후 확정한다. 기존 v3/v4 18-D action에 이 action을 중복 합성하지 않는다.
 
 | slice | 차원 | 의미 | 적용 시점 |
@@ -141,7 +142,11 @@ NumPy 후보 계획을 GPU PPO 수천 환경 안에 그대로 호출하지 않�
 
 구현 순서는 controller parameter interface → 23-D 학습 환경 → 센서 map/candidates → teacher/student
 학습 entry point → 현재 viewer의 새 checkpoint 모드다. 현재 stage31 viewer는 비교용으로 보존한다.
-학습/실행 검증은 사용자에게 맡기며, 이 설계 문서 작성으로 학습을 자동 시작하지 않는다.
+학습/실행 검증은 사용자에게 맡기며, 구현 작업으로 학습을 자동 시작하지 않는다.
+
+현재 구현은 LiDAR actor/GT critic asymmetric PPO와 동일 23-D teacher 가중치 초기화를 제공한다.
+teacher imitation과 높이 복원 auxiliary loss, odom/TF/센서 지연 오차 모델, held-out 검증,
+Isaac 23-D 이식은 남아 있다. 기존 넓은 heightfield 코스 대신 MJX ray가 처리하는 평지/box 계단/경사를 사용한다.
 
 Isaac 이전에 저장할 contract는 action/observation schema, parameter bounds/neutral, 좌표/단위,
 센서 TF/FOV/주기, terrain raster 규칙, normalizer, joint order/sign, 제어기 버전, command/action/state

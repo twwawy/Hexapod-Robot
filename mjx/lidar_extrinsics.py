@@ -3,8 +3,7 @@
 Measurement datum: centre of the chassis underside, not the feet/ground plane.
 The current base_link STL underside is z=-50.8 mm with zero visual origin.
 Controller axes at that datum are forward/left/up; CAD forward is base_link -Y.
-The sensor +Z axis points upward and is tilted forward 38 deg (upright mounting).
-This raises the local horizontal scan plane by 7 deg from the previous 45 deg mount.
+The sensor +Z axis points upward and is tilted forward 45 deg (upright mounting).
 """
 from __future__ import annotations
 
@@ -18,7 +17,7 @@ SENSOR_FRAME = 'lidar_sensor_frame'
 BASE_TO_BOTTOM_XYZ_M = (0.0, 0.0, -0.0508)
 BASE_TO_BOTTOM_RPY_RAD = (0.0, 0.0, -math.pi / 2)
 BOTTOM_TO_LIDAR_XYZ_M = (0.013529, 0.0, 0.215)
-BOTTOM_TO_LIDAR_RPY_RAD = (0.0, math.radians(38.0), 0.0)
+BOTTOM_TO_LIDAR_RPY_RAD = (0.0, math.pi / 4, 0.0)
 
 
 def measured_transform():
@@ -26,8 +25,7 @@ def measured_transform():
     angle = BOTTOM_TO_LIDAR_RPY_RAD[1]
     c, s = math.cos(angle), math.sin(angle)
     transform = np.eye(4)
-    # Rz(-90 deg) @ Ry(+38 deg): sensor +Z points up and forward.  Decreasing
-    # this pitch from 45 deg raises the local horizontal scan rays by 7 deg.
+    # Rz(-90 deg) @ Ry(+45 deg): sensor +Z points up and forward.
     transform[:3, :3] = ((0.0, 1.0, 0.0), (-c, 0.0, -s), (-s, 0.0, c))
     transform[:3, 3] = (0.0, -BOTTOM_TO_LIDAR_XYZ_M[0],
                          BASE_TO_BOTTOM_XYZ_M[2] + BOTTOM_TO_LIDAR_XYZ_M[2])
@@ -61,5 +59,5 @@ def measurement_metadata():
         'T_base_bottom_rpy_rad': BASE_TO_BOTTOM_RPY_RAD,
         'T_bottom_lidar_xyz_m': BOTTOM_TO_LIDAR_XYZ_M,
         'T_bottom_lidar_rpy_rad': BOTTOM_TO_LIDAR_RPY_RAD,
-        'pitch_description': 'upright: sensor +Z tilted 38 deg forward from vertical; scan raised 7 deg from previous 45 deg; roll=0',
+        'pitch_description': 'upright: sensor +Z tilted 45 deg forward from vertical; roll=0',
     }

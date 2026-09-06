@@ -41,8 +41,23 @@
 자동 적용하지 않는다. Isaac `data/training/latest_mjx_training.json`은 기존 run 기록과 호환성/안전 gate를
 담은 handoff이며, 이번 코드 변경 후의 신규 학습 결과가 아니다.
 
-measured LiDAR TF(215 mm, 기존 45°에서 scan을 7° 올린 전방 38°)와 URDF CAD 장착 chain은 별도 출처다.
+measured LiDAR TF(215 mm, 전방 45°로 복원)와 URDF CAD 장착 chain은 별도 출처다.
 이번 CAD 변경을 measured TF와 같은 값이라고 해석하지 않는다.
+
+## 추가 업데이트: 45° 복원과 23-D MJX 파라미터 학습
+
+- LiDAR 38° 변경을 롤백하고 측정 TF를 다시 45°로 맞췄다.
+- `adaptive_gait_controller.py`: 제어기 내부에서 착지 XY·여유 높이·자세·보폭·주기를 처리한다.
+  미관측 nominal fallback, 스윙 목표 latch, 접촉/IK gate, 자세 rate limit을 포함한다.
+- `adaptive_gait_perception.py` / `adaptive_gait_env.py`: JAX MID-360 angular ray,
+  64×64/5 cm/60초 지도, 6×9 후보, 641-D actor / 764-D privileged critic을 연결했다.
+- `train_adaptive_gait.py` / `scripts/train_adaptive_gait.sh`: 새 23-D PPO와 같은 계약 teacher 초기화,
+  checkpoint별 contract·정규화·소스 hash 저장을 추가했다.
+- `--controller adaptive`: 같은 MJX 지형에서 기본 action 0 또는 새 checkpoint를 방향키로 재생하고,
+  지도·후보·수락 목표와 trace를 저장한다. stage31 18-D 재생은 기존 기본 모드다.
+
+새 학습/GUI/보행 검증은 실행하지 않았다. 사용자 확인 후 학습을 시작한다.
+자세한 명령·검증 항목·미구현 후속은 [23-D 사용 가이드](HEXAPOD_MJX_ADAPTIVE_GAIT_USAGE.md)를 따른다.
 
 ## 파일 관리와 검증 상태
 

@@ -5,7 +5,35 @@
 무관하게 gait·접촉·자세를 계속 처리한다. LiDAR 착지 후보를 발의 절대 경로로 주입하는 전환은 제거했다.
 
 다음 학습은 **MJX에서 보폭·주기·몸체 자세·스윙 높이의 residual을 학습하고 Isaac Lab으로 sim-to-sim 이전**하는 순서로 진행한다.
-[파라미터 학습 설계](docs/HEXAPOD_MJX_ADAPTIVE_GAIT_LEARNING_PLAN.md)는 후속 계획이며, 아래 실행기는 기존 stage31 비교 모드다.
+[파라미터 학습 설계](docs/HEXAPOD_MJX_ADAPTIVE_GAIT_LEARNING_PLAN.md)에 따라 **23-D MJX 환경·LiDAR actor/GT critic PPO·재생기**를 추가했다.
+새 가중치는 아직 학습하지 않았으며 실행 검증은 사용자가 진행한다. 아래 기본 실행기는 기존 stage31 비교 모드다.
+
+## 새 23-D 보행 파라미터 모드
+
+LiDAR 기울기는 **45°로 롤백**했다. 새 모드는 기본 제어기를 유지하며 다리별 착지 XY·스윙 여유 높이,
+몸체 pitch/roll/height·보폭·주기를 조절한다. 미관측 다리는 기본 궤적으로 시작하고 관측된 목표는 스윙 시작에 고정한다.
+
+```bash
+cd /home/huro/Hexapod-Robot
+source /home/huro/.venvs/hexapod-mjx/bin/activate
+
+# 먼저 기본 제어기 반복 보행 확인 (새 정책 없이 action 0)
+bash scripts/view_foothold_planner.sh --controller adaptive --terrain flat --perception blind
+
+# LiDAR 기반 착지/단차 보정 확인 (5 cm × 7단, action 0)
+bash scripts/view_foothold_planner.sh --controller adaptive --terrain steps --perception lidar
+
+# 사용자 확인 후 새 LiDAR 정책 학습 시작
+bash scripts/train_adaptive_gait.sh --perception lidar --terrain-level 0 \
+  --num-envs 64 --timesteps 10000000 --output mjx/runs/adaptive-lidar-flat
+```
+
+방향키로 계속 걷고, Space 정지, Enter 일시정지, H 초기화, C 지도 지우기, M 지도 표시, P trace 저장이다.
+흐린 청록 점은 지도, 진한 녹색은 후보, 빨간 점은 수락한 목표다. 학습 가중치 없이도 LiDAR 기준값은 적용된다.
+기존 18-D stage31 가중치는 새 모드에 호환되지 않는다.
+
+[새 모드 실행·학습·환경 구성·확인 항목](docs/HEXAPOD_MJX_ADAPTIVE_GAIT_USAGE.md)에
+checkpoint 재생, 계단 학습, teacher 이관, 관측 계약과 현재 제한을 정리했다.
 
 ## 바로 실행
 
@@ -96,8 +124,8 @@ GT 오차는 관측된 샘플만 비교하며, 없으면 `n/a`다. 기준은 2 c
 
 | 항목 | 뷰어 기본값 |
 |---|---|
-| LiDAR measured TF | 밑면 중심에서 높이 215 mm, 전방 13.529 mm, 기존 45°에서 광선을 7° 위로 올린 전방 38° |
-| base→LiDAR | XYZ `(0,-0.013529,0.1642) m`, RPY `(0,38°,-90°)` |
+| LiDAR measured TF | 밑면 중심에서 높이 215 mm, 전방 13.529 mm, 전방 기울기 45°로 복원 |
+| base→LiDAR | XYZ `(0,-0.013529,0.1642) m`, RPY `(0,45°,-90°)` |
 | MID-360 proxy | 수평 360°, 수직 -7°~+52°, 거리 0.1~8 m, 720×64 angular rays |
 | 높이 지도 | odom 정렬 8×8 m rolling map, 4 cm 셀, 60초 유지 |
 | 불투명도 | 지도 16%, 점군 22%, 후보 마커 불투명 |
@@ -114,6 +142,7 @@ CAD 비교는 `--controller nominal --robot-model mesh`로 열 수 있다.
 |---|---|
 | `scripts/view_foothold_planner.sh` 기본 모드 | 격리된 v3/18-D action·146-D observation + LiDAR 입력과 residual gain |
 | `scripts/view_trained_policy.sh` | stage31 가중치와 저장 설정으로 v3 재생, GT 입력 사용 |
+| `--controller adaptive` / `scripts/train_adaptive_gait.sh` | 신규 23-D 파라미터 action, actor 641-D / critic 764-D; 아직 새 학습 결과 없음 |
 | 루트 `mjx/` 학습 | v4/18-D action·146-D observation, swing X/Y·stance Z 최대 ±100 mm, curriculum 0~16 |
 | `isaaclab_hexapod/` | v4 Torch 제어기·센서·지형·학습 scaffold와 USD 이식 |
 | `SW/mjx/` | 과거 24-D/113-D 실험; 아래 레거시 설명 참고 |
