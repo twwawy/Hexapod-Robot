@@ -66,6 +66,9 @@ def main():
     output.mkdir(parents=True, exist_ok=False)
     (output/'.gitignore').write_text('*\n')
     metadata = contract(env)
+    print(json.dumps({k: metadata[k] for k in ('action_contract', 'observation_contract',
+        'observation_size', 'limits')}, indent=2), flush=True)
+    print('Timing baselines: Tripod=1.0 s, Wave=1.0 s. Stage 0 is a user-run prerequisite.', flush=True)
     metadata['initial_checkpoint'] = str(restore) if restore else None
     metadata['initialization'] = 'teacher_weight_transfer_then_asymmetric_ppo' if args.init_teacher else 'ppo'
     (output/'adaptive_contract.json').write_text(json.dumps(metadata, indent=2)+'\n')

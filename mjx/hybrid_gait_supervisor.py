@@ -1,5 +1,6 @@
 """Geometry-owned NORMAL -> SHORT -> WAVE -> HOLD; never an RL gait action."""
 from typing import NamedTuple
+from adaptive_contract import TRIPOD_PHASE_LIMITS, WAVE_PHASE_LIMITS
 import jax.numpy as jp
 from wave_gait_scheduler import TRIPOD, WAVE, TRIPOD_PHASE_S, WAVE_PHASE_S
 
@@ -23,8 +24,8 @@ def initial_supervisor():
 def phase_duration(scale, mode):
     # L = v * nominal_duration * scale. Low scales hit T_min and consequently
     # reduce velocity; Wave has its own one-second baseline and five-phase stance.
-    return jp.where(mode == WAVE, jp.clip(WAVE_PHASE_S*scale, .6, 1.4),
-                    jp.clip(TRIPOD_PHASE_S*scale, .25, .7))
+    return jp.where(mode == WAVE, jp.clip(WAVE_PHASE_S*scale, *WAVE_PHASE_LIMITS),
+                    jp.clip(TRIPOD_PHASE_S*scale, *TRIPOD_PHASE_LIMITS))
 
 
 def decide(s, *, tripod_feasible, tripod_known_bad, wave_feasible, two_tripod_phases,

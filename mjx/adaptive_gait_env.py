@@ -22,15 +22,16 @@ from rough_terrain_env import (
 )
 from terrain_curriculum import terrain_level as terrain_spec
 from adaptive_foothold_estimator import (
-    CANDIDATE_COUNT, CANDIDATE_OFFSETS, CANDIDATE_FEATURES, RESIDUAL_RADIUS,
+    CANDIDATE_COUNT, CANDIDATE_OFFSETS, CANDIDATE_FEATURES,
+    local_candidate_xy, project_local_candidates, residual_extent, LOCAL_CENTER_INDEX,
     FOOT_RADIUS, evaluate_candidates,
 )
 
-OBSERVATION_CONTRACT = 'adaptive_hybrid_geometry_candidates25_24_v3'
-REWARD_CONTRACT = 'adaptive_hybrid_safe_progress_v3'
+OBSERVATION_CONTRACT = 'adaptive_hybrid_geometry_local25_extent_24_v4'
+REWARD_CONTRACT = 'adaptive_hybrid_efficient_progress_v4'
 PROPRIO_SIZE = 157
 GLOBAL_SIZE = 23
-REFERENCE_SIZE = 6*5
+REFERENCE_SIZE = 6*9
 ACTOR_SIZE = PROPRIO_SIZE + GLOBAL_SIZE + REFERENCE_SIZE + 6*CANDIDATE_COUNT*len(CANDIDATE_FEATURES)
 CRITIC_SIZE = ACTOR_SIZE + 6*CANDIDATE_COUNT*2 + 15
 
@@ -101,7 +102,7 @@ class AdaptiveGaitEnv(HexapodRoughTerrainEnv):
             known, age = jp.ones_like(known), jp.zeros_like(age)
         return height, known, age, spread
 
-    def _candidates(self, data, info, stride=1., period=.5, *, lift=None, apex_delta=0.,
+    def _candidates(self, data, info, stride=1., period=1., *, lift=None, apex_delta=0.,
                     transfer_delta=0., mode=0, privileged=False):
         lift = jp.zeros(6) if lift is None else lift
         rotation = data.xmat[self._root_id]
@@ -110,7 +111,7 @@ class AdaptiveGaitEnv(HexapodRoughTerrainEnv):
         base_period = jp.where(mode == scheduler.WAVE, scheduler.WAVE_PHASE_S, scheduler.TRIPOD_PHASE_S)
         speed_scale = stride*base_period/period*jp.where(mode == scheduler.WAVE, scheduler.WAVE_SPEED_SCALE, 1.)
         vx = jp.clip(info['command'][0]*speed_scale,
-                     -fw.MAX_LINEAR_SPEED, fw.MAX_LINEAR_SPEED)
+                     -adaptive.MAX_LINEAR_SPEED, adaptive.MAX_LINEAR_SPEED)
         vy, wz = jp.asarray(0.), info['command'][1]*speed_scale
         displacement = period*jp.stack((-vx+wz*fw.BASE_FEET[:, 1],
                                         -vy-wz*fw.BASE_FEET[:, 0], jp.zeros(6)), axis=-1)
@@ -186,8 +187,16 @@ class AdaptiveGaitEnv(HexapodRoughTerrainEnv):
         next_check = self._phase_check(next_plan, future_data, future_info, first_feet,
                                        scheduler.TRIPOD, phase+1, scheduler.TRIPOD_PHASE_S, 1.)
         wave_phase = jp.where(cs.scheduler.mode == scheduler.WAVE, cs.scheduler.phase, 0)
-        wave_plan = self._candidates(data, info, 1., scheduler.WAVE_PHASE_S, mode=scheduler.WAVE)
-        wave_check = self._phase_check(wave_plan, data, info, feet, scheduler.WAVE, wave_phase, scheduler.WAVE_PHASE_S, 1.)
+        wave_periods = jax.vmap(lambda scale: supervisor.phase_duration(scale, scheduler.WAVE))(supervisor.STRIDE_SCALES)
+        wave_bank = jax.vmap(lambda scale, duration: self._candidates(data, info, scale, duration,
+            mode=scheduler.WAVE))(supervisor.STRIDE_SCALES, wave_periods)
+        wave_checks = jax.vmap(lambda p, duration, scale: self._phase_check(p, data, info, feet,
+            scheduler.WAVE, wave_phase, duration, scale))(wave_bank, wave_periods, supervisor.STRIDE_SCALES)
+        wave_eligible = wave_checks['feasible'] & (supervisor.STRIDE_SCALES <= requested_stride+1e-6)
+        wave_index = jp.argmax(wave_eligible.astype(jp.int32))
+        wave_plan = jax.tree_util.tree_map(lambda value: value[wave_index], wave_bank)
+        wave_check = jax.tree_util.tree_map(lambda value: value[wave_index], wave_checks)
+        wave_check['feasible'] &= jp.any(wave_eligible)
         next_supervisor, bank_index = supervisor.decide(info['supervisor'],
             tripod_feasible=checks['feasible'], tripod_known_bad=checks['known_infeasible'],
             wave_feasible=wave_check['feasible'], two_tripod_phases=checks['feasible'][1] & next_check['feasible'],
@@ -197,7 +206,7 @@ class AdaptiveGaitEnv(HexapodRoughTerrainEnv):
             decision = jp.asarray(supervisor.WAVE_MODE if self.gait_mode == 'wave' else supervisor.NORMAL)
             bank_index = jp.asarray(1)
         mode = jp.where(decision == supervisor.WAVE_MODE, scheduler.WAVE, scheduler.TRIPOD)
-        stride = jp.where(mode == scheduler.WAVE, 1., supervisor.STRIDE_SCALES[bank_index])
+        stride = jp.where(mode == scheduler.WAVE, supervisor.STRIDE_SCALES[wave_index], supervisor.STRIDE_SCALES[bank_index])
         period = supervisor.phase_duration(stride, mode)
         tripod_plan = jax.tree_util.tree_map(lambda value: value[bank_index], bank)
         reference_plan = jax.tree_util.tree_map(lambda t, w: jp.where(mode == scheduler.WAVE, w, t), tripod_plan, wave_plan)
@@ -211,14 +220,17 @@ class AdaptiveGaitEnv(HexapodRoughTerrainEnv):
         ref = jp.where((reference_index >= 0)[:, None], ref,
                        reference_plan['nominal'].at[:, 2].add(-FOOT_RADIUS))
         requested = ref[:, :2] + xy_bias @ reference_plan['basis']
-        refined = self._candidates(data, info, stride, period, lift=lift, mode=mode,
-                                   apex_delta=apex_delta, transfer_delta=transfer_delta)
+        local_xy = local_candidate_xy(ref, reference_plan['basis'])
+        local_nominal = ref.at[:, 2].add(FOOT_RADIUS)
+        refined = evaluate_candidates(self, data, info, local_xy, local_nominal, reference_plan['basis'],
+                                      lift, apex_delta=apex_delta, transfer_delta=transfer_delta)
+        neutral_local = evaluate_candidates(self, data, info, local_xy, local_nominal,
+                                             reference_plan['basis'], jp.zeros(6))
         relative_xy = (refined['xy']-ref[:, None, :2]) @ jp.linalg.inv(reference_plan['basis'])
-        bounded = jp.all(jp.abs(relative_xy) <= RESIDUAL_RADIUS+1e-6, axis=-1)
+        bounded = jp.all(jp.abs(relative_xy) <= jp.asarray(adaptive.XY_LIMIT_M)+1e-6, axis=-1)
         eligible = refined['safe'] & (refined['path_coverage'] >= .6) & bounded & (reference_index >= 0)[:, None]
-        distance = jp.linalg.norm(refined['xy']-requested[:, None, :], axis=-1)
-        residual_ok = jp.any(eligible, axis=1)
-        selected = jp.where(residual_ok, jp.argmin(jp.where(eligible, distance, jp.inf), axis=1), reference_index)
+        selected, residual_ok = project_local_candidates(refined['xy'], eligible, requested)
+        selected = jp.where(residual_ok, selected, jp.where(reference_index >= 0, LOCAL_CENTER_INDEX, -1))
         # If the lift request invalidates every nearby option, use the neutral
         # reference path. A rejected residual cannot erase a safe reference.
         plan = dict(refined)
@@ -230,9 +242,10 @@ class AdaptiveGaitEnv(HexapodRoughTerrainEnv):
                 mask = mask[..., None]
             plan['selected_'+name] = jp.where(mask, values, fallback)
         known = selected >= 0
-        fallback_mask = (~residual_ok)[:, None] & (jp.arange(CANDIDATE_COUNT)[None, :] == reference_index[:, None])
+        fallback_mask = (~residual_ok)[:, None] & (jp.arange(CANDIDATE_COUNT)[None, :] == LOCAL_CENTER_INDEX)
         for name in ('safe', 'ik_ok', 'path_ok', 'status'):
-            plan[name] = jp.where(fallback_mask, reference_plan[name], plan[name])
+            ref_value = reference_plan[name][leg, jp.maximum(reference_index, 0)]
+            plan[name] = jp.where(fallback_mask, ref_value[:, None], plan[name])
         observed_hazard = jp.any(reference_plan['unsafe'] | reference_plan['terrain_ok'], axis=1)
         proposal_safe = known | ~observed_hazard
         if self.perception != 'blind':
@@ -241,7 +254,7 @@ class AdaptiveGaitEnv(HexapodRoughTerrainEnv):
         plan['selected_world'] = jp.where(known[:, None], plan['selected_world'],
                                            reference_plan['nominal'].at[:, 2].add(-FOOT_RADIUS))
         accepted_xy = (plan['selected_world'][:, :2]-ref[:, :2]) @ jp.linalg.inv(reference_plan['basis'])
-        accepted = action.at[:12].set(jp.where(known[:, None], jp.clip(accepted_xy/RESIDUAL_RADIUS, -1., 1.), 0.).reshape(-1))
+        accepted = action.at[:12].set(jp.where(known[:, None], jp.clip(accepted_xy/jp.asarray(adaptive.XY_LIMIT_M), -1., 1.), 0.).reshape(-1))
         effective_lift = plan['selected_clearance']-fw.SWING_HEIGHT-plan['selected_required']
         accepted = accepted.at[12:18].set(jp.where(known, jp.clip(effective_lift/.04, -1., 1.), 0.))
         accepted = accepted.at[18:].set(jp.where(global_known, action[18:], 0.))
@@ -249,7 +262,9 @@ class AdaptiveGaitEnv(HexapodRoughTerrainEnv):
         gradient = jp.sum(jp.where((reference_index >= 0)[:, None], gradients, 0.), axis=0)/jp.maximum(jp.sum(reference_index >= 0), 1)
         posture = posture.at[:2].add(jp.clip(jp.array((jp.arctan(gradient[1]), -jp.arctan(gradient[0]))),
                                              -jp.deg2rad(12.), jp.deg2rad(12.)))
+        posture = posture.at[:2].set(jp.clip(posture[:2], -jp.deg2rad(15.), jp.deg2rad(15.)))
         posture = jp.where(global_known, posture, jp.zeros(3))
+        accepted = accepted.at[21].set(jp.clip(jp.where(stride < 1., (stride-1.)/.5, (stride-1.)/.3), -1., 1.))
         projection = jp.where(known, jp.linalg.norm(plan['selected_world'][:, :2]-requested, axis=-1), 0.)
         max_stride = jp.max(jp.where(checks['feasible'], supervisor.STRIDE_SCALES, 0.))
         # Refinement must preserve the combined landing support margin too.
@@ -261,7 +276,7 @@ class AdaptiveGaitEnv(HexapodRoughTerrainEnv):
         for name in ('world', 'pre', 'clearance', 'required', 'apex_phase', 'transfer'):
             fallback = reference_plan[name][leg, jp.maximum(reference_index, 0)]
             plan['selected_'+name] = jp.where(combo_ok, plan['selected_'+name], fallback)
-        selected = jp.where(combo_ok, selected, reference_index)
+        selected = jp.where(combo_ok, selected, jp.where(reference_index >= 0, LOCAL_CENTER_INDEX, -1))
         accepted = accepted.at[:18].set(jp.where(combo_ok, accepted[:18], 0.))
         # Explicit blind mode is nominal controller debugging, never hybrid fallback.
         if self.perception == 'blind':
@@ -273,7 +288,11 @@ class AdaptiveGaitEnv(HexapodRoughTerrainEnv):
             plan['selected_clearance'] = jp.full(6, fw.SWING_HEIGHT)
             plan['selected_apex_phase'], plan['selected_transfer'] = jp.full(6, .5), jp.full(6, .5)
             proposal_safe, accepted, posture = jp.ones(6, dtype=jp.bool_), jp.zeros(adaptive.ACTION_SIZE), jp.zeros(3)
+        projection = jp.where(known, jp.linalg.norm(plan['selected_world'][:, :2]-requested, axis=-1), 0.)
         plan.update(time=data.time, reference_index=reference_index, reference_world=ref, selected_index=selected,
+                    wide_xy=reference_plan['xy'], wide_height=reference_plan['height'],
+                    wide_status=reference_plan['status'], wide_nominal=reference_plan['nominal'],
+                    local_extent=residual_extent(neutral_local['safe'] & (reference_index >= 0)[:, None]),
                     requested_xy=requested, selected_known=known, proposal_safe=proposal_safe,
                     residual_rejected=(reference_index >= 0) & (~residual_ok | ~combo_ok),
                     projection=projection, accepted_action=accepted, posture=posture, stride=stride, period=period,
@@ -342,8 +361,9 @@ class AdaptiveGaitEnv(HexapodRoughTerrainEnv):
         ref_body = jp.stack((-model_ref[:, 1], model_ref[:, 0], model_ref[:, 2]), axis=-1)
         ref_known = plan['reference_index'] >= 0
         reference_obs = jp.concatenate((jp.where(ref_known[:, None], ref_body, 0.),
-            jp.where(ref_known, jp.linalg.norm(ref_world[:, :2]-plan['nominal'][:, :2], axis=-1), 0.)[:, None],
-            ref_known.astype(jp.float32)[:, None]), axis=-1)
+            jp.where(ref_known, jp.linalg.norm(ref_world[:, :2]-plan['wide_nominal'][:, :2], axis=-1), 0.)[:, None],
+            ref_known.astype(jp.float32)[:, None],
+            plan['local_extent']/jp.array((.06, .06, .04, .04))), axis=-1)
         # vy command is explicitly zero in this MJX bridge; do not imply lateral
         # command support that the inherited firmware interface does not provide.
         foot_surface = data.site_xpos[self._foot_site_ids, 2]-FOOT_RADIUS
@@ -373,7 +393,8 @@ class AdaptiveGaitEnv(HexapodRoughTerrainEnv):
         state.metrics.update({name: jp.asarray(0.) for name in (
             'map_known_fraction', 'map_mae_m', 'map_compared_count', 'lidar_returns',
             'plan_rejected', 'projection_m', 'touchdown_error_m', 'foot_slip',
-            'stride_scale', 'phase_duration_s', 'pitch_target_rad', 'foothold_center_known_fraction',
+            'efficiency_joint_speed', 'efficiency_vertical_speed', 'efficiency_foot_travel', 'efficiency_excess_clearance',
+            'efficiency_tiny_stride', 'stride_scale', 'phase_duration_s', 'pitch_target_rad', 'foothold_center_known_fraction',
             'foothold_coverage_fraction', 'foothold_terrain_fraction', 'foothold_ik_fraction',
             'foothold_safe_fraction', 'foothold_selected_fraction', 'foothold_residual_rejected_fraction',
             'gait_mode', 'supervisor_mode', 'max_feasible_stride', 'support_margin', 'gait_switch',
@@ -463,6 +484,17 @@ class AdaptiveGaitEnv(HexapodRoughTerrainEnv):
         penalty = self.dt*(.5*result.info['projection_m']/.04 + .2*slip +
                           .5*jp.mean(plan['residual_rejected'].astype(jp.float32))) + 2.*landing_error
         penalty += self.dt*.005*(cs.scheduler.mode == scheduler.WAVE) + .01*switched
+        # Dimensionless efficiency proxies, not measured servo electrical power.
+        joint_speed = jp.mean((result.data.qvel[self._joint_qvel_ids]/5.)**2)
+        vertical_speed = (result.data.qvel[2]/.2)**2
+        foot_travel = jp.mean(jp.linalg.norm(feet-previous_feet, axis=-1))/self.dt
+        excess_clearance = jp.mean(jp.maximum(cs.swing_clearance-plan['selected_required']-.06, 0.))
+        tiny_stride = jp.maximum(1.-cs.stride_scale, 0.) * plan['tripod_feasible'][1]
+        penalty += self.dt*(.002*joint_speed + .002*vertical_speed + .003*foot_travel +
+                            .02*excess_clearance + .003*tiny_stride)
+        result.metrics.update(efficiency_joint_speed=joint_speed, efficiency_vertical_speed=vertical_speed,
+            efficiency_foot_travel=foot_travel, efficiency_excess_clearance=excess_clearance,
+            efficiency_tiny_stride=tiny_stride)
         return result.replace(reward=result.reward-penalty, obs=self._get_obs(result.data, result.info))
 
     @property

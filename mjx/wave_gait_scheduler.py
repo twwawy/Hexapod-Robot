@@ -1,4 +1,4 @@
-"""JAX contact scheduler port of main 90a8950 gait-manager semantics.
+"""JAX contact scheduler port of main 9752c760 (also de77791d) gait-manager semantics.
 
 Hardware raw/confirmed FSR is represented by policy-rate MJX contact input.
 The environment supplies confirmed contacts; stale 5-ms repeats are not samples.
@@ -8,8 +8,7 @@ import jax.numpy as jp
 
 TRIPOD, WAVE = 0, 1
 WAVE_ORDER = jp.array((0, 5, 1, 3, 2, 4), dtype=jp.int32)
-TRIPOD_PHASE_S = .5
-WAVE_PHASE_S = 1.
+from adaptive_contract import TRIPOD_PHASE_S, WAVE_PHASE_S
 WAVE_SPEED_SCALE = .2
 WAVE_STANCE_PHASES = 5.
 START_DELAY_S = .1

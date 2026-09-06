@@ -96,10 +96,15 @@ class HybridSafetyTest(unittest.TestCase):
                     state=jp.array([scheduler.SWING]+[scheduler.HOLD]*5), progress=jp.zeros(6), startup=False)
         prepared = initial._replace(proposal_end=end, proposal_clearance=jp.full(6, .08))
         updates, _ = controller._foot_trajectory(prepared, gait, jp.zeros(4), True)
-        latched = prepared._replace(**updates)._replace(proposal_end=end+1.)
+        latched = prepared._replace(**updates)._replace(proposal_end=end+1.,
+            proposal_clearance=jp.full(6,.18),proposal_apex_phase=jp.full(6,.7),
+            proposal_transfer=jp.full(6,.65),proposal_mode=jp.asarray(scheduler.WAVE))
         gait['entering'] = jp.zeros(6, dtype=bool)
         again, _ = controller._foot_trajectory(latched, gait, jp.zeros(4), True)
         np.testing.assert_allclose(again['swing_end'][0], end[0])
+        self.assertAlmostEqual(float(again['swing_clearance'][0]),.08,places=6)
+        self.assertAlmostEqual(float(again['apex_phase'][0]),.5,places=6)
+        self.assertAlmostEqual(float(again['transfer'][0]),.5,places=6)
 
 
 if __name__ == '__main__':

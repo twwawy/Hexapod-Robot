@@ -10,8 +10,8 @@ import jax.numpy as jp
 import firmware_mjx_controller as fw
 import wave_gait_scheduler as scheduler
 
-ACTION_SIZE = 24
-ACTION_CONTRACT = 'adaptive_hybrid_geometry_residual_24_v3'
+from adaptive_contract import ACTION_SIZE, ACTION_CONTRACT, XY_LIMIT_M, BODY_HEIGHT_LIMIT_M
+from adaptive_contract import MAX_LINEAR_SPEED_MPS, MAX_YAW_RATE_RADPS
 LEG_ORDER = ('RF', 'RM', 'RB', 'LF', 'LM', 'LB')
 AdaptiveState = namedtuple('AdaptiveState', fw.FirmwareState._fields + (
     'request', 'proposal_end', 'proposal_known', 'proposal_safe', 'proposal_clearance',
@@ -30,8 +30,8 @@ AdaptiveState = namedtuple('AdaptiveState', fw.FirmwareState._fields + (
 def initial_state():
     return AdaptiveState(*fw.initial_state(), jp.zeros(ACTION_SIZE), fw.BASE_FEET,
                          jp.zeros(6, dtype=jp.bool_), jp.ones(6, dtype=jp.bool_), jp.full(6, .06),
-                         jp.zeros(3), jp.asarray(1.), jp.asarray(.5),
-                         jp.asarray(.5), jp.asarray(1.), fw.BASE_FEET, jp.full(6, .06),
+                         jp.zeros(3), jp.asarray(1.), jp.asarray(1.),
+                         jp.asarray(1.), jp.asarray(1.), fw.BASE_FEET, jp.full(6, .06),
                          jp.zeros(6, dtype=jp.bool_), jp.zeros(3), jp.zeros(ACTION_SIZE), jp.asarray(False),
                          jp.eye(3), jp.zeros(3), jp.zeros((6, 3)), jp.zeros((6, 3)),
                          jp.zeros(3), jp.asarray(0.),
@@ -44,8 +44,8 @@ def initial_state():
 def decode(action):
     a = jp.clip(action, -1., 1.)
     stride = 1. + jp.where(a[21] < 0., .5*a[21], .3*a[21])
-    posture = jp.array((a[18]*jp.deg2rad(5.), a[19]*jp.deg2rad(10.), a[20]*.03))
-    return a[:12].reshape(6, 2)*.04, a[12:18]*.04, posture, stride, a[22]*.15, a[23]*.15
+    posture = jp.array((a[18]*jp.deg2rad(5.), a[19]*jp.deg2rad(10.), a[20]*BODY_HEIGHT_LIMIT_M))
+    return a[:12].reshape(6, 2)*jp.asarray(XY_LIMIT_M), a[12:18]*.04, posture, stride, a[22]*.15, a[23]*.15
 
 
 def planned_swing(progress, start, end, clearance, apex_phase=.5, transfer=.5):
@@ -92,6 +92,10 @@ from firmware_mjx_controller import (
     _swing,
     apply_joint_sign_pattern
 )
+
+
+MAX_LINEAR_SPEED = MAX_LINEAR_SPEED_MPS
+MAX_YAW_RATE = MAX_YAW_RATE_RADPS
 
 
 def _preview_gait(candidate: jax.Array, posture: jax.Array, duration: jax.Array) -> jax.Array:
@@ -245,7 +249,7 @@ def step(
         candidate_twist - state.previous_twist, -twist_step, twist_step
     )
 
-    gait_preview_valid = _preview_gait(candidate_twist, state.posture_command, state.phase_duration)
+    gait_preview_valid = jp.asarray(True)  # geometry bank + actual planned_swing preflight below
     gait_accepted = state.first_step | gait_preview_valid
     gait_applied = jp.where(
         state.first_step,
@@ -288,16 +292,10 @@ def step(
         entering & ~blocked, state.request[12:18], state.accepted_action[12:18]))
     accepted_action = accepted_action.at[18:].set(jp.where(boundary, state.request[18:], state.accepted_action[18:]))
     goal_world = jp.where((entering & ~blocked)[:, None], state.proposal_world, state.goal_world)
-    # A landing patch stays fixed in world coordinates, but only this controller
-    # converts it to its own pre-posture trajectory frame and updates memory.
-    model_goal = (goal_world + jp.array((0., 0., .032)) - state.root_position) @ state.root_rotation
-    body_goal = jp.stack((-model_goal[:, 1], model_goal[:, 0], model_goal[:, 2]), axis=-1)
-    pre_goal = body_goal @ fw._rotation_matrix(state.posture_command).T
-    pre_goal = pre_goal.at[:, 2].add(jp.clip(height_offset, -.10, .10))
-    mapped = state.active_known | (entering & state.proposal_known)
-    trajectory_state = state._replace(phase_duration=phase_duration, scheduler=gait_updates['scheduler'],
-        proposal_end=jp.where(state.proposal_known[:, None], pre_goal, state.proposal_end),
-        swing_end=jp.where(mapped[:, None], pre_goal, state.swing_end))
+    # Execution endpoints live in the phase-entry pre-posture controller frame.
+    # Freeze this exact endpoint like STM32; map/world metadata is diagnostic.
+    trajectory_state = state._replace(phase_duration=phase_duration,
+                                     scheduler=gait_updates['scheduler'])
     foot_updates, nominal_feet = _foot_trajectory(
         trajectory_state, gait, gait_applied, tripod_enable
     )

@@ -45,6 +45,7 @@ def main():
     from foothold_preview_runtime import add_sphere, draw_mid360_fov
     from adaptive_foothold_estimator import CANDIDATE_COUNT, STATUS_NAMES
     from adaptive_gait_controller import LEG_ORDER, ACTION_SIZE
+    from firmware_mjx_controller import _rotate_inverse
     from hybrid_gait_supervisor import MODE_NAMES
 
     policy, metadata = load_policy(args.checkpoint) if args.checkpoint else (None, None)
@@ -86,7 +87,7 @@ def main():
           ('NEW CHECKPOINT' if policy else 'ZERO ACTION, NO TRAINED POLICY'), flush=True)
     print('Arrows: speed/yaw; Space: stop; Enter: pause; H: reset; C: clear map; M: map; G: LiDAR FOV; B: rejected candidates; P: save trace', flush=True)
     print('MID-360 FOV: H360 V[-7,+52]deg; orange=lower, blue=upper; wires show angular limits, not returns.', flush=True)
-    print('Candidates: gray=unknown yellow=coverage orange=edge/rough blue=IK purple=path green=safe; white=reference red=selected/latched.', flush=True)
+    print('Candidates: gray=unknown yellow=coverage orange=edge/rough blue=IK purple=path green=safe; white=wide reference cyan=request orange=projected red=latched; local XY grid 3/2 cm shares 5 cm map cells.', flush=True)
     if perception == 'oracle':
         print('DEBUG GT ORACLE: terrain and path queries are 100% known; no LiDAR scans, no RL policy.', flush=True)
 
@@ -200,14 +201,21 @@ def main():
                                       (1., .4, .05, .9), (.15, .35, 1., .95), (.7, .15, 1., .95), (.1, .9, .25, .9))
                             sphere(scene, (*plan['xy'][leg, candidate], plan['height'][leg, candidate]+.01),
                                    .009, colors[status])
+                    add_sphere(scene, plan['wide_nominal'][leg]+np.array((0., 0., .01)),
+                               .007, (.5, .5, 1., .8), f'{LEG_ORDER[leg]} nominal')
                     if plan['reference_index'][leg] >= 0:
+                        add_sphere(scene, np.array((*plan['requested_xy'][leg], plan['reference_world'][leg, 2]+.065)),
+                                   .009, (0., 1., 1., 1.), f'{LEG_ORDER[leg]} RL request')
                         add_sphere(scene, plan['reference_world'][leg]+np.array((0., 0., .025)),
                                    .011, (1., 1., 1., .9), f'{LEG_ORDER[leg]} ref')
                     if plan['selected_index'][leg] >= 0:
                         add_sphere(scene, plan['selected_world'][leg]+np.array((0., 0., .05)),
-                                   .012, (1., .15, .05, 1.), f'{LEG_ORDER[leg]} selected')
+                                   .012, (1., .5, .05, 1.), f'{LEG_ORDER[leg]} selected')
                     if cs.active_known[leg]:
-                        add_sphere(scene, cs.goal_world[leg]+np.array((0., 0., FOOT_RADIUS)),
+                        pre = jp.asarray(cs.swing_end[leg]).at[2].add(-cs.height_applied)
+                        body = np.asarray(_rotate_inverse(pre, jp.asarray(cs.posture_command)))
+                        execution_world = np.asarray(cs.root_position) + np.asarray(cs.root_rotation) @ np.array((body[1], -body[0], body[2]))
+                        add_sphere(scene, execution_world,
                                    .019, (.8, .03, .02, 1.), f'{LEG_ORDER[leg]} latched')
             viewer.sync()
             if display.time-last_log >= 1.:

@@ -9,9 +9,13 @@ import jax.numpy as jp
 import adaptive_gait_controller as adaptive
 import firmware_mjx_controller as fw
 from adaptive_gait_perception import MAX_AGE, RESOLUTION
+from adaptive_contract import XY_LIMIT_M
 
 SEARCH_RADIUS = .08
-RESIDUAL_RADIUS = .04
+RESIDUAL_X, RESIDUAL_Y = XY_LIMIT_M
+RESIDUAL_OFFSETS = jp.array([(x, y) for x in (-.06, -.03, 0., .03, .06)
+                            for y in (-.04, -.02, 0., .02, .04)])
+LOCAL_CENTER_INDEX = 12
 CANDIDATE_COUNT = 25
 CANDIDATE_OFFSETS = jp.array([(x, y) for x in (-.08, -.04, 0., .04, .08)
                             for y in (-.08, -.04, 0., .04, .08)])
@@ -81,6 +85,26 @@ def edge_distance(height, known, spread):
     cell_dist = jp.maximum(jp.linalg.norm(EDGE_OFFSETS, axis=-1)-RESOLUTION/jp.sqrt(2.), 0.)
     edge = jp.minimum(edge, jp.min(jp.where(cell_edge, cell_dist, jp.inf), axis=-1))
     return jp.minimum(edge, .15), jp.isfinite(edge)
+
+
+def local_candidate_xy(reference_world, basis):
+    """Actual endpoints, independent of 5-cm terrain lookup cells."""
+    return reference_world[:, None, :2] + RESIDUAL_OFFSETS[None, :, :] @ basis
+
+
+def project_local_candidates(xy, safe, requested):
+    distance = jp.linalg.norm(xy-requested[:, None, :], axis=-1)
+    valid = jp.any(safe, axis=1)
+    index = jp.argmin(jp.where(safe, distance, jp.inf), axis=1)
+    return jp.where(valid, index, -1), valid
+
+
+def residual_extent(safe):
+    """Per-axis extrema, not a claim that the interior rectangle is all safe."""
+    lo = jp.min(jp.where(safe[..., None], RESIDUAL_OFFSETS, jp.inf), axis=1)
+    hi = jp.max(jp.where(safe[..., None], RESIDUAL_OFFSETS, -jp.inf), axis=1)
+    bounds = jp.stack((lo[:, 0], hi[:, 0], lo[:, 1], hi[:, 1]), axis=-1)
+    return jp.where(jp.any(safe, axis=1)[:, None], bounds, 0.)
 
 
 def evaluate_candidates(env, data, info, xy, nominal, basis, lift, *, apex_delta=0., transfer_delta=0., privileged=False):
@@ -156,7 +180,8 @@ def evaluate_candidates(env, data, info, xy, nominal, basis, lift, *, apex_delta
         neg = line[..., 1].astype(jp.float32) + (line[..., 1] & line[..., 0]).astype(jp.float32)
         pos = line[..., 3].astype(jp.float32) + (line[..., 3] & line[..., 4]).astype(jp.float32)
         lengths.append(jp.where(line[..., 2], (1.+neg+pos)*RESOLUTION, 0.))
-    features = jp.concatenate((jp.broadcast_to(CANDIDATE_OFFSETS, (6, CANDIDATE_COUNT, 2))/SEARCH_RADIUS,
+    offsets = (xy-nominal[:, None, :2]) @ jp.linalg.inv(basis)
+    features = jp.concatenate((offsets/SEARCH_RADIUS,
         jp.stack((jp.where(quality['center_known'], relative/.2, 0.), quality['center_known'].astype(jp.float32),
             quality['coverage'], terrain_ok.astype(jp.float32), safe.astype(jp.float32),
             jp.clip(quality['spread']/.05, 0., 5.), jp.clip(age[..., 0]/MAX_AGE, 0., 1.),

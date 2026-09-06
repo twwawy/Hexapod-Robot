@@ -10,7 +10,7 @@ from adaptive_gait_env import ACTOR_SIZE, CRITIC_SIZE, OBSERVATION_CONTRACT, REW
 from adaptive_gait_perception import GRID_N, RESOLUTION, MAX_AGE, SENSOR_PERIOD
 from lidar_extrinsics import measurement_metadata
 from adaptive_foothold_estimator import (
-    CANDIDATE_COUNT, SEARCH_RADIUS, RESIDUAL_RADIUS, MIN_COVERAGE,
+    CANDIDATE_COUNT, SEARCH_RADIUS, RESIDUAL_X, RESIDUAL_Y, RESIDUAL_OFFSETS, MIN_COVERAGE,
     MAX_PLANE_RESIDUAL, MAX_SLOPE_RAD, EDGE_JUMP, EDGE_CLEARANCE, PATH_SAMPLES,
 )
 
@@ -24,7 +24,7 @@ def network_factory():
 
 def contract(env):
     root = Path(__file__).resolve().parent
-    sources = ('adaptive_gait_controller.py', 'adaptive_gait_env.py', 'adaptive_gait_perception.py',
+    sources = ('adaptive_contract.py', 'adaptive_gait_controller.py', 'adaptive_gait_env.py', 'adaptive_gait_perception.py',
                'adaptive_foothold_estimator.py', 'foothold_feasibility.py',
                'hybrid_gait_supervisor.py', 'wave_gait_scheduler.py',
                'adaptive_gait_policy.py', 'firmware_mjx_controller.py', 'rough_terrain_env.py',
@@ -37,9 +37,9 @@ def contract(env):
         gait_mode=env.gait_mode,
         action_slices={'xy': [0, 12], 'clearance': [12, 18], 'roll_pitch_height': [18, 21],
                        'stride': 21, 'apex_phase': 22, 'transfer_timing': 23},
-        limits=dict(xy_m=.04, clearance_residual_m=.04, clearance_m=[.04, .18],
+        limits=dict(xy_x_m=.06, xy_y_m=.04, clearance_residual_m=.04, clearance_m=[.04, .18],
                     pitch_deg=10., roll_deg=5., height_m=.03, stride=[.5, 1.3],
-                    tripod_phase_s=[.25, .7], wave_phase_s=[.6, 1.4], timing_residual=.15),
+                    tripod_phase_s=[.5, 1.4], wave_phase_s=[.6, 1.4], timing_residual=.15),
         frames='controller forward/left/up; model forward -Y, left +X; map world XY; metres/radians/seconds',
         geometry='230 mm distal training link; 32 mm sphere centre is IK endpoint',
         joint_order=[f'{leg}_{joint}' for leg in LEG_ORDER for joint in (1, 2, 3)],
@@ -53,7 +53,9 @@ def contract(env):
                    horizontal_fov_deg=360, vertical_fov_deg=[-7, 52], range_m=[.1, 8.],
                    dropout=env.sensor.dropout, noise_m=env.sensor.noise),
         candidates=dict(per_leg=CANDIDATE_COUNT, features=CANDIDATE_FEATURES,
-                        search_radius_m=SEARCH_RADIUS, residual_about_reference_m=RESIDUAL_RADIUS,
+                        search_radius_m=SEARCH_RADIUS, residual_about_reference_m=[RESIDUAL_X, RESIDUAL_Y],
+                        residual_offsets_m=RESIDUAL_OFFSETS.tolist(),
+                        shared_map_cells=True,
                         patch_radius_m=RESOLUTION, min_coverage=MIN_COVERAGE,
                         plane_residual_m=MAX_PLANE_RESIDUAL, max_slope_rad=MAX_SLOPE_RAD,
                         edge_jump_m=EDGE_JUMP, edge_clearance_m=EDGE_CLEARANCE,
