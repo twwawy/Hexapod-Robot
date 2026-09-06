@@ -551,10 +551,12 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
         config_overrides: Optional[dict[str, Any]] = None,
         *,
         terrain_level: int = 0,
+        rough_boxes: bool = False,
     ) -> None:
         spec = terrain_level_spec(terrain_level)
         self._terrain_level = terrain_level
         self._terrain_spec = spec
+        self._rough_boxes = rough_boxes
         self._terrain_total_rise = spec.final_height
         self._terrain_step_height = spec.stair_riser
         self._terrain_goal_x = spec.goal_x
@@ -574,12 +576,16 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
             raise ValueError("ctrl_dt must be an integer multiple of the 5 ms firmware tick")
         self._firmware_steps = int(round(ratio))
 
-        prepare_rl_scene(RL_SCENE_OUTPUT)
-        self._xml_path = str(RL_SCENE_OUTPUT)
+        scene_output = RL_SCENE_OUTPUT.with_name('hexapod_adaptive_rl.xml') if rough_boxes else RL_SCENE_OUTPUT
+        prepare_rl_scene(scene_output, rough_boxes=rough_boxes)
+        self._xml_path = str(scene_output)
         self._mj_model = mujoco.MjModel.from_xml_path(self._xml_path)
         self._mj_model.opt.timestep = self.sim_dt
         self._configure_terrain_geometry()
         self._configure_collision_masks()
+        if rough_boxes:
+            # Recompute geometry-derived bounds after configuring box heights.
+            mujoco.mj_setConst(self._mj_model, mujoco.MjData(self._mj_model))
         self._mjx_model = mjx.put_model(self._mj_model, impl=self._config.impl)
         template_data = mjx.make_data(
             self._mj_model,
@@ -683,6 +689,15 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
         self._set_geom_active("terrain_plateau", False, (0, 0, 0, 0))
 
         spec = self._terrain_spec
+        if self._rough_boxes:
+            from terrain_curriculum import rough_tile_heights
+            for index, height in enumerate(rough_tile_heights(spec.rough_amplitude)):
+                geom = self._set_geom_active(f'adaptive_rough_{index}', spec.kind == 'rough', (.32, .42, .31, 1.))
+                self._mj_model.geom_size[geom.id, 2] = max(height / 2, .0005)
+                self._mj_model.geom_pos[geom.id, 2] = max(height / 2, .0005)
+                self._mj_model.geom_group[geom.id] = 0 if spec.kind == 'rough' else 5
+            if spec.kind == 'rough':
+                return
         if spec.kind == "rough":
             self._set_geom_active(
                 "rough_hfield_geom", True, (0.32, 0.42, 0.31, 1.0)
@@ -790,6 +805,12 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
     def _terrain_height(self, xy: jax.Array) -> jax.Array:
         x, y = xy[..., 0], xy[..., 1]
         spec = self._terrain_spec
+        if self._rough_boxes and spec.kind == 'rough':
+            from terrain_curriculum import rough_tile_centers, rough_tile_heights, ROUGH_TILE_DEPTH, ROUGH_TILE_WIDTH
+            centers = jp.asarray(rough_tile_centers())
+            inside = jp.all(jp.abs(xy[..., None, :] - centers) <= jp.array((ROUGH_TILE_DEPTH/2, ROUGH_TILE_WIDTH/2)), axis=-1)
+            # On a shared tile boundary return the highest touching solid.
+            return jp.max(jp.where(inside, jp.asarray(rough_tile_heights(spec.rough_amplitude)), 0.), axis=-1)
         if spec.kind == "flat":
             return jp.zeros(x.shape)
         if spec.kind == "rough":

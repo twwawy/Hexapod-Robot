@@ -43,8 +43,6 @@ class AdaptiveGaitEnv(HexapodRoughTerrainEnv):
                  bootstrap_unmapped=True, action_profile='full',):
         if perception not in ('lidar', 'teacher', 'blind', 'oracle'):
             raise ValueError('perception must be lidar, teacher, blind or debug-only oracle')
-        if terrain_spec(terrain_level).kind == 'rough':
-            raise ValueError('MJX ray does not support hfields: use level 0, 3, 4 or 5..16')
         self.perception = perception
         if gait_mode not in ('hybrid', 'tripod', 'wave'):
             raise ValueError('gait_mode must be hybrid, tripod or wave')
@@ -96,7 +94,7 @@ class AdaptiveGaitEnv(HexapodRoughTerrainEnv):
         # Posture is owned by the parameter policy, not a terrain-kind sampler.
         config.command.height_min = config.command.height_max = 0.
         config.command.pitch_min_deg = config.command.pitch_max_deg = 0.
-        super().__init__(config=config, terrain_level=terrain_level)
+        super().__init__(config=config, terrain_level=terrain_level, rough_boxes=True)
         self._root_id = self.mj_model.body('hexapod').id
         self._home_qpos = self._home_qpos.at[2].set(-fw.BASE_FOOT_Z + FOOT_RADIUS)
         self.sensor = AngularLidar(self.mjx_model, self._root_id, azimuths, elevations, dropout, noise)

@@ -29,6 +29,7 @@
 | Stage0 viewer·표시·조작 | [viewer 사용법](docs/HEXAPOD_MJX_ADAPTIVE_GAIT_USAGE.md) |
 | 학습 단계 | [학습 계획](docs/HEXAPOD_MJX_ADAPTIVE_GAIT_LEARNING_PLAN.md) |
 | 짧은 평지 cycle 반복·cycle별 W&B score/영상 | [실행 명령 및 저장 규칙](docs/ADAPTIVE_OBSERVE_CYCLES.md) |
+| Rough hfield 오류 수정·평지 가중치에서 재개 | [adaptive box 지형과 명시적 이전](docs/ADAPTIVE_ROUGH_BOXES.md) |
 | 수 회 Tripod 후 정지·영상 종료 수정 | [원인·수정·사용자 검증 명령](docs/TRIPOD_STOP_FIX.md) |
 | Jetson ↔ STM32 wire | [SPI v3](docs/ADAPTIVE_SPI_V3.md) |
 | STM32 실제 contact/Wave 기준 | [Wave gait](SW/STM32/WAVE_GAIT.md) |

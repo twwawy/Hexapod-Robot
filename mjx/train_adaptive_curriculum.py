@@ -69,6 +69,8 @@ def read_json(path: Path) -> Any:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--migrate-flat-boxes', action='store_true',
+                        help='Reviewed flat checkpoint transfer on the first cycle only; requires --restore.')
 
     parser.add_argument(
         "--profile",
@@ -203,6 +205,8 @@ def main() -> None:
     )
 
     args = parser.parse_args()
+    if args.migrate_flat_boxes and not args.restore:
+        parser.error('--migrate-flat-boxes requires --restore')
 
     # ------------------------------------------------------------------
     # Validate
@@ -246,6 +250,12 @@ def main() -> None:
     )
     if args.profile == 'observe':
         curriculum = tuple(StageSpec(1, 0, 'tripod-flat') for _ in range(args.cycles))
+    # Validate all future stages before launching even the first training job.
+    from terrain_curriculum import terrain_level
+    for stage in curriculum:
+        spec = terrain_level(stage.terrain_level)
+        if spec.kind not in {'flat', 'rough', 'ramp', 'stairs'} or stage.gait_stage not in (1, 2, 3):
+            parser.error(f'Unsupported adaptive curriculum stage: {stage}')
 
     if not 0 <= args.start_index < len(curriculum):
         parser.error(
@@ -415,6 +425,8 @@ def main() -> None:
             ]
 
             command.append('--wandb' if args.wandb else '--no-wandb')
+            if args.migrate_flat_boxes and stage_index == args.start_index and retry == 0:
+                command.append('--migrate-flat-boxes')
 
             if args.wandb_entity:
                 command.extend(

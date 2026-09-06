@@ -358,7 +358,7 @@ def _add_terrain_pool(root: ET.Element) -> None:
     )
 
 
-def prepare_rl_scene(output: Path = RL_SCENE_OUTPUT) -> Path:
+def prepare_rl_scene(output: Path = RL_SCENE_OUTPUT, *, rough_boxes: bool = False) -> Path:
     import mujoco
 
     prepare_scene(SCENE_OUTPUT)
@@ -374,12 +374,28 @@ def prepare_rl_scene(output: Path = RL_SCENE_OUTPUT) -> Path:
     _strip_cad_meshes(root)
     _add_robot_colliders(root, source_model)
     _add_terrain_pool(root)
+    if rough_boxes:
+        from terrain_curriculum import rough_tile_centers, ROUGH_TILE_DEPTH, ROUGH_TILE_WIDTH
+        world = root.find('worldbody')
+        # Remove the unsupported type entirely: invisible hfields can still be
+        # encountered by a ray implementation's static dispatch.
+        old = world.find("geom[@name='rough_hfield_geom']")
+        old.attrib.pop('hfield')
+        old.set('type', 'box')
+        old.set('size', '.001 .001 .001')
+        old.set('group', '5')
+        asset = root.find('asset')
+        asset.remove(asset.find("hfield[@name='rough_hfield']"))
+        for index, (x, y) in enumerate(rough_tile_centers()):
+            ET.SubElement(world, 'geom', dict(name=f'adaptive_rough_{index}', type='box',
+                pos=_numbers((x, y, .0005)), size=_numbers((ROUGH_TILE_DEPTH/2, ROUGH_TILE_WIDTH/2, .0005)),
+                friction='1.1 0.01 0.001', **_hidden_attributes()))
 
     output.parent.mkdir(parents=True, exist_ok=True)
     ET.indent(tree, space="  ")
     tree.write(output, encoding="utf-8", xml_declaration=True)
     model = mujoco.MjModel.from_xml_path(str(output))
-    if model.ngeom >= 120:
+    if model.ngeom >= (152 if rough_boxes else 120):
         raise ValueError(f"RL collision model is unexpectedly large: {model.ngeom}")
     robot_mass = sum(
         float(model.body_mass[body_id]) for body_id in _robot_body_ids(model)

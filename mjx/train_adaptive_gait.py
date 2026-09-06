@@ -287,6 +287,8 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=__doc__,
     )
+    parser.add_argument('--migrate-flat-boxes', action='store_true',
+                        help='Explicit reviewed flat 786ff09 checkpoint transfer; requires --restore.')
 
     # -------------------------------------------------------
     # Adaptive environment
@@ -535,6 +537,8 @@ def parse_args() -> argparse.Namespace:
 )
 
     args = parser.parse_args()
+    if args.migrate_flat_boxes and not args.restore:
+        parser.error('--migrate-flat-boxes requires --restore')
 
     # -------------------------------------------------------
     # Validation
@@ -693,7 +697,7 @@ def main() -> None:
 
     if args.restore or args.init_teacher:
         restore, old = read_contract(
-            args.restore or args.init_teacher
+            args.restore or args.init_teacher, migrate_flat_boxes=args.migrate_flat_boxes
         )
 
         expected_source = (
@@ -759,6 +763,11 @@ def main() -> None:
     # -----------------------------------------------------------------------
 
     metadata = contract(env)
+    if args.migrate_flat_boxes:
+        if old.get('action_profile') != args.action_profile:
+            raise ValueError('Migration must preserve the source action_profile')
+        metadata['explicit_migration'] = old['explicit_migration']
+        print('Explicit checkpoint migration: ' + json.dumps(metadata['explicit_migration']), flush=True)
 
     metadata["action_profile"] = args.action_profile
 

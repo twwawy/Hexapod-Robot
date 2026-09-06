@@ -62,6 +62,7 @@ def contract(env):
                         path_samples=PATH_SAMPLES, path_check='observed swept foot samples; not whole-body collision'),
         oracle_debug_only=env.perception == 'oracle',
         terrain_level=env.curriculum_level, terrain_description=env.terrain_description,
+        rough_representation='adaptive_boxes_8x4_v1',
         episode_length=env.episode_length, config=env._config.to_dict(),
         source_sha256={name: hashlib.sha256((root/name).read_bytes()).hexdigest() for name in sources},
         runtime_validation='left to user; no training or locomotion validation performed by agent')
@@ -79,7 +80,7 @@ def resolve_checkpoint(path):
     return max(candidates, key=lambda p: int(p.name))
 
 
-def read_contract(path):
+def read_contract(path, *, migrate_flat_boxes=False):
     path = resolve_checkpoint(path)
     manifest = path/'adaptive_contract.json'
     if not manifest.is_file():
@@ -91,13 +92,30 @@ def read_contract(path):
         if metadata.get(field) != expected:
             raise ValueError(f'Incompatible checkpoint {field}: {metadata.get(field)} != {expected}')
     root = Path(__file__).resolve().parent
+    if migrate_flat_boxes and metadata.get('terrain_level') != 0:
+        raise ValueError('Flat-to-box migration accepts only a flat terrain checkpoint')
+    migrated_sources = []
+    migration_files = {'adaptive_gait_env.py', 'rough_terrain_env.py', 'prepare_rl_scene.py', 'adaptive_gait_policy.py'}
     for name, expected in metadata['source_sha256'].items():
         source = (root/name).resolve()
-        if source.parent != root or hashlib.sha256(source.read_bytes()).hexdigest() != expected:
-            raise ValueError(f'Controller/source contract changed: {name}; replay with the recorded source revision')
+        if source.parent != root:
+            raise ValueError(f'Invalid contract source: {name}')
+        if hashlib.sha256(source.read_bytes()).hexdigest() != expected:
+            if not migrate_flat_boxes or name not in migration_files:
+                raise ValueError(f'Controller/source contract changed: {name}; replay with the recorded source revision')
+            # Only permit the reviewed flat checkpoint source, not arbitrary
+            # source-hash bypasses. Action/obs/network checks still apply.
+            previous = subprocess.check_output(['git', '-C', str(root.parent), 'show',
+                f'786ff09f284b290b4c499abd79159754642375bf:mjx/{name}'])
+            if hashlib.sha256(previous).hexdigest() != expected:
+                raise ValueError(f'Unreviewed migration source: {name}')
+            migrated_sources.append(name)
     network = json.loads((path/'ppo_network_config.json').read_text())
     if network['action_size'] != ACTION_SIZE or network['observation_size'] != metadata['observation_size']:
         raise ValueError('Saved PPO network dimensions differ from adaptive contract')
+    if migrate_flat_boxes:
+        metadata['explicit_migration'] = dict(kind='flat_786ff09_to_boxes',
+                                             changed_sources=migrated_sources)
     return path, metadata
 
 
