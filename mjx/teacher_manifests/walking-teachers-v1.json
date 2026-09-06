@@ -1,0 +1,93 @@
+{
+  "description": "Level-matched frozen walking teachers for the 146-D command/posture student.",
+  "levels": {
+    "0": {
+      "v3_checkpoint": "terrain/firmware-terrain-adaptive-swing-v3-stage00-level0_20260825-184352_seed9/checkpoints/000001703936",
+      "v3_weight": 1.0,
+      "v2_xy_weight": 0.0
+    },
+    "1": {
+      "v3_checkpoint": "terrain/firmware-terrain-adaptive-swing-v3-stage02-level1_20260825-192147_seed11/checkpoints/000003407872",
+      "v3_weight": 0.8,
+      "v2_xy_weight": 0.0
+    },
+    "2": {
+      "v3_checkpoint": "terrain/firmware-terrain-adaptive-swing-v3-stage04-level2_20260825-201554_seed13/checkpoints/000001703936",
+      "v2_xy_checkpoint": "terrain/firmware-terrain-ik-safe-max3-v3-stage00-level2_20260825-120409_seed1/checkpoints/000003407872",
+      "v3_weight": 0.7,
+      "v2_xy_weight": 0.2
+    },
+    "3": {
+      "v3_checkpoint": "terrain/firmware-terrain-adaptive-swing-v3-stage06-level3_20260825-210601_seed15/checkpoints/000003407872",
+      "v2_xy_checkpoint": "terrain/firmware-terrain-ik-safe-max3-v3-stage00-level2_20260825-120409_seed1/checkpoints/000003407872",
+      "v3_weight": 0.5,
+      "v2_xy_weight": 0.15
+    },
+    "4": {
+      "v3_checkpoint": "terrain/firmware-terrain-adaptive-swing-v3-stage10-level4_20260825-223633_seed19/checkpoints/000003407872",
+      "v2_xy_checkpoint": "terrain/firmware-terrain-ik-safe-max3-v3-stage00-level2_20260825-120409_seed1/checkpoints/000003407872",
+      "v3_weight": 0.35,
+      "v2_xy_weight": 0.1
+    },
+    "5": {
+      "v3_checkpoint": "terrain/firmware-terrain-adaptive-swing-v3-fixed-stairs-stage13-level5_20260826-070747_seed22/checkpoints/000001703936",
+      "v2_xy_checkpoint": "terrain/firmware-terrain-ik-safe-max3-v3-stage00-level2_20260825-120409_seed1/checkpoints/000003407872",
+      "v3_weight": 0.25,
+      "v2_xy_weight": 0.05
+    },
+    "6": {
+      "v3_checkpoint": "terrain/firmware-terrain-adaptive-swing-v3-fixed-stairs-stage13-level5_20260826-070747_seed22/checkpoints/000001703936",
+      "v3_weight": 0.3,
+      "v2_xy_weight": 0.0
+    },
+    "7": {
+      "v3_checkpoint": "terrain/firmware-terrain-adaptive-swing-v3-fixed-stairs-stage13-level5_20260826-070747_seed22/checkpoints/000001703936",
+      "v3_weight": 0.25,
+      "v2_xy_weight": 0.0
+    },
+    "8": {
+      "v3_checkpoint": "terrain/firmware-terrain-adaptive-swing-v3-fixed-stairs-stage13-level5_20260826-070747_seed22/checkpoints/000001703936",
+      "v3_weight": 0.2,
+      "v2_xy_weight": 0.0
+    },
+    "9": {
+      "v3_checkpoint": "terrain/firmware-terrain-adaptive-swing-v3-fixed-stairs-stage13-level5_20260826-070747_seed22/checkpoints/000001703936",
+      "v3_weight": 0.15,
+      "v2_xy_weight": 0.0
+    },
+    "10": {
+      "v3_checkpoint": "terrain/firmware-terrain-adaptive-swing-v3-fixed-stairs-stage13-level5_20260826-070747_seed22/checkpoints/000001703936",
+      "v3_weight": 0.1,
+      "v2_xy_weight": 0.0
+    },
+    "11": {
+      "v3_checkpoint": "terrain/firmware-terrain-adaptive-swing-v3-fixed-stairs-stage13-level5_20260826-070747_seed22/checkpoints/000001703936",
+      "v3_weight": 0.15,
+      "v2_xy_weight": 0.0
+    },
+    "12": {
+      "v3_checkpoint": "terrain/firmware-terrain-adaptive-swing-v3-fixed-stairs-stage13-level5_20260826-070747_seed22/checkpoints/000001703936",
+      "v3_weight": 0.12,
+      "v2_xy_weight": 0.0
+    },
+    "13": {
+      "v3_checkpoint": "terrain/firmware-terrain-adaptive-swing-v3-fixed-stairs-stage13-level5_20260826-070747_seed22/checkpoints/000001703936",
+      "v3_weight": 0.1,
+      "v2_xy_weight": 0.0
+    },
+    "14": {
+      "v3_checkpoint": "terrain/firmware-terrain-adaptive-swing-v3-fixed-stairs-stage13-level5_20260826-070747_seed22/checkpoints/000001703936",
+      "v3_weight": 0.07,
+      "v2_xy_weight": 0.0
+    },
+    "15": {
+      "v3_checkpoint": "terrain/firmware-terrain-adaptive-swing-v3-fixed-stairs-stage13-level5_20260826-070747_seed22/checkpoints/000001703936",
+      "v3_weight": 0.03,
+      "v2_xy_weight": 0.0
+    },
+    "16": {
+      "v3_weight": 0.0,
+      "v2_xy_weight": 0.0
+    }
+  }
+}
