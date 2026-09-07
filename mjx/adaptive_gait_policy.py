@@ -6,7 +6,8 @@ from pathlib import Path
 import subprocess
 
 from adaptive_gait_controller import ACTION_CONTRACT, ACTION_SIZE, LEG_ORDER
-from adaptive_gait_env import ACTOR_SIZE, CRITIC_SIZE, OBSERVATION_CONTRACT, REWARD_CONTRACT, CANDIDATE_FEATURES
+from adaptive_gait_env import (ACTOR_SIZE, CRITIC_SIZE, OBSERVATION_CONTRACT, REWARD_CONTRACT,
+    CANDIDATE_FEATURES, COMPLETION_BONUS, STALL_PENALTY, PHYSICAL_FAILURE_PENALTY, TIMEOUT_PENALTY)
 from adaptive_gait_perception import GRID_N, RESOLUTION, MAX_AGE, SENSOR_PERIOD
 from lidar_extrinsics import measurement_metadata
 from adaptive_foothold_estimator import (
@@ -38,6 +39,8 @@ def contract(env):
                              resolution_m=GRID_RESOLUTION, channels=GRID_CHANNEL_NAMES,
                              frame='body yaw aligned forward/left, height relative to body Z'),
         reward_contract=REWARD_CONTRACT, action_size=ACTION_SIZE,
+        terminal_rewards=dict(success=COMPLETION_BONUS, no_progress=STALL_PENALTY,
+                              physical_failure=PHYSICAL_FAILURE_PENALTY, timeout=TIMEOUT_PENALTY),
         observation_size={'state': ACTOR_SIZE, 'privileged_state': CRITIC_SIZE},
         actor_source=env.perception, leg_order=LEG_ORDER,
         gait_mode=env.gait_mode, action_profile=env.action_profile,
@@ -86,7 +89,7 @@ def resolve_checkpoint(path):
     return max(candidates, key=lambda p: int(p.name))
 
 
-def read_contract(path, *, migrate_flat_boxes=False):
+def read_contract(path, *, migrate_flat_boxes=False, migrate_completion_reward=False):
     path = resolve_checkpoint(path)
     manifest = path/'adaptive_contract.json'
     if not manifest.is_file():
@@ -99,6 +102,10 @@ def read_contract(path, *, migrate_flat_boxes=False):
         if metadata.get(field) != expected:
             raise ValueError(f'Incompatible checkpoint {field}: {metadata.get(field)} != {expected}')
     root = Path(__file__).resolve().parent
+    old_reward = 'adaptive_hybrid_efficifent_progress_v4'
+    if metadata.get('reward_contract') != REWARD_CONTRACT:
+        if not migrate_completion_reward or metadata.get('reward_contract') != old_reward:
+            raise ValueError('Reward contract changed; use --migrate-completion-reward for reviewed grid-v5 weights')
     if migrate_flat_boxes and metadata.get('terrain_level') != 0:
         raise ValueError('Flat-to-box migration accepts only a flat terrain checkpoint')
     migrated_sources = []
@@ -108,6 +115,13 @@ def read_contract(path, *, migrate_flat_boxes=False):
         if source.parent != root:
             raise ValueError(f'Invalid contract source: {name}')
         if hashlib.sha256(source.read_bytes()).hexdigest() != expected:
+            if migrate_completion_reward and name in {'adaptive_gait_env.py', 'adaptive_gait_policy.py'}:
+                previous = subprocess.check_output(['git', '-C', str(root.parent), 'show',
+                    f'6cba853:mjx/{name}'])
+                if hashlib.sha256(previous).hexdigest() != expected:
+                    raise ValueError(f'Unreviewed completion reward migration source: {name}')
+                migrated_sources.append(name)
+                continue
             if not migrate_flat_boxes or name not in migration_files:
                 raise ValueError(f'Controller/source contract changed: {name}; replay with the recorded source revision')
             # Only permit the reviewed flat checkpoint source, not arbitrary
@@ -123,6 +137,10 @@ def read_contract(path, *, migrate_flat_boxes=False):
     if migrate_flat_boxes:
         metadata['explicit_migration'] = dict(kind='flat_786ff09_to_boxes',
                                              changed_sources=migrated_sources)
+    if migrate_completion_reward:
+        metadata['explicit_migration'] = dict(kind='grid_v5_completion_reward',
+            old_reward=metadata.get('reward_contract'), new_reward=REWARD_CONTRACT,
+            changed_sources=migrated_sources, transfer='weights; reward scores are not comparable')
     return path, metadata
 
 

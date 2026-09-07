@@ -78,6 +78,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--migrate-flat-boxes', action='store_true',
                         help='Reviewed flat checkpoint transfer on the first cycle only; requires --restore.')
+    parser.add_argument('--migrate-completion-reward', action='store_true',
+                        help='Transfer reviewed grid v5 checkpoint to completion reward on first cycle only.')
 
     parser.add_argument(
         "--profile",
@@ -95,6 +97,7 @@ def main() -> None:
     parser.add_argument('--batch-size', type=int, default=64)
     parser.add_argument('--num-minibatches', type=int, default=4)
     parser.add_argument('--num-eval-envs', type=int, default=4)
+    parser.add_argument('--discounting', type=float, default=.997)
     parser.add_argument('--baseline-comparison-seconds', type=float, default=None,
                         help='Cycle-end paired check; default 20s for teacher profile, otherwise disabled.')
 
@@ -145,7 +148,7 @@ def main() -> None:
     parser.add_argument(
         "--best-video-duration",
         type=float,
-        default=12.0,
+        default=40.0,
         help="Seconds rendered for each completed cycle's best-score video.",
     )
 
@@ -177,7 +180,7 @@ def main() -> None:
         type=int,
         default=2,
     )
-    parser.add_argument('--on-stage-failure', choices=('stop', 'advance'), default='stop',
+    parser.add_argument('--on-stage-failure', choices=('stop', 'advance'), default='advance',
                         help='After retries: stop, or advance with the final attempt best without claiming success.')
 
     parser.add_argument(
@@ -248,6 +251,10 @@ def main() -> None:
     if args.max_retries < 0:
         parser.error("--max-retries cannot be negative")
 
+    if args.migrate_completion_reward and (not args.restore or args.migrate_flat_boxes):
+        parser.error('--migrate-completion-reward requires --restore and excludes --migrate-flat-boxes')
+    if not 0. < args.discounting < 1.:
+        parser.error('--discounting must be between 0 and 1')
     if args.restore and args.init_teacher:
         parser.error("choose either --restore or --init-teacher")
 
@@ -447,8 +454,11 @@ def main() -> None:
 
             command.append('--wandb' if args.wandb else '--no-wandb')
             command.extend(['--baseline-comparison-seconds', str(comparison_seconds)])
+            command.extend(['--discounting', str(args.discounting)])
             if args.migrate_flat_boxes and stage_index == args.start_index and retry == 0:
                 command.append('--migrate-flat-boxes')
+            if args.migrate_completion_reward and stage_index == args.start_index and retry == 0:
+                command.append('--migrate-completion-reward')
 
             if args.wandb_entity:
                 command.extend(

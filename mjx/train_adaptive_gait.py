@@ -109,6 +109,7 @@ def render_policy_video(
 
     import jax
     import numpy as np
+    from collections import deque
     from PIL import Image
     import mujoco
     from mujoco import mjx
@@ -170,6 +171,8 @@ def render_policy_video(
 
     frames: list[Image.Image] = []
     frame_index = 0
+    diagnostic_tail = deque(maxlen=51)
+    trace_interval = max(1, round(.1/float(env.dt)))
 
     try:
         for control_step in range(control_steps):
@@ -189,6 +192,27 @@ def render_policy_video(
             done = bool(
                 np.asarray(state.done)
             )
+            if control_step % trace_interval == 0 or done:
+                cs = jax.device_get(state.info['controller_state'])
+                plan = jax.device_get(state.info['foothold_plan'])
+                diagnostic_tail.append(dict(
+                    time_s=float(state.data.time), action=np.asarray(action).tolist(),
+                    accepted_action=np.asarray(cs.accepted_action).tolist(),
+                    root_pose=np.asarray(state.data.qpos[:7]).tolist(),
+                    joints=np.asarray(state.data.qpos[env._joint_qpos_ids]).tolist(),
+                    command=np.asarray(state.info['command']).tolist(),
+                    raw_contacts=np.asarray(cs.raw_contacts).tolist(),
+                    confirmed_contacts=np.asarray(cs.confirmed_contacts).tolist(),
+                    scheduler={k: np.asarray(v).tolist() for k, v in cs.scheduler._asdict().items()},
+                    stride=float(cs.stride_scale), phase_duration_s=float(cs.phase_duration),
+                    posture=np.asarray(cs.adapt_posture).tolist(), height=float(cs.height_applied),
+                    clearance=np.asarray(cs.swing_clearance).tolist(),
+                    apex=np.asarray(cs.apex_phase).tolist(), transfer=np.asarray(cs.transfer).tolist(),
+                    latched_target=np.asarray(cs.goal_world).tolist(),
+                    candidate_status=np.asarray(plan['status']).tolist(),
+                    support_margin=float(plan['support_margin']), plan_permit=bool(plan['permit']),
+                    metrics={k: float(v) for k, v in state.metrics.items()
+                             if k.startswith(('termination/', 'hold_'))}))
 
             should_render = (
                 frame_index < requested_frames
@@ -273,6 +297,8 @@ def render_policy_video(
             if key.startswith("termination/") and float(np.asarray(value)) != 0.
         },
         "terrain_success": float(np.asarray(state.metrics.get("terrain_success", 0.))),
+        "trace_note": "Last approximately 5 s at 10 Hz of this video rollout; not a PPO evaluation trajectory",
+        "diagnostic_tail": list(diagnostic_tail),
     }
     output.with_suffix(".termination.json").write_text(json.dumps(report, indent=2) + "\n")
     print(f"Policy video termination: {report}", flush=True)
@@ -505,7 +531,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--best-video-duration",
         type=float,
-        default=20.0,
+        default=40.0,
     )
 
     parser.add_argument(
@@ -538,7 +564,15 @@ def parse_args() -> argparse.Namespace:
 
     parser.add_argument('--baseline-comparison-seconds', type=float, default=0.,
                         help='Cycle-end same-seed zero-action vs best-policy comparison; 0 disables.')
+    parser.add_argument('--migrate-completion-reward', action='store_true',
+                        help='Explicitly transfer reviewed v5-grid weights into new completion reward.')
+    parser.add_argument('--discounting', type=float, default=.997,
+                        help='PPO discount; .997 retains more delayed completion credit than .99.')
     args = parser.parse_args()
+    if not 0. < args.discounting < 1.:
+        parser.error('--discounting must be between 0 and 1')
+    if args.migrate_completion_reward and (not args.restore or args.migrate_flat_boxes):
+        parser.error('--migrate-completion-reward requires --restore and excludes --migrate-flat-boxes')
     if not math.isfinite(args.baseline_comparison_seconds) or args.baseline_comparison_seconds < 0:
         parser.error('--baseline-comparison-seconds must be finite and nonnegative')
     if args.migrate_flat_boxes and not args.restore:
@@ -701,7 +735,8 @@ def main() -> None:
 
     if args.restore or args.init_teacher:
         restore, old = read_contract(
-            args.restore or args.init_teacher, migrate_flat_boxes=args.migrate_flat_boxes
+            args.restore or args.init_teacher, migrate_flat_boxes=args.migrate_flat_boxes,
+            migrate_completion_reward=args.migrate_completion_reward
         )
 
         expected_source = (
@@ -767,13 +802,15 @@ def main() -> None:
     # -----------------------------------------------------------------------
 
     metadata = contract(env)
-    if args.migrate_flat_boxes:
+    if args.migrate_flat_boxes or args.migrate_completion_reward:
         if old.get('action_profile') != args.action_profile:
             raise ValueError('Migration must preserve the source action_profile')
         metadata['explicit_migration'] = old['explicit_migration']
         print('Explicit checkpoint migration: ' + json.dumps(metadata['explicit_migration']), flush=True)
 
     metadata["action_profile"] = args.action_profile
+    metadata['discounting'] = args.discounting
+    metadata['checkpoint_selection'] = 'terrain_success_then_score'
 
     metadata["initial_checkpoint"] = (
         str(restore)
@@ -1013,6 +1050,7 @@ def main() -> None:
             "score_key": args.score_key,
             "path": str(best_checkpoint),
             "metrics": best_metrics,
+            "selection": "terrain_success_then_score",
         }
 
         write_json(
@@ -1077,11 +1115,14 @@ def main() -> None:
             args.score_key
         )
 
+        success_rate = numeric.get('eval/episode_terrain_success', float('nan'))
+        previous_success = (best_metrics or {}).get('eval/episode_terrain_success', -math.inf)
         new_best = (
             step > 0
             and score is not None
             and math.isfinite(score)
-            and score > best_score
+            and math.isfinite(success_rate)
+            and (success_rate, score) > (previous_success, best_score)
         )
 
         if new_best:
@@ -1127,7 +1168,8 @@ def main() -> None:
         if wandb_run is not None:
             cycle_metrics = {}
             if best_step is not None:
-                cycle_metrics = {'cycle/best_score': best_score, 'cycle/best_step': best_step}
+                cycle_metrics = {'cycle/best_score': best_score, 'cycle/best_step': best_step,
+                                 'cycle/best_success_rate': best_metrics['eval/episode_terrain_success']}
                 wandb_run.summary.update(cycle_metrics)
                 wandb_run.summary['cycle/score_key'] = args.score_key
             wandb_run.log(
@@ -1497,7 +1539,7 @@ def main() -> None:
 
             learning_rate=args.learning_rate,
             entropy_cost=args.entropy_cost,
-            discounting=0.99,
+            discounting=args.discounting,
 
             unroll_length=20,
 

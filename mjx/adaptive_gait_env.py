@@ -29,7 +29,11 @@ from adaptive_foothold_estimator import (
 )
 
 OBSERVATION_CONTRACT = 'adaptive_hybrid_elevation_grid24x24x6_v5'
-REWARD_CONTRACT = 'adaptive_hybrid_efficifent_progress_v4'
+REWARD_CONTRACT = 'adaptive_completion_outcome_v5'
+COMPLETION_BONUS = 120.
+STALL_PENALTY = -60.
+PHYSICAL_FAILURE_PENALTY = -80.
+TIMEOUT_PENALTY = -40.
 PROPRIO_SIZE = 157
 GLOBAL_SIZE = 23
 REFERENCE_SIZE = 6*9
@@ -97,6 +101,9 @@ class AdaptiveGaitEnv(HexapodRoughTerrainEnv):
         # Posture is owned by the parameter policy, not a terrain-kind sampler.
         config.command.height_min = config.command.height_max = 0.
         config.command.pitch_min_deg = config.command.pitch_max_deg = 0.
+        # Adaptive terminal outcomes are added after the legacy per-step clip.
+        # Leave legacy environment/controller reward defaults untouched.
+        config.success_bonus = config.failure_penalty = config.no_progress_penalty = 0.
         super().__init__(config=config, terrain_level=terrain_level, rough_boxes=True)
         self._root_id = self.mj_model.body('hexapod').id
         self._home_qpos = self._home_qpos.at[2].set(-fw.BASE_FOOT_Z + FOOT_RADIUS)
@@ -522,6 +529,7 @@ class AdaptiveGaitEnv(HexapodRoughTerrainEnv):
             'scheduler_fault', 'hold_planner_s', 'hold_contact_wait_s', 'hold_map_unknown_s',
             'hold_surface_rejected_s', 'hold_ik_rejected_s', 'hold_path_rejected_s',
             'hold_support_rejected_s', 'bootstrap_classical_s', 'stride_preference_projected_s',
+            'reward/timeout', 'termination/timeout',
             'oracle_safe_recall', 'oracle_false_safe', 'oracle_unknown_fraction',
             'oracle_foothold_error_m', 'oracle_compared', 'oracle_edge_recall', 'oracle_edge_precision', 'action_authority_mean',)})
         return state
@@ -644,7 +652,22 @@ class AdaptiveGaitEnv(HexapodRoughTerrainEnv):
         result.metrics.update(efficiency_joint_speed=joint_speed, efficiency_vertical_speed=vertical_speed,
             efficiency_foot_travel=foot_travel, efficiency_excess_clearance=excess_clearance,
             efficiency_tiny_stride=tiny_stride, action_authority_mean=jp.mean(self.action_scale),)
-        return result.replace(reward=result.reward-penalty, obs=self._get_obs(result.data, result.info))
+        success = result.metrics['terrain_success'] > 0.
+        stalled = result.metrics['termination/no_progress'] > 0.
+        physical = jp.any(jp.stack([value > 0. for key, value in result.metrics.items()
+            if key.startswith('termination/') and key not in ('termination/no_progress', 'termination/timeout')]))
+        timeout = (result.info['policy_steps'] >= self.episode_length) & ~result.done.astype(jp.bool_)
+        # Exactly one terminal class; physical safety failures outrank stalls.
+        completed = success & ~physical
+        stall_only = stalled & ~physical & ~completed
+        result.metrics['reward/success'] = jp.where(completed, COMPLETION_BONUS, 0.)
+        result.metrics['reward/failure'] = jp.where(physical, PHYSICAL_FAILURE_PENALTY, 0.)
+        result.metrics['reward/no_progress'] = jp.where(stall_only, STALL_PENALTY, 0.)
+        result.metrics['reward/timeout'] = jp.where(timeout, TIMEOUT_PENALTY, 0.)
+        result.metrics['termination/timeout'] = timeout.astype(jp.float32)
+        outcome = sum(result.metrics['reward/'+key] for key in ('success', 'failure', 'no_progress', 'timeout'))
+        return result.replace(reward=result.reward-penalty+outcome,
+            done=jp.maximum(result.done, timeout.astype(jp.float32)), obs=self._get_obs(result.data, result.info))
 
     @property
     def action_size(self):

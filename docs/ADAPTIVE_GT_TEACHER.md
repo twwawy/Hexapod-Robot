@@ -1,5 +1,8 @@
 # GT teacher 우선 학습
 
+최신 변경은 [완주 보상·경사면 재개 명령](ADAPTIVE_COMPLETION_REWARD.md)을 먼저 확인한다.
+잔차 authority는 유지하고 완주율 우선 best 선택, 최대 40초 영상, 마지막 5초 진단을 추가했다.
+
 LiDAR coverage와 RL을 동시에 해결하려고 반복 학습하는 대신, 정확한 지형으로 보행
 전략을 먼저 학습한다. 새 `teacher` curriculum profile을 사용한다. 별도 Stage 0 프로세스는
 필수가 아니며 cycle 끝의 짧은 baseline 비교를 진단에 사용한다. 이 변경이 제어기 문제를
@@ -17,7 +20,7 @@ bash scripts/train_adaptive_curriculum.sh \
   --num-envs 512 --batch-size 128 --num-minibatches 4 \
   --num-evals 5 --num-eval-envs 8 --episode-length 8000 \
   --action-profile terrain_mid --baseline-comparison-seconds 20 \
-  --best-video-duration 12 --max-retries 1 --on-stage-failure stop \
+  --best-video-duration 40 --discounting .997 --max-retries 1 --on-stage-failure advance \
   --wandb --wandb-mode online
 ```
 
@@ -29,8 +32,8 @@ action/network contract는 이번 학습 orchestration 변경으로 바뀌지 �
 Tripod 순서: flat → ramp8 → stair5 → stair8 → rough25 → ramp15 → stair10 → rough50.
 이후 기존 Wave/Hybrid 단계를 이어간다. 단위와 지형 정의는 terrain_curriculum.py를 따른다.
 기존 fast/full/observe profile 순서는 유지한다.
-통과 기준 미달 시 한 번 재시도한 뒤 정지한다. 실패한 기초 보행으로 어려운 지형에
-계속 진입하지 않도록 추천 명령은 advance 대신 stop이다.
+통과 기준 미달 시 한 번 재시도한 뒤 미통과 기록과 함께 다음 지형으로 진행한다.
+기초 단계가 통과해야만 진행하려면 `--on-stage-failure stop`으로 명시한다.
 
 ## 기본 보행과 정책 비교
 
