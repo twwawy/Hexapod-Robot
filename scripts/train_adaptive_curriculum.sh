@@ -14,5 +14,5 @@ if [[ ! -x "$python_bin" ]]; then
 fi
 
 exec "$python_bin" -u \
-    "$repo/mjx/train_adaptive_curriculum.py" \
+    "$repo/mjx/launch_adaptive_curriculum.py" \
     "$@"

@@ -72,6 +72,23 @@ bash scripts/train_adaptive_curriculum.sh \
 새 task이므로 위 명령은 restore 없이 시작한다. `--episode-length 2000`은 40초로
 여러 명령 전환을 포함한다. 기존 계단 학습 run/checkpoint를 삭제하지 않는다.
 
+### 학습 중 코드 변경과 retry
+
+`scripts/train_adaptive_curriculum.sh`는 시작 시 현재 commit을 별도 detached
+worktree(`~/.cache/hexapod-training-sources/`)에 고정한다. 같은 run의 모든 retry와
+다음 stage는 그 소스로 실행되므로 개발 저장소 수정이 중간 retry에 섞이지 않는다.
+시작 로그의 `PINNED SOURCE`와 `SOURCE REVISION`을 보관한다. 실행 중 해당
+worktree를 수정/삭제하지 않는다. 저장 위치는 기존 `mjx/runs/adaptive-curriculum`이다.
+추적 파일에 미커밋 변경이 있으면 시작 전에 오류를 내므로 변경을 commit한 뒤 실행한다.
+untracked 파일은 복사되지 않는다. 모델/소스 의존 파일도 commit되어 있어야 한다.
+
+직접 `python mjx/train_adaptive_curriculum.py`나 `train_adaptive_gait.py`를 실행하면
+이 고정 기능이 적용되지 않는다. 이미 실행 중인 run에는 소급 적용되지 않는다.
+체크포인트 source hash 검증은 유지한다. 과거 계단 checkpoint를 새 RC task로
+자동 변환하지 않으며, 이번 RC 학습의 **첫 실행에는 `--restore`를 넣지 않는다.**
+이후 동일 RC run 내 retry/승급에서는 manager가 직전 checkpoint를 이어받는 것이 정상이다.
+학습·영상 생성·시뮬레이션 검증은 사용자가 실행한다.
+
 ## 기록
 
 - cycle best는 `command_success` 우선, 같은 성공률이면 reward로 선택한다.
