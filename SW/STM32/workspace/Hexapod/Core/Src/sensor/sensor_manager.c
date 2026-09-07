@@ -77,8 +77,18 @@ bool SensorManager_Update(
         handle->snapshot.gps.latitude_deg = gps_data.latitude_deg;    // 위도를 갱신한다.
         handle->snapshot.gps.longitude_deg = gps_data.longitude_deg;  // 경도를 갱신한다.
         handle->snapshot.gps.altitude_m = gps_data.height_m;          // 고도를 갱신한다.
+        handle->snapshot.gps.velocity_north_mps = gps_data.velocity_north_mps;  // 북쪽 속도를 갱신한다.
+        handle->snapshot.gps.velocity_east_mps = gps_data.velocity_east_mps;    // 동쪽 속도를 갱신한다.
+        handle->snapshot.gps.horizontal_accuracy_m = gps_data.horizontal_accuracy_m;  // 수평 정확도를 갱신한다.
+        handle->snapshot.gps.i_tow_ms = gps_data.i_tow_ms;            // GPS 시각을 갱신한다.
         handle->snapshot.gps.timestamp_ms = gps_data.mcu_time_ms;     // GPS 시각을 갱신한다.
+        handle->snapshot.gps.fix_type = gps_data.fix_type;            // Fix 종류를 갱신한다.
+        handle->snapshot.gps.satellites_used = gps_data.satellites_used;  // 위성 수를 갱신한다.
+        handle->snapshot.gps.protocol = (uint8_t)gps_data.protocol;    // 수신 프로토콜을 갱신한다.
+        handle->snapshot.gps.fix_ok = gps_data.fix_ok;                 // Fix 성공 여부를 갱신한다.
         handle->snapshot.gps.valid = gps_data.position_valid;         // GPS 유효성을 갱신한다.
+        handle->snapshot.gps.velocity_valid = gps_data.velocity_valid;  // 속도 유효성을 갱신한다.
+        handle->snapshot.gps.time_valid = gps_data.time_valid;        // 시각 유효성을 갱신한다.
     }
 
     if (IMU_GetLatest(handle->imu, &imu_data))

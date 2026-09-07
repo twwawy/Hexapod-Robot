@@ -17,7 +17,8 @@ bool CommunicationTest_Run(void)
     JetsonSpi_ParsedPacket_t parsed;                    // SPI 파싱 결과를 저장한다.
     JetsonSpi_CommandFrame_t command;                   // 명령 전용 파싱 결과를 저장한다.
     RobotUserCommand_t user;                            // 매니퓰레이터 패킷 조종값을 저장한다.
-    uint8_t spi_frame[JETSON_SPI_FRAME_SIZE];           // CRC 시험 패킷을 저장한다.
+    uint8_t spi_frame[JETSON_SPI_FRAME_SIZE];           // 32바이트 Subframe CRC 시험값을 저장한다.
+    uint8_t command_frame[JETSON_SPI_TRANSFER_SIZE];     // 64바이트 Jetson 명령 시험값을 저장한다.
     uint8_t manipulator_packet[MANIPULATOR_PACKET_SIZE];  // 유선 조종 패킷을 저장한다.
     uint8_t expected_joint;                             // 관절별 예상 인코딩값을 저장한다.
     uint16_t crc;                                       // 시험 패킷 CRC를 저장한다.
@@ -28,10 +29,13 @@ bool CommunicationTest_Run(void)
     char text[ROBOT_TELEMETRY_MAX_TEXT + 1U];           // 생성한 패킷을 저장한다.
 
     if ((JETSON_SPI_FRAME_SIZE != 32U) ||
+        (JETSON_SPI_TRANSFER_SIZE != 64U) ||
         (JETSON_SPI_PAYLOAD_SIZE != 24U) ||
+        (JETSON_SPI_COMMAND_PAYLOAD_SIZE != 56U) ||
         (JETSON_SPI_OFFSET_DELTA_TIME != 4U) ||
         (JETSON_SPI_OFFSET_FLAGS != 5U) ||
-        (JETSON_SPI_OFFSET_CRC != 30U))
+        (JETSON_SPI_OFFSET_CRC != 30U) ||
+        (JETSON_SPI_COMMAND_OFFSET_CRC != 62U))
     {
         return false;
     }
@@ -42,6 +46,7 @@ bool CommunicationTest_Run(void)
     memset(&jetson_tx, 0, sizeof(jetson_tx));  // 관절각 송신 시험 상태를 준비한다.
     memset(&user, 0, sizeof(user));      // 매니퓰레이터 조종값을 0으로 준비한다.
     memset(spi_frame, 0, sizeof(spi_frame));  // SPI 시험 패킷을 0으로 준비한다.
+    memset(command_frame, 0, sizeof(command_frame));  // 64바이트 명령을 0으로 준비한다.
     RobotTelemetry_Init(&telemetry);     // 패킷 주기를 초기화한다.
     if (RobotTelemetry_BuildNext(&telemetry, 999U, ROBOT_MODE_READY,
                                  &safety, &sensor, 0U, text, sizeof(text)))
@@ -58,7 +63,7 @@ bool CommunicationTest_Run(void)
     spi_frame[JETSON_SPI_OFFSET_MAGIC] = JETSON_SPI_MAGIC;
     spi_frame[JETSON_SPI_OFFSET_VERSION_TYPE] =
         JETSON_SPI_MAKE_VERSION_TYPE(JETSON_SPI_PROTOCOL_VERSION,
-                                     JETSON_SPI_TYPE_COMMAND);
+                                     JETSON_SPI_TYPE_GPS);
     spi_frame[JETSON_SPI_OFFSET_SEQUENCE] = 0x34U;
     spi_frame[JETSON_SPI_OFFSET_SEQUENCE + 1U] = 0x12U;
     spi_frame[JETSON_SPI_OFFSET_DELTA_TIME] = 50U;
@@ -70,7 +75,7 @@ bool CommunicationTest_Run(void)
     spi_frame[JETSON_SPI_OFFSET_CRC + 1U] = (uint8_t)(crc >> 8U);
 
     if (!JetsonSpi_ParseFrame(spi_frame, &parsed) ||
-        (parsed.type != JETSON_SPI_TYPE_COMMAND) ||
+        (parsed.type != JETSON_SPI_TYPE_GPS) ||
         (parsed.sequence != 0x1234U) ||
         (parsed.delta_time_100us != 50U) ||
         (parsed.flags != 0x2DU))
@@ -78,7 +83,21 @@ bool CommunicationTest_Run(void)
         return false;
     }
 
-    if (!JetsonSpi_ParseCommandFrame(spi_frame, &command) ||
+    command_frame[JETSON_SPI_OFFSET_MAGIC] = JETSON_SPI_MAGIC;
+    command_frame[JETSON_SPI_OFFSET_VERSION_TYPE] =
+        JETSON_SPI_MAKE_VERSION_TYPE(JETSON_SPI_PROTOCOL_VERSION,
+                                     JETSON_SPI_TYPE_COMMAND);
+    command_frame[JETSON_SPI_OFFSET_SEQUENCE] = 0x34U;
+    command_frame[JETSON_SPI_OFFSET_SEQUENCE + 1U] = 0x12U;
+    command_frame[JETSON_SPI_OFFSET_DELTA_TIME] = 50U;
+    command_frame[JETSON_SPI_OFFSET_FLAGS] = 0x2DU;
+    command_frame[JETSON_SPI_COMMAND_OFFSET_PAYLOAD] = 0x5AU;
+    crc = JetsonSpi_Crc16CcittFalse(command_frame,
+                                    JETSON_SPI_COMMAND_CRC_INPUT_SIZE);
+    command_frame[JETSON_SPI_COMMAND_OFFSET_CRC] = (uint8_t)(crc & 0xFFU);
+    command_frame[JETSON_SPI_COMMAND_OFFSET_CRC + 1U] = (uint8_t)(crc >> 8U);
+
+    if (!JetsonSpi_ParseCommandFrame(command_frame, &command) ||
         (command.sequence != 0x1234U) ||
         (command.delta_time_100us != 50U) ||
         (command.flags != 0x2DU) ||
@@ -97,9 +116,24 @@ bool CommunicationTest_Run(void)
     {
         sensor.joint_angle_rad[joint] = 1.0f;  // 모든 관절에 같은 양의 각도를 입력한다.
     }
+    sensor.gps.latitude_deg = 37.4501234;
+    sensor.gps.longitude_deg = 126.6534567;
+    sensor.gps.altitude_m = 42.5f;
+    sensor.gps.velocity_north_mps = -1.25f;
+    sensor.gps.velocity_east_mps = 2.5f;
+    sensor.gps.horizontal_accuracy_m = 1.2f;
+    sensor.gps.i_tow_ms = 123456U;
+    sensor.gps.timestamp_ms = 100U;
+    sensor.gps.fix_type = 3U;
+    sensor.gps.satellites_used = 12U;
+    sensor.gps.protocol = 2U;  // GPS_PROTOCOL_UBX 값을 지정한다.
+    sensor.gps.fix_ok = true;
+    sensor.gps.valid = true;
+    sensor.gps.velocity_valid = true;
+    sensor.gps.time_valid = true;
     jetson_tx.spi = (SPI_HandleTypeDef *)&jetson_tx;  // 프레임 생성 조건만 만족하는 시험 포인터를 지정한다.
     jetson_tx.protocol_ready = true;                  // 송신 프로토콜 준비 상태를 지정한다.
-    if (!JetsonSpi_PrepareSensorFrame(&jetson_tx, &sensor, true, 0U))
+    if (!JetsonSpi_PrepareSensorFrame(&jetson_tx, &sensor, true, 200U))
     {
         return false;
     }
@@ -118,9 +152,22 @@ bool CommunicationTest_Run(void)
             return false;  // 송신값만 반전되고 센서 원본은 유지되는지 확인한다.
         }
     }
+    if (!JetsonSpi_ParseFrame(
+            &jetson_tx.tx_frame[JETSON_SPI_GPS_FRAME_OFFSET],
+            &parsed) ||
+        (parsed.type != JETSON_SPI_TYPE_GPS) ||
+        (parsed.sequence != 1U) ||
+        ((parsed.flags & JETSON_SPI_GPS_FLAG_POSITION_VALID) == 0U) ||
+        (jetson_tx.tx_frame[JETSON_SPI_GPS_FRAME_OFFSET +
+                            JETSON_SPI_GPS_OFFSET_SATELLITES] != 12U) ||
+        (jetson_tx.tx_frame[JETSON_SPI_GPS_FRAME_OFFSET +
+                            JETSON_SPI_GPS_OFFSET_FIX_TYPE] != 3U))
+    {
+        return false;  // 두 번째 32바이트 영역에 유효한 GPS Subframe이 생성되는지 확인한다.
+    }
 
     jetson_tx.tx_frame_ready = false;  // 릴레이 OFF 프레임 생성을 허가한다.
-    if (!JetsonSpi_PrepareSensorFrame(&jetson_tx, &sensor, false, 1U))
+    if (!JetsonSpi_PrepareSensorFrame(&jetson_tx, &sensor, false, 201U))
     {
         return false;
     }

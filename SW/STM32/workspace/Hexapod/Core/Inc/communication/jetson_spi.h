@@ -8,10 +8,16 @@
 #include <stdint.h>
 
 #define JETSON_SPI_FRAME_SIZE              32U
+#define JETSON_SPI_TRANSFER_SIZE           64U
 #define JETSON_SPI_PAYLOAD_SIZE            24U
 #define JETSON_SPI_CRC_INPUT_SIZE          30U
+#define JETSON_SPI_COMMAND_PAYLOAD_SIZE    56U
+#define JETSON_SPI_COMMAND_CRC_INPUT_SIZE  62U
 #define JETSON_SPI_MAGIC                   0xA5U
-#define JETSON_SPI_PROTOCOL_VERSION        2U
+#define JETSON_SPI_PROTOCOL_VERSION        3U
+
+#define JETSON_SPI_SENSOR_FRAME_OFFSET      0U
+#define JETSON_SPI_GPS_FRAME_OFFSET        32U
 
 #define JETSON_SPI_OFFSET_MAGIC             0U
 #define JETSON_SPI_OFFSET_VERSION_TYPE      1U
@@ -25,7 +31,27 @@
 #define JETSON_SPI_OFFSET_IMU_YAW          28U
 #define JETSON_SPI_OFFSET_CRC              30U
 
+#define JETSON_SPI_COMMAND_OFFSET_PAYLOAD   6U
+#define JETSON_SPI_COMMAND_OFFSET_CRC      62U
+
+#define JETSON_SPI_GPS_OFFSET_LATITUDE      6U
+#define JETSON_SPI_GPS_OFFSET_LONGITUDE    10U
+#define JETSON_SPI_GPS_OFFSET_ALTITUDE     14U
+#define JETSON_SPI_GPS_OFFSET_ITOW         18U
+#define JETSON_SPI_GPS_OFFSET_VELOCITY_N   22U
+#define JETSON_SPI_GPS_OFFSET_VELOCITY_E   24U
+#define JETSON_SPI_GPS_OFFSET_HACC         26U
+#define JETSON_SPI_GPS_OFFSET_SATELLITES   28U
+#define JETSON_SPI_GPS_OFFSET_FIX_TYPE     29U
+
 #define JETSON_SPI_SENSOR_FOOT_CONTACT_MASK 0x3FU
+
+#define JETSON_SPI_GPS_FLAG_FIX_OK          (1U << 0U)
+#define JETSON_SPI_GPS_FLAG_POSITION_VALID  (1U << 1U)
+#define JETSON_SPI_GPS_FLAG_VELOCITY_VALID  (1U << 2U)
+#define JETSON_SPI_GPS_FLAG_TIME_VALID      (1U << 3U)
+#define JETSON_SPI_GPS_FLAG_PROTOCOL_UBX    (1U << 4U)
+#define JETSON_SPI_GPS_FLAG_PROTOCOL_NMEA   (1U << 5U)
 
 #define JETSON_SPI_MAKE_VERSION_TYPE(version, type) \
     ((uint8_t)((((uint8_t)(version) & 0x0FU) << 4U) | \
@@ -37,7 +63,8 @@ typedef enum
     JETSON_SPI_TYPE_SENSOR = 0x1U,
     JETSON_SPI_TYPE_COMMAND = 0x2U,
     JETSON_SPI_TYPE_ACK = 0x3U,
-    JETSON_SPI_TYPE_ERROR = 0x4U
+    JETSON_SPI_TYPE_ERROR = 0x4U,
+    JETSON_SPI_TYPE_GPS = 0x5U
 } JetsonSpi_PacketType_t;
 
 typedef struct
@@ -53,20 +80,22 @@ typedef struct
 {
     uint16_t sequence;                            // Jetson 명령 패킷 순번을 저장한다.
     uint8_t delta_time_100us;                     // Jetson 명령 생성 간격을 100 us 단위로 저장한다.
-    uint8_t flags;                                // COMMAND에서는 예약값이며 현재 0으로 송신한다.
-    uint8_t payload[JETSON_SPI_PAYLOAD_SIZE];     // 아직 할당하지 않은 24바이트 명령 Payload다.
+    uint8_t flags;                                // COMMAND Flags 원본을 보관하며 의미는 아직 할당하지 않았다.
+    uint8_t payload[JETSON_SPI_COMMAND_PAYLOAD_SIZE];  // Byte 6~61의 56바이트 명령 Payload다.
 } JetsonSpi_CommandFrame_t;
 
 typedef struct
 {
     SPI_HandleTypeDef *spi;                       // SPI2 Slave Handle을 저장한다.
-    uint8_t tx_frame[JETSON_SPI_FRAME_SIZE];      // 다음 전송에서 Jetson으로 보낼 프레임이다.
-    uint8_t rx_frame[JETSON_SPI_FRAME_SIZE];      // Jetson에서 마지막으로 받은 프레임이다.
+    uint8_t tx_frame[JETSON_SPI_TRANSFER_SIZE];   // SENSOR 32B와 GPS 32B를 합친 송신 버퍼다.
+    uint8_t rx_frame[JETSON_SPI_TRANSFER_SIZE];   // Jetson COMMAND 64B 수신 버퍼다.
     JetsonSpi_ParsedPacket_t rx_packet;           // 마지막 정상 수신 패킷을 저장한다.
     JetsonSpi_CommandFrame_t command;             // 마지막 정상 Jetson 명령 프레임을 저장한다.
     uint16_t tx_sequence;                         // 다음 센서 패킷에 넣을 순번이다.
+    uint16_t gps_sequence;                        // 새 GPS 측정마다 증가하는 순번이다.
     uint16_t last_rx_sequence;                    // 마지막 정상 수신 순번이다.
     uint32_t last_frame_ms;                       // 마지막 센서 패킷 생성 시각이다.
+    uint32_t last_gps_timestamp_ms;               // 마지막으로 패킹한 GPS 측정 시각이다.
     uint32_t transfer_count;                      // 완료된 SPI 트랜잭션 수를 저장한다.
     uint32_t valid_rx_count;                      // 정상 수신 프로토콜 패킷 수를 저장한다.
     uint32_t command_count;                       // 정상 수신 COMMAND 패킷 수를 저장한다.
@@ -92,8 +121,8 @@ uint16_t JetsonSpi_Crc16CcittFalse(const uint8_t *data,
 bool JetsonSpi_ParseFrame(const uint8_t frame[JETSON_SPI_FRAME_SIZE],
                           JetsonSpi_ParsedPacket_t *packet);  // 공통 헤더와 CRC를 검사해 Payload를 분리한다.
 
-bool JetsonSpi_ParseCommandFrame(const uint8_t frame[JETSON_SPI_FRAME_SIZE],
-                                 JetsonSpi_CommandFrame_t *command);  // COMMAND 패킷을 검사하고 Raw Payload를 분리한다.
+bool JetsonSpi_ParseCommandFrame(const uint8_t frame[JETSON_SPI_TRANSFER_SIZE],
+                                  JetsonSpi_CommandFrame_t *command);  // COMMAND 패킷을 검사하고 Raw Payload를 분리한다.
 
 bool JetsonSpi_PrepareSensorFrame(JetsonSpi_Handle_t *handle,
                                   const RobotSensorSnapshot_t *snapshot,
@@ -101,7 +130,7 @@ bool JetsonSpi_PrepareSensorFrame(JetsonSpi_Handle_t *handle,
                                   uint32_t now_ms);  // 릴레이 OFF 관절각을 0도로 만들어 송신한다.
 
 /*
- * 준비된 32바이트를 SPI2 Slave DMA 방식으로 동시 송수신한다.
+ * SENSOR 32바이트와 GPS 32바이트를 합친 64바이트를 SPI2 Slave DMA로 교환한다.
  * SPI를 먼저 Arm한 뒤 DRDY를 올리고, 완료된 프레임의 파싱은 메인 루프에서 처리한다.
  */
 bool JetsonSpi_Process(JetsonSpi_Handle_t *handle);

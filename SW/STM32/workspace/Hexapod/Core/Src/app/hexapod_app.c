@@ -799,7 +799,7 @@ HAL_StatusTypeDef HexapodApp_Init(HexapodApp_Handle_t *handle,
 
     if (hardware->jetson_spi != NULL)
     {
-        JetsonSpi_Init(&handle->jetson, hardware->jetson_spi);  // 32바이트 SPI 센서 프로토콜을 준비한다.
+        JetsonSpi_Init(&handle->jetson, hardware->jetson_spi);  // 64바이트 SPI 센서·GPS 프로토콜을 준비한다.
     }
 
     status = GPS_Start(&handle->gps);  // GPS 인터럽트 수신을 시작한다.
@@ -1369,7 +1369,7 @@ HAL_StatusTypeDef HexapodApp_BoardInit(void)
     hardware.manipulator_uart = &huart5;   // 115200 baud 매니퓰레이터를 UART5에 연결한다.
     hardware.crsf_uart = &huart6;          // CRSF를 USART6에 연결한다.
     hardware.adc_spi = &hspi1;             // MCP3008을 SPI1에 연결한다.
-    hardware.jetson_spi = &hspi2;          // Jetson 32바이트 SPI2 Slave 통신을 활성화한다.
+    hardware.jetson_spi = &hspi2;          // Jetson 64바이트 SPI2 Slave 통신을 활성화한다.
     hardware.control_timer = &htim6;       // 1 ms 기준 주기를 TIM6에 연결한다.
     hardware.servo_timers.tim1 = &htim1;   // TIM1 서보 채널을 연결한다.
     hardware.servo_timers.tim2 = &htim2;   // TIM2 서보 채널을 연결한다.

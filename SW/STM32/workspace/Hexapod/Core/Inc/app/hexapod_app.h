@@ -132,7 +132,7 @@ typedef struct
     LoRa_Handle_t lora;                                // LoRa 송수신 상태를 저장한다.
     ManipulatorLink_Handle_t manipulator;              // 유선 매니퓰레이터 송신 상태를 저장한다.
     RobotTelemetry_Handle_t telemetry;                 // 관제 패킷 주기를 저장한다.
-    JetsonSpi_Handle_t jetson;                         // Jetson 32바이트 SPI 프로토콜 상태를 저장한다.
+    JetsonSpi_Handle_t jetson;                         // Jetson 64바이트 SPI 프로토콜 상태를 저장한다.
     HexapodApp_RlRuntime_t rl;                         // 패킷과 독립적인 강화학습 제어 상태를 저장한다.
     RobotSensorSnapshot_t sensor_snapshot;             // 최근 실제 센서값을 저장한다.
     RobotUserCommand_t user;                           // 최근 안전한 사용자 명령을 저장한다.

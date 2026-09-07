@@ -1,6 +1,7 @@
 #include "communication/jetson_spi.h"
 
 #include "main.h"
+#include "sensor/gps.h"
 
 #include <stddef.h>
 #include <string.h>
@@ -28,6 +29,19 @@ static void JetsonSpi_WriteU16Le(uint8_t *destination, uint16_t value)
 static void JetsonSpi_WriteI16Le(uint8_t *destination, int16_t value)
 {
     JetsonSpi_WriteU16Le(destination, (uint16_t)value);
+}
+
+static void JetsonSpi_WriteU32Le(uint8_t *destination, uint32_t value)
+{
+    destination[0] = (uint8_t)(value & 0xFFU);
+    destination[1] = (uint8_t)((value >> 8U) & 0xFFU);
+    destination[2] = (uint8_t)((value >> 16U) & 0xFFU);
+    destination[3] = (uint8_t)((value >> 24U) & 0xFFU);
+}
+
+static void JetsonSpi_WriteI32Le(uint8_t *destination, int32_t value)
+{
+    JetsonSpi_WriteU32Le(destination, (uint32_t)value);
 }
 
 static int32_t JetsonSpi_RoundFloat(float value)
@@ -97,11 +111,53 @@ static int16_t JetsonSpi_EncodeImu(float angle_rad)
     return (int16_t)JetsonSpi_RoundFloat(scaled);
 }
 
-static bool JetsonSpi_IsEmptyFrame(const uint8_t frame[JETSON_SPI_FRAME_SIZE])
+static int32_t JetsonSpi_EncodeI32(double scaled)
+{
+    if (scaled > 2147483647.0)
+    {
+        scaled = 2147483647.0;
+    }
+    if (scaled < -2147483648.0)
+    {
+        scaled = -2147483648.0;
+    }
+
+    return (int32_t)((scaled >= 0.0) ? (scaled + 0.5) : (scaled - 0.5));
+}
+
+static int16_t JetsonSpi_EncodeI16(float scaled)
+{
+    if (scaled > 32767.0f)
+    {
+        scaled = 32767.0f;
+    }
+    if (scaled < -32768.0f)
+    {
+        scaled = -32768.0f;
+    }
+
+    return (int16_t)JetsonSpi_RoundFloat(scaled);
+}
+
+static uint16_t JetsonSpi_EncodeU16(float scaled)
+{
+    if (scaled < 0.0f)
+    {
+        scaled = 0.0f;
+    }
+    if (scaled > 65535.0f)
+    {
+        scaled = 65535.0f;
+    }
+
+    return (uint16_t)JetsonSpi_RoundFloat(scaled);
+}
+
+static bool JetsonSpi_IsEmptyFrame(const uint8_t frame[JETSON_SPI_TRANSFER_SIZE])
 {
     uint32_t index;
 
-    for (index = 0U; index < JETSON_SPI_FRAME_SIZE; ++index)
+    for (index = 0U; index < JETSON_SPI_TRANSFER_SIZE; ++index)
     {
         if (frame[index] != 0U)
         {
@@ -208,21 +264,45 @@ bool JetsonSpi_ParseFrame(const uint8_t frame[JETSON_SPI_FRAME_SIZE],
     return true;
 }
 
-bool JetsonSpi_ParseCommandFrame(const uint8_t frame[JETSON_SPI_FRAME_SIZE],
-                                 JetsonSpi_CommandFrame_t *command)
+bool JetsonSpi_ParseCommandFrame(const uint8_t frame[JETSON_SPI_TRANSFER_SIZE],
+                                  JetsonSpi_CommandFrame_t *command)
 {
-    JetsonSpi_ParsedPacket_t parsed;
+    uint8_t version;
+    uint8_t type;
+    uint16_t received_crc;
+    uint16_t calculated_crc;
 
-    if ((command == NULL) || !JetsonSpi_ParseFrame(frame, &parsed) ||
-        (parsed.type != JETSON_SPI_TYPE_COMMAND))
+    if ((frame == NULL) || (command == NULL) ||
+        (frame[JETSON_SPI_OFFSET_MAGIC] != JETSON_SPI_MAGIC))
     {
         return false;
     }
 
-    command->sequence = parsed.sequence;
-    command->delta_time_100us = parsed.delta_time_100us;
-    command->flags = parsed.flags;
-    memcpy(command->payload, parsed.payload, JETSON_SPI_PAYLOAD_SIZE);
+    version = (uint8_t)(frame[JETSON_SPI_OFFSET_VERSION_TYPE] >> 4U);
+    type = (uint8_t)(frame[JETSON_SPI_OFFSET_VERSION_TYPE] & 0x0FU);
+    if ((version != JETSON_SPI_PROTOCOL_VERSION) ||
+        (type != (uint8_t)JETSON_SPI_TYPE_COMMAND))
+    {
+        return false;
+    }
+
+    received_crc = JetsonSpi_ReadU16Le(
+        &frame[JETSON_SPI_COMMAND_OFFSET_CRC]);
+    calculated_crc = JetsonSpi_Crc16CcittFalse(
+        frame,
+        JETSON_SPI_COMMAND_CRC_INPUT_SIZE);
+    if (received_crc != calculated_crc)
+    {
+        return false;
+    }
+
+    command->sequence = JetsonSpi_ReadU16Le(
+        &frame[JETSON_SPI_OFFSET_SEQUENCE]);
+    command->delta_time_100us = frame[JETSON_SPI_OFFSET_DELTA_TIME];
+    command->flags = frame[JETSON_SPI_OFFSET_FLAGS];
+    memcpy(command->payload,
+           &frame[JETSON_SPI_COMMAND_OFFSET_PAYLOAD],
+           JETSON_SPI_COMMAND_PAYLOAD_SIZE);
     return true;
 }
 
@@ -236,7 +316,12 @@ bool JetsonSpi_PrepareSensorFrame(JetsonSpi_Handle_t *handle,
     uint16_t crc;
     uint32_t joint;
     uint32_t leg;
+    uint32_t gps_age_ms;
     uint8_t contact_mask = 0U;
+    uint8_t gps_flags = 0U;
+    uint8_t gps_age_100ms;
+    uint8_t *sensor_frame;
+    uint8_t *gps_frame;
 
     if ((handle == NULL) || (snapshot == NULL) ||
         (handle->spi == NULL) || !handle->protocol_ready ||
@@ -260,20 +345,23 @@ bool JetsonSpi_PrepareSensorFrame(JetsonSpi_Handle_t *handle,
     }
 
     memset(handle->tx_frame, 0, sizeof(handle->tx_frame));
-    handle->tx_frame[JETSON_SPI_OFFSET_MAGIC] = JETSON_SPI_MAGIC;
-    handle->tx_frame[JETSON_SPI_OFFSET_VERSION_TYPE] =
+    sensor_frame = &handle->tx_frame[JETSON_SPI_SENSOR_FRAME_OFFSET];
+    gps_frame = &handle->tx_frame[JETSON_SPI_GPS_FRAME_OFFSET];
+
+    sensor_frame[JETSON_SPI_OFFSET_MAGIC] = JETSON_SPI_MAGIC;
+    sensor_frame[JETSON_SPI_OFFSET_VERSION_TYPE] =
         JETSON_SPI_MAKE_VERSION_TYPE(JETSON_SPI_PROTOCOL_VERSION,
                                      JETSON_SPI_TYPE_SENSOR);
-    JetsonSpi_WriteU16Le(&handle->tx_frame[JETSON_SPI_OFFSET_SEQUENCE],
+    JetsonSpi_WriteU16Le(&sensor_frame[JETSON_SPI_OFFSET_SEQUENCE],
                          handle->tx_sequence);
-    handle->tx_frame[JETSON_SPI_OFFSET_DELTA_TIME] = delta_time_100us;
+    sensor_frame[JETSON_SPI_OFFSET_DELTA_TIME] = delta_time_100us;
 
     for (joint = 0U; joint < ROBOT_JOINT_COUNT; ++joint)
     {
         const float angle_rad = relay_enabled ?
             snapshot->joint_angle_rad[joint] : 0.0f;  // 릴레이 OFF 시 ADC 대신 0도를 선택한다.
 
-        handle->tx_frame[JETSON_SPI_OFFSET_JOINTS + joint] =
+        sensor_frame[JETSON_SPI_OFFSET_JOINTS + joint] =
             JetsonSpi_EncodeJoint(JetsonSpi_GetTransmitJointAngle(
                 joint, angle_rad));  // Jetson 송신 좌표계로만 변환해 인코딩한다.
     }
@@ -286,19 +374,84 @@ bool JetsonSpi_PrepareSensorFrame(JetsonSpi_Handle_t *handle,
         }
     }
 
-    JetsonSpi_WriteI16Le(&handle->tx_frame[JETSON_SPI_OFFSET_IMU_ROLL],
+    JetsonSpi_WriteI16Le(&sensor_frame[JETSON_SPI_OFFSET_IMU_ROLL],
                          JetsonSpi_EncodeImu(snapshot->imu.attitude_rad.roll));
-    JetsonSpi_WriteI16Le(&handle->tx_frame[JETSON_SPI_OFFSET_IMU_PITCH],
+    JetsonSpi_WriteI16Le(&sensor_frame[JETSON_SPI_OFFSET_IMU_PITCH],
                          JetsonSpi_EncodeImu(snapshot->imu.attitude_rad.pitch));
-    JetsonSpi_WriteI16Le(&handle->tx_frame[JETSON_SPI_OFFSET_IMU_YAW],
+    JetsonSpi_WriteI16Le(&sensor_frame[JETSON_SPI_OFFSET_IMU_YAW],
                          JetsonSpi_EncodeImu(snapshot->imu.attitude_rad.yaw));
 
-    handle->tx_frame[JETSON_SPI_OFFSET_FLAGS] =
+    sensor_frame[JETSON_SPI_OFFSET_FLAGS] =
         (uint8_t)(contact_mask & JETSON_SPI_SENSOR_FOOT_CONTACT_MASK);
 
-    crc = JetsonSpi_Crc16CcittFalse(handle->tx_frame,
+    crc = JetsonSpi_Crc16CcittFalse(sensor_frame,
                                     JETSON_SPI_CRC_INPUT_SIZE);
-    JetsonSpi_WriteU16Le(&handle->tx_frame[JETSON_SPI_OFFSET_CRC], crc);
+    JetsonSpi_WriteU16Le(&sensor_frame[JETSON_SPI_OFFSET_CRC], crc);
+
+    if ((snapshot->gps.timestamp_ms != 0U) &&
+        (snapshot->gps.timestamp_ms != handle->last_gps_timestamp_ms))
+    {
+        handle->gps_sequence++;
+        handle->last_gps_timestamp_ms = snapshot->gps.timestamp_ms;
+    }
+
+    gps_age_ms = (snapshot->gps.timestamp_ms == 0U) ? UINT32_MAX :
+                 (now_ms - snapshot->gps.timestamp_ms);
+    gps_age_100ms = (gps_age_ms >= 25500U) ? 255U :
+                    (uint8_t)(gps_age_ms / 100U);
+
+    if (snapshot->gps.fix_ok)
+    {
+        gps_flags |= JETSON_SPI_GPS_FLAG_FIX_OK;
+    }
+    if (snapshot->gps.valid)
+    {
+        gps_flags |= JETSON_SPI_GPS_FLAG_POSITION_VALID;
+    }
+    if (snapshot->gps.velocity_valid)
+    {
+        gps_flags |= JETSON_SPI_GPS_FLAG_VELOCITY_VALID;
+    }
+    if (snapshot->gps.time_valid)
+    {
+        gps_flags |= JETSON_SPI_GPS_FLAG_TIME_VALID;
+    }
+    if (snapshot->gps.protocol == (uint8_t)GPS_PROTOCOL_UBX)
+    {
+        gps_flags |= JETSON_SPI_GPS_FLAG_PROTOCOL_UBX;
+    }
+    if (snapshot->gps.protocol == (uint8_t)GPS_PROTOCOL_NMEA)
+    {
+        gps_flags |= JETSON_SPI_GPS_FLAG_PROTOCOL_NMEA;
+    }
+
+    gps_frame[JETSON_SPI_OFFSET_MAGIC] = JETSON_SPI_MAGIC;
+    gps_frame[JETSON_SPI_OFFSET_VERSION_TYPE] =
+        JETSON_SPI_MAKE_VERSION_TYPE(JETSON_SPI_PROTOCOL_VERSION,
+                                     JETSON_SPI_TYPE_GPS);
+    JetsonSpi_WriteU16Le(&gps_frame[JETSON_SPI_OFFSET_SEQUENCE],
+                         handle->gps_sequence);
+    gps_frame[JETSON_SPI_OFFSET_DELTA_TIME] = gps_age_100ms;
+    gps_frame[JETSON_SPI_OFFSET_FLAGS] = gps_flags;
+    JetsonSpi_WriteI32Le(&gps_frame[JETSON_SPI_GPS_OFFSET_LATITUDE],
+                         JetsonSpi_EncodeI32(snapshot->gps.latitude_deg * 1.0e7));
+    JetsonSpi_WriteI32Le(&gps_frame[JETSON_SPI_GPS_OFFSET_LONGITUDE],
+                         JetsonSpi_EncodeI32(snapshot->gps.longitude_deg * 1.0e7));
+    JetsonSpi_WriteI32Le(&gps_frame[JETSON_SPI_GPS_OFFSET_ALTITUDE],
+                         JetsonSpi_EncodeI32((double)snapshot->gps.altitude_m * 1000.0));
+    JetsonSpi_WriteU32Le(&gps_frame[JETSON_SPI_GPS_OFFSET_ITOW],
+                         snapshot->gps.i_tow_ms);
+    JetsonSpi_WriteI16Le(&gps_frame[JETSON_SPI_GPS_OFFSET_VELOCITY_N],
+                         JetsonSpi_EncodeI16(snapshot->gps.velocity_north_mps * 100.0f));
+    JetsonSpi_WriteI16Le(&gps_frame[JETSON_SPI_GPS_OFFSET_VELOCITY_E],
+                         JetsonSpi_EncodeI16(snapshot->gps.velocity_east_mps * 100.0f));
+    JetsonSpi_WriteU16Le(&gps_frame[JETSON_SPI_GPS_OFFSET_HACC],
+                         JetsonSpi_EncodeU16(snapshot->gps.horizontal_accuracy_m * 100.0f));
+    gps_frame[JETSON_SPI_GPS_OFFSET_SATELLITES] = snapshot->gps.satellites_used;
+    gps_frame[JETSON_SPI_GPS_OFFSET_FIX_TYPE] = snapshot->gps.fix_type;
+    crc = JetsonSpi_Crc16CcittFalse(gps_frame,
+                                    JETSON_SPI_CRC_INPUT_SIZE);
+    JetsonSpi_WriteU16Le(&gps_frame[JETSON_SPI_OFFSET_CRC], crc);
 
     handle->tx_sequence++;
     handle->last_frame_ms = now_ms;
@@ -308,7 +461,7 @@ bool JetsonSpi_PrepareSensorFrame(JetsonSpi_Handle_t *handle,
 
 static bool JetsonSpi_FinalizeTransfer(JetsonSpi_Handle_t *handle)
 {
-    JetsonSpi_ParsedPacket_t parsed;
+    JetsonSpi_CommandFrame_t command;
 
     handle->tx_frame_ready = false;
     handle->rx_packet_valid = false;
@@ -322,13 +475,13 @@ static bool JetsonSpi_FinalizeTransfer(JetsonSpi_Handle_t *handle)
 
     handle->transfer_count++;
 
-    /* Jetson이 센서 읽기만 수행하며 보낸 32바이트 0은 명령 오류로 세지 않는다. */
+    /* Jetson이 센서 읽기만 수행하며 보낸 64바이트 0은 명령 오류로 세지 않는다. */
     if (JetsonSpi_IsEmptyFrame(handle->rx_frame))
     {
         return true;
     }
 
-    if (!JetsonSpi_ParseFrame(handle->rx_frame, &parsed))
+    if (!JetsonSpi_ParseCommandFrame(handle->rx_frame, &command))
     {
         handle->invalid_rx_count++;
         return true;
@@ -336,7 +489,7 @@ static bool JetsonSpi_FinalizeTransfer(JetsonSpi_Handle_t *handle)
 
     if (handle->has_rx_sequence)
     {
-        const uint16_t gap = (uint16_t)(parsed.sequence -
+        const uint16_t gap = (uint16_t)(command.sequence -
                                         handle->last_rx_sequence);
         if (gap > 1U)
         {
@@ -344,23 +497,21 @@ static bool JetsonSpi_FinalizeTransfer(JetsonSpi_Handle_t *handle)
         }
     }
 
-    handle->rx_packet = parsed;
-    handle->last_rx_sequence = parsed.sequence;
+    handle->rx_packet.type = JETSON_SPI_TYPE_COMMAND;
+    handle->rx_packet.sequence = command.sequence;
+    handle->rx_packet.delta_time_100us = command.delta_time_100us;
+    handle->rx_packet.flags = command.flags;
+    memcpy(handle->rx_packet.payload,
+           command.payload,
+           JETSON_SPI_PAYLOAD_SIZE);  // 기존 조회 API에는 명령 Payload 앞 24바이트를 제공한다.
+    handle->last_rx_sequence = command.sequence;
     handle->has_rx_sequence = true;
     handle->rx_packet_valid = true;
     handle->valid_rx_count++;
 
-    if (parsed.type == JETSON_SPI_TYPE_COMMAND)
-    {
-        handle->command.sequence = parsed.sequence;
-        handle->command.delta_time_100us = parsed.delta_time_100us;
-        handle->command.flags = parsed.flags;
-        memcpy(handle->command.payload,
-               parsed.payload,
-               JETSON_SPI_PAYLOAD_SIZE);
-        handle->command_pending = true;
-        handle->command_count++;
-    }
+    handle->command = command;
+    handle->command_pending = true;
+    handle->command_count++;
 
     return true;
 }
@@ -395,7 +546,7 @@ bool JetsonSpi_Process(JetsonSpi_Handle_t *handle)
     status = HAL_SPI_TransmitReceive_DMA(handle->spi,
                                          handle->tx_frame,
                                          handle->rx_frame,
-                                         JETSON_SPI_FRAME_SIZE);
+                                         JETSON_SPI_TRANSFER_SIZE);
     if (status != HAL_OK)
     {
         handle->error_count++;

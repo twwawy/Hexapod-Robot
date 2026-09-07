@@ -1,557 +1,222 @@
-# STM32–Jetson SPI 32바이트 패킷 프로토콜 v2
+# STM32–Jetson SPI 64바이트 전이중 프로토콜 v3
 
-## 1. 문서 목적
+## 1. 개요
 
-STM32F446RE와 Jetson Orin Nano Super 사이에서 SPI로 전달할 32바이트 고정 길이 센서 패킷을 정의한다. 이 문서의 패킷은 STM32가 측정한 18개 관절각, 6개 발 접촉 상태와 IMU 자세를 Jetson으로 전달하는 상태 패킷이다. 발압 ADC raw 값은 전송하지 않는다.
+Jetson Orin Nano Super를 SPI Master, STM32F446RE를 SPI2 Slave로 사용한다. Jetson이 약 5 ms마다 한 번씩 정확히 64바이트의 클록을 발생시키며, 같은 전이중 트랜잭션에서 다음 데이터를 교환한다.
 
-`workspace/Hexapod/Core/Inc/communication/jetson_spi.h`와 `workspace/Hexapod/Core/Src/communication/jetson_spi.c`에 아래 프로토콜의 패킹, CRC, 공통 수신 파싱과 SPI 송수신 코드가 구현되어 있다. Jetson 명령 Payload의 구체적인 의미와 제어 적용은 아직 정의하지 않는다.
+```text
+MISO, STM32 -> Jetson: [SENSOR 32B][GPS 32B]
+MOSI, Jetson -> STM32: [COMMAND 64B]
+```
 
-Jetson에서 STM32로 보내는 패킷도 동일한 32바이트 헤더와 CRC 위치를 사용한다. `COMMAND` 패킷은 공통 검증 후 24바이트 Payload를 Raw 상태로 보관하며, Payload 내부 필드는 추후 명령 규격 확정 시 할당한다.
+SENSOR와 GPS는 각각 독립된 헤더와 CRC를 갖는 32바이트 Subframe이다. 따라서 GPS 한쪽이 손상돼도 SENSOR Subframe을 별도로 검증해 사용할 수 있다. COMMAND는 64바이트 전체를 하나의 프레임으로 검증한다.
 
-## 2. 통신 기본 조건
+발압 ADC raw 값은 보내지 않으며, 각 발의 접촉 여부 6개만 SENSOR의 1바이트 비트마스크로 전송한다.
+
+## 2. SPI 설정과 배선
 
 | 항목 | 설정 |
 |---|---|
-| Jetson | SPI Master |
-| STM32 | SPI2 Slave |
-| 프레임 길이 | 항상 32바이트 |
+| Master | Jetson |
+| Slave | STM32 SPI2 |
 | SPI Mode | Mode 0, CPOL=0, CPHA=0 |
-| 데이터 길이 | 8비트 |
-| 비트 순서 | MSB First |
-| 바이트 순서 | 멀티바이트 정수는 Little Endian |
-| Chip Select | 하드웨어 NSS, 한 프레임 동안 Low |
-| 준비 신호 | STM32 PC9 `DRDY`, High일 때 전송 준비 완료 |
-| 기준 전송 주기 | 5 ms, 200 Hz |
+| 데이터 | 8 bit, MSB First |
+| 멀티바이트 정수 | Little Endian |
+| 전송 길이 | CS Low 한 번당 정확히 64바이트 |
+| 기준 주기 | 5 ms, 200 Hz |
+| 권장 초기 속도 | 1 MHz |
+| 준비 신호 | STM32 PC9 `DRDY`, High이면 DMA 준비 완료 |
 
-## 3. 32바이트 패킷 구조
+STM32F446RE SPI2 핀은 PB12=NSS, PB13=SCK, PB14=MISO, PB15=MOSI다. 두 장치의 GND를 반드시 공통으로 연결한다.
 
-```text
-[A5][VER/TYPE][SEQ 2B][DT 1B][FOOT CONTACT 1B][JOINT x18][ROLL 2B][PITCH 2B][YAW 2B][CRC16 2B]
-```
+64바이트는 512비트이므로 100 kHz에서는 순수 클록 시간만 5.12 ms가 걸린다. 200 Hz 주기에는 여유가 없으므로 1 MHz 이상으로 시작하는 것이 적절하다. 1 MHz에서는 약 0.512 ms가 걸린다.
 
-| 바이트 | 크기 | 필드 | 자료형 | 설명 |
-|---:|---:|---|---|---|
-| 0 | 1 | `MAGIC` | `uint8_t` | 패킷 시작 확인값 `0xA5` |
-| 1 | 1 | `VERSION_TYPE` | `uint8_t` | 상위 4비트 프로토콜 버전, 하위 4비트 패킷 종류 |
-| 2~3 | 2 | `SEQUENCE` | `uint16_t` | 패킷 순번, Little Endian |
-| 4 | 1 | `DELTA_TIME` | `uint8_t` | 이전 패킷 생성 후 경과 시간, 100 us/LSB |
-| 5 | 1 | `FLAGS` | `uint8_t` | SENSOR: Bit 0~5 = Leg 1~6 접촉, COMMAND: 현재 0 |
-| 6~23 | 18 | `JOINT[18]` | `uint8_t[18]` | 18개 관절 측정각 |
-| 24~25 | 2 | `IMU_ROLL` | `int16_t` | Roll rad x 10000 |
-| 26~27 | 2 | `IMU_PITCH` | `int16_t` | Pitch rad x 10000 |
-| 28~29 | 2 | `IMU_YAW` | `int16_t` | Yaw rad x 10000 |
-| 30~31 | 2 | `CRC16` | `uint16_t` | Byte 0~29의 CRC-16/CCITT-FALSE |
+## 3. 전체 64바이트 트랜잭션
 
-전체 크기는 다음과 같다.
+### 3.1 STM32에서 Jetson 방향, MISO
 
-```text
-1 + 1 + 2 + 1 + 1 + 18 + 6 + 2 = 32바이트
-```
-
-## 4. 헤더 정의
-
-### 4.1 시작 확인값
-
-```c
-#define JETSON_SPI_MAGIC  0xA5U
-```
-
-SPI의 NSS 상승·하강으로 프레임 경계가 구분되지만, 수신 데이터가 올바른 프로토콜인지 확인하기 위해 첫 바이트를 검사한다.
-
-### 4.2 버전 및 패킷 종류
-
-`VERSION_TYPE` 한 바이트를 다음과 같이 나눈다.
-
-```text
-Bit 7~4: 프로토콜 버전
-Bit 3~0: 패킷 종류
-```
-
-```c
-#define JETSON_SPI_PROTOCOL_VERSION  2U
-
-typedef enum
-{
-    JETSON_SPI_TYPE_NONE        = 0x0U,
-    JETSON_SPI_TYPE_SENSOR      = 0x1U,
-    JETSON_SPI_TYPE_COMMAND     = 0x2U,
-    JETSON_SPI_TYPE_ACK         = 0x3U,
-    JETSON_SPI_TYPE_ERROR       = 0x4U
-} JetsonSpi_PacketType_t;
-
-#define JETSON_SPI_MAKE_VERSION_TYPE(version, type) \
-    (uint8_t)((((version) & 0x0FU) << 4U) | ((type) & 0x0FU))
-```
-
-버전 2의 센서 패킷은 `0x21`이다. v1과 Delta time 배치가 호환되지 않으므로 버전을 증가시켰다.
-
-### 4.3 패킷 순번
-
-`SEQUENCE`는 센서 패킷을 만들 때마다 1씩 증가한다. `uint16_t`이므로 200 Hz 전송 시 약 327.68초마다 `65535`에서 `0`으로 순환한다. 순환은 오류가 아니며 송신과 수신 모두 unsigned 뺄셈으로 처리한다.
-
-```c
-uint16_t sequence_gap = (uint16_t)(current_sequence - previous_sequence);
-```
-
-- `sequence_gap == 1`: 정상적으로 연속 수신함
-- `sequence_gap > 1`: 중간에 `sequence_gap - 1`개가 유실됨
-- `sequence_gap == 0`: 동일 패킷이 중복되었거나 새 패킷이 아님
-
-### 4.4 Delta time
-
-`DELTA_TIME`은 이번 센서 스냅샷 패킷을 만든 시각과 이전 패킷을 만든 시각의 차이다. 단위는 100 us로 정의한다.
-
-```text
-전송값 = 경과 시간[us] / 100
-복원 시간[s] = 전송값 x 0.0001
-```
-
-정상적인 5 ms 주기에서는 `50`이 들어간다. `uint8_t`이므로 최대 표현 시간은 25.5 ms이며 현재 `HAL_GetTick()` 기준 구현은 25 ms에서 포화한다. 패킷 유실 여부는 16비트 `SEQUENCE`로 별도 판별한다.
-
-관절 ADC와 IMU가 서로 다른 시각에 갱신될 수 있으므로 이 필드는 개별 센서의 내부 샘플 주기가 아니라 패킷 생성 주기를 의미한다.
-
-### 4.5 발 접촉 상태
-
-SENSOR 패킷에서 Byte 5 `FLAGS`의 Bit 0~5는 각각 Leg 1~6의 접촉 상태다. STM32가 발압 센서 raw 값에 보정 임계값과 히스테리시스를 적용해 만든 `foot_contact[6]`을 비트마스크로 변환한다. 발압 ADC raw 값 자체는 전송하지 않는다. COMMAND 패킷에서는 Byte 5를 예약 영역으로 두고 현재 0으로 송신한다.
-
-```text
-Bit 0 = Leg 1, Bit 1 = Leg 2, ... Bit 5 = Leg 6
-0 = 비접촉, 1 = 접촉
-Bit 6~7 = 예약, 항상 0
-```
-
-## 5. 관절각 인코딩
-
-현재 프로젝트의 관절 배열은 `leg * 3 + joint` 순서다.
-
-| 패킷 바이트 | 배열 인덱스 | 데이터 |
+| 전체 오프셋 | 크기 | 내용 |
 |---:|---:|---|
-| 6~8 | 0~2 | Leg 1의 Joint 1, 2, 3 |
-| 9~11 | 3~5 | Leg 2의 Joint 1, 2, 3 |
-| 12~14 | 6~8 | Leg 3의 Joint 1, 2, 3 |
-| 15~17 | 9~11 | Leg 4의 Joint 1, 2, 3 |
-| 18~20 | 12~14 | Leg 5의 Joint 1, 2, 3 |
-| 21~23 | 15~17 | Leg 6의 Joint 1, 2, 3 |
+| 0~31 | 32 | SENSOR Subframe, 자체 CRC 포함 |
+| 32~63 | 32 | GPS Subframe, 자체 CRC 포함 |
 
-프로젝트의 공통 관절 범위 `-135도~+135도`를 `0~255`로 선형 매핑한다.
+### 3.2 Jetson에서 STM32 방향, MOSI
 
-```text
--135도 -> 0
-   0도 -> 약 128
-+135도 -> 255
-```
+| 전체 오프셋 | 크기 | 내용 |
+|---:|---:|---|
+| 0~63 | 64 | COMMAND Frame, Byte 0~61 CRC 적용 |
 
-해상도는 약 `1.059도/LSB`다. 이 정밀도는 상태 확인과 상위 판단용으로 사용할 수 있지만, Jetson에서 정밀한 저수준 관절 제어를 수행하는 용도로는 부족할 수 있다.
+Jetson이 명령 없이 센서만 읽을 때는 MOSI로 64바이트 전부 `0x00`을 보낼 수 있다. STM32는 이 값을 오류 명령으로 집계하지 않는다.
 
-STM32 내부 좌표를 Jetson 표시 좌표에 맞추기 위해 송신할 때만 Leg 1~3의 Joint 2와 Leg 4~6의 Joint 3 부호를 반전한다. 내부 센서 스냅샷은 변경하지 않는다. 서보 전원 릴레이가 모두 꺼져 있으면 ADC 자세 대신 18개 관절을 모두 0도로 인코딩한다.
+## 4. 버전과 패킷 종류
 
-```c
-#include <math.h>
-#include <stdint.h>
-
-#define JOINT_MIN_RAD  (-2.35619449f)
-#define JOINT_MAX_RAD  ( 2.35619449f)
-
-static uint8_t JetsonSpi_EncodeJoint(float angle_rad)
-{
-    float normalized;
-
-    if (angle_rad < JOINT_MIN_RAD)
-    {
-        angle_rad = JOINT_MIN_RAD;
-    }
-    if (angle_rad > JOINT_MAX_RAD)
-    {
-        angle_rad = JOINT_MAX_RAD;
-    }
-
-    normalized = (angle_rad - JOINT_MIN_RAD) /
-                 (JOINT_MAX_RAD - JOINT_MIN_RAD);
-    return (uint8_t)lroundf(normalized * 255.0f);
-}
-
-static float JetsonSpi_DecodeJoint(uint8_t encoded)
-{
-    return JOINT_MIN_RAD +
-           ((float)encoded / 255.0f) *
-           (JOINT_MAX_RAD - JOINT_MIN_RAD);
-}
-```
-
-## 6. IMU 인코딩
-
-Roll, Pitch, Yaw는 각각 `int16_t`로 저장하며 `1 LSB = 0.0001 rad`로 정의한다.
+Byte 1은 상위 4비트가 버전, 하위 4비트가 종류다.
 
 ```text
-인코딩값 = round(각도[rad] x 10000)
-각도[rad] = 인코딩값 / 10000
+VERSION_TYPE = (version << 4) | type
+Protocol version = 3
 ```
 
-해상도는 약 `0.00573도/LSB`이며 `-pi~+pi rad` 범위를 표현할 수 있다.
+| 종류 | Type | Byte 1 |
+|---|---:|---:|
+| SENSOR | `0x1` | `0x31` |
+| COMMAND | `0x2` | `0x32` |
+| GPS | `0x5` | `0x35` |
 
-```c
-static int16_t JetsonSpi_EncodeImu(float angle_rad)
-{
-    float scaled = angle_rad * 10000.0f;
+이번 변경은 전송 길이와 COMMAND CRC 위치가 v2와 호환되지 않으므로 프로토콜 버전을 3으로 올렸다. Jetson의 기존 v2 파서는 그대로 사용할 수 없다.
 
-    if (scaled > 32767.0f)
-    {
-        scaled = 32767.0f;
-    }
-    if (scaled < -32768.0f)
-    {
-        scaled = -32768.0f;
-    }
+## 5. SENSOR Subframe, MISO Byte 0~31
 
-    return (int16_t)lroundf(scaled);
-}
+| Subframe 바이트 | 크기 | 자료형 | 필드 | 변환 |
+|---:|---:|---|---|---|
+| 0 | 1 | `uint8_t` | MAGIC | `0xA5` |
+| 1 | 1 | `uint8_t` | VERSION/TYPE | `0x31` |
+| 2~3 | 2 | `uint16_t` | Sequence | 패킷마다 증가 |
+| 4 | 1 | `uint8_t` | Delta time | 100 us/LSB, 최대 25.5 ms |
+| 5 | 1 | `uint8_t` | Foot contact | Bit 0~5 = Leg 1~6 |
+| 6~23 | 18 | `uint8_t[18]` | Joint angle | -135~+135 deg를 0~255로 매핑 |
+| 24~25 | 2 | `int16_t` | IMU roll | rad x 10000 |
+| 26~27 | 2 | `int16_t` | IMU pitch | rad x 10000 |
+| 28~29 | 2 | `int16_t` | IMU yaw | rad x 10000 |
+| 30~31 | 2 | `uint16_t` | CRC16 | Byte 0~29, Low byte 먼저 |
 
-static float JetsonSpi_DecodeImu(int16_t encoded)
-{
-    return (float)encoded / 10000.0f;
-}
+관절 순서는 `leg * 3 + joint`다. 즉 Byte 6~8은 Leg 1의 Joint 1~3이고, Byte 21~23은 Leg 6의 Joint 1~3이다.
+
+관절 복원식은 다음과 같다.
+
+```text
+angle_rad = -2.35619449 + encoded / 255 * 4.71238898
 ```
 
-## 7. CRC 정의
+인코딩값 약 128이 0도이며 해상도는 약 1.059도/LSB다. STM32는 Jetson 표시 좌표계에 맞추기 위해 송신 시 선택 관절의 부호만 변환한다. 내부 센서값은 변경하지 않는다. 릴레이가 꺼져 있으면 관절 18개는 0도에 해당하는 값으로 전송한다.
 
-CRC는 `CRC-16/CCITT-FALSE`를 사용한다.
+## 6. GPS Subframe, MISO Byte 32~63
 
-| 설정 | 값 |
+아래 바이트 번호는 GPS Subframe 내부 기준이다. 실제 64바이트 수신 버퍼에서는 모든 오프셋에 32를 더한다.
+
+| Subframe 바이트 | 크기 | 자료형 | 필드 | 단위/설명 |
+|---:|---:|---|---|---|
+| 0 | 1 | `uint8_t` | MAGIC | `0xA5` |
+| 1 | 1 | `uint8_t` | VERSION/TYPE | `0x35` |
+| 2~3 | 2 | `uint16_t` | GPS Sequence | 새 GPS 측정 시 증가 |
+| 4 | 1 | `uint8_t` | GPS age | 100 ms/LSB, 255=25.5초 이상 또는 미수신 |
+| 5 | 1 | `uint8_t` | GPS flags | 아래 비트 정의 참조 |
+| 6~9 | 4 | `int32_t` | Latitude | degree x 1e7 |
+| 10~13 | 4 | `int32_t` | Longitude | degree x 1e7 |
+| 14~17 | 4 | `int32_t` | Altitude | mm |
+| 18~21 | 4 | `uint32_t` | iTOW | GPS week time, ms |
+| 22~23 | 2 | `int16_t` | Velocity north | cm/s |
+| 24~25 | 2 | `int16_t` | Velocity east | cm/s |
+| 26~27 | 2 | `uint16_t` | Horizontal accuracy | cm, 포화 655.35 m |
+| 28 | 1 | `uint8_t` | Satellites | 사용 위성 수 |
+| 29 | 1 | `uint8_t` | Fix type | GPS 드라이버의 Fix 값 |
+| 30~31 | 2 | `uint16_t` | CRC16 | Subframe Byte 0~29 |
+
+GPS flags는 다음과 같다.
+
+| 비트 | 의미 |
+|---:|---|
+| 0 | Fix 성공 |
+| 1 | 위도·경도·고도 유효 |
+| 2 | 속도 유효 |
+| 3 | GPS 시각 유효 |
+| 4 | UBX 데이터 |
+| 5 | NMEA 데이터 |
+| 6~7 | 예약 |
+
+GPS는 보통 SPI 200 Hz보다 느리게 갱신된다. 같은 GPS 값이 여러 SPI 트랜잭션에 반복되는 것은 정상이다. 새 값 여부는 GPS Sequence로, 데이터의 오래된 정도는 GPS age로 판단한다.
+
+## 7. COMMAND Frame, MOSI Byte 0~63
+
+| 바이트 | 크기 | 자료형 | 필드 | 설명 |
+|---:|---:|---|---|---|
+| 0 | 1 | `uint8_t` | MAGIC | `0xA5` |
+| 1 | 1 | `uint8_t` | VERSION/TYPE | `0x32` |
+| 2~3 | 2 | `uint16_t` | Sequence | Jetson 명령 순번 |
+| 4 | 1 | `uint8_t` | Delta time | 100 us/LSB |
+| 5 | 1 | `uint8_t` | Flags | 현재 Raw 보관, 의미 미할당 |
+| 6~61 | 56 | `uint8_t[56]` | Payload | 현재 Raw 보관, 의미 미할당 |
+| 62~63 | 2 | `uint16_t` | CRC16 | Byte 0~61, Low byte 먼저 |
+
+현재 STM32는 COMMAND의 헤더·버전·종류·CRC·순번을 검증하고 56바이트 Payload를 보관한다. 이 Payload를 보행이나 모터 제어에 적용하는 규격은 아직 정의하지 않았다.
+
+## 8. CRC 규격
+
+모든 CRC는 CRC-16/CCITT-FALSE를 사용한다.
+
+| 항목 | 값 |
 |---|---|
 | Polynomial | `0x1021` |
 | Initial value | `0xFFFF` |
-| RefIn/RefOut | False |
+| RefIn / RefOut | False / False |
 | Final XOR | `0x0000` |
-| 검사 범위 | Byte 0~29 |
-| 패킷 저장 순서 | CRC Low, CRC High |
+| 저장 순서 | CRC Low, CRC High |
 
-```c
-static uint16_t JetsonSpi_Crc16CcittFalse(const uint8_t *data,
-                                          uint32_t length)
-{
-    uint16_t crc = 0xFFFFU;
-    uint32_t index;
-    uint8_t bit;
+검사 범위는 SENSOR와 GPS가 각각 해당 Subframe의 Byte 0~29이고, COMMAND는 64바이트 프레임의 Byte 0~61이다.
 
-    for (index = 0U; index < length; ++index)
-    {
-        crc ^= (uint16_t)data[index] << 8U;
+## 9. DRDY와 DMA 동작 순서
 
-        for (bit = 0U; bit < 8U; ++bit)
-        {
-            if ((crc & 0x8000U) != 0U)
-            {
-                crc = (uint16_t)((crc << 1U) ^ 0x1021U);
-            }
-            else
-            {
-                crc <<= 1U;
-            }
-        }
-    }
+1. STM32가 `tx_frame[0:32]`에 SENSOR, `tx_frame[32:64]`에 GPS를 만든다.
+2. STM32가 `HAL_SPI_TransmitReceive_DMA(..., 64)`로 SPI2 Slave DMA를 Arm한다.
+3. DMA Arm 성공 후 STM32가 PC9 `DRDY`를 High로 만든다.
+4. Jetson이 DRDY High를 확인하고 CS를 Low로 내린다.
+5. Jetson이 정확히 64바이트를 전송해 MOSI COMMAND와 MISO SENSOR+GPS를 동시에 교환한다.
+6. Jetson이 CS를 High로 올린다.
+7. STM32 완료 콜백이 DRDY를 Low로 내린다.
+8. STM32 메인 루프가 수신 COMMAND를 검증하고 다음 송신 프레임을 준비한다.
 
-    return crc;
-}
-```
+CS를 32바이트마다 올렸다 내리거나, 기존처럼 32바이트만 전송하면 DMA 완료가 발생하지 않으므로 반드시 한 CS 구간에서 64바이트를 교환해야 한다.
 
-## 8. STM32 패킷 생성 예제
-
-구조체를 통째로 전송하면 컴파일러 패딩과 엔디언에 의존할 수 있으므로, 반드시 `uint8_t frame[32]`에 명시적으로 넣는다.
-
-```c
-#define JETSON_SPI_FRAME_SIZE           32U
-#define JETSON_SPI_JOINT_COUNT          18U
-#define JETSON_SPI_CRC_INPUT_SIZE       30U
-
-#define SPI_OFFSET_MAGIC                 0U
-#define SPI_OFFSET_VERSION_TYPE          1U
-#define SPI_OFFSET_SEQUENCE              2U
-#define SPI_OFFSET_DELTA_TIME             4U
-#define SPI_OFFSET_FLAGS                  5U
-#define SPI_OFFSET_JOINTS                6U
-#define SPI_OFFSET_IMU_ROLL             24U
-#define SPI_OFFSET_IMU_PITCH            26U
-#define SPI_OFFSET_IMU_YAW              28U
-#define SPI_OFFSET_CRC                  30U
-
-static void JetsonSpi_WriteU16Le(uint8_t *destination, uint16_t value)
-{
-    destination[0] = (uint8_t)(value & 0xFFU);
-    destination[1] = (uint8_t)((value >> 8U) & 0xFFU);
-}
-
-static void JetsonSpi_WriteI16Le(uint8_t *destination, int16_t value)
-{
-    JetsonSpi_WriteU16Le(destination, (uint16_t)value);
-}
-
-static void JetsonSpi_BuildSensorFrame(uint8_t frame[JETSON_SPI_FRAME_SIZE],
-                                       uint16_t sequence,
-                                       uint8_t delta_time_100us,
-                                       const bool foot_contact[6],
-                                       const float joint_angle_rad[18],
-                                       float roll_rad,
-                                       float pitch_rad,
-                                       float yaw_rad)
-{
-    uint16_t crc;
-    uint32_t joint;
-    uint32_t leg;
-
-    frame[SPI_OFFSET_MAGIC] = JETSON_SPI_MAGIC;
-    frame[SPI_OFFSET_VERSION_TYPE] =
-        JETSON_SPI_MAKE_VERSION_TYPE(JETSON_SPI_PROTOCOL_VERSION,
-                                     JETSON_SPI_TYPE_SENSOR);
-
-    JetsonSpi_WriteU16Le(&frame[SPI_OFFSET_SEQUENCE], sequence);
-    frame[SPI_OFFSET_DELTA_TIME] = delta_time_100us;
-    frame[SPI_OFFSET_FLAGS] = 0U;
-
-    for (leg = 0U; leg < 6U; ++leg)
-    {
-        if (foot_contact[leg])
-        {
-            frame[SPI_OFFSET_FLAGS] |= (uint8_t)(1U << leg);
-        }
-    }
-
-    for (joint = 0U; joint < JETSON_SPI_JOINT_COUNT; ++joint)
-    {
-        frame[SPI_OFFSET_JOINTS + joint] =
-            JetsonSpi_EncodeJoint(joint_angle_rad[joint]);
-    }
-
-    JetsonSpi_WriteI16Le(&frame[SPI_OFFSET_IMU_ROLL],
-                         JetsonSpi_EncodeImu(roll_rad));
-    JetsonSpi_WriteI16Le(&frame[SPI_OFFSET_IMU_PITCH],
-                         JetsonSpi_EncodeImu(pitch_rad));
-    JetsonSpi_WriteI16Le(&frame[SPI_OFFSET_IMU_YAW],
-                         JetsonSpi_EncodeImu(yaw_rad));
-
-    crc = JetsonSpi_Crc16CcittFalse(frame, JETSON_SPI_CRC_INPUT_SIZE);
-    JetsonSpi_WriteU16Le(&frame[SPI_OFFSET_CRC], crc);
-}
-```
-
-## 9. STM32 수신 패킷 검증 예제
-
-향후 Jetson 명령 패킷도 같은 32바이트 외피를 사용한다. STM32는 데이터를 적용하기 전에 최소한 크기, 시작값, 버전, 패킷 종류와 CRC를 검사해야 한다.
-
-```c
-static uint16_t JetsonSpi_ReadU16Le(const uint8_t *source)
-{
-    return (uint16_t)source[0] |
-           ((uint16_t)source[1] << 8U);
-}
-
-static int16_t JetsonSpi_ReadI16Le(const uint8_t *source)
-{
-    return (int16_t)JetsonSpi_ReadU16Le(source);
-}
-
-static bool JetsonSpi_ValidateFrame(const uint8_t frame[32],
-                                    uint8_t expected_type)
-{
-    uint8_t version;
-    uint8_t type;
-    uint16_t received_crc;
-    uint16_t calculated_crc;
-
-    if (frame[SPI_OFFSET_MAGIC] != JETSON_SPI_MAGIC)
-    {
-        return false;
-    }
-
-    version = (uint8_t)(frame[SPI_OFFSET_VERSION_TYPE] >> 4U);
-    type = (uint8_t)(frame[SPI_OFFSET_VERSION_TYPE] & 0x0FU);
-
-    if ((version != JETSON_SPI_PROTOCOL_VERSION) ||
-        (type != expected_type))
-    {
-        return false;
-    }
-
-    received_crc = JetsonSpi_ReadU16Le(&frame[SPI_OFFSET_CRC]);
-    calculated_crc = JetsonSpi_Crc16CcittFalse(
-        frame,
-        JETSON_SPI_CRC_INPUT_SIZE);
-
-    return received_crc == calculated_crc;
-}
-```
-
-검증에 실패한 프레임은 부분적으로 사용하지 않고 통째로 폐기한다. 명령 패킷의 경우 마지막 정상 명령을 제한 시간 동안만 유지하고, 통신 Timeout이 발생하면 안전 상태로 전환해야 한다.
-
-## 10. Jetson Python 파싱 예제
+## 10. Jetson 파싱 골격
 
 ```python
 import struct
-from dataclasses import dataclass
 
-FRAME_SIZE = 32
-MAGIC = 0xA5
-PROTOCOL_VERSION = 2
-PACKET_TYPE_SENSOR = 1
-
-JOINT_MIN_RAD = -2.35619449
-JOINT_MAX_RAD = 2.35619449
+TRANSFER_SIZE = 64
+VERSION = 3
 
 
 def crc16_ccitt_false(data: bytes) -> int:
     crc = 0xFFFF
-
     for value in data:
         crc ^= value << 8
-
         for _ in range(8):
-            if crc & 0x8000:
-                crc = ((crc << 1) ^ 0x1021) & 0xFFFF
-            else:
-                crc = (crc << 1) & 0xFFFF
-
+            crc = (((crc << 1) ^ 0x1021) if (crc & 0x8000)
+                   else (crc << 1)) & 0xFFFF
     return crc
 
 
-def decode_joint(encoded: int) -> float:
-    return JOINT_MIN_RAD + (encoded / 255.0) * (
-        JOINT_MAX_RAD - JOINT_MIN_RAD
-    )
-
-
-@dataclass
-class SensorPacket:
-    sequence: int
-    delta_time_s: float
-    foot_contact: list[bool]
-    joint_angle_rad: list[float]
-    roll_rad: float
-    pitch_rad: float
-    yaw_rad: float
-
-
-def parse_sensor_packet(frame: bytes) -> SensorPacket:
-    if len(frame) != FRAME_SIZE:
-        raise ValueError(f"invalid frame size: {len(frame)}")
-
-    if frame[0] != MAGIC:
-        raise ValueError("invalid magic")
-
-    version = frame[1] >> 4
-    packet_type = frame[1] & 0x0F
-
-    if version != PROTOCOL_VERSION:
-        raise ValueError(f"unsupported protocol version: {version}")
-
-    if packet_type != PACKET_TYPE_SENSOR:
-        raise ValueError(f"unexpected packet type: {packet_type}")
-
+def validate_subframe(frame: bytes, expected_type: int) -> None:
+    if len(frame) != 32:
+        raise ValueError("subframe length")
+    if frame[0] != 0xA5 or frame[1] != ((VERSION << 4) | expected_type):
+        raise ValueError("header/version/type")
     received_crc = struct.unpack_from("<H", frame, 30)[0]
-    calculated_crc = crc16_ccitt_false(frame[:30])
+    if received_crc != crc16_ccitt_false(frame[:30]):
+        raise ValueError("CRC")
 
-    if received_crc != calculated_crc:
-        raise ValueError(
-            f"CRC mismatch: rx=0x{received_crc:04X}, "
-            f"calc=0x{calculated_crc:04X}"
-        )
 
-    sequence = struct.unpack_from("<H", frame, 2)[0]
-    delta_time_100us = frame[4]
-    contact_mask = frame[5]
-    foot_contact = [bool(contact_mask & (1 << leg)) for leg in range(6)]
-    joints = [decode_joint(value) for value in frame[6:24]]
-    roll_raw, pitch_raw, yaw_raw = struct.unpack_from("<hhh", frame, 24)
+rx = bytes(spi.xfer2([0x00] * TRANSFER_SIZE))
+sensor = rx[0:32]
+gps = rx[32:64]
+validate_subframe(sensor, 0x1)
+validate_subframe(gps, 0x5)
 
-    return SensorPacket(
-        sequence=sequence,
-        delta_time_s=delta_time_100us * 0.0001,
-        foot_contact=foot_contact,
-        joint_angle_rad=joints,
-        roll_rad=roll_raw / 10000.0,
-        pitch_rad=pitch_raw / 10000.0,
-        yaw_rad=yaw_raw / 10000.0,
-    )
+latitude_deg = struct.unpack_from("<i", gps, 6)[0] / 1e7
+longitude_deg = struct.unpack_from("<i", gps, 10)[0] / 1e7
+altitude_m = struct.unpack_from("<i", gps, 14)[0] / 1000.0
 ```
 
-## 11. Jetson SPI 수신 예제
+실제 Jetson 코드는 DRDY를 확인한 뒤 `xfer2()`를 호출해야 한다. 명령을 보낼 때는 `[0x00] * 64` 대신 규격에 맞춰 CRC까지 생성한 COMMAND 64바이트를 전달한다.
 
-Jetson은 `DRDY`가 High인 것을 확인한 후 NSS/CS를 Low로 만들고 정확히 32바이트를 교환한다. Python `spidev`를 사용하는 최소 형태는 다음과 같다.
+## 11. 현재 구현 파일과 남은 작업
 
-```python
-import spidev
+STM32 구현은 다음 파일에 반영되어 있다.
 
-spi = spidev.SpiDev()
-spi.open(0, 0)
-spi.mode = 0
-spi.max_speed_hz = 1_000_000
-spi.bits_per_word = 8
+- `workspace/Hexapod/Core/Inc/communication/jetson_spi.h`
+- `workspace/Hexapod/Core/Src/communication/jetson_spi.c`
+- `workspace/Hexapod/Core/Inc/common/robot_types.h`
+- `workspace/Hexapod/Core/Src/sensor/sensor_manager.c`
+- `workspace/Hexapod/Core/Src/test/communication_test.c`
 
-
-def read_stm32_sensor_packet() -> SensorPacket:
-    # 실제 코드에서는 이 호출 전에 DRDY GPIO가 High인지 확인한다.
-    received = bytes(spi.xfer2([0x00] * FRAME_SIZE))
-    return parse_sensor_packet(received)
-```
-
-`spi.open(bus, chip_select)` 값과 `DRDY` GPIO 번호는 Jetson의 실제 핀 설정에 맞춰 확정해야 한다. SPI 속도는 처음에는 1 MHz로 검증하고 배선과 신호 무결성을 확인한 뒤 높인다.
-
-## 12. SPI 및 DRDY 동작 순서
-
-권장 트랜잭션 순서는 다음과 같다.
-
-1. STM32가 최신 센서 스냅샷으로 다음 `tx_frame[32]`를 완성한다.
-2. STM32가 `HAL_SPI_TransmitReceive_DMA()`로 32바이트 Slave DMA를 Arm한다.
-3. DMA Arm이 성공하면 STM32가 `DRDY`를 High로 만들고 Jetson이 이를 확인한다.
-4. Jetson이 NSS/CS를 Low로 만들고 정확히 32바이트의 SPI 클록을 발생시킨다.
-5. Jetson은 MOSI로 명령 또는 NOP 패킷을 보내면서 동시에 MISO로 센서 패킷을 받는다.
-6. 32바이트 교환 후 Jetson이 NSS/CS를 High로 만든다.
-7. STM32가 전송 완료를 확인하고 `DRDY`를 Low로 만든다.
-8. STM32가 수신 프레임을 검증하고 다음 송신 프레임을 준비한다.
-9. 준비가 끝나면 STM32가 다시 `DRDY`를 High로 만든다.
-
-SPI는 전이중 통신이므로 같은 트랜잭션에서 송신과 수신이 동시에 진행된다. 따라서 Jetson이 이번 트랜잭션에서 보낸 명령의 처리 결과는 일반적으로 다음 트랜잭션의 STM32 송신 패킷에 반영된다.
-
-## 13. 수신 검사 순서
-
-Jetson과 STM32 모두 다음 순서로 검사한다.
-
-1. 수신 길이가 정확히 32바이트인지 확인한다.
-2. `MAGIC == 0xA5`인지 확인한다.
-3. 프로토콜 버전을 확인한다.
-4. 예상한 패킷 종류인지 확인한다.
-5. Byte 0~29로 CRC를 다시 계산한다.
-6. 계산 CRC와 Byte 30~31의 수신 CRC를 비교한다.
-7. 순번을 이전 정상 패킷과 비교한다.
-8. 모든 검사가 통과한 경우에만 데이터를 사용한다.
-
-CRC 오류 패킷의 순번은 마지막 정상 순번으로 갱신하지 않는다.
-
-## 14. 현재 코드 구현 상태
-
-현재 구현된 기능은 다음과 같다.
-
-- 18개 관절각, 6개 발 접촉 상태와 IMU 자세의 32바이트 센서 프레임 생성
-- 순번 증가와 패킷 생성 Delta time 계산
-- CRC-16/CCITT-FALSE 생성 및 검증
-- 수신 패킷의 시작값, 버전, 순번, 종류와 Payload 파싱
-- `COMMAND` 패킷의 24바이트 Raw Payload 보관 및 일회성 소비 API
-- 수신 순번 유실, 유효 패킷, 잘못된 패킷과 HAL SPI 오류 횟수 기록
-- Jetson이 센서 읽기용으로 보내는 32바이트 `0x00` Dummy 프레임 허용
-- 릴레이 OFF일 때 18개 관절을 0도로 전송하고 Jetson 좌표용 선택 관절 부호 변환
-- SPI2 RX/TX DMA를 먼저 Arm한 뒤 `DRDY` High, 완료·오류 콜백에서 Low
-- DMA 완료 프레임을 Main Loop에서 파싱하여 5 ms 제어가 Jetson 클록을 기다리지 않음
-- 최종 `HexapodApp_BoardInit()` 경로에서 SPI2 통신 활성화
-
-추가로 필요한 작업은 다음과 같다.
-
-1. Jetson에서 보낼 `COMMAND` Payload의 24바이트 세부 배치를 정의한다.
-2. 정상 `COMMAND` 패킷을 프로젝트의 자율주행 명령과 안전 우선순위에 연결한다.
-3. Jetson 명령이 일정 시간 들어오지 않으면 자율주행 명령을 해제하고 프로젝트의 안전 상태로 전환한다.
-4. 실제 Jetson에서 DRDY 대기, 32바이트 전이중 전송, CRC·순번과 DMA 오류 복구를 통합 검증한다.
-
-## 15. 향후 확장 원칙
-
-- Jetson에서 STM32로 보내는 제어 패킷도 동일한 `MAGIC`, 버전/종류, 순번, Delta time, CRC 위치를 사용한다.
-- Byte 6~29의 24바이트 데이터 영역만 패킷 종류에 따라 다르게 해석한다.
-- 기존 필드의 의미나 배율을 바꾸면 프로토콜 버전을 증가시킨다.
-- 패킷 종류를 추가할 때 기존 종류의 바이트 배치를 변경하지 않는다.
-- 각 패킷 종류별로 정상 패킷, CRC 오류, 순번 순환, 최대·최소 센서값에 대한 테스트 벡터를 만든다.
+남은 작업은 Jetson 실행 코드의 v3/64바이트 대응, COMMAND Payload 56바이트의 구체적인 제어 필드 정의, 명령 Timeout 및 Safety 우선순위 연결, STM32 재빌드·플래시 후 실제 하드웨어 검증이다.

@@ -125,8 +125,18 @@ typedef struct
     double latitude_deg;        // 위도를 저장한다.
     double longitude_deg;       // 경도를 저장한다.
     float altitude_m;           // 고도를 저장한다.
+    float velocity_north_mps;   // 북쪽 속도를 저장한다.
+    float velocity_east_mps;    // 동쪽 속도를 저장한다.
+    float horizontal_accuracy_m;// 수평 위치 정확도를 저장한다.
+    uint32_t i_tow_ms;          // GPS 주간 기준 시각을 ms로 저장한다.
     uint32_t timestamp_ms;      // 최근 수신 시각을 저장한다.
+    uint8_t fix_type;           // GPS Fix 종류를 저장한다.
+    uint8_t satellites_used;    // 사용 중인 위성 수를 저장한다.
+    uint8_t protocol;           // GPS_PROTOCOL_* 값을 저장한다.
+    bool fix_ok;                // 수신기가 Fix 성공을 보고했는지 저장한다.
     bool valid;                 // 위치 유효성을 저장한다.
+    bool velocity_valid;        // 속도 유효성을 저장한다.
+    bool time_valid;            // GPS 시각 유효성을 저장한다.
 } RobotGpsState_t;
 
 typedef struct
