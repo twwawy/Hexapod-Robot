@@ -15,7 +15,7 @@ Features
 - deterministic best-policy GIF at stage end
 - curriculum-manager friendly monitor files
 
-Stage 0 geometry/planner validation must be completed before PPO training.
+Optional cycle-end baseline comparison diagnoses planner versus policy failure.
 """
 
 from __future__ import annotations
@@ -536,7 +536,11 @@ def parse_args() -> argparse.Namespace:
     default="full",
 )
 
+    parser.add_argument('--baseline-comparison-seconds', type=float, default=0.,
+                        help='Cycle-end same-seed zero-action vs best-policy comparison; 0 disables.')
     args = parser.parse_args()
+    if not math.isfinite(args.baseline_comparison_seconds) or args.baseline_comparison_seconds < 0:
+        parser.error('--baseline-comparison-seconds must be finite and nonnegative')
     if args.migrate_flat_boxes and not args.restore:
         parser.error('--migrate-flat-boxes requires --restore')
 
@@ -1251,6 +1255,24 @@ def main() -> None:
         best_checkpoint = Path(
             pointer["path"]
         ).resolve()
+
+        if args.baseline_comparison_seconds:
+            try:
+                from adaptive_teacher_comparison import compare_baseline
+                comparison = compare_baseline(env, latest_policy['make_policy'], checkpoint.load(best_checkpoint),
+                    args.seed+30_000, duration=args.baseline_comparison_seconds)
+                write_json(monitor_dir/'baseline_comparison.json', comparison)
+                print('BASELINE COMPARISON: '+json.dumps(comparison, sort_keys=True), flush=True)
+                if wandb_run is not None:
+                    wandb_run.log({**comparison, 'train/global_step': latest_policy['step']})
+                    wandb_run.summary.update(comparison)
+            except Exception as exc:
+                # Diagnostic failure must not suppress the cycle best video.
+                error = f'{type(exc).__name__}: {exc}'
+                write_json(monitor_dir/'baseline_comparison_error.json', {'error': error})
+                print('BASELINE COMPARISON ERROR: '+error, flush=True)
+                if wandb_run is not None:
+                    wandb_run.summary['comparison/error'] = error
 
         print(
             "\n"

@@ -18,6 +18,10 @@
 
 ## 통합 v4: 시작과 문서
 
+**현재 추천 학습: [GT teacher curriculum](docs/ADAPTIVE_GT_TEACHER.md)**.
+정확한 지형으로 먼저 학습하고 cycle마다 zero-action/best-policy를 같은 seed로 비교한다.
+기존 cycle별 W&B best score/영상은 유지한다. 실행은 사용자에게 맡긴다.
+
 **최신 변경: elevation grid CNN 관측 v5** — 24-D 물리 action/SPI는 v4를 유지하지만,
 정책은 24×24×6 로컬 지도를 CNN으로 읽는다. 지도 극값 누적·보폭 선호 때문에 발생하는
 HOLD를 수정하고 보행 전환 지속 확인과 W&B 정지 시간 지표를 추가했다.

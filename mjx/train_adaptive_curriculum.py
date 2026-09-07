@@ -51,6 +51,13 @@ FULL_CURRICULUM = FAST_CURRICULUM + (
     StageSpec(3, 10, "hybrid-stair20"),
 )
 
+# Learn smooth terrain adaptation before sparse/rubble footholds; source is GT.
+TEACHER_CURRICULUM = tuple(StageSpec(1, level, name) for level, name in (
+    (0, 'tripod-flat'), (3, 'tripod-ramp8'), (5, 'tripod-stair5'),
+    (7, 'tripod-stair8'), (1, 'tripod-rough25'), (4, 'tripod-ramp15'),
+    (8, 'tripod-stair10'), (2, 'tripod-rough50'))) + tuple(
+        stage for stage in FULL_CURRICULUM if stage.gait_stage != 1)
+
 
 def write_json(path: Path, payload: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -74,7 +81,7 @@ def main() -> None:
 
     parser.add_argument(
         "--profile",
-        choices=("observe", "fast", "full"),
+        choices=("observe", "fast", "full", "teacher"),
         default="fast",
     )
 
@@ -88,6 +95,8 @@ def main() -> None:
     parser.add_argument('--batch-size', type=int, default=64)
     parser.add_argument('--num-minibatches', type=int, default=4)
     parser.add_argument('--num-eval-envs', type=int, default=4)
+    parser.add_argument('--baseline-comparison-seconds', type=float, default=None,
+                        help='Cycle-end paired check; default 20s for teacher profile, otherwise disabled.')
 
     parser.add_argument(
         "--run-name",
@@ -252,6 +261,16 @@ def main() -> None:
     )
     if args.profile == 'observe':
         curriculum = tuple(StageSpec(1, 0, 'tripod-flat') for _ in range(args.cycles))
+    if args.profile == 'teacher':
+        if args.perception != 'teacher':
+            parser.error('--profile teacher requires --perception teacher')
+        curriculum = TEACHER_CURRICULUM
+    comparison_seconds = args.baseline_comparison_seconds
+    if comparison_seconds is None:
+        comparison_seconds = 20. if args.profile == 'teacher' else 0.
+    import math
+    if not math.isfinite(comparison_seconds) or comparison_seconds < 0:
+        parser.error('--baseline-comparison-seconds must be finite and nonnegative')
     # Validate all future stages before launching even the first training job.
     from terrain_curriculum import terrain_level
     for stage in curriculum:
@@ -427,6 +446,7 @@ def main() -> None:
             ]
 
             command.append('--wandb' if args.wandb else '--no-wandb')
+            command.extend(['--baseline-comparison-seconds', str(comparison_seconds)])
             if args.migrate_flat_boxes and stage_index == args.start_index and retry == 0:
                 command.append('--migrate-flat-boxes')
 
