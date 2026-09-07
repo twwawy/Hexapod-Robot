@@ -40,6 +40,8 @@ def contract(env):
                              frame='body yaw aligned forward/left, height relative to body Z'),
         reward_contract=REWARD_CONTRACT, action_size=ACTION_SIZE,
         scheduler_contract='boundary_recontact_v1',
+        path_contract='sampled_foot_bottleneck_projection_v1',
+        path_variants=['request', 'early_lift_late_transfer', 'raise', 'raise_and_timing'],
         terminal_rewards=dict(success=COMPLETION_BONUS, no_progress=STALL_PENALTY,
                               physical_failure=PHYSICAL_FAILURE_PENALTY, timeout=TIMEOUT_PENALTY),
         observation_size={'state': ACTOR_SIZE, 'privileged_state': CRITIC_SIZE},

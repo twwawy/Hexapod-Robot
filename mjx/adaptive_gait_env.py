@@ -28,7 +28,7 @@ from adaptive_foothold_estimator import (
     FOOT_RADIUS, evaluate_candidates,
 )
 
-OBSERVATION_CONTRACT = 'adaptive_hybrid_elevation_grid24x24x6_v5'
+OBSERVATION_CONTRACT = 'adaptive_hybrid_elevation_grid24x24x6_path_v6'
 REWARD_CONTRACT = 'adaptive_completion_outcome_v5'
 COMPLETION_BONUS = 120.
 STALL_PENALTY = -60.
@@ -319,7 +319,9 @@ class AdaptiveGaitEnv(HexapodRoughTerrainEnv):
         # If the lift request invalidates every nearby option, use the neutral
         # reference path. A rejected residual cannot erase a safe reference.
         plan = dict(refined)
-        for name in ('world', 'pre', 'clearance', 'required', 'apex_phase', 'transfer'):
+        for name in ('world', 'pre', 'clearance', 'required', 'apex_phase', 'transfer',
+                     'path_min_margin', 'path_bottleneck_phase', 'path_bottleneck_distance',
+                     'path_margin_known', 'path_variant', 'path_height_correction'):
             values = refined[name][leg, jp.maximum(selected, 0)]
             fallback = reference_plan[name][leg, jp.maximum(reference_index, 0)]
             mask = residual_ok
@@ -358,7 +360,9 @@ class AdaptiveGaitEnv(HexapodRoughTerrainEnv):
         refined_margin = support_margin(future_feet[:, :2],
             jp.where(mode == scheduler.WAVE, jp.ones(6, dtype=jp.bool_), selected_check['swing_mask']), com[:2])
         combo_ok = refined_margin >= .012
-        for name in ('world', 'pre', 'clearance', 'required', 'apex_phase', 'transfer'):
+        for name in ('world', 'pre', 'clearance', 'required', 'apex_phase', 'transfer',
+                     'path_min_margin', 'path_bottleneck_phase', 'path_bottleneck_distance',
+                     'path_margin_known', 'path_variant', 'path_height_correction'):
             fallback = reference_plan[name][leg, jp.maximum(reference_index, 0)]
             plan['selected_'+name] = jp.where(combo_ok, plan['selected_'+name], fallback)
         selected = jp.where(combo_ok, selected, jp.where(reference_index >= 0, LOCAL_CENTER_INDEX, -1))
@@ -537,6 +541,8 @@ class AdaptiveGaitEnv(HexapodRoughTerrainEnv):
         state.metrics.update({name: jp.asarray(0.) for name in (
             'map_known_fraction', 'map_mae_m', 'map_compared_count', 'lidar_returns',
             'plan_rejected', 'projection_m', 'touchdown_error_m', 'foot_slip',
+            'path/proposal_repair_fraction', 'path/proposal_height_correction_m',
+            'path/proposal_min_margin_m', 'path/proposal_observed_fraction',
             'efficiency_joint_speed', 'efficiency_vertical_speed', 'efficiency_foot_travel', 'efficiency_excess_clearance',
             'efficiency_tiny_stride', 'stride_scale', 'phase_duration_s', 'pitch_target_rad', 'foothold_center_known_fraction',
             'foothold_coverage_fraction', 'foothold_terrain_fraction', 'foothold_ik_fraction',
@@ -680,6 +686,15 @@ class AdaptiveGaitEnv(HexapodRoughTerrainEnv):
         result.metrics.update(efficiency_joint_speed=joint_speed, efficiency_vertical_speed=vertical_speed,
             efficiency_foot_travel=foot_travel, efficiency_excess_clearance=excess_clearance,
             efficiency_tiny_stride=tiny_stride, action_authority_mean=jp.mean(self.action_scale),)
+        # Proposal diagnostics, not measured contacts or the latched swing path.
+        path_known = plan['selected_path_margin_known'] & (plan['selected_index'] >= 0)
+        result.metrics.update({
+            'path/proposal_repair_fraction': jp.mean(((plan['selected_path_variant'] > 0) & path_known).astype(jp.float32)),
+            'path/proposal_height_correction_m': jp.mean(jp.where(path_known, plan['selected_path_height_correction'], 0.)),
+            'path/proposal_min_margin_m': jp.where(jp.any(path_known),
+                jp.min(jp.where(path_known, plan['selected_path_min_margin'], jp.inf)), 0.),
+            'path/proposal_observed_fraction': jp.mean(path_known.astype(jp.float32)),
+        })
         success = result.metrics['terrain_success'] > 0.
         stalled = result.metrics['termination/no_progress'] > 0.
         physical = jp.any(jp.stack([value > 0. for key, value in result.metrics.items()

@@ -279,7 +279,12 @@ def main():
                         f'surface_safe={terrain_count:2d} ik_safe={ik_count:2d} path_safe={safe_count:2d} '+
                         f'ref={plan["reference_index"][leg]:2d} selected={plan["selected_index"][leg]:2d} '+
                         f'active={cs.active_index[leg]:2d} phase={int(state.info["controller_output"].gait_state[leg])} '+
-                        f'residual_rejected={bool(plan["residual_rejected"][leg])} reason={reason}', flush=True)
+                        f'residual_rejected={bool(plan["residual_rejected"][leg])} reason={reason} '+
+                        f'proposal_path={int(plan["selected_path_variant"][leg])} '+
+                        f'margin={plan["selected_path_min_margin"][leg]:+.3f}m '+
+                        f'bottleneck_phase={plan["selected_path_bottleneck_phase"][leg]:.2f} '+
+                        f'bottleneck_distance={plan["selected_path_bottleneck_distance"][leg]:.3f}m '+
+                        f'height_repair={plan["selected_path_height_correction"][leg]:.3f}m', flush=True)
             if save:
                 output.mkdir(parents=True, exist_ok=True)
                 (output/'.gitignore').write_text('*\n')

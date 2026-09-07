@@ -37,6 +37,8 @@ CANDIDATE_FEATURES = (
     'edge_margin', 'edge_observed', 'ik_ok', 'path_ok', 'reference',
     'normal_x', 'normal_y', 'normal_z', 'slope_x', 'slope_y', 'confidence',
     'patch_length', 'patch_width', 'ik_margin', 'joint_margin',
+    'path_min_margin', 'path_bottleneck_phase', 'path_bottleneck_distance',
+    'path_margin_known', 'path_height_correction', 'path_timing_correction',
 )
 UNKNOWN, LOW_COVERAGE, EDGE_ROUGH, IK_REJECTED, PATH_REJECTED, SAFE = range(6)
 STATUS_NAMES = ('UNKNOWN', 'LOW_COVERAGE', 'EDGE_ROUGH', 'IK_REJECTED', 'PATH_REJECTED', 'SAFE')
@@ -107,6 +109,24 @@ def residual_extent(safe):
     return jp.where(jp.any(safe, axis=1)[:, None], bounds, 0.)
 
 
+def path_bottleneck(world, height, known, fractions):
+    """Observed interior swept-foot clearance; unknown is explicitly masked."""
+    interior = (fractions > .05) & (fractions < .95)
+    observed = known & interior[..., None]
+    margin = world[..., 2, None]-FOOT_RADIUS-height
+    per_phase = jp.min(jp.where(observed, margin, jp.inf), axis=-1)
+    index = jp.argmin(per_phase, axis=-1)
+    valid = jp.any(observed, axis=(-2, -1))
+    minimum = jp.min(per_phase, axis=-1)
+    return (jp.where(valid, minimum, 0.), jp.where(valid, fractions[index], 0.), valid, index)
+
+
+def select_path_variant(feasible, cost):
+    """Preserve a safe request; reject the original if no repair is feasible."""
+    best = jp.argmin(jp.where(feasible, cost, jp.inf), axis=0)
+    return jp.where(feasible[0] | ~jp.any(feasible, axis=0), 0, best)
+
+
 def evaluate_candidates(env, data, info, xy, nominal, basis, lift, *, apex_delta=0., transfer_delta=0., privileged=False):
     """Terrain, endpoint/path IK and observed swing collisions for all 6x25 points."""
     query = lambda points: env._query(info['lidar_map'], points, data.time, privileged=privileged)
@@ -138,28 +158,58 @@ def evaluate_candidates(env, data, info, xy, nominal, basis, lift, *, apex_delta
     rise = center_h-(feet[:, None, 2]-FOOT_RADIUS)
     apex_phase = jp.clip(.5-jp.clip(rise/.15, -1., 1.)*.1+apex_delta, .3, .7)
     transfer = jp.clip(.5+transfer_delta, .35, .65)*jp.ones_like(clearance)
-    paths = jax.vmap(adaptive.planned_swing, in_axes=(0, None, None, None, None, None))(
-        fractions, starts, pre, clearance, apex_phase, transfer).transpose(1, 2, 0, 3)
-    shifted = paths.at[..., 2].add(-cs.height_applied)
-    controller_paths = fw._rotate_inverse(shifted, cs.posture_command)
-    # Firmware IK expects the leg axis immediately before XYZ.
-    ik_vectors = controller_paths.transpose(1, 2, 0, 3)
-    angles, path_ik = fw._solve_ik(ik_vectors)
-    local = fw._body_to_leg(ik_vectors)
-    reach = jp.sqrt((jp.linalg.norm(local[..., :2], axis=-1)-fw.LINK_1)**2 + local[..., 2]**2)
-    reach_margin = jp.minimum(fw.LINK_2+fw.LINK_3-reach, reach-abs(fw.LINK_2-fw.LINK_3))
-    ik_margin = jp.min(reach_margin, axis=1).T
-    joint_margin = jp.min(fw.JOINT_LIMIT-jp.max(jp.abs(angles), axis=-1), axis=1).T
-    ik_ok = jp.all(path_ik, axis=1).T & (ik_margin >= fw.WORKSPACE_MARGIN) & (joint_margin >= .01745)
-    path_model = jp.stack((controller_paths[..., 1], -controller_paths[..., 0], controller_paths[..., 2]), axis=-1)
-    path_world = data.qpos[:3] + path_model @ rotation.T
-    ch, ck, _, _ = query(path_world[..., None, :2] + footprint)
-    # Conservative swept foot footprint, excluding exact takeoff/touchdown.
-    interior = (fractions > .05) & (fractions < .95)
-    collision = ck & interior[None, None, :, None] & (
-        path_world[..., 2, None]-FOOT_RADIUS < ch+.002)
-    path_ok = ~jp.any(collision, axis=(-2, -1)) & (clearance >= required+.02)
-    path_coverage = jp.mean(ck.astype(jp.float32), axis=(-2, -1))
+    def check_trajectory(candidate_clearance, candidate_apex, candidate_transfer):
+        paths = jax.vmap(adaptive.planned_swing, in_axes=(0, None, None, None, None, None))(
+            fractions, starts, pre, candidate_clearance, candidate_apex, candidate_transfer).transpose(1, 2, 0, 3)
+        shifted = paths.at[..., 2].add(-cs.height_applied)
+        controller_paths = fw._rotate_inverse(shifted, cs.posture_command)
+        # Firmware IK expects the leg axis immediately before XYZ.
+        ik_vectors = controller_paths.transpose(1, 2, 0, 3)
+        angles, path_ik = fw._solve_ik(ik_vectors)
+        local = fw._body_to_leg(ik_vectors)
+        reach = jp.sqrt((jp.linalg.norm(local[..., :2], axis=-1)-fw.LINK_1)**2 + local[..., 2]**2)
+        reach_margin = jp.minimum(fw.LINK_2+fw.LINK_3-reach, reach-abs(fw.LINK_2-fw.LINK_3))
+        ik_margin = jp.min(reach_margin, axis=1).T
+        joint_margin = jp.min(fw.JOINT_LIMIT-jp.max(jp.abs(angles), axis=-1), axis=1).T
+        ik_ok = jp.all(path_ik, axis=1).T & (ik_margin >= fw.WORKSPACE_MARGIN) & (joint_margin >= .01745)
+        path_model = jp.stack((controller_paths[..., 1], -controller_paths[..., 0], controller_paths[..., 2]), axis=-1)
+        path_world = data.qpos[:3] + path_model @ rotation.T
+        ch, ck, _, _ = query(path_world[..., None, :2] + footprint)
+        min_margin, bottleneck_phase, margin_known, bottleneck_index = path_bottleneck(path_world, ch, ck, fractions)
+        path_ok = (~margin_known | (min_margin >= .002)) & (candidate_clearance >= required+.02)
+        path_coverage = jp.mean(ck.astype(jp.float32), axis=(-2, -1))
+        distance = jp.linalg.norm(path_world[..., :2]-feet[:, None, None, :2], axis=-1)
+        bottleneck_distance = jp.take_along_axis(distance, bottleneck_index[..., None], axis=-1)[..., 0]
+        return dict(ik_margin=ik_margin, joint_margin=joint_margin, ik_ok=ik_ok,
+            path_ok=path_ok, path_coverage=path_coverage, path_min_margin=min_margin,
+            path_bottleneck_phase=bottleneck_phase, path_margin_known=margin_known,
+            path_bottleneck_distance=jp.where(margin_known, bottleneck_distance, 0.))
+    # Check the RL request first. Only project it when it fails path/IK safety.
+    # Fixed bank: request, timing repair, height repair, combined repair.
+    initial = check_trajectory(clearance, apex_phase, transfer)
+    deficit = jp.maximum(.006-initial['path_min_margin'], 0.)
+    raised = jp.minimum(clearance+jp.clip(deficit*1.5, .015, .06), .18)
+    early = jp.clip(apex_phase-.10, .3, .7)
+    delayed = jp.clip(transfer+.10, .35, .65)
+    heights = jp.stack((clearance, clearance, raised, raised))
+    apexes = jp.stack((apex_phase, early, apex_phase, early))
+    transfers = jp.stack((transfer, delayed, transfer, delayed))
+    repairs = jax.vmap(check_trajectory)(heights[1:], apexes[1:], transfers[1:])
+    alternatives = jax.tree_util.tree_map(
+        lambda original, repaired: jp.concatenate((original[None, ...], repaired), axis=0), initial, repairs)
+    feasible = alternatives['ik_ok'] & alternatives['path_ok'] & (alternatives['path_coverage'] >= MIN_COVERAGE)
+    cost = (heights-clearance)/.06 + jp.abs(apexes-apex_phase) + jp.abs(transfers-transfer)
+    variant = select_path_variant(feasible, cost)
+    selected_path = jax.tree_util.tree_map(
+        lambda values: jp.take_along_axis(values, variant[None, ...], axis=0)[0], alternatives)
+    height_correction = jp.take_along_axis(heights, variant[None, ...], axis=0)[0]-clearance
+    timing_correction = (variant == 1) | (variant == 3)
+    clearance = jp.take_along_axis(heights, variant[None, ...], axis=0)[0]
+    apex_phase = jp.take_along_axis(apexes, variant[None, ...], axis=0)[0]
+    transfer = jp.take_along_axis(transfers, variant[None, ...], axis=0)[0]
+    ik_margin, joint_margin = selected_path['ik_margin'], selected_path['joint_margin']
+    ik_ok, path_ok = selected_path['ik_ok'], selected_path['path_ok']
+    path_coverage = selected_path['path_coverage']
     path_observed = path_coverage >= MIN_COVERAGE
     safe = terrain_ok & ik_ok & path_ok & path_observed
     status = jp.where(~quality['any_known'], UNKNOWN,
@@ -192,7 +242,12 @@ def evaluate_candidates(env, data, info, xy, nominal, basis, lift, *, apex_delta
             quality['normal'][..., 0], quality['normal'][..., 1], quality['normal'][..., 2],
             quality['gradient'][..., 0], quality['gradient'][..., 1], confidence,
             lengths[0]/.25, lengths[1]/.25, jp.clip(ik_margin/.1, -2., 2.),
-            jp.clip(joint_margin, -2., 2.)), axis=-1)), axis=-1)
+            jp.clip(joint_margin, -2., 2.),
+            jp.clip(selected_path['path_min_margin']/.1, -2., 2.),
+            selected_path['path_bottleneck_phase'],
+            jp.clip(selected_path['path_bottleneck_distance']/.3, 0., 3.),
+            selected_path['path_margin_known'].astype(jp.float32), height_correction/.06,
+            timing_correction.astype(jp.float32)), axis=-1)), axis=-1)
     return dict(xy=xy, height=center_h, known=quality['coverage_ok'], unsafe=unsafe,
         safe=safe, terrain_ok=terrain_ok, ik_ok=ik_ok, path_ok=path_ok, status=status,
         path_height=path_high, path_coverage=path_coverage, required=required, clearance=clearance,
@@ -201,4 +256,11 @@ def evaluate_candidates(env, data, info, xy, nominal, basis, lift, *, apex_delta
         patch_known=known, patch_height=jp.where(known, height, 0.),
         confidence=confidence, patch_length=lengths[0], patch_width=lengths[1],
         ik_margin=ik_margin, joint_margin=joint_margin, apex_phase=apex_phase, transfer=transfer,
-        reference_index=reference_index, **quality)
+        reference_index=reference_index, path_variant=variant,
+        path_min_margin=selected_path['path_min_margin'],
+        path_bottleneck_phase=selected_path['path_bottleneck_phase'],
+        path_bottleneck_distance=selected_path['path_bottleneck_distance'],
+        path_margin_known=selected_path['path_margin_known'],
+        path_height_correction=height_correction, path_timing_correction=timing_correction,
+        requested_path_margin=initial['path_min_margin'],
+        requested_bottleneck_phase=initial['path_bottleneck_phase'], **quality)

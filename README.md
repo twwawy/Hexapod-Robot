@@ -4,6 +4,13 @@
 현재 목표는 **yaw 조종 명령 없이 전진해서 지형을 완주하는 정책**을 학습하는 것이다.
 작업 브랜치는 `codex/adaptive-hybrid-rl-integration`이다.
 
+## 계단 경로 보정 업데이트
+
+계단 경로의 최소 여유 높이와 그 위치·시점을 계산해 높이/이동 timing 보정안을 비교한다.
+기존 보폭 후보에도 같은 검사를 적용한다. [설계·진단·사용자 검사](docs/ADAPTIVE_PATH_BOTTLENECK.md).
+관측 계약이 path v6로 바뀌었으므로 이전 checkpoint restore 없이 새 학습을 시작한다.
+실행 중인 pinned source 학습에는 변경이 적용되지 않는다.
+
 ## 현재 학습 방향
 
 | 항목 | 설정 |
@@ -54,7 +61,7 @@ bash scripts/train_adaptive_curriculum.sh \
   --profile teacher \
   --command-mode terrain \
   --perception teacher \
-  --run-name adaptive-gt-forward-completion \
+  --run-name forward-gt-path-v6 \
   --timesteps-per-stage 800000 \
   --num-envs 512 --batch-size 128 --num-minibatches 4 \
   --num-evals 5 --num-eval-envs 16 --episode-length 8000 \
