@@ -87,7 +87,8 @@ bash scripts/train_adaptive_curriculum.sh \
 ## W&B와 결과 확인
 
 Cycle은 `tryXX` 하나의 학습 시도다. 평가 중 점수·완주율을 기록하고,
-cycle 종료 시 그 cycle의 best checkpoint로 영상을 생성해 W&B에 업로드한다.
+매 학습 후 평가 종료마다 그 시점까지의 cycle best checkpoint로 영상을 생성해 W&B에 업로드한다.
+Best가 갱신되지 않은 평가에서도 업로드한다. Step 0 평가와 cycle 종료의 중복 영상은 제외한다.
 Best는 완주율 우선, 동률이면 reward로 선택한다. 전체 누적 best 영상은 생성하지 않는다.
 
 - `eval/episode_terrain_success`: 승급 기준. 평가 환경 16개에서는 최소 12개 성공이 필요하다.
@@ -123,3 +124,5 @@ RC와 terrain은 서로 다른 task다. RC 가중치를 자동 이전하지 않�
 
 상세: [GT 전진 완주 학습](docs/ADAPTIVE_GT_TEACHER.md).
 학습·시뮬레이션·실기 검증은 사용자가 실행한다. 설정 변경을 학습 성능 검증으로 취급하지 않는다.
+
+매 평가 영상 및 기존 계단 checkpoint 재개: [실행 안내](docs/ADAPTIVE_EVAL_VIDEOS.md).
