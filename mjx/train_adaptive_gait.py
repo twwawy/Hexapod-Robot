@@ -12,7 +12,7 @@ Features
 - 24-D adaptive contract persistence
 - W&B metrics
 - best-score checkpoint selection
-- deterministic best-policy GIF at stage end
+- deterministic best-so-far GIF after every trained evaluation
 - curriculum-manager friendly monitor files
 
 Optional cycle-end baseline comparison diagnoses planner versus policy failure.
@@ -26,6 +26,7 @@ import functools
 import json
 import math
 import os
+import shutil
 from pathlib import Path
 from typing import Any
 
@@ -996,7 +997,7 @@ def main() -> None:
             "cycle/*",
             step_metric="train/global_step",
         )
-        wandb_run.summary['cycle/best_video_status'] = 'waiting_for_cycle_end' if args.best_video else 'disabled'
+        wandb_run.summary['cycle/best_video_status'] = 'waiting_for_evaluation' if args.best_video else 'disabled'
 
         wandb_run.summary["stage/gait"] = (
             args.stage
@@ -1093,6 +1094,32 @@ def main() -> None:
 
         return True
 
+    pending_video_step = None
+    published_video_steps = set()
+
+    def publish_pending_video():
+        nonlocal pending_video_step
+        step = pending_video_step
+        if step is None or step in published_video_steps or not args.best_video:
+            return
+        if not latest_policy or latest_policy['step'] < step or best_step is None:
+            return
+        if not persist_best_pointer():
+            return
+        # Callback order may be checkpoint->eval or eval->checkpoint.
+        # Publish each trained evaluation once, including non-NEW BEST events.
+        pending_video_step = None
+        published_video_steps.add(step)
+        try:
+            publish_best_video(step)
+        except Exception as exc:
+            error = f'{type(exc).__name__}: {exc}'
+            write_json(monitor_dir/f'eval_video_{step:012d}_error.json', {'step': step, 'error': error})
+            print(f'EVAL VIDEO ERROR | step={step}: {error}', flush=True)
+            if wandb_run is not None:
+                wandb_run.summary['cycle/best_video_status'] = 'publish_failed'
+                wandb_run.summary['cycle/best_video_error'] = error
+
     # -----------------------------------------------------------------------
     # Brax progress callback
     # -----------------------------------------------------------------------
@@ -1101,7 +1128,7 @@ def main() -> None:
         step: int,
         metrics: Any,
     ) -> None:
-        nonlocal best_score, best_step, best_metrics, pending_best
+        nonlocal best_score, best_step, best_metrics, pending_best, pending_video_step
 
         step = int(step)
         numeric = numeric_metrics(metrics)
@@ -1212,6 +1239,10 @@ def main() -> None:
                     }
                 )
 
+        if step > 0 and score is not None and math.isfinite(score):
+            pending_video_step = step
+            publish_pending_video()
+
     # -----------------------------------------------------------------------
     # Brax policy/checkpoint callback
     # -----------------------------------------------------------------------
@@ -1282,6 +1313,8 @@ def main() -> None:
         # Also handles callback ordering where best was already known.
         if best_step == step:
             persist_best_pointer()
+
+        publish_pending_video()
 
     # -----------------------------------------------------------------------
     # Stage finalization
@@ -1358,6 +1391,18 @@ def main() -> None:
             flush=True,
         )
 
+        # The last evaluation already published its best-so-far video.
+        publish_pending_video()
+
+        print(
+            "============================================\n",
+            flush=True,
+        )
+
+    def publish_best_video(evaluation_step):
+        pointer_path = monitor_dir/'best_checkpoint.json'
+        pointer = json.loads(pointer_path.read_text())
+        best_checkpoint = Path(pointer['path']).resolve()
         # ---------------------------------------------------------------
         # Render deterministic best rollout
         # ---------------------------------------------------------------
@@ -1375,7 +1420,7 @@ def main() -> None:
 
             video_path = (
                 video_dir
-                / "best.gif"
+                / f"eval_{evaluation_step:012d}_best_{best_step:012d}.gif"
             )
 
             try:
@@ -1423,9 +1468,15 @@ def main() -> None:
                     flush=True,
                 )
 
-                pointer["video"] = str(
-                    video_path
-                )
+                # Keep the manager's final-cycle path while preserving each eval file.
+                shutil.copy2(video_path, video_dir/'best.gif')
+                termination = video_path.with_suffix('.termination.json')
+                if termination.is_file():
+                    shutil.copy2(termination, (video_dir/'best.gif').with_suffix('.termination.json'))
+                pointer['video'] = str(video_dir/'best.gif')
+                pointer['evaluation_video'] = str(video_path)
+                pointer['video_evaluation_step'] = evaluation_step
+                write_json(monitor_dir/f'eval_video_{evaluation_step:012d}.json', pointer)
 
                 write_json(
                     pointer_path,
@@ -1441,7 +1492,7 @@ def main() -> None:
                     and wandb_module is not None
                 ):
                     caption = (
-                        f"Adaptive elevation CNN v5 | "
+                        f"{metadata['observation_contract']} | eval {evaluation_step:,} | "
                         f"gait stage {args.stage} | "
                         f"terrain {args.terrain_level} | "
                         f"step {best_step:,} | "
@@ -1462,6 +1513,7 @@ def main() -> None:
                                     format="gif",
                                     caption=caption,
                                 ),
+                            "cycle/video_evaluation_step": evaluation_step,
                             "stage/best_score":
                                 best_score,
                             "stage/best_step":
@@ -1471,7 +1523,7 @@ def main() -> None:
                             "cycle/best_step":
                                 best_step,
                             "train/global_step":
-                                latest_policy['step'],
+                                evaluation_step,
                         }
                     )
 
@@ -1490,6 +1542,7 @@ def main() -> None:
                             ),
                             type="policy",
                             metadata={
+                                "evaluation_step": evaluation_step,
                                 "step":
                                     best_step,
                                 "score":
@@ -1530,14 +1583,11 @@ def main() -> None:
                         aliases=[
                             "best",
                             f"step-{best_step}",
+                            f"eval-{evaluation_step}",
                         ],
                     )
                     wandb_run.summary['cycle/best_video_status'] = 'upload_queued'
 
-        print(
-            "============================================\n",
-            flush=True,
-        )
 
     # -----------------------------------------------------------------------
     # PPO
@@ -1609,7 +1659,7 @@ def main() -> None:
     except BaseException as exc:
         if wandb_run is not None:
             wandb_run.summary['cycle/error'] = f'{type(exc).__name__}: {exc}'
-            if wandb_run.summary.get('cycle/best_video_status') == 'waiting_for_cycle_end':
+            if wandb_run.summary.get('cycle/best_video_status') == 'waiting_for_evaluation':
                 wandb_run.summary['cycle/best_video_status'] = 'training_failed_before_video'
         raise
     finally:

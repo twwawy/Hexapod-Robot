@@ -1,3 +1,9 @@
+# 계단 v5 checkpoint 재개 전용 브랜치
+
+현재 브랜치는 `codex/stair5-eval-video-resume`이며 v5 소스를 보존한다.
+**[checkpoint 및 실행 명령](docs/ADAPTIVE_EVAL_VIDEOS.md)**을 사용한다.
+매 평가 best-so-far 영상을 게시한다. v6 경로 보정은 포함하지 않는다.
+
 # Hexapod Robot — 전진 지형 완주 학습
 
 6개 다리·18개 관절을 사용하는 로봇의 MJX 기반 residual RL 프로젝트다.
