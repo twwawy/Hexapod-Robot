@@ -106,6 +106,15 @@ def main():
                            np.full(3, radius), np.asarray(position), np.eye(3).reshape(9), np.asarray(color, dtype=np.float32))
         scene.ngeom += 1
 
+    def elevation_cell(scene, position):
+        if scene.ngeom >= scene.maxgeom:
+            return
+        mujoco.mjv_initGeom(scene.geoms[scene.ngeom], mujoco.mjtGeom.mjGEOM_BOX,
+                           np.array((RESOLUTION*.47, RESOLUTION*.47, .001)),
+                           np.asarray(position), np.eye(3).reshape(9),
+                           np.array((.1, .7, .85, .18), dtype=np.float32))
+        scene.ngeom += 1
+
     with mujoco.viewer.launch_passive(model, display, key_callback=keys.put) as viewer:
         viewer.cam.distance = 2.6
         viewer.cam.azimuth = 135.
@@ -204,7 +213,7 @@ def main():
                     indices = indices[::max(1, int(np.ceil(len(indices)/700)))]
                     for i, j in indices:
                         xy = grid.center + (np.array((i, j))+.5-GRID_N/2)*RESOLUTION
-                        sphere(scene, (*xy, grid.height[i, j]+.002), .009, (.1, .7, .85, .14))
+                        elevation_cell(scene, (*xy, grid.height[i, j]+.002))
                 for leg in range(6):
                     for candidate in range(CANDIDATE_COUNT):
                         status = int(plan['status'][leg, candidate])

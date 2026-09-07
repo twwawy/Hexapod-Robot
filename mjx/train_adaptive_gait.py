@@ -853,6 +853,8 @@ def main() -> None:
     # -----------------------------------------------------------------------
 
     factory = network_factory()
+    print(f'NETWORK: elevation CNN v5 | observation={env.observation_size} | '
+          'grid=24x24x6 @ 5cm | physical action=24-D v4 | fresh v5 checkpoint required', flush=True)
 
     network_config = checkpoint.network_config(
         env.observation_size,

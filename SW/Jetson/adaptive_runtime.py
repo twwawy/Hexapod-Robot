@@ -13,7 +13,7 @@ import jax.numpy as jp
 import numpy as np
 import adaptive_gait_controller as adaptive
 from adaptive_gait_env import AdaptiveGaitEnv, ACTOR_SIZE
-from adaptive_gait_perception import MapState, initial_map, sample, GRID_N, RESOLUTION, MAX_AGE
+from adaptive_gait_perception import MapState, initial_map, sample, GRID_N, RESOLUTION, MAX_AGE, fuse_surface
 import hybrid_gait_supervisor as supervisor
 import wave_gait_scheduler as scheduler
 from adaptive_execution_plan import AdaptiveExecutionPlan, LegPlan
@@ -39,6 +39,8 @@ class HardwareGeometry:
     perception = 'lidar'
     gait_mode = 'hybrid'
     dt = .02
+    # Hardware never authorizes blind bootstrap from simulator assumptions.
+    bootstrap_unmapped = False
     def _query(self, grid, xy, now, *, privileged=False):
         if privileged:
             raise ValueError('Hardware geometry has no oracle')
@@ -65,11 +67,8 @@ def update_world_returns(grid, points, valid, position, now):
     ij=jp.clip(ij,0,GRID_N-1); ids=ij[:,0]*GRID_N+ij[:,1]
     high=jp.full(GRID_N*GRID_N,-jp.inf).at[ids].max(jp.where(valid,points[:,2],-jp.inf)).reshape(GRID_N,GRID_N)
     low=jp.full(GRID_N*GRID_N,jp.inf).at[ids].min(jp.where(valid,points[:,2],jp.inf)).reshape(GRID_N,GRID_N)
-    seen=jp.isfinite(high); fresh=(now-stamp>=0)&(now-stamp<=MAX_AGE)
-    high=jp.where(fresh,jp.maximum(high,height),high)
-    low=jp.where(fresh,jp.minimum(low,height-spread),low)
-    return MapState(jp.where(seen,high,height),jp.where(seen,now,stamp),
-                    jp.where(seen,high-low,spread),center,jp.sum(valid))
+    height,stamp,spread=fuse_surface(height,stamp,spread,high,low,now)
+    return MapState(height,stamp,spread,center,jp.sum(valid))
 
 class AdaptiveRuntime:
     def __init__(self):
@@ -117,7 +116,8 @@ class AdaptiveRuntime:
                          jp.asarray(com_world)[None],jp.asarray(now))
         contacts=jp.array([bool(o['contacts']&(1<<i)) for i in range(6)])
         info=dict(controller_state=cs,lidar_map=grid,confirmed_contacts=contacts,
-                  command=jp.array((o['command'][0],o['command'][2],0.,0.,0.)),supervisor=self.supervisor)
+                  command=jp.array((o['command'][0],o['command'][2],0.,0.,0.)),supervisor=self.supervisor,
+                  bootstrap_complete=jp.asarray(True),bootstrap_ready_s=jp.asarray(0.))
         plan=self.geometry._landing_plan(data,info,action)
         self.supervisor=supervisor.SupervisorState(plan['return_time'],plan['wave_time'],plan['decision'])
         mode=int(plan['mode']); desired_mask=int(sum((1<<i)*int(v) for i,v in enumerate(np.asarray(scheduler.swing_mask(mode,phase if mode==o['gait'] else 0)))))

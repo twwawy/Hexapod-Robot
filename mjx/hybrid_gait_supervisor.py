@@ -28,16 +28,26 @@ def phase_duration(scale, mode):
                     jp.clip(TRIPOD_PHASE_S*scale, *TRIPOD_PHASE_LIMITS))
 
 
+def stride_choice(feasible, requested_scale):
+    """Prefer a safe scale at/below request, otherwise nearest safe scale.
+
+    A preference must not turn an existing safe plan into HOLD.
+    Oversize Tripod constraints are applied by the caller.
+    """
+    below = feasible & (STRIDE_SCALES <= requested_scale+1e-6)
+    preferred = jp.argmax(below.astype(jp.int32))
+    nearest = jp.argmin(jp.where(feasible, jp.abs(STRIDE_SCALES-requested_scale), jp.inf))
+    return jp.where(jp.any(below), preferred, nearest), jp.any(feasible)
+
+
 def decide(s, *, tripod_feasible, tripod_known_bad, wave_feasible, two_tripod_phases,
            current_mode, requested_scale, dt, fixed_mode='hybrid'):
     return_time = jp.where(two_tripod_phases, s.return_time+dt, 0.)
     wave_time = jp.where(current_mode == WAVE, s.wave_time+dt, 0.)
     # Oversize stride is permitted only if normal stride also passed preflight.
     normal = tripod_feasible[1]
-    eligible = tripod_feasible & (STRIDE_SCALES <= requested_scale+1e-6)
-    eligible &= (STRIDE_SCALES <= 1.) | normal
-    has_tripod = jp.any(eligible)
-    index = jp.argmax(eligible.astype(jp.int32))
+    eligible = tripod_feasible & ((STRIDE_SCALES <= 1.) | normal)
+    index, has_tripod = stride_choice(eligible, requested_scale)
     normal_or_short = jp.where(STRIDE_SCALES[index] >= 1., NORMAL, SHORT)
     all_known_bad = jp.all(tripod_known_bad[1:])
     decision = jp.where(has_tripod, normal_or_short,

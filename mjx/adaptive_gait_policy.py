@@ -16,21 +16,27 @@ from adaptive_foothold_estimator import (
 
 
 def network_factory():
-    from brax.training.agents.ppo import networks
-    return functools.partial(networks.make_ppo_networks, policy_hidden_layer_sizes=(256, 256, 128),
+    from adaptive_grid_network import make_grid_networks
+    return functools.partial(make_grid_networks, policy_hidden_layer_sizes=(256, 256, 128),
                              value_hidden_layer_sizes=(256, 256, 128),
                              policy_obs_key='state', value_obs_key='privileged_state')
 
 
 def contract(env):
     root = Path(__file__).resolve().parent
-    sources = ('adaptive_contract.py', 'adaptive_gait_controller.py', 'adaptive_gait_env.py', 'adaptive_gait_perception.py',
+    sources = ('adaptive_contract.py', 'adaptive_grid.py', 'adaptive_grid_network.py', 'adaptive_gait_controller.py', 'adaptive_gait_env.py', 'adaptive_gait_perception.py',
                'adaptive_foothold_estimator.py', 'foothold_feasibility.py',
                'hybrid_gait_supervisor.py', 'wave_gait_scheduler.py',
                'adaptive_gait_policy.py', 'firmware_mjx_controller.py', 'rough_terrain_env.py',
                'prepare_rl_scene.py', 'servo_model.py', 'terrain_curriculum.py', 'lidar_extrinsics.py')
     revision = subprocess.check_output(['git', '-C', str(root.parent), 'rev-parse', 'HEAD'], text=True).strip()
+    from adaptive_grid import GRID_SIDE, GRID_CHANNEL_NAMES, GRID_RESOLUTION
+    from adaptive_grid_network import NETWORK_CONTRACT
     return dict(git_commit=revision, action_contract=ACTION_CONTRACT, observation_contract=OBSERVATION_CONTRACT,
+        network_contract=NETWORK_CONTRACT,
+        elevation_input=dict(shape=[GRID_SIDE, GRID_SIDE, len(GRID_CHANNEL_NAMES)],
+                             resolution_m=GRID_RESOLUTION, channels=GRID_CHANNEL_NAMES,
+                             frame='body yaw aligned forward/left, height relative to body Z'),
         reward_contract=REWARD_CONTRACT, action_size=ACTION_SIZE,
         observation_size={'state': ACTOR_SIZE, 'privileged_state': CRITIC_SIZE},
         actor_source=env.perception, leg_order=LEG_ORDER,
@@ -86,8 +92,9 @@ def read_contract(path, *, migrate_flat_boxes=False):
     if not manifest.is_file():
         raise ValueError(f'Missing 24-D adaptive contract: {manifest}; stage31 18-D cannot be loaded')
     metadata = json.loads(manifest.read_text())
+    from adaptive_grid_network import NETWORK_CONTRACT
     for field, expected in (('action_contract', ACTION_CONTRACT), ('observation_contract', OBSERVATION_CONTRACT),
-                            ('action_size', ACTION_SIZE),
+                            ('action_size', ACTION_SIZE), ('network_contract', NETWORK_CONTRACT),
                             ('observation_size', {'state': ACTOR_SIZE, 'privileged_state': CRITIC_SIZE})):
         if metadata.get(field) != expected:
             raise ValueError(f'Incompatible checkpoint {field}: {metadata.get(field)} != {expected}')

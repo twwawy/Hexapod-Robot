@@ -16,6 +16,7 @@ import wave_gait_scheduler as scheduler
 import hybrid_gait_supervisor as supervisor
 from foothold_feasibility import phase_feasibility, support_margin
 from adaptive_gait_perception import AngularLidar, SENSOR_PERIOD, MAX_AGE, initial_map, sample
+from adaptive_grid import GRID_SIZE, local_grid
 from rough_terrain_env import (
     HexapodRoughTerrainEnv, MODEL_FORWARD, MODEL_LATERAL,
     _quat_rotate_inverse, default_config,
@@ -27,13 +28,15 @@ from adaptive_foothold_estimator import (
     FOOT_RADIUS, evaluate_candidates,
 )
 
-OBSERVATION_CONTRACT = 'adaptive_hybrid_geometry_local25_extent_24_v4'
+OBSERVATION_CONTRACT = 'adaptive_hybrid_elevation_grid24x24x6_v5'
 REWARD_CONTRACT = 'adaptive_hybrid_efficifent_progress_v4'
 PROPRIO_SIZE = 157
 GLOBAL_SIZE = 23
 REFERENCE_SIZE = 6*9
 BOOTSTRAP_MAX_PHASES = 24
-ACTOR_SIZE = PROPRIO_SIZE + GLOBAL_SIZE + REFERENCE_SIZE + 6*CANDIDATE_COUNT*len(CANDIDATE_FEATURES)
+BOOTSTRAP_CONFIRM_S = .4
+VECTOR_SIZE = PROPRIO_SIZE + GLOBAL_SIZE + REFERENCE_SIZE + 6*CANDIDATE_COUNT*len(CANDIDATE_FEATURES)
+ACTOR_SIZE = VECTOR_SIZE + GRID_SIZE
 CRITIC_SIZE = ACTOR_SIZE + 6*CANDIDATE_COUNT*2 + 15
 
 
@@ -132,6 +135,7 @@ class AdaptiveGaitEnv(HexapodRoughTerrainEnv):
         info['confirmed_contacts'] = jp.zeros(6, dtype=jp.bool_)
         info['slip_estimate'] = jp.zeros(6)
         info['bootstrap_complete'] = jp.asarray(self.perception != 'lidar')
+        info['bootstrap_ready_s'] = jp.asarray(0.)
         info['foothold_plan'] = self._landing_plan(data, info, jp.zeros(adaptive.ACTION_SIZE))
         return info
 
@@ -253,11 +257,10 @@ class AdaptiveGaitEnv(HexapodRoughTerrainEnv):
             mode=scheduler.WAVE))(supervisor.STRIDE_SCALES, wave_periods)
         wave_checks = jax.vmap(lambda p, duration, scale: self._phase_check(p, data, info, feet,
             scheduler.WAVE, wave_phase, duration, scale))(wave_bank, wave_periods, supervisor.STRIDE_SCALES)
-        wave_eligible = wave_checks['feasible'] & (supervisor.STRIDE_SCALES <= requested_stride+1e-6)
-        wave_index = jp.argmax(wave_eligible.astype(jp.int32))
+        wave_index, wave_available = supervisor.stride_choice(wave_checks['feasible'], requested_stride)
         wave_plan = jax.tree_util.tree_map(lambda value: value[wave_index], wave_bank)
         wave_check = jax.tree_util.tree_map(lambda value: value[wave_index], wave_checks)
-        wave_check['feasible'] &= jp.any(wave_eligible)
+        wave_check['feasible'] &= wave_available
         next_supervisor, bank_index = supervisor.decide(info['supervisor'],
             tripod_feasible=checks['feasible'], tripod_known_bad=checks['known_infeasible'],
             wave_feasible=wave_check['feasible'], two_tripod_phases=checks['feasible'][1] & next_check['feasible'],
@@ -355,8 +358,11 @@ class AdaptiveGaitEnv(HexapodRoughTerrainEnv):
         # conservative classical Tripod phases. This is permitted only until a
         # local support patch has been observed, with all six feet confirmed,
         # and without claiming that unknown map cells are generally safe.
-        local_plan_ready = jp.any(checks['feasible'])
-        info['bootstrap_complete'] = info['bootstrap_complete'] | local_plan_ready
+        # Only hand off at a contact boundary after BOTH groups remain feasible.
+        local_plan_ready = checks['feasible'][1] & next_check['feasible']
+        info['bootstrap_ready_s'] = jp.where(local_plan_ready, info['bootstrap_ready_s']+self.dt, 0.)
+        boundary = ~cs.scheduler.running & jp.all(contacts)
+        info['bootstrap_complete'] |= boundary & (info['bootstrap_ready_s'] >= BOOTSTRAP_CONFIRM_S)
         bootstrap = (self.bootstrap_unmapped & (self.perception == 'lidar') &
                      ~info['bootstrap_complete'] & ~cs.scheduler.running & jp.all(contacts) &
                      (cs.scheduler.epoch < BOOTSTRAP_MAX_PHASES))
@@ -364,6 +370,12 @@ class AdaptiveGaitEnv(HexapodRoughTerrainEnv):
         bootstrap_period = supervisor.phase_duration(bootstrap_stride, scheduler.TRIPOD)
         bootstrap_plan = self._candidates(data, info, bootstrap_stride, bootstrap_period,
                                           mode=scheduler.TRIPOD)
+        # Initial blind advance is bounded and must never override an observed
+        # obstacle at the actual nominal landing. Wide-search off-path edges do
+        # not veto otherwise unknown nominal locations.
+        nominal_hazard = bootstrap_plan['unsafe'][:, CANDIDATE_COUNT//2]
+        bootstrap &= ~jp.any(scheduler.swing_mask(scheduler.TRIPOD, phase) & nominal_hazard)
+        bootstrap &= self.gait_mode != 'wave'
         bootstrap_world = bootstrap_plan['nominal'].at[:, 2].add(-FOOT_RADIUS)
         model = (bootstrap_world+jp.array((0., 0., FOOT_RADIUS))-data.qpos[:3]) @ data.xmat[self._root_id]
         body = jp.stack((-model[:, 1], model[:, 0], model[:, 2]), axis=-1)
@@ -483,7 +495,10 @@ class AdaptiveGaitEnv(HexapodRoughTerrainEnv):
             jp.array((plan['decision'], plan['max_feasible_stride'], plan['tripod_feasible'][1],
                       plan['wave_feasible'], jp.mean(candidates['confidence']), plan['support_margin']))))
         assert global_obs.shape == (GLOBAL_SIZE,)
-        actor = jp.concatenate((proprio, global_obs, reference_obs.reshape(-1), candidates['features'].reshape(-1)))
+        grid = local_grid(lambda xy, now: self._query(info['lidar_map'], xy, now),
+                          data.qpos[:3], data.xmat[self._root_id] @ MODEL_FORWARD, data.time)
+        actor = jp.concatenate((proprio, global_obs, reference_obs.reshape(-1),
+                                candidates['features'].reshape(-1), grid.reshape(-1)))
         # Privileged fields are a separate network input, never concatenated into actor.
         xy = candidates['xy'].reshape(-1, 2)
         gt = self._terrain_height(xy).reshape(6, CANDIDATE_COUNT)
@@ -504,7 +519,10 @@ class AdaptiveGaitEnv(HexapodRoughTerrainEnv):
             'foothold_coverage_fraction', 'foothold_terrain_fraction', 'foothold_ik_fraction',
             'foothold_safe_fraction', 'foothold_selected_fraction', 'foothold_residual_rejected_fraction',
             'gait_mode', 'supervisor_mode', 'max_feasible_stride', 'support_margin', 'gait_switch',
-            'scheduler_fault', 'oracle_safe_recall', 'oracle_false_safe', 'oracle_unknown_fraction',
+            'scheduler_fault', 'hold_planner_s', 'hold_contact_wait_s', 'hold_map_unknown_s',
+            'hold_surface_rejected_s', 'hold_ik_rejected_s', 'hold_path_rejected_s',
+            'hold_support_rejected_s', 'bootstrap_classical_s', 'stride_preference_projected_s',
+            'oracle_safe_recall', 'oracle_false_safe', 'oracle_unknown_fraction',
             'oracle_foothold_error_m', 'oracle_compared', 'oracle_edge_recall', 'oracle_edge_precision', 'action_authority_mean',)})
         return state
 
@@ -561,6 +579,25 @@ class AdaptiveGaitEnv(HexapodRoughTerrainEnv):
             touchdown_error_m=landing_error, foot_slip=slip, stride_scale=cs.stride_scale,
             phase_duration_s=cs.phase_duration, pitch_target_rad=cs.adapt_posture[1])
         plan = result.info['foothold_plan']
+        # Seconds per tick, summed by the evaluator into episode durations.
+        # Candidate rejection categories may overlap: these are evidence, not
+        # mutually exclusive assertions about a single causal failure.
+        commanded = jp.any(jp.abs(result.info['command'][:2]) > 1e-4)
+        waiting = commanded & ~cs.scheduler.running
+        held = waiting & ~plan['permit']
+        active = scheduler.swing_mask(plan['mode'], cs.scheduler.phase)
+        def missing(mask):
+            return jp.any(active & ~jp.any(mask, axis=1))
+        result.metrics.update(
+            hold_planner_s=held.astype(jp.float32)*self.dt,
+            hold_contact_wait_s=(waiting & ~jp.all(result.info['confirmed_contacts'])).astype(jp.float32)*self.dt,
+            hold_map_unknown_s=(held & missing(plan['coverage_ok'])).astype(jp.float32)*self.dt,
+            hold_surface_rejected_s=(held & jp.any(active[:, None] & plan['unsafe'])).astype(jp.float32)*self.dt,
+            hold_ik_rejected_s=(held & missing(plan['terrain_ok'] & plan['ik_ok'])).astype(jp.float32)*self.dt,
+            hold_path_rejected_s=(held & missing(plan['terrain_ok'] & plan['ik_ok'] & plan['path_ok'] & (plan['path_coverage'] >= .6))).astype(jp.float32)*self.dt,
+            hold_support_rejected_s=(held & (plan['support_margin'] < .012)).astype(jp.float32)*self.dt,
+            bootstrap_classical_s=plan['bootstrap_classical'].astype(jp.float32)*self.dt,
+            stride_preference_projected_s=(plan['permit'] & (plan['stride'] > adaptive.decode(action)[3]+1e-6)).astype(jp.float32)*self.dt)
         result.metrics.update(foothold_center_known_fraction=jp.mean(plan['center_known'].astype(jp.float32)),
             foothold_coverage_fraction=jp.mean(plan['coverage_ok'].astype(jp.float32)),
             foothold_terrain_fraction=jp.mean(plan['terrain_ok'].astype(jp.float32)),

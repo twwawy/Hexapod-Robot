@@ -18,6 +18,26 @@ GRID_N = 64
 RESOLUTION = .05
 MAX_AGE = 60.  # retain front scans long enough to reach the rear legs at slow speed
 SENSOR_PERIOD = 5  # 100 ms, simulated time
+SPREAD_DECAY_S = 2.
+
+
+def fuse_surface(height, stamp, spread, high, low, now):
+    """Recent upper surface/envelope, never an unbounded lifetime min/max.
+
+    Simultaneous vertical returns and repeated height transitions retain their
+    spread. Isolated historical extrema decay as new measurements arrive.
+    Unseen cells retain both their value and original age.
+    """
+    seen = jp.isfinite(high) & jp.isfinite(low)
+    fresh = (now-stamp >= 0.) & (now-stamp <= MAX_AGE)
+    high = jp.where(seen, high, height)
+    low = jp.where(seen, low, height-spread)
+    decay = jp.exp(-jp.maximum(now-stamp, 0.)/SPREAD_DECAY_S)
+    # A new observed surface is adopted immediately; no persistent upward bias.
+    innovation = jp.abs(high-height)
+    variation = jp.maximum(high-low, jp.where(fresh, jp.maximum(spread*decay, innovation), 0.))
+    return (jp.where(seen, high, height), jp.where(seen, now, stamp),
+            jp.where(seen, variation, spread))
 
 
 class MapState(NamedTuple):
@@ -91,9 +111,5 @@ class AngularLidar:
         seen = jp.isfinite(maximum).reshape(GRID_N, GRID_N)
         new_high = maximum.reshape(GRID_N, GRID_N)
         new_low = minimum.reshape(GRID_N, GRID_N)
-        fresh = data.time-stamp <= MAX_AGE
-        new_high = jp.where(fresh, jp.maximum(new_high, height), new_high)
-        new_low = jp.where(fresh, jp.minimum(new_low, height-spread), new_low)
-        updated = jp.where(seen, new_high, height)
-        variation = jp.where(seen, new_high-new_low, spread)
-        return MapState(updated, jp.where(seen, data.time, stamp), variation, center, jp.sum(valid)), key
+        updated, stamp, variation = fuse_surface(height, stamp, spread, new_high, new_low, data.time)
+        return MapState(updated, stamp, variation, center, jp.sum(valid)), key

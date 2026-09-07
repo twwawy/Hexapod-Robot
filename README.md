@@ -18,6 +18,12 @@
 
 ## 통합 v4: 시작과 문서
 
+**최신 변경: elevation grid CNN 관측 v5** — 24-D 물리 action/SPI는 v4를 유지하지만,
+정책은 24×24×6 로컬 지도를 CNN으로 읽는다. 지도 극값 누적·보폭 선호 때문에 발생하는
+HOLD를 수정하고 보행 전환 지속 확인과 W&B 정지 시간 지표를 추가했다.
+**기존 checkpoint와 입력/network가 달라 새 학습이 필요하다. 이번 변경의 학습·시뮬레이션은
+실행하지 않았다.** [변경 범위·새 학습 명령·확인 항목](docs/ADAPTIVE_ELEVATION_GRID_V5.md)
+
 현재 작업 브랜치 `codex/adaptive-hybrid-rl-integration`은 최신 main에서 시작해 adaptive MJX를
 선택적으로 가져왔다. Full merge는 하지 않았다. **코드 통합과 portable 계약 검사까지 진행했으며,
 계단 등판·PPO·STM32 보드 동작은 아직 검증하지 않았다.**
