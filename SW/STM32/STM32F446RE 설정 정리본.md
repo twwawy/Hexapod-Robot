@@ -236,7 +236,7 @@ STM32F446RE = SPI Slave
 
 ### 현재 프로토콜
 
-SPI2는 고정 32바이트 v2 프레임을 DMA 전이중 방식으로 송수신한다. STM32가 DMA를 먼저 Arm한 뒤 `DRDY`를 High로 만들고, 32바이트 전송 완료 또는 오류 콜백에서 `DRDY`를 Low로 내린다. 센서 프레임에는 18개 관절각, 6개 발 접촉과 IMU Roll·Pitch·Yaw를 넣고 CRC-16/CCITT-FALSE로 검증한다. 수신 `COMMAND`의 24바이트 Payload는 보관하지만 자율주행 제어에는 아직 연결하지 않는다. 바이트 배치와 Jetson 처리 순서는 [STM32–Jetson SPI 32바이트 패킷 프로토콜](STM32-Jetson%20SPI%2032바이트%20패킷%20프로토콜.md)을 따른다.
+SPI2는 고정 64바이트 v3 트랜잭션을 DMA 전이중 방식으로 송수신한다. STM32가 DMA를 먼저 Arm한 뒤 `DRDY`를 High로 만들고, 한 CS 구간의 64바이트 전송 완료 또는 오류 콜백에서 `DRDY`를 Low로 내린다. STM32에서 Jetson으로 보내는 Byte 0~31은 18개 관절각·6개 발 접촉·IMU 자세를 담은 SENSOR Subframe이고, Byte 32~63은 위도·경도·고도·속도·정확도·위성 및 Fix 상태를 담은 GPS Subframe이다. 두 Subframe은 CRC-16/CCITT-FALSE로 각각 검증한다. Jetson에서 받는 `COMMAND`도 64바이트이며 56바이트 Raw Payload를 보관하지만 자율주행 제어에는 아직 연결하지 않는다. 바이트 배치와 Jetson 처리 순서는 [STM32–Jetson SPI 패킷 프로토콜](STM32-Jetson%20SPI%2032바이트%20패킷%20프로토콜.md)을 따른다.
 
 ---
 

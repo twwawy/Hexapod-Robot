@@ -339,7 +339,7 @@ UART5 115200 baud에 연결된 RYLR998의 AT 명령, 주소·Network 설정, 송
 
 ### `communication/jetson_spi.h`
 
-SPI2 Slave에서 32바이트 v2 프레임을 DMA 전이중 송수신한다. 센서 프레임에는 관절각, 발 접촉과 IMU 자세를 넣고 CRC-16/CCITT-FALSE로 보호한다. 수신 `COMMAND`의 24바이트 Payload는 검증·보관하지만 자율주행 명령에는 아직 연결하지 않는다. 세부 규격은 [STM32–Jetson SPI 프로토콜](STM32-Jetson%20SPI%2032바이트%20패킷%20프로토콜.md)을 따른다.
+SPI2 Slave에서 64바이트 v3 트랜잭션을 DMA 전이중 송수신한다. STM32 송신 버퍼의 Byte 0~31은 관절각·발 접촉·IMU를 담은 SENSOR Subframe이고, Byte 32~63은 위도·경도·고도·속도·정확도·위성 및 Fix 상태를 담은 GPS Subframe이다. 두 Subframe은 각각 독립된 CRC-16/CCITT-FALSE를 사용한다. Jetson이 보내는 `COMMAND`는 64바이트 전체 프레임이며, Byte 6~61의 56바이트 Payload를 검증·보관하지만 자율주행 명령에는 아직 연결하지 않는다. 세부 규격은 [STM32–Jetson SPI 프로토콜](STM32-Jetson%20SPI%2032바이트%20패킷%20프로토콜.md)을 따른다.
 
 ### `communication/manipulator_link.h`
 
@@ -476,7 +476,7 @@ Kill 상태를 반영한 Relay 출력
 | 서기 전 영점 정렬 | 30 deg/s |
 | Rollover Fault | Roll 또는 Pitch 절댓값 80 deg 이상 |
 | Controller Fault | 비유한 IMU 또는 최종 IK Invalid 3회 연속 |
-| Jetson SPI | SPI2 Slave DMA, 32바이트 v2, CRC-16/CCITT-FALSE |
+| Jetson SPI | SPI2 Slave DMA, 64바이트 v3, SENSOR 32B + GPS 32B, CRC-16/CCITT-FALSE |
 | 매니퓰레이터 | UART5, 115200 baud, 16바이트, 200 Hz |
 
 관절 ADC, 압력센서 임계값, 서보 방향·영점, 릴레이-다리 대응과 CRSF raw 보정값은 현재 `common/robot_calibration.c`에 저장되어 있다. 기구나 배선이 바뀌면 Measurement Stage 결과로 이 중앙 테이블을 다시 갱신한다.
