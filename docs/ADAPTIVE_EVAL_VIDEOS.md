@@ -16,6 +16,17 @@ Best가 같으면 영상 내용도 같을 수 있다. 새 정책의 매 평가 �
 실패는 status/error로 남기며 PPO를 중단하지 않는다. 무손실 업로드를 보장하지 않는다.
 Baseline 비교는 기존대로 cycle 종료에 한 번만 수행한다.
 
+## 경로 혼동 없이 실행
+
+```bash
+bash /home/huro/Hexapod-Robot-stair5-resume/scripts/resume_stair5_best.sh
+```
+
+현재 터미널 위치와 무관하게 이 스크립트가 있는 v5 저장소를 사용한다.
+시작 전에 checkpoint의 모든 기록된 source hash를 검사한다. v6 소스와 혼합되면
+JAX/W&B/run 생성 전에 종료한다. 위 명령이 사용하는 모든 옵션은 아래와 같다.
+필요한 학습량/환경 수는 뒤에 옵션을 붙여 바꿀 수 있으나 restore/task는 preset 그대로 사용한다.
+
 ## 지정 GIF의 checkpoint
 
 `best_video_7_0e1017aebbbc13860373.gif`는 로컬 best.gif와 SHA256이 일치한다.
