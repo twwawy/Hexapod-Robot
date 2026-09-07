@@ -1,5 +1,8 @@
 # GT teacher 우선 학습
 
+재접촉 수정 이후 최신 승급 정책/재개 명령은 [70% 통과까지 재시도](ADAPTIVE_RECONTACT.md)를 따른다.
+아래 advance 명령은 이전의 지형 탐색용 설정이며 현재 추천은 무제한 retry + stop이다.
+
 최신 변경은 [완주 보상·경사면 재개 명령](ADAPTIVE_COMPLETION_REWARD.md)을 먼저 확인한다.
 잔차 authority는 유지하고 완주율 우선 best 선택, 최대 40초 영상, 마지막 5초 진단을 추가했다.
 

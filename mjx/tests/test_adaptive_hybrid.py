@@ -15,6 +15,50 @@ from foothold_feasibility import support_margin
 
 
 class HybridSafetyTest(unittest.TestCase):
+    def test_boundary_recontact_without_new_swing_permission(self):
+        state = scheduler.initial_scheduler()._replace(epoch=jp.asarray(4), phase=jp.asarray(4))
+        contacts = jp.array((False, True, True, True, True, True))
+        def advance(s, contact, raw):
+            return scheduler.advance(s, requested_mode=jp.asarray(scheduler.WAVE), permit=jp.asarray(False),
+                proposal_epoch=s.epoch, command_active=jp.asarray(True), contacts=contact,
+                raw_contacts=raw, duration=1., dt=.005)
+        state, gait = advance(state, contacts, contacts)
+        self.assertTrue(bool(state.recontact_active))
+        self.assertEqual(int(gait['state'][0]), scheduler.LATE)
+        self.assertTrue(bool(jp.all(gait['state'][1:] == scheduler.HOLD)))
+        self.assertFalse(bool(jp.any(gait['entering'])))
+        self.assertEqual(int(state.mode), scheduler.TRIPOD)
+        self.assertEqual(int(state.epoch), 4)
+        state, gait = advance(state, contacts, jp.ones(6, dtype=bool))
+        self.assertEqual(int(gait['state'][0]), scheduler.TOUCHDOWN)
+        for _ in range(25):
+            state, gait = advance(state, jp.ones(6, dtype=bool), jp.ones(6, dtype=bool))
+        self.assertFalse(bool(state.recontact_active))
+        self.assertFalse(bool(state.running))  # still no validated new plan
+        state, gait = scheduler.advance(state, requested_mode=jp.asarray(scheduler.WAVE), permit=jp.asarray(True),
+            proposal_epoch=state.epoch, command_active=jp.asarray(True), contacts=jp.ones(6, dtype=bool),
+            raw_contacts=jp.ones(6, dtype=bool), duration=1., dt=.005)
+        self.assertTrue(bool(state.running))
+        self.assertEqual(int(state.mode), scheduler.WAVE)
+
+    def test_boundary_recontact_is_vertical_and_bounded(self):
+        state = controller.initial_state()
+        sched = state.scheduler._replace(epoch=jp.asarray(2), recontact_active=jp.asarray(True))
+        state = state._replace(scheduler=sched)
+        gait = dict(entering=jp.zeros(6, dtype=bool), state=jp.array([scheduler.LATE]+[scheduler.HOLD]*5),
+                    progress=jp.ones(6), startup=False, recontact_active=True)
+        updates, _ = controller._foot_trajectory(state, gait, jp.zeros(4), True)
+        np.testing.assert_allclose(updates['foot_memory'][:, :2], state.foot_memory[:, :2])
+        self.assertAlmostEqual(float(state.foot_memory[0, 2]-updates['foot_memory'][0, 2]), .03*.005, places=6)
+        np.testing.assert_allclose(updates['foot_memory'][1:], state.foot_memory[1:])
+        contacts = jp.array([False]+[True]*5)
+        expired = sched._replace(recontact_time=jp.asarray(scheduler.RECONTACT_TIMEOUT_S))
+        next_state, gait = scheduler.advance(expired, requested_mode=0, permit=True, proposal_epoch=expired.epoch,
+            command_active=True, contacts=contacts, raw_contacts=contacts, duration=1., dt=.005)
+        self.assertTrue(bool(next_state.fault))
+        self.assertTrue(bool(next_state.recontact_exhausted))
+        self.assertTrue(bool(jp.all(gait['state'] == scheduler.HOLD)))
+
     def test_partial_plane_requires_center_and_noncollinear_support(self):
         height = PATCH_OFFSETS[:, 0]*.1
         spread = jp.zeros(5)

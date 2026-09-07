@@ -18,12 +18,16 @@
 
 ## 통합 v4: 시작과 문서
 
+**최신: [phase 경계 재접촉 복구·70% 통과까지 재시도](docs/ADAPTIVE_RECONTACT.md)**.
+MJX에서 대기 중 접촉이 끊긴 발만 제한적으로 내려 복구한다. GT 높이 계산/잔차 범위는
+유지한다. curriculum 기본값은 완주율 70%를 통과해야 다음 지형으로 진행하며 무제한 재시도를 지원한다.
+
 **현재 추천 학습: [GT teacher curriculum](docs/ADAPTIVE_GT_TEACHER.md)**.
 정확한 지형으로 먼저 학습하고 cycle마다 zero-action/best-policy를 같은 seed로 비교한다.
 기존 cycle별 W&B best score/영상은 유지한다. 실행은 사용자에게 맡긴다.
 경사면 기존 checkpoint에서 [완주 보상으로 재개](docs/ADAPTIVE_COMPLETION_REWARD.md)할 수 있다.
 잔차 범위 유지, 완주율 우선 best 선택, 최대 40초 영상과 마지막 5초 진단,
-retry 소진 후 다음 지형 진행을 적용한다.
+재시도·승급 정책은 위 최신 재접촉 문서의 70% 통과 기준을 따른다.
 
 **최신 변경: elevation grid CNN 관측 v5** — 24-D 물리 action/SPI는 v4를 유지하지만,
 정책은 24×24×6 로컬 지도를 CNN으로 읽는다. 지도 극값 누적·보폭 선호 때문에 발생하는

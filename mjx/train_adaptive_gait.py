@@ -566,9 +566,13 @@ def parse_args() -> argparse.Namespace:
                         help='Cycle-end same-seed zero-action vs best-policy comparison; 0 disables.')
     parser.add_argument('--migrate-completion-reward', action='store_true',
                         help='Explicitly transfer reviewed v5-grid weights into new completion reward.')
+    parser.add_argument('--migrate-recontact', action='store_true',
+                        help='Explicit controller migration from reviewed completion reward revision.')
     parser.add_argument('--discounting', type=float, default=.997,
                         help='PPO discount; .997 retains more delayed completion credit than .99.')
     args = parser.parse_args()
+    if args.migrate_recontact and (not args.restore or args.migrate_completion_reward or args.migrate_flat_boxes):
+        parser.error('--migrate-recontact requires --restore and excludes other migrations')
     if not 0. < args.discounting < 1.:
         parser.error('--discounting must be between 0 and 1')
     if args.migrate_completion_reward and (not args.restore or args.migrate_flat_boxes):
@@ -736,7 +740,8 @@ def main() -> None:
     if args.restore or args.init_teacher:
         restore, old = read_contract(
             args.restore or args.init_teacher, migrate_flat_boxes=args.migrate_flat_boxes,
-            migrate_completion_reward=args.migrate_completion_reward
+            migrate_completion_reward=args.migrate_completion_reward,
+            migrate_recontact=args.migrate_recontact
         )
 
         expected_source = (
@@ -802,7 +807,7 @@ def main() -> None:
     # -----------------------------------------------------------------------
 
     metadata = contract(env)
-    if args.migrate_flat_boxes or args.migrate_completion_reward:
+    if args.migrate_flat_boxes or args.migrate_completion_reward or args.migrate_recontact:
         if old.get('action_profile') != args.action_profile:
             raise ValueError('Migration must preserve the source action_profile')
         metadata['explicit_migration'] = old['explicit_migration']

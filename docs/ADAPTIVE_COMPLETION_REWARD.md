@@ -1,5 +1,8 @@
 # 완주 중심 보상과 비동기 사용자 실행
 
+재접촉 수정 이후의 최신 추천은 [70% 통과까지 같은 지형 재시도](ADAPTIVE_RECONTACT.md)다.
+아래 advance는 이전 실행 설정이며 필요할 때만 명시적으로 선택한다.
+
 ## 변경
 
 - 24-D residual 범위, terrain_mid scale, 경사면 body/stride/clearance authority는 유지했다.

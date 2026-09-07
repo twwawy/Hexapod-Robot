@@ -39,6 +39,7 @@ def contract(env):
                              resolution_m=GRID_RESOLUTION, channels=GRID_CHANNEL_NAMES,
                              frame='body yaw aligned forward/left, height relative to body Z'),
         reward_contract=REWARD_CONTRACT, action_size=ACTION_SIZE,
+        scheduler_contract='boundary_recontact_v1',
         terminal_rewards=dict(success=COMPLETION_BONUS, no_progress=STALL_PENALTY,
                               physical_failure=PHYSICAL_FAILURE_PENALTY, timeout=TIMEOUT_PENALTY),
         observation_size={'state': ACTOR_SIZE, 'privileged_state': CRITIC_SIZE},
@@ -89,7 +90,7 @@ def resolve_checkpoint(path):
     return max(candidates, key=lambda p: int(p.name))
 
 
-def read_contract(path, *, migrate_flat_boxes=False, migrate_completion_reward=False):
+def read_contract(path, *, migrate_flat_boxes=False, migrate_completion_reward=False, migrate_recontact=False):
     path = resolve_checkpoint(path)
     manifest = path/'adaptive_contract.json'
     if not manifest.is_file():
@@ -115,6 +116,13 @@ def read_contract(path, *, migrate_flat_boxes=False, migrate_completion_reward=F
         if source.parent != root:
             raise ValueError(f'Invalid contract source: {name}')
         if hashlib.sha256(source.read_bytes()).hexdigest() != expected:
+            if migrate_recontact and name in {'adaptive_gait_env.py', 'adaptive_gait_controller.py',
+                                              'wave_gait_scheduler.py', 'adaptive_gait_policy.py'}:
+                previous = subprocess.check_output(['git', '-C', str(root.parent), 'show', f'9e8c1ab:mjx/{name}'])
+                if hashlib.sha256(previous).hexdigest() != expected:
+                    raise ValueError(f'Unreviewed recontact migration source: {name}')
+                migrated_sources.append(name)
+                continue
             if migrate_completion_reward and name in {'adaptive_gait_env.py', 'adaptive_gait_policy.py'}:
                 previous = subprocess.check_output(['git', '-C', str(root.parent), 'show',
                     f'6cba853:mjx/{name}'])
@@ -141,6 +149,9 @@ def read_contract(path, *, migrate_flat_boxes=False, migrate_completion_reward=F
         metadata['explicit_migration'] = dict(kind='grid_v5_completion_reward',
             old_reward=metadata.get('reward_contract'), new_reward=REWARD_CONTRACT,
             changed_sources=migrated_sources, transfer='weights; reward scores are not comparable')
+    if migrate_recontact:
+        metadata['explicit_migration'] = dict(kind='completion_reward_to_boundary_recontact',
+            changed_sources=migrated_sources, transfer='weights; gait behavior requires new evaluation')
     return path, metadata
 
 

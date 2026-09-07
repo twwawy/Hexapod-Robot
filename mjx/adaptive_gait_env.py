@@ -530,6 +530,7 @@ class AdaptiveGaitEnv(HexapodRoughTerrainEnv):
             'hold_surface_rejected_s', 'hold_ik_rejected_s', 'hold_path_rejected_s',
             'hold_support_rejected_s', 'bootstrap_classical_s', 'stride_preference_projected_s',
             'reward/timeout', 'termination/timeout',
+            'recontact/active_s', 'recontact/exhausted', 'recontact/ik_blocked', 'recontact/applied_descent_m',
             'oracle_safe_recall', 'oracle_false_safe', 'oracle_unknown_fraction',
             'oracle_foothold_error_m', 'oracle_compared', 'oracle_edge_recall', 'oracle_edge_precision', 'action_authority_mean',)})
         return state
@@ -556,6 +557,7 @@ class AdaptiveGaitEnv(HexapodRoughTerrainEnv):
             state.data.qpos[0] + .5*state.info['support_height'], state.info['progress_anchor_potential'])
         previous_contacts = state.info['contact_state']
         previous_mode = state.info['controller_state'].scheduler.mode
+        previous_recontact_distance = state.info['controller_state'].scheduler.recontact_distance
         previous_feet = state.data.site_xpos[self._foot_site_ids]
         result = super().step(state, action)
         # Publish the scan in the NEXT observation. The current action and its
@@ -567,6 +569,13 @@ class AdaptiveGaitEnv(HexapodRoughTerrainEnv):
                 lambda _: (result.info['lidar_map'], result.info['rng']), operand=None)
             result.info['lidar_map'], result.info['rng'] = grid, key
         cs = result.info['controller_state']
+        result.metrics.update({
+            'recontact/active_s': cs.scheduler.recontact_active.astype(jp.float32)*self.dt,
+            'recontact/exhausted': cs.scheduler.recontact_exhausted.astype(jp.float32),
+            'recontact/ik_blocked': cs.scheduler.recontact_ik_blocked.astype(jp.float32),
+            'recontact/applied_descent_m': jp.sum(jp.maximum(cs.scheduler.recontact_distance-
+                previous_recontact_distance, 0.)),
+        })
         feet = result.data.site_xpos[self._foot_site_ids]
         touchdown = ~previous_contacts & result.info['contact_state'] & cs.active_known
         target = cs.goal_world + jp.array((0., 0., FOOT_RADIUS))

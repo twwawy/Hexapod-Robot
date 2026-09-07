@@ -7,6 +7,7 @@ import argparse
 from datetime import datetime
 from dataclasses import dataclass
 import json
+import itertools
 from pathlib import Path
 import subprocess
 import sys
@@ -80,6 +81,8 @@ def main() -> None:
                         help='Reviewed flat checkpoint transfer on the first cycle only; requires --restore.')
     parser.add_argument('--migrate-completion-reward', action='store_true',
                         help='Transfer reviewed grid v5 checkpoint to completion reward on first cycle only.')
+    parser.add_argument('--migrate-recontact', action='store_true',
+                        help='Transfer reviewed completion-reward weights to boundary recontact controller.')
 
     parser.add_argument(
         "--profile",
@@ -178,9 +181,10 @@ def main() -> None:
     parser.add_argument(
         "--max-retries",
         type=int,
-        default=2,
+        default=-1,
+        help='Retries per terrain; -1 retries until the promotion criterion passes.',
     )
-    parser.add_argument('--on-stage-failure', choices=('stop', 'advance'), default='advance',
+    parser.add_argument('--on-stage-failure', choices=('stop', 'advance'), default='stop',
                         help='After retries: stop, or advance with the final attempt best without claiming success.')
 
     parser.add_argument(
@@ -248,8 +252,12 @@ def main() -> None:
     if not 0.0 <= args.promote_threshold <= 1.0:
         parser.error("--promote-threshold must be in [0, 1]")
 
-    if args.max_retries < 0:
-        parser.error("--max-retries cannot be negative")
+    if args.max_retries < -1:
+        parser.error('--max-retries must be -1 (unlimited) or nonnegative')
+    if args.max_retries == -1 and args.on_stage_failure == 'advance':
+        parser.error('Unlimited retries requires --on-stage-failure stop; it advances only on success')
+    if args.migrate_recontact and (not args.restore or args.migrate_completion_reward or args.migrate_flat_boxes):
+        parser.error('--migrate-recontact requires --restore and excludes other migrations')
 
     if args.migrate_completion_reward and (not args.restore or args.migrate_flat_boxes):
         parser.error('--migrate-completion-reward requires --restore and excludes --migrate-flat-boxes')
@@ -367,7 +375,8 @@ def main() -> None:
         selected_checkpoint: Path | None = None
         final_promote_value = 0.0
 
-        for retry in range(args.max_retries + 1):
+        retries = itertools.count() if args.max_retries == -1 else range(args.max_retries+1)
+        for retry in retries:
             run_dir = (
                 root
                 / (
@@ -459,6 +468,8 @@ def main() -> None:
                 command.append('--migrate-flat-boxes')
             if args.migrate_completion_reward and stage_index == args.start_index and retry == 0:
                 command.append('--migrate-completion-reward')
+            if args.migrate_recontact and stage_index == args.start_index and retry == 0:
+                command.append('--migrate-recontact')
 
             if args.wandb_entity:
                 command.extend(
@@ -667,7 +678,7 @@ def main() -> None:
         if not stage_passed:
             write_json(root / 'failed_stage.json', {
                 'stage_index': stage_index, 'name': spec.name,
-                'attempts': args.max_retries + 1,
+                'attempts': retry + 1,
                 'promote_key': args.promote_key, 'promote_value': final_promote_value,
                 'threshold': args.promote_threshold,
                 'checkpoint': str(selected_checkpoint),
@@ -679,7 +690,7 @@ def main() -> None:
                 f"best {args.promote_key}="
                 f"{final_promote_value:.4f} "
                 f"< threshold={args.promote_threshold:.4f}\n"
-                f"attempts={args.max_retries + 1}"
+                f"attempts={retry + 1}"
             )
             if args.on_stage_failure == 'stop':
                 raise RuntimeError(message + '\nCheckpoint and resume indices saved in failed_stage.json')

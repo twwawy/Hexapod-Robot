@@ -148,6 +148,10 @@ def _foot_trajectory(state, gait, applied_twist, tripod_enable):
         scheduler.LATE_INWARD_SPEED*jp.cos(LEG_ANGLES),
         scheduler.LATE_INWARD_SPEED*jp.sin(LEG_ANGLES),
         jp.full(6, scheduler.LATE_SPEED)), axis=-1)
+    recovery_step = jp.minimum(scheduler.RECONTACT_SPEED*FIRMWARE_CONTROL_DT,
+        jp.maximum(scheduler.RECONTACT_DISTANCE-state.scheduler.recontact_distance, 0.))
+    vertical_recontact = state.foot_memory.at[:, 2].add(-recovery_step)
+    late = jp.where(gait.get('recontact_active', False), vertical_recontact, late)
     # The first Wave revolution moves stance at half rate, as on main.
     startup_scale = jp.where((state.scheduler.mode == scheduler.WAVE) & gait['startup'], .5, 1.)
     velocity = jp.stack((-applied_twist[0]+applied_twist[3]*state.foot_memory[:, 1],
@@ -185,15 +189,19 @@ def step(
 ) -> tuple[AdaptiveState, FirmwareOutput]:
     """Advance one firmware tick using the environment's prepared parameters."""
     command_requested = (jp.abs(target_velocity[0]) >= .001) | (jp.abs(target_velocity[1]) >= .001)
+    recovery_hold = state.scheduler.recontact_active | state.scheduler.recontact_exhausted | state.scheduler.recontact_ik_blocked
+    recovery_hold |= (command_requested & ~state.scheduler.running & (state.scheduler.epoch > 0) & ~jp.all(state.confirmed_contacts))
     # Ratio coupling: shortening stride and duration together makes shorter,
     # faster steps without simply changing nominal mean speed.
     target_velocity = target_velocity * state.speed_scale
     target_pose = state.posture_target
     rate = jp.array((jp.deg2rad(15.), jp.deg2rad(15.), .04)) * FIRMWARE_CONTROL_DT
     adapt_posture = state.adapt_posture + jp.clip(target_pose-state.adapt_posture, -rate, rate)
+    adapt_posture = jp.where(recovery_hold, state.adapt_posture, adapt_posture)
     roll_cmd = roll_cmd + adapt_posture[0]
     pitch_cmd = pitch_cmd + adapt_posture[1]
     height_offset = jp.clip(height_offset + adapt_posture[2], -.05, .10)
+    height_offset = jp.where(recovery_hold, state.height_applied, height_offset)
     pitch_ff = jp.asarray(0.)
     target_velocity = jp.clip(
         target_velocity, jp.array((-MAX_LINEAR_SPEED, -MAX_YAW_RATE)),
@@ -302,6 +310,23 @@ def step(
     foot_updates = {key: jp.where(blocked, getattr(state, key), value)
                     for key, value in foot_updates.items()}
     nominal_feet = jp.where(blocked, state.foot_memory, nominal_feet)
+    # Workspace-check the actual vertical recovery target before committing
+    # foot memory. A blocked target must not accumulate fictional search travel.
+    shifted_recovery = _apply_height_offset(nominal_feet, state.height_applied)
+    _, reach_limited = _limit_foot_reach(_rotate_inverse(shifted_recovery, state.posture_command))
+    recovery_valid = _all_feet_valid(shifted_recovery, state.posture_command) & ~jp.any(reach_limited)
+    recovery_blocked = gait['recontact_active'] & ~recovery_valid
+    foot_updates = {key: jp.where(recovery_blocked, getattr(state, key), value)
+                    for key, value in foot_updates.items()}
+    nominal_feet = jp.where(recovery_blocked, state.foot_memory, nominal_feet)
+    applied_descent = jp.where(gait['recontact_active'] & ~recovery_blocked,
+                               jp.maximum(state.foot_memory[:, 2]-nominal_feet[:, 2], 0.), 0.)
+    rec_sched = gait_updates['scheduler']
+    gait_updates['scheduler'] = rec_sched._replace(
+        recontact_distance=rec_sched.recontact_distance+applied_descent,
+        recontact_ik_blocked=rec_sched.recontact_ik_blocked | recovery_blocked,
+        fault=rec_sched.fault | recovery_blocked,
+        recontact_active=rec_sched.recontact_active & ~recovery_blocked)
 
     effective_pitch = jp.clip(
         pitch_cmd + pitch_ff,
@@ -324,6 +349,7 @@ def step(
         + jp.clip(-state.posture_command[2], -jp.deg2rad(15.0), jp.deg2rad(15.0))
         * FIRMWARE_CONTROL_DT
     )
+    posture_candidate = jp.where(recovery_hold, state.posture_command, posture_candidate)
     shifted_nominal_feet = _apply_height_offset(nominal_feet, height_offset)
     posture_accepted = _all_feet_valid(shifted_nominal_feet, posture_candidate)
     posture_command = jp.where(
