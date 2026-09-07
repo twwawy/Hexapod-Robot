@@ -1,3 +1,9 @@
+> 현재 권장: **v6 수정 + 기존 계단 가중치**는
+> `bash /home/huro/Hexapod-Robot-integration/scripts/resume_stair5_path_v6.sh`를 사용한다.
+> 아래의 v5 전용 재개/이전 미지원 설명은 이전 상태다. `--migrate-path-v6`가
+> d0370b3의 terrain v5 source 전체 hash를 확인한 뒤 명시적으로 이전한다.
+> 이전 가중치의 원본 파일은 변경하지 않는다. 실행/학습 검증은 아직 하지 않았다.
+
 # 계단 경로 여유 높이 기반 보정
 
 ## 변경 내용

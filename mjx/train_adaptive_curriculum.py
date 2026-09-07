@@ -85,6 +85,7 @@ def main() -> None:
                         help='Reviewed flat checkpoint transfer on the first cycle only; requires --restore.')
     parser.add_argument('--migrate-completion-reward', action='store_true',
                         help='Transfer reviewed grid v5 checkpoint to completion reward on first cycle only.')
+    parser.add_argument('--migrate-path-v6', action='store_true', help='Reviewed v5->v6 migration on the first cycle only.')
     parser.add_argument('--migrate-recontact', action='store_true',
                         help='Transfer reviewed completion-reward weights to boundary recontact controller.')
 
@@ -261,6 +262,8 @@ def main() -> None:
         parser.error('--max-retries must be -1 (unlimited) or nonnegative')
     if args.max_retries == -1 and args.on_stage_failure == 'advance':
         parser.error('Unlimited retries requires --on-stage-failure stop; it advances only on success')
+    if args.migrate_path_v6 and (not args.restore or args.init_teacher or args.profile == 'rc' or args.command_mode != 'terrain' or args.migrate_recontact or args.migrate_completion_reward or args.migrate_flat_boxes):
+        parser.error('--migrate-path-v6 requires terrain --restore and excludes other migrations')
     if args.migrate_recontact and (not args.restore or args.migrate_completion_reward or args.migrate_flat_boxes):
         parser.error('--migrate-recontact requires --restore and excludes other migrations')
 
@@ -482,6 +485,8 @@ def main() -> None:
                 command.append('--migrate-flat-boxes')
             if args.migrate_completion_reward and stage_index == args.start_index and retry == 0:
                 command.append('--migrate-completion-reward')
+            if args.migrate_path_v6 and stage_index == args.start_index and retry == 0:
+                command.append('--migrate-path-v6')
             if args.migrate_recontact and stage_index == args.start_index and retry == 0:
                 command.append('--migrate-recontact')
 

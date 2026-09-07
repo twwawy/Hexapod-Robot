@@ -8,7 +8,7 @@
 
 계단 경로의 최소 여유 높이와 그 위치·시점을 계산해 높이/이동 timing 보정안을 비교한다.
 기존 보폭 후보에도 같은 검사를 적용한다. [설계·진단·사용자 검사](docs/ADAPTIVE_PATH_BOTTLENECK.md).
-관측 계약이 path v6로 바뀌었으므로 이전 checkpoint restore 없이 새 학습을 시작한다.
+관측 계약은 path v6다. 지정 계단 v5 checkpoint는 아래 명시적 이전 스크립트로 이어갈 수 있다.
 실행 중인 pinned source 학습에는 변경이 적용되지 않는다.
 
 ## 현재 학습 방향
@@ -126,3 +126,15 @@ RC와 terrain은 서로 다른 task다. RC 가중치를 자동 이전하지 않�
 학습·시뮬레이션·실기 검증은 사용자가 실행한다. 설정 변경을 학습 성능 검증으로 취급하지 않는다.
 
 매 평가 영상 및 기존 계단 checkpoint 재개: [실행 안내](docs/ADAPTIVE_EVAL_VIDEOS.md).
+
+## 기존 계단 best에서 v6로 이어가기
+
+```bash
+bash /home/huro/Hexapod-Robot-integration/scripts/resume_stair5_path_v6.sh
+```
+
+이 명령은 terrain 5부터 v6 경로 보정을 적용하며 `--migrate-path-v6`로 지정 v5 가중치를 이전한다.
+기존 feature 가중치·정규화 통계·CNN을 보존하고 추가 feature 입력 가중치를 0으로 초기화한다.
+Optimizer는 새로 시작한다. 매 평가 best-so-far 영상과 W&B 기록을 유지한다.
+변환·학습은 사용자 실행 대상이며 이전 정책의 보행 성능 보존을 보장하지 않는다.
+이 목적에는 별도 `Hexapod-Robot-stair5-resume`의 v5 재개 스크립트를 사용하지 않는다.
