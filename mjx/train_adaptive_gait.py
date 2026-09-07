@@ -994,8 +994,6 @@ def main() -> None:
         Save best checkpoint metadata once the checkpoint for best_step exists.
         """
         if best_step is None:
-            if wandb_run is not None:
-                wandb_run.summary['cycle/best_video_status'] = 'no_trained_checkpoint'
             return False
 
         best_checkpoint = checkpoint_for_step(
@@ -1224,6 +1222,8 @@ def main() -> None:
 
     def finalize_best() -> None:
         if best_step is None:
+            if wandb_run is not None:
+                wandb_run.summary['cycle/best_video_status'] = 'no_trained_checkpoint'
             print(
                 "No trained evaluation produced a "
                 "finite best score.",
