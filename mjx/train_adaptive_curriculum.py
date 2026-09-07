@@ -168,6 +168,8 @@ def main() -> None:
         type=int,
         default=2,
     )
+    parser.add_argument('--on-stage-failure', choices=('stop', 'advance'), default='stop',
+                        help='After retries: stop, or advance with the final attempt best without claiming success.')
 
     parser.add_argument(
         "--restore",
@@ -633,13 +635,25 @@ def main() -> None:
         # --------------------------------------------------------------
 
         if not stage_passed:
-            raise RuntimeError(
+            write_json(root / 'failed_stage.json', {
+                'stage_index': stage_index, 'name': spec.name,
+                'attempts': args.max_retries + 1,
+                'promote_key': args.promote_key, 'promote_value': final_promote_value,
+                'threshold': args.promote_threshold,
+                'checkpoint': str(selected_checkpoint),
+                'next_stage_index': stage_index + 1,
+                'on_stage_failure': args.on_stage_failure,
+            })
+            message = (
                 f"Curriculum stage failed: {spec.name}\n"
                 f"best {args.promote_key}="
                 f"{final_promote_value:.4f} "
                 f"< threshold={args.promote_threshold:.4f}\n"
                 f"attempts={args.max_retries + 1}"
             )
+            if args.on_stage_failure == 'stop':
+                raise RuntimeError(message + '\nCheckpoint and resume indices saved in failed_stage.json')
+            print(message + '\nADVANCE requested: promotion criterion NOT met; using final attempt best.', flush=True)
 
         assert selected_checkpoint is not None
 
@@ -648,6 +662,8 @@ def main() -> None:
             {
                 "completed_stage_index": stage_index,
                 "completed_name": spec.name,
+                'promotion_passed': stage_passed,
+                'advanced_without_passing': not stage_passed,
                 "gait_stage": spec.gait_stage,
                 "terrain_level": spec.terrain_level,
                 "checkpoint": str(

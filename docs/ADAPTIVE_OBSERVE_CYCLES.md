@@ -75,6 +75,7 @@ W&B 인증은 현재 머신의 로그인 계정을 사용한다. 이전 소스 c
 | 지형 승급 지표 | `--promote-key` | `eval/episode_terrain_success` | `fast`/`full` 전용; cycle best 선정 지표와 다름 |
 | 승급 기준 | `--promote-threshold` | `0.70` | `fast`/`full` 전용, 범위 0~1 |
 | 승급 실패 추가 시도 | `--max-retries` | `2` | `fast`/`full`: 최초+추가 2회. observe는 승급 검사 없이 다음 cycle |
+| 재시도 소진 시 동작 | `--on-stage-failure` | `stop` | `advance`는 마지막 시도의 best 가중치로 다음 stage 진행. 승급 성공으로 기록하지 않음 |
 
 `--cycles`는 보행의 Tripod cycle 수가 아니라 **학습 실행 구간 수**다.
 총 요청 학습량은 observe에서 `cycles × timesteps-per-stage`이고, 병렬 환경 수를 다시 곱하지 않는다.
@@ -155,3 +156,18 @@ bash scripts/train_adaptive_gait.sh --help
 
 공식 반복 학습 진입점은 `train_adaptive_curriculum.sh`다.
 이름이 비슷한 `mjx/train_adoptive_curriculum.py`는 기존 별도 파일이며 위 명령에서 사용하지 않는다.
+
+## 성공률 미달로 종료됐을 때
+
+`--max-retries 3`은 최초 1회+추가 3회이며, 총 4회 시도 뒤 성공률이
+`--promote-threshold 0.70` 미만이면 기본 동작은 중단이다. reward best는
+승급 성공률 best와 다르다. W&B 업로드 오류나 checkpoint 유실을 의미하지 않는다.
+
+중단 정보는 `failed_stage.json`에 checkpoint·다음 stage index와 함께 저장된다.
+사용자가 기준 미달이어도 다음 지형으로 진행하려면 `--start-index 1`과
+해당 checkpoint의 `--restore`를 지정한다. 이후에도 재시도 소진 시 계속하려면
+`--on-stage-failure advance`를 추가한다. 이 옵션은 LiDAR/planner HOLD 문제를
+고치는 것이 아니라 curriculum 운영 동작만 변경한다. low-level safety는 유지된다.
+`curriculum_state.json`의 `promotion_passed`와 `advanced_without_passing`으로
+실제 승급과 기준 미달 진행을 구분한다. 마지막 시도의 best를 사용하며
+서로 다른 seed의 과거 retry 점수를 단순 비교해 전체 best로 선정하지 않는다.
