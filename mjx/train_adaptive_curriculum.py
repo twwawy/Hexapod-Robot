@@ -91,7 +91,7 @@ def main() -> None:
     parser.add_argument(
         "--profile",
         choices=("observe", "fast", "full", "teacher", "rc"),
-        default="fast",
+        default="teacher",
     )
 
     parser.add_argument(

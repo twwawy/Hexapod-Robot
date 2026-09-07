@@ -1,42 +1,36 @@
-# GT teacher 우선 학습
+# GT 전진 완주 학습
 
-재접촉 수정 이후 최신 승급 정책/재개 명령은 [70% 통과까지 재시도](ADAPTIVE_RECONTACT.md)를 따른다.
-아래 advance 명령은 이전의 지형 탐색용 설정이며 현재 추천은 무제한 retry + stop이다.
-
-최신 변경은 [완주 보상·경사면 재개 명령](ADAPTIVE_COMPLETION_REWARD.md)을 먼저 확인한다.
-잔차 authority는 유지하고 완주율 우선 best 선택, 최대 40초 영상, 마지막 5초 진단을 추가했다.
-
-LiDAR coverage와 RL을 동시에 해결하려고 반복 학습하는 대신, 정확한 지형으로 보행
-전략을 먼저 학습한다. 새 `teacher` curriculum profile을 사용한다. 별도 Stage 0 프로세스는
-필수가 아니며 cycle 끝의 짧은 baseline 비교를 진단에 사용한다. 이 변경이 제어기 문제를
-해결했다는 뜻은 아니다. 이번 작업에서 simulation/PPO/비교 rollout을 실행하지 않았다.
+현재 방향은 yaw 조종을 제외한 전진 지형 완주다. `teacher` profile과 `terrain` command mode를 사용한다.
+Terrain 기본 yaw 명령은 0이고 RC의 회전·후진·정지 sampler는 사용하지 않는다.
+직진 중 회전 억제를 위한 yaw 안정화 보상은 유지한다. Residual 범위와 접촉/IK 안전은 그대로다.
 
 ## 실행
+
+RC checkpoint는 task가 다르므로 아래 첫 실행에는 restore하지 않는다.
 
 ```bash
 cd /home/huro/Hexapod-Robot-integration
 source /home/huro/.venvs/hexapod-mjx/bin/activate
+
 bash scripts/train_adaptive_curriculum.sh \
-  --profile teacher --perception teacher \
-  --run-name adaptive-grid-v5-gt-teacher \
+  --profile teacher \
+  --command-mode terrain \
+  --perception teacher \
+  --run-name adaptive-gt-forward-completion \
   --timesteps-per-stage 800000 \
   --num-envs 512 --batch-size 128 --num-minibatches 4 \
-  --num-evals 5 --num-eval-envs 8 --episode-length 8000 \
-  --action-profile terrain_mid --baseline-comparison-seconds 20 \
-  --best-video-duration 40 --discounting .997 --max-retries 1 --on-stage-failure advance \
+  --num-evals 5 --num-eval-envs 16 --episode-length 8000 \
+  --action-profile terrain_mid --discounting 0.997 \
+  --baseline-comparison-seconds 20 --best-video-duration 40 \
+  --promote-key eval/episode_terrain_success --promote-threshold 0.70 \
+  --max-retries -1 --on-stage-failure stop \
   --wandb --wandb-mode online
 ```
 
-기존 LiDAR checkpoint를 restore하지 않는다. 초기 residual은 기존 terrain_mid의 고정
-authority를 사용하며 자동 확대 스케줄은 추가하지 않았다. GT teacher의 actor grid와
-planner는 GT를 사용한다. critic만 GT인 LiDAR student 학습과 다르다.
-action/network contract는 이번 학습 orchestration 변경으로 바뀌지 않는다.
-
+완주율 70% 미달이면 무제한 retry하며 실패한 지형을 자동으로 넘기지 않는다.
 Tripod 순서: flat → ramp8 → stair5 → stair8 → rough25 → ramp15 → stair10 → rough50.
-이후 기존 Wave/Hybrid 단계를 이어간다. 단위와 지형 정의는 terrain_curriculum.py를 따른다.
-기존 fast/full/observe profile 순서는 유지한다.
-통과 기준 미달 시 한 번 재시도한 뒤 미통과 기록과 함께 다음 지형으로 진행한다.
-기초 단계가 통과해야만 진행하려면 `--on-stage-failure stop`으로 명시한다.
+이후 Wave/Hybrid 단계로 진행한다. GT는 actor grid와 planner에 사용한다.
+학습·시뮬레이션은 사용자가 실행한다.
 
 ## 기본 보행과 정책 비교
 
