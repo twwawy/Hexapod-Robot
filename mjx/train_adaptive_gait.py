@@ -12,7 +12,7 @@ Features
 - 24-D adaptive contract persistence
 - W&B metrics
 - best-score checkpoint selection
-- deterministic best-so-far GIF after every trained evaluation
+- current-policy GIF every trained evaluation; best GIF only on improvement
 - curriculum-manager friendly monitor files
 
 Optional cycle-end baseline comparison diagnoses planner versus policy failure.
@@ -1107,6 +1107,7 @@ def main() -> None:
 
         return True
 
+    evaluation_metrics = {}
     rendered_best = {}
     uploaded_best = set()
     pending_video_step = None
@@ -1119,7 +1120,7 @@ def main() -> None:
             return
         if not latest_policy or latest_policy['step'] < step or best_step is None:
             return
-        if not persist_best_pointer():
+        if checkpoint_for_step(step) is None or not persist_best_pointer():
             return
         # Callback order may be checkpoint->eval or eval->checkpoint.
         # Publish each trained evaluation once, including non-NEW BEST events.
@@ -1128,7 +1129,9 @@ def main() -> None:
         try:
             print(f'EVAL VIDEO START | eval={step:,} best={best_step:,}', flush=True)
             started = time.monotonic()
-            publish_best_video(step)
+            publish_current_video(step)
+            if best_step == step:
+                publish_best_video(step)
             print(f'EVAL VIDEO RETURN | elapsed={time.monotonic()-started:.1f}s; PPO continues until next evaluation', flush=True)
         except Exception as exc:
             error = f'{type(exc).__name__}: {exc}'
@@ -1137,6 +1140,7 @@ def main() -> None:
             if wandb_run is not None:
                 wandb_run.summary['cycle/best_video_status'] = 'publish_failed'
                 wandb_run.summary['cycle/best_video_error'] = error
+                wandb_run.summary['cycle/current_video_status'] = 'publish_failed'
 
     # -----------------------------------------------------------------------
     # Brax progress callback
@@ -1258,6 +1262,7 @@ def main() -> None:
                 )
 
         if step > 0 and score is not None and math.isfinite(score):
+            evaluation_metrics[step] = dict(numeric)
             pending_video_step = step
             publish_pending_video()
 
@@ -1416,6 +1421,49 @@ def main() -> None:
             "============================================\n",
             flush=True,
         )
+
+    def publish_current_video(evaluation_step):
+        current_checkpoint = checkpoint_for_step(evaluation_step)
+        current_metrics = evaluation_metrics[evaluation_step]
+        current_score = current_metrics.get(args.score_key)
+        video_path = video_dir/f'eval_{evaluation_step:012d}_current.gif'
+        if wandb_run is not None:
+            wandb_run.summary['cycle/current_video_status'] = 'rendering'
+        render_policy_video(
+            env=env, make_policy=latest_policy['make_policy'],
+            params=checkpoint.load(current_checkpoint), output=video_path,
+            seed=args.seed+20_000, duration=args.best_video_duration,
+            fps=args.video_fps, width=args.video_width, height=args.video_height)
+        # If this evaluation is best, publish its already-rendered video twice
+        # under distinct W&B roles without a second rollout.
+        if best_step == evaluation_step:
+            rendered_best[evaluation_step] = video_path
+        pointer = dict(evaluation_step=evaluation_step, policy_step=evaluation_step,
+            path=str(current_checkpoint), video=str(video_path), score=current_score,
+            score_key=args.score_key, best_step=best_step, best_score=best_score,
+            role='current', metrics=current_metrics)
+        manifest = monitor_dir/f'current_video_{evaluation_step:012d}.json'
+        write_json(manifest, pointer)
+        print(f'CURRENT VIDEO | step={evaluation_step:,} score={current_score} path={video_path}', flush=True)
+        if wandb_run is not None and wandb_module is not None:
+            caption = (f'CURRENT policy {evaluation_step:,} | score={current_score} | '
+                       f'best={best_step:,} score={best_score:.3f} | terrain={args.terrain_level}')
+            wandb_run.log({
+                'cycle/current_video': wandb_module.Video(str(video_path), format='gif', caption=caption),
+                'cycle/current_score': current_score, 'cycle/current_step': evaluation_step,
+                'cycle/best_score': best_score, 'cycle/best_step': best_step,
+                'train/global_step': evaluation_step})
+            artifact = wandb_module.Artifact(f'{output.name}-current-policy', type='policy',
+                metadata={k: v for k, v in pointer.items() if k != 'metrics'})
+            artifact.add_file(str(video_path), name='current.gif')
+            artifact.add_file(str(manifest), name='current_checkpoint.json')
+            report = video_path.with_suffix('.termination.json')
+            if report.is_file():
+                artifact.add_file(str(report), name='current.termination.json')
+            artifact.add_dir(str(current_checkpoint), name='checkpoint')
+            wandb_run.log_artifact(artifact, aliases=['latest', f'step-{evaluation_step}'])
+            wandb_run.summary['cycle/current_video_status'] = 'upload_queued'
+            wandb_run.summary['cycle/current_video_path'] = str(video_path)
 
     def publish_best_video(evaluation_step):
         pointer_path = monitor_dir/'best_checkpoint.json'

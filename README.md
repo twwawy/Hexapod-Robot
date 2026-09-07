@@ -64,9 +64,9 @@ bash scripts/train_adaptive_curriculum.sh \
   --run-name forward-gt-path-v6 \
   --timesteps-per-stage 800000 \
   --num-envs 512 --batch-size 128 --num-minibatches 4 \
-  --num-evals 5 --num-eval-envs 16 --episode-length 8000 \
+  --num-evals 9 --num-eval-envs 16 --episode-length 8000 \
   --action-profile terrain_mid --discounting 0.997 \
-  --baseline-comparison-seconds 20 --best-video-duration 40 \
+  --baseline-comparison-seconds 0 --best-video-duration 20 \
   --promote-key eval/episode_terrain_success --promote-threshold 0.70 \
   --max-retries -1 --on-stage-failure stop \
   --wandb --wandb-mode online
@@ -81,23 +81,23 @@ bash scripts/train_adaptive_curriculum.sh \
 | `--batch-size`, `--num-minibatches` | PPO batch 구성 |
 | `--num-evals`, `--num-eval-envs` | 평가 횟수·평가 환경 수 |
 | `--episode-length 8000` | 최대 160초 episode; 완주/실패하면 더 일찍 종료 |
-| `--best-video-duration 40` | 최대 40초 영상; 학습 episode 길이와 별개 |
+| `--best-video-duration 20` | 최대 20초 영상; 학습 episode 길이와 별개 |
 | `--max-retries -1` | 완주율 기준을 통과할 때까지 재시도 |
 
 ## W&B와 결과 확인
 
 Cycle은 `tryXX` 하나의 학습 시도다. 평가 중 점수·완주율을 기록하고,
-매 학습 후 평가 종료마다 그 시점까지의 cycle best checkpoint로 영상을 생성해 W&B에 업로드한다.
-Best가 갱신되지 않은 평가에서도 업로드한다. Step 0 평가와 cycle 종료의 중복 영상은 제외한다.
+매 학습 후 평가 종료마다 현재 정책 영상을 `cycle/current_video`로 게시한다.
+Best 영상은 best가 갱신된 평가에서만 `cycle/best_video`로 추가한다. Step 0 평가와 cycle 종료의 중복 영상은 제외한다.
 Best는 완주율 우선, 동률이면 reward로 선택한다. 전체 누적 best 영상은 생성하지 않는다.
 
 - `eval/episode_terrain_success`: 승급 기준. 평가 환경 16개에서는 최소 12개 성공이 필요하다.
 - `cycle/best_video_status`: 영상 생성·업로드 진행 또는 실패 상태.
 - Cycle 영상 및 baseline 비교: 전진·접촉·정지 원인과 residual 효과 확인.
-- 40초 영상이 끝났다는 이유만으로 160초 episode의 완주 여부를 판단하지 않는다.
+- 20초 영상이 끝났다는 이유만으로 160초 episode의 완주 여부를 판단하지 않는다.
 
 결과는 `mjx/runs/adaptive-curriculum/<run-name>/` 아래에 저장한다.
-Cycle 영상은 각 시도 폴더의 `videos/best.gif`다.
+현재 정책 영상은 `videos/eval_<step>_current.gif`, best 영상은 `videos/best.gif`다.
 
 ## 소스 고정과 checkpoint
 
@@ -135,7 +135,7 @@ bash /home/huro/Hexapod-Robot-integration/scripts/resume_stair5_path_v6.sh
 
 이 명령은 terrain 5부터 v6 경로 보정을 적용하며 `--migrate-path-v6`로 지정 v5 가중치를 이전한다.
 기존 feature 가중치·정규화 통계·CNN을 보존하고 추가 feature 입력 가중치를 0으로 초기화한다.
-Optimizer는 새로 시작한다. 매 평가 best-so-far 영상과 W&B 기록을 유지한다.
+Optimizer는 새로 시작한다. 매 평가 현재 정책 영상과 W&B 기록을 유지한다.
 변환·학습은 사용자 실행 대상이며 이전 정책의 보행 성능 보존을 보장하지 않는다.
 이 목적에는 별도 `Hexapod-Robot-stair5-resume`의 v5 재개 스크립트를 사용하지 않는다.
 
@@ -147,5 +147,5 @@ Optimizer는 새로 시작한다. 매 평가 best-so-far 영상과 W&B 기록을
 bash /home/huro/Hexapod-Robot-integration/scripts/resume_stair5_v6_clearance.sh
 ```
 
-같은 best 영상은 재사용하되 매 평가 W&B 게시를 유지한다.
+매 평가 현재 정책을 게시하며 best 영상은 갱신 시에만 게시한다.
 [대기 진단·높이 설정·checkpoint 호환 범위](docs/ADAPTIVE_VIDEO_WAIT_CLEARANCE.md).

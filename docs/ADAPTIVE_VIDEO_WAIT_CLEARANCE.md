@@ -9,9 +9,8 @@ PPO 연산인지 업로드 처리인지 그 시점의 child stack은 확보하�
 
 실제 확인한 중복 작업을 줄였다.
 
-- 같은 best step이면 저장 영상을 재사용하고 평가 step별로 W&B에 다시 게시한다.
-- 같은 best checkpoint directory는 cycle 내 최초 게시에서만 artifact에 넣는다.
-  후속 evaluation artifact에는 영상/metrics/pointer를 기록한다. 실제 checkpoint는 최초 artifact 또는 로컬 path를 사용한다.
+- 현재 정책은 매 평가 새로 렌더링한다. Best가 갱신된 경우 해당 영상을 best로도 게시하며 중복 rollout하지 않는다.
+- 모든 평가의 현재 checkpoint는 current-policy artifact로 저장한다. Best-policy artifact는 best 갱신 시에만 추가한다.
 - `EVAL VIDEO START`, `CACHE`, `RETURN`으로 callback의 진입/복귀를 표시한다.
 - 부모는 30초마다 `WORKER WAIT`를 표시한다. 이는 프로세스 생존 표시이며 PPO 진행 보장이 아니다.
 - Ctrl+C 시 부모가 child에 terminate하고 10초 안에 종료하지 않으면 kill하여 방치하지 않는다.
@@ -41,3 +40,5 @@ bash /home/huro/Hexapod-Robot-integration/scripts/resume_stair5_v6_clearance.sh
 
 학습·시뮬레이션·영상 렌더링·변환 실행 검증은 하지 않았다. AST/shell 문법 및
 기존 checkpoint의 source hash 읽기만 확인했다.
+
+재개 스크립트는 평가 9회·현재 정책 영상 20초·baseline 비교 0으로 설정한다. 학습량 800000과 episode 8000은 유지한다.

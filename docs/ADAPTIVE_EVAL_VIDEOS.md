@@ -4,23 +4,26 @@
 > d0370b3의 terrain v5 source 전체 hash를 확인한 뒤 명시적으로 이전한다.
 > 이전 가중치의 원본 파일은 변경하지 않는다. 실행/학습 검증은 아직 하지 않았다.
 
-# 매 평가 best 영상과 계단 checkpoint 재개
+# 매 평가 현재 정책 영상
 
-`--best-video`는 이제 각 학습 후 평가 종료마다 현재 cycle의 best-so-far 영상을 게시한다.
-204800 / 409600 / 614400 / 819200의 평가가 있으면 네 번 게시한다.
-NEW BEST가 아니어도 같은 best 가중치로 다시 생성해 평가 시점과 best 시점을 각각 기록한다.
-초기 step 0는 제외하며 cycle 종료에 다섯 번째 중복 영상은 생성하지 않는다.
-선정 기준은 기존처럼 완주율 우선, 동률이면 reward다.
+`--best-video`를 켜면 학습 후 평가마다 **현재 정책**을 렌더링한다.
+W&B `cycle/current_video`, `cycle/current_score`, `cycle/current_step`을 확인한다.
+Best는 완주율 우선, 동률이면 reward로 계속 보존한다.
+Best가 갱신된 평가에서만 `cycle/best_video`와 best-policy artifact를 추가한다.
+해당 평가의 현재 영상을 재사용하므로 rollout을 두 번 실행하지 않는다.
+초기 step 0 및 cycle 종료 중복 영상은 제외한다.
 
-각 영상은 `videos/eval_<evaluation_step>_best_<best_step>.gif`에 저장한다.
-`videos/best.gif`는 마지막 게시 영상의 복사본이며 manager와의 호환 경로다.
-`monitor/eval_video_<evaluation_step>.json`에 checkpoint/score/영상 연결을 남긴다.
-W&B `cycle/best_video`, `cycle/video_evaluation_step`, `cycle/best_step`으로 확인한다.
-Best가 같으면 영상 내용도 같을 수 있다. 새 정책의 매 평가 영상과는 다르다.
-렌더링은 callback에서 수행하므로 그동안 다음 PPO 업데이트가 기다린다.
-업로드는 W&B에 enqueue하며 네트워크 상황에 따라 표시가 지연될 수 있다.
-실패는 status/error로 남기며 PPO를 중단하지 않는다. 무손실 업로드를 보장하지 않는다.
-Baseline 비교는 기존대로 cycle 종료에 한 번만 수행한다.
+현재 영상은 `videos/eval_<step>_current.gif`, 연결 정보는
+`monitor/current_video_<step>.json`에 저장한다. 모든 평가 checkpoint는
+current-policy artifact에 기록하며 best는 별도 best-policy artifact로 보관한다.
+Best가 같더라도 current 영상은 새 checkpoint의 실제 정책을 보여준다.
+동일 seed/명령 조건으로 비교하지만 단일 영상의 결과는 평가 성공률과 다를 수 있다.
+
+재개 preset: 학습량 800000, 평가 설정 9, 평가 env 16, 영상 최대 20초,
+추가 baseline 비교 0. Brax의 초기 평가를 제외한 학습 후 평가는 보통 8회이며
+실제 간격은 PPO batch 단위로 결정된다(현재 구성에서 약 102400 step).
+영상은 동기식으로 생성하므로 PPO가 기다리며, 평가 횟수 증가가 전체 학습을
+더 빠르게 만든다는 의미는 아니다. 학습/영상 검증은 사용자에게 맡긴다.
 
 ## 지정 GIF의 checkpoint
 
