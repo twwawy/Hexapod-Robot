@@ -1,4 +1,6 @@
-../Core/Src/test/mode_transition_test.c:12:13:ModeTransitionTest_CheckSwitchFunctions	17
-../Core/Src/test/mode_transition_test.c:108:13:ModeTransitionTest_CheckCorrectionMemory	8
-../Core/Src/test/mode_transition_test.c:161:13:ModeTransitionTest_CheckCorrectionPostureMemory	9
-../Core/Src/test/mode_transition_test.c:220:6:ModeTransitionTest_Run	11
+../Core/Src/test/mode_transition_test.c:12:13:ModeTransitionTest_CheckSwitchFunctions	19
+../Core/Src/test/mode_transition_test.c:119:13:ModeTransitionTest_CheckRlPriority	28
+../Core/Src/test/mode_transition_test.c:247:13:ModeTransitionTest_CheckRlDrone	31
+../Core/Src/test/mode_transition_test.c:318:13:ModeTransitionTest_CheckCorrectionMemory	8
+../Core/Src/test/mode_transition_test.c:371:13:ModeTransitionTest_CheckCorrectionPostureMemory	9
+../Core/Src/test/mode_transition_test.c:430:6:ModeTransitionTest_Run	15

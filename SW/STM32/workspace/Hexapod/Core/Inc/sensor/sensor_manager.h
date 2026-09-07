@@ -30,7 +30,8 @@ void SensorManager_Init(SensorManager_Handle_t *handle,
 bool SensorManager_Update(
     SensorManager_Handle_t *handle,
     const float pwm_angle_rad[ROBOT_JOINT_COUNT],
-    bool pwm_valid);  // 최신 센서값과 PWM 예측으로 스냅샷을 갱신한다.
+    bool pwm_valid,
+    bool joint_adc_powered);  // 전원이 켜진 관절 ADC와 PWM 예측으로 스냅샷을 갱신한다.
 
 bool SensorManager_UpdatePressure(SensorManager_Handle_t *handle);  // 압력 6채널만 갱신한다.
 

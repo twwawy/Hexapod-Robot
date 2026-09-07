@@ -34,7 +34,9 @@ Core/Src/test/user_command_test.o: ../Core/Src/test/user_command_test.c \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_uart.h \
  ../Core/Inc/sensor/foot_pressure.h ../Core/Inc/sensor/imu.h \
  ../Core/Inc/sensor/joint_feedback.h ../Core/Inc/sensor/mcp3008.h \
- ../Core/Inc/user_command/user_command.h
+ ../Core/Inc/user_command/user_command.h \
+ ../Core/Inc/high_control/control_priority.h \
+ ../Core/Inc/high_control/drone_controller.h
 ../Core/Inc/test/user_command_test.h:
 ../Core/Inc/common/robot_calibration.h:
 ../Core/Inc/low_control/relay.h:
@@ -75,3 +77,5 @@ Core/Src/test/user_command_test.o: ../Core/Src/test/user_command_test.c \
 ../Core/Inc/sensor/joint_feedback.h:
 ../Core/Inc/sensor/mcp3008.h:
 ../Core/Inc/user_command/user_command.h:
+../Core/Inc/high_control/control_priority.h:
+../Core/Inc/high_control/drone_controller.h:

@@ -994,7 +994,8 @@ static void HexapodApp_ControlStep(HexapodApp_Handle_t *handle)
     sensor_updated = SensorManager_Update(
         &handle->sensors,
         handle->servo_pwm.previous_angle_rad,
-        handle->servo_pwm.started && handle->servo_pwm.seeded);   // ADC와 유효한 PWM 명령으로 관절각을 추정한다.
+        handle->servo_pwm.started && handle->servo_pwm.seeded,
+        handle->bringup.relay_enabled);                           // 릴레이 ON에서만 관절 ADC 필터를 갱신한다.
     (void)SensorManager_GetSnapshot(&handle->sensors,
                                     &handle->sensor_snapshot);     // 같은 주기의 센서값을 복사한다.
     HexapodApp_ProcessTouchdownLatch(handle);                      // 전체 읽기에서 생긴 접촉도 처리한다.

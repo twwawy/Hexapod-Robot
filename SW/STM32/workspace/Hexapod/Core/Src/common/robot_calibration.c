@@ -43,34 +43,34 @@ const RobotCalibration_t g_robot_calibration =
 
     .joint =
     {
-        JOINT_CALIBRATION( 91U, 104U, 118U, -1),  // L1 J1의 ADC 보정값과 방향을 저장한다.
-        JOINT_CALIBRATION( 98U, 112U, 126U,  1),  // L1 J2의 ADC 보정값과 방향을 저장한다.
-        JOINT_CALIBRATION( 97U, 111U, 124U, -1),  // L1 J3의 ADC 보정값과 방향을 저장한다.
-        JOINT_CALIBRATION(100U, 113U, 127U, -1),  // L2 J1의 ADC 보정값과 방향을 저장한다.
-        JOINT_CALIBRATION( 96U, 109U, 123U,  1),  // L2 J2의 ADC 보정값과 방향을 저장한다.
-        JOINT_CALIBRATION(100U, 113U, 127U, -1),  // L2 J3의 ADC 보정값과 방향을 저장한다.
-        JOINT_CALIBRATION(101U, 114U, 129U, -1),  // L3 J1의 ADC 보정값과 방향을 저장한다.
-        JOINT_CALIBRATION(100U, 113U, 127U,  1),  // L3 J2의 ADC 보정값과 방향을 저장한다.
+        JOINT_CALIBRATION( 90U, 104U, 118U, -1),  // L1 J1의 ADC 보정값과 방향을 저장한다.
+        JOINT_CALIBRATION( 96U, 110U, 124U,  1),  // L1 J2의 ADC 보정값과 방향을 저장한다.
+        JOINT_CALIBRATION( 96U, 110U, 123U, -1),  // L1 J3의 ADC 보정값과 방향을 저장한다.
+        JOINT_CALIBRATION(100U, 113U, 126U, -1),  // L2 J1의 ADC 보정값과 방향을 저장한다.
+        JOINT_CALIBRATION( 94U, 108U, 121U,  1),  // L2 J2의 ADC 보정값과 방향을 저장한다.
+        JOINT_CALIBRATION( 99U, 112U, 126U, -1),  // L2 J3의 ADC 보정값과 방향을 저장한다.
+        JOINT_CALIBRATION(100U, 114U, 128U, -1),  // L3 J1의 ADC 보정값과 방향을 저장한다.
+        JOINT_CALIBRATION( 99U, 112U, 126U,  1),  // L3 J2의 ADC 보정값과 방향을 저장한다.
         JOINT_CALIBRATION( 93U, 106U, 119U, -1),  // L3 J3의 ADC 보정값과 방향을 저장한다.
-        JOINT_CALIBRATION( 99U, 113U, 126U, -1),  // L4 J1의 ADC 보정값과 방향을 저장한다.
-        JOINT_CALIBRATION( 97U, 111U, 125U, -1),  // L4 J2의 ADC 보정값과 방향을 저장한다.
-        JOINT_CALIBRATION( 94U, 108U, 122U,  1),  // L4 J3의 ADC 보정값과 방향을 저장한다.
-        JOINT_CALIBRATION( 92U, 106U, 119U, -1),  // L5 J1의 ADC 보정값과 방향을 저장한다.
+        JOINT_CALIBRATION(101U, 113U, 127U, -1),  // L4 J1의 ADC 보정값과 방향을 저장한다.
+        JOINT_CALIBRATION( 97U, 111U, 124U, -1),  // L4 J2의 ADC 보정값과 방향을 저장한다.
+        JOINT_CALIBRATION( 95U, 109U, 122U,  1),  // L4 J3의 ADC 보정값과 방향을 저장한다.
+        JOINT_CALIBRATION( 93U, 106U, 120U, -1),  // L5 J1의 ADC 보정값과 방향을 저장한다.
         JOINT_CALIBRATION(103U, 117U, 131U, -1),  // L5 J2의 ADC 보정값과 방향을 저장한다.
-        JOINT_CALIBRATION( 99U, 112U, 125U,  1),  // L5 J3의 ADC 보정값과 방향을 저장한다.
-        JOINT_CALIBRATION( 91U, 105U, 118U, -1),  // L6 J1의 ADC 보정값과 방향을 저장한다.
-        JOINT_CALIBRATION(105U, 118U, 133U, -1),  // L6 J2의 ADC 보정값과 방향을 저장한다.
-        JOINT_CALIBRATION( 97U, 111U, 124U,  1)   // L6 J3의 ADC 보정값과 방향을 저장한다.
+        JOINT_CALIBRATION(100U, 112U, 126U,  1),  // L5 J3의 ADC 보정값과 방향을 저장한다.
+        JOINT_CALIBRATION( 91U, 104U, 118U, -1),  // L6 J1의 ADC 보정값과 방향을 저장한다.
+        JOINT_CALIBRATION(105U, 119U, 132U, -1),  // L6 J2의 ADC 보정값과 방향을 저장한다.
+        JOINT_CALIBRATION( 98U, 111U, 124U,  1)   // L6 J3의 ADC 보정값과 방향을 저장한다.
     },
 
     .pressure =
     {
-        {13U,  6U, true, true},  // 다리 1의 20% 접촉·10% 해제값을 저장한다.
-        {15U,  7U, true, true},  // 다리 2의 20% 접촉·10% 해제값을 저장한다.
-        {27U, 13U, true, true},  // 다리 3의 20% 접촉·10% 해제값을 저장한다.
+        {20U, 10U, true, true},  // 다리 1의 20% 접촉·10% 해제값을 저장한다.
+        {20U, 10U, true, true},  // 다리 2의 20% 접촉·10% 해제값을 저장한다.
+        {20U, 10U, true, true},  // 다리 3의 20% 접촉·10% 해제값을 저장한다.
         {20U, 10U, true, true},  // 다리 4의 20% 접촉·10% 해제값을 저장한다.
-        {28U, 14U, true, true},  // 다리 5의 20% 접촉·10% 해제값을 저장한다.
-        { 9U,  4U, true, true}   // 다리 6의 20% 접촉·10% 해제값을 저장한다.
+        {20U, 10U, true, true},  // 다리 5의 20% 접촉·10% 해제값을 저장한다.
+        {20U, 10U, true, true}   // 다리 6의 20% 접촉·10% 해제값을 저장한다.
     },
 
     .servo =

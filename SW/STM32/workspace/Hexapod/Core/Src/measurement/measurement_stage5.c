@@ -19,7 +19,7 @@
 #define MEASUREMENT_STAGE5_RELAY_OFF_TIME_MS      500U
 #define MEASUREMENT_STAGE5_MINIMUM_RAW_SPAN        20U
 #define MEASUREMENT_STAGE5_TEST_ANGLE_DEG         20.0f
-#define MEASUREMENT_STAGE5_TARGET_COUNT             2U
+#define MEASUREMENT_STAGE5_TARGET_COUNT             1U
 
 typedef enum
 {
@@ -51,8 +51,7 @@ static bool measurement_initialized;                               // 5단계 �
 
 static const uint8_t measurement_target_joint[MEASUREMENT_STAGE5_TARGET_COUNT] =
 {
-    2U,  // L1 J3 전체 관절 번호를 저장한다.
-    5U   // L2 J3 전체 관절 번호를 저장한다.
+    15U  // L6 J1 전체 관절 인덱스를 저장한다.
 };
 
 /* 모든 다리 전원과 PWM을 정지한다. */
@@ -185,7 +184,7 @@ static bool MeasurementStage5_ValidateJoint(void)
     return true;
 }
 
-/* 선택한 두 관절만 새 ADC 보정값으로 교체한다. */
+/* 선택한 L6 J1만 새 ADC 보정값으로 교체한다. */
 static bool MeasurementStage5_BuildTable(void)
 {
     uint32_t target;  // 교체할 대상 순서를 저장한다.
@@ -277,7 +276,7 @@ static void MeasurementStage5_UpdateAdc(uint32_t now_ms)
     }
 }
 
-/* SPI1 ADC와 대상 두 관절의 자동 센서 측정을 준비한다. */
+/* SPI1 ADC와 L6 J1의 자동 센서 측정을 준비한다. */
 bool MeasurementStage5_Init(SPI_HandleTypeDef *adc_spi,
                             TIM_HandleTypeDef *tim1,
                             TIM_HandleTypeDef *tim2,
@@ -306,7 +305,7 @@ bool MeasurementStage5_Init(SPI_HandleTypeDef *adc_spi,
     ServoPwm_Init(&measurement_servo, &timers);                    // 18개 PWM 채널을 준비한다.
     measurement_initialized = false;                              // 초기화 완료 전 실행을 막는다.
     measurement_target_index = 0U;                                // 첫 대상부터 시작한다.
-    measurement_joint_index = measurement_target_joint[0];        // L1 J3를 첫 관절로 선택한다.
+    measurement_joint_index = measurement_target_joint[0];        // L6 J1을 측정 관절로 선택한다.
     g_measurement_debug.joint_calibration_completed_count = 0U;   // 완료 관절 수를 초기화한다.
     g_measurement_debug.joint_calibration_error_joint = 0U;       // 오류 관절을 초기화한다.
     g_measurement_debug.joint_calibration_complete = false;       // 전체 완료 전으로 표시한다.
@@ -371,7 +370,7 @@ bool MeasurementStage5_Init(SPI_HandleTypeDef *adc_spi,
     return true;
 }
 
-/* 대상 두 관절의 -20·0·+20도 ADC를 평균한다. */
+/* L6 J1의 -20·0·+20도 ADC를 평균한다. */
 void MeasurementStage5_Process(void)
 {
     const uint32_t now_ms = HAL_GetTick();  // 현재 실측 시각을 저장한다.

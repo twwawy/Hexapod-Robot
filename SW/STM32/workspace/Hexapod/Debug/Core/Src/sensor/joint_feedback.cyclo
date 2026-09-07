@@ -2,7 +2,8 @@
 ../Core/Src/sensor/joint_feedback.c:22:14:JointFeedback_Median3	4
 ../Core/Src/sensor/joint_feedback.c:49:13:JointFeedback_ConvertOne	7
 ../Core/Src/sensor/joint_feedback.c:87:6:JointFeedback_Init	3
-../Core/Src/sensor/joint_feedback.c:111:6:JointFeedback_SetCalibration	6
-../Core/Src/sensor/joint_feedback.c:128:6:JointFeedback_ConvertJoint	4
-../Core/Src/sensor/joint_feedback.c:142:6:JointFeedback_Convert	6
-../Core/Src/sensor/joint_feedback.c:168:6:JointFeedback_UpdateEstimate	22
+../Core/Src/sensor/joint_feedback.c:111:6:JointFeedback_ResetEstimate	2
+../Core/Src/sensor/joint_feedback.c:127:6:JointFeedback_SetCalibration	6
+../Core/Src/sensor/joint_feedback.c:144:6:JointFeedback_ConvertJoint	4
+../Core/Src/sensor/joint_feedback.c:158:6:JointFeedback_Convert	6
+../Core/Src/sensor/joint_feedback.c:184:6:JointFeedback_UpdateEstimate	22

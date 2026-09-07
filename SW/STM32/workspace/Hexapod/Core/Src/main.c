@@ -38,7 +38,7 @@
 /* USER CODE BEGIN PD */
 #define SENSOR_RAW_TEST_MODE         0U  // 세 보행 모드를 포함한 일반 제어 앱을 실행한다.
 #define JOINT_ZERO_CALIBRATION_MODE  0U  // 관절 기구학 영점 정렬 모드를 선택한다.
-#define JOINT_ADC_CALIBRATION_MODE   0U  // L1 J3·L2 J3 ADC 보정 모드를 선택한다.
+#define JOINT_ADC_CALIBRATION_MODE   0U  // L6 J1 ADC 보정 모드를 선택한다.
 #define JETSON_SPI_BRINGUP_TEST      0U  // Jetson SPI 단독 시험 모드를 선택한다.
 /* USER CODE END PD */
 
@@ -190,7 +190,7 @@ int main(void)
 #if SENSOR_RAW_TEST_MODE
     MeasurementStage0_Process();  // GPS·IMU·ADC·조종기 값을 계속 기록한다.
 #elif JOINT_ADC_CALIBRATION_MODE
-    MeasurementStage5_Process();  // L1 J3·L2 J3의 세 각도 ADC를 자동 측정한다.
+    MeasurementStage5_Process();  // L6 J1의 세 각도 ADC를 자동 측정한다.
 #elif JOINT_ZERO_CALIBRATION_MODE
     MeasurementStage4_Process();  // 전체 관절을 보정표 기준 0도로 유지한다.
 #elif JETSON_SPI_BRINGUP_TEST

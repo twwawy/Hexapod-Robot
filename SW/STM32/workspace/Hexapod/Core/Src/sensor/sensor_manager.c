@@ -48,7 +48,8 @@ void SensorManager_Init(SensorManager_Handle_t *handle,
 bool SensorManager_Update(
     SensorManager_Handle_t *handle,
     const float pwm_angle_rad[ROBOT_JOINT_COUNT],
-    bool pwm_valid)
+    bool pwm_valid,
+    bool joint_adc_powered)
 {
     GPS_Data_t gps_data;   // 최근 GPS 값을 저장한다.
     IMU_Data_t imu_data;   // 최근 IMU 값을 저장한다.
@@ -65,6 +66,11 @@ bool SensorManager_Update(
     (void)GPS_Process(handle->gps);                 // GPS 수신 버퍼를 해석한다.
     (void)IMU_Process(handle->imu);                 // IMU 수신 버퍼를 해석한다.
     adc_ok = (MCP3008_ReadAll(handle->mcp3008, &handle->adc) == HAL_OK);  // 24개 ADC 채널을 읽는다.
+
+    if (!joint_adc_powered)
+    {
+        JointFeedback_ResetEstimate(&handle->joints);  // 다음 전원 투입의 첫 ADC로 필터를 다시 시작한다.
+    }
 
     if (GPS_GetLatest(handle->gps, &gps_data))
     {
@@ -94,25 +100,31 @@ bool SensorManager_Update(
     {
         for (leg = 0U; leg < ROBOT_LEG_COUNT; ++leg)
         {
-            for (joint = 0U; joint < ROBOT_JOINTS_PER_LEG; ++joint)
+            if (joint_adc_powered)
             {
-                const uint32_t index = leg * ROBOT_JOINTS_PER_LEG + joint;  // 관절 배열 위치를 계산한다.
-                handle->snapshot.joint_raw[index] = handle->adc.leg_raw[leg][joint];  // 관절 raw 값을 배치한다.
+                for (joint = 0U; joint < ROBOT_JOINTS_PER_LEG; ++joint)
+                {
+                    const uint32_t index = leg * ROBOT_JOINTS_PER_LEG + joint;  // 관절 배열 위치를 계산한다.
+                    handle->snapshot.joint_raw[index] = handle->adc.leg_raw[leg][joint];  // 전원이 켜진 관절 raw 값을 배치한다.
+                }
             }
 
             handle->snapshot.pressure_raw[leg] =
                 handle->adc.leg_raw[leg][MCP3008_LEG_PRESSURE];             // 압력 raw 값을 배치한다.
         }
 
-        (void)JointFeedback_Convert(&handle->joints,
-                                    handle->snapshot.joint_raw,
-                                    handle->snapshot.joint_angle_rad);       // ADC를 보정 관절각으로 변환한다.
-        (void)JointFeedback_UpdateEstimate(
-            &handle->joints,
-            handle->snapshot.joint_angle_rad,
-            pwm_angle_rad,
-            pwm_valid,
-            handle->snapshot.joint_angle_rad);                              // ADC와 PWM을 최종 관절각으로 융합한다.
+        if (joint_adc_powered)
+        {
+            (void)JointFeedback_Convert(&handle->joints,
+                                        handle->snapshot.joint_raw,
+                                        handle->snapshot.joint_angle_rad);  // 전원이 켜진 ADC를 보정 관절각으로 변환한다.
+            (void)JointFeedback_UpdateEstimate(
+                &handle->joints,
+                handle->snapshot.joint_angle_rad,
+                pwm_angle_rad,
+                pwm_valid,
+                handle->snapshot.joint_angle_rad);                         // ADC와 PWM을 최종 관절각으로 융합한다.
+        }
         SensorManager_UpdateContactState(handle);                            // 접촉과 새 접촉 Latch를 갱신한다.
         handle->snapshot.timestamp_ms = handle->adc.mcu_time_ms;             // 스냅샷 시각을 갱신한다.
     }

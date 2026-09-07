@@ -107,6 +107,22 @@ void JointFeedback_Init(JointFeedback_Handle_t *handle)
     }
 }
 
+/* 보정 테이블을 유지하고 관절각 필터 이력만 초기화한다. */
+void JointFeedback_ResetEstimate(JointFeedback_Handle_t *handle)
+{
+    if (handle == NULL)
+    {
+        return;
+    }
+
+    memset(handle->adc_history_rad, 0, sizeof(handle->adc_history_rad));                    // Median 입력 이력을 제거한다.
+    memset(handle->adc_filtered_rad, 0, sizeof(handle->adc_filtered_rad));                  // ADC 필터 출력을 제거한다.
+    memset(handle->estimated_angle_rad, 0, sizeof(handle->estimated_angle_rad));            // 융합 관절각을 제거한다.
+    memset(handle->pwm_prediction_angle_rad, 0, sizeof(handle->pwm_prediction_angle_rad));  // PWM 예측 기준을 제거한다.
+    handle->filter_sample_count = 0U;                                                       // 다음 측정을 첫 표본으로 처리한다.
+    handle->pwm_prediction_valid = false;                                                   // PWM 예측 재초기화를 요청한다.
+}
+
 /* 한 관절의 실측 보정값을 설정한다. */
 bool JointFeedback_SetCalibration(JointFeedback_Handle_t *handle,
                                   uint8_t joint,

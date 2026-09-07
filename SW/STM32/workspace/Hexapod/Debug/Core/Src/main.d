@@ -43,6 +43,7 @@ Core/Src/main.o: ../Core/Src/main.c ../Core/Inc/main.h \
  ../Core/Inc/high_control/gait_manager.h \
  ../Core/Inc/high_control/gait_pose_controller.h \
  ../Core/Inc/high_control/leg_kinematics.h \
+ ../Core/Inc/high_control/rl_controller.h \
  ../Core/Inc/high_control/safety.h \
  ../Core/Inc/high_control/workspace_limiter.h \
  ../Core/Inc/low_control/servo_pwm.h ../Core/Inc/sensor/gps.h \
@@ -103,6 +104,7 @@ Core/Src/main.o: ../Core/Src/main.c ../Core/Inc/main.h \
 ../Core/Inc/high_control/gait_manager.h:
 ../Core/Inc/high_control/gait_pose_controller.h:
 ../Core/Inc/high_control/leg_kinematics.h:
+../Core/Inc/high_control/rl_controller.h:
 ../Core/Inc/high_control/safety.h:
 ../Core/Inc/high_control/workspace_limiter.h:
 ../Core/Inc/low_control/servo_pwm.h:

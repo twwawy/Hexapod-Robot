@@ -1,2 +1,4 @@
-../Core/Src/test/workspace_test.c:9:13:WorkspaceTest_CheckReducedCommand	73
-../Core/Src/test/workspace_test.c:166:6:WorkspaceTest_Run	49
+../Core/Src/test/workspace_test.c:10:13:WorkspaceTest_CheckRlPlan	26
+../Core/Src/test/workspace_test.c:94:13:WorkspaceTest_CheckWavePreview	7
+../Core/Src/test/workspace_test.c:139:13:WorkspaceTest_CheckReducedCommand	73
+../Core/Src/test/workspace_test.c:296:6:WorkspaceTest_Run	51

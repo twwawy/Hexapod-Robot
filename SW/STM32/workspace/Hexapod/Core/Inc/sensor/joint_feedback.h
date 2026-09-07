@@ -31,6 +31,8 @@ typedef struct
 
 void JointFeedback_Init(JointFeedback_Handle_t *handle);   // 기본 보정 테이블을 준비한다.
 
+void JointFeedback_ResetEstimate(JointFeedback_Handle_t *handle);  // 관절각 필터 이력을 초기화한다.
+
 bool JointFeedback_SetCalibration(JointFeedback_Handle_t *handle,
                                   uint8_t joint,
                                   const JointFeedback_Calibration_t *calibration);  // 한 관절 보정값을 갱신한다.

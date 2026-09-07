@@ -49,7 +49,8 @@ bool SensorRawMeasurement_Sample(SensorRawMeasurement_t *measurement)
 
     adc_ok = SensorManager_Update(measurement->sensors,
                                   NULL,
-                                  false);  // PWM 예측 없이 센서와 ADC 필터를 갱신한다.
+                                  false,
+                                  true);   // 측정 모드의 상시 전원 관절 ADC를 갱신한다.
     (void)SensorManager_GetSnapshot(measurement->sensors,
                                     &measurement->latest);  // ADC 실패와 무관하게 최신 센서를 보관한다.
     g_measurement_debug.latest_sensor = measurement->latest; // GPS·IMU 최신값을 디버거에 갱신한다.

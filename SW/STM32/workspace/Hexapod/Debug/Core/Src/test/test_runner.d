@@ -37,8 +37,10 @@ Core/Src/test/test_runner.o: ../Core/Src/test/test_runner.c \
  ../Core/Inc/test/calibration_algorithm_test.h \
  ../Core/Inc/test/communication_test.h ../Core/Inc/test/controller_test.h \
  ../Core/Inc/test/gait_test.h ../Core/Inc/test/kinematics_test.h \
- ../Core/Inc/test/mode_transition_test.h ../Core/Inc/test/safety_test.h \
- ../Core/Inc/test/user_command_test.h ../Core/Inc/test/workspace_test.h
+ ../Core/Inc/test/mode_transition_test.h \
+ ../Core/Inc/test/rl_controller_test.h ../Core/Inc/test/rl_stop_test.h \
+ ../Core/Inc/test/safety_test.h ../Core/Inc/test/user_command_test.h \
+ ../Core/Inc/test/workspace_test.h
 ../Core/Inc/test/test_runner.h:
 ../Core/Inc/common/robot_calibration.h:
 ../Core/Inc/low_control/relay.h:
@@ -85,6 +87,8 @@ Core/Src/test/test_runner.o: ../Core/Src/test/test_runner.c \
 ../Core/Inc/test/gait_test.h:
 ../Core/Inc/test/kinematics_test.h:
 ../Core/Inc/test/mode_transition_test.h:
+../Core/Inc/test/rl_controller_test.h:
+../Core/Inc/test/rl_stop_test.h:
 ../Core/Inc/test/safety_test.h:
 ../Core/Inc/test/user_command_test.h:
 ../Core/Inc/test/workspace_test.h:

@@ -44,6 +44,33 @@ static void ServoPwm_Map(ServoPwm_Handle_t *handle,
     handle->channel[joint] = channel;  // 관절 채널을 저장한다.
 }
 
+/* PWM 시작 전에 타이머별 CCR preload를 출력 레지스터에 반영한다. */
+static void ServoPwm_LatchPreload(ServoPwm_Handle_t *handle)
+{
+    uint32_t joint;  // 확인할 관절 번호를 저장한다.
+
+    for (joint = 0U; joint < ROBOT_JOINT_COUNT; ++joint)
+    {
+        uint32_t previous;  // 같은 타이머의 선행 채널을 확인한다.
+
+        for (previous = 0U; previous < joint; ++previous)
+        {
+            if (handle->timer[previous] == handle->timer[joint])
+            {
+                break;
+            }
+        }
+
+        if (previous != joint)
+        {
+            continue;
+        }
+
+        (void)HAL_TIM_GenerateEvent(handle->timer[joint], TIM_EVENTSOURCE_UPDATE);  // CCR preload를 즉시 확정한다.
+        __HAL_TIM_CLEAR_FLAG(handle->timer[joint], TIM_FLAG_UPDATE);                // 강제 update 상태를 정리한다.
+    }
+}
+
 /* CubeMX의 18개 PWM 채널과 기본 보정값을 준비한다. */
 void ServoPwm_Init(ServoPwm_Handle_t *handle,
                    const ServoPwm_TimerBank_t *timers)
@@ -137,7 +164,7 @@ bool ServoPwm_CalculatePulse(const ServoPwm_Calibration_t *calibration,
 /* 모든 서보 PWM을 중립 Pulse에서 시작한다. */
 HAL_StatusTypeDef ServoPwm_Start(ServoPwm_Handle_t *handle)
 {
-    uint32_t joint;   // 시작할 관절 번호를 저장한다.
+    uint32_t joint;  // 시작할 관절 번호를 저장한다.
 
     if (handle == NULL)
     {
@@ -156,13 +183,18 @@ HAL_StatusTypeDef ServoPwm_Start(ServoPwm_Handle_t *handle)
                               handle->channel[joint],
                               handle->table[joint].neutral_us);  // 중립 Pulse를 먼저 기록한다.
 
+        handle->pulse_us[joint] = handle->table[joint].neutral_us;  // 최근 Pulse를 갱신한다.
+    }
+
+    ServoPwm_LatchPreload(handle);  // 첫 출력 전에 모든 타이머의 중립 Pulse를 확정한다.
+
+    for (joint = 0U; joint < ROBOT_JOINT_COUNT; ++joint)
+    {
         if (HAL_TIM_PWM_Start(handle->timer[joint], handle->channel[joint]) != HAL_OK)
         {
             ServoPwm_Stop(handle);  // 시작된 PWM을 모두 정리한다.
             return HAL_ERROR;
         }
-
-        handle->pulse_us[joint] = handle->table[joint].neutral_us;  // 최근 Pulse를 갱신한다.
     }
 
     handle->started = true;  // 전체 PWM 시작을 표시한다.
@@ -207,6 +239,8 @@ HAL_StatusTypeDef ServoPwm_StartAngles(ServoPwm_Handle_t *handle,
             ROBOT_JOINT_MIN_RAD,
             ROBOT_JOINT_MAX_RAD);                             // 초기 PWM 명령각을 맞춘다.
     }
+
+    ServoPwm_LatchPreload(handle);  // 첫 출력 전에 모든 타이머의 시작각 Pulse를 확정한다.
 
     for (joint = 0U; joint < ROBOT_JOINT_COUNT; ++joint)
     {

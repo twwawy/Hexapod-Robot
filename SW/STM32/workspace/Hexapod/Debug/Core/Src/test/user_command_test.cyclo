@@ -1,1 +1,3 @@
-../Core/Src/test/user_command_test.c:9:6:UserCommandTest_Run	23
+../Core/Src/test/user_command_test.c:12:13:UserCommandTest_CheckS1Boundaries	9
+../Core/Src/test/user_command_test.c:65:13:UserCommandTest_CheckWalkingSelection	20
+../Core/Src/test/user_command_test.c:133:6:UserCommandTest_Run	25

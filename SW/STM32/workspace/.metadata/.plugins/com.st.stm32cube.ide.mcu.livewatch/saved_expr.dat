@@ -1,1 +1,7 @@
-g_hexapod_app
+g_hexapod_app.startup_zero_state
+g_hexapod_app.bringup.relay_enabled
+g_hexapod_app.servo_pwm.started
+g_hexapod_app.sensor_snapshot.joint_raw[6]
+g_hexapod_app.sensor_snapshot.joint_angle_rad[6]
+g_hexapod_app.startup_initial_angle_rad[6]
+g_hexapod_app.servo_pwm.pulse_us[6]

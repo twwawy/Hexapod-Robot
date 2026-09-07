@@ -1,0 +1,7 @@
+../Core/Src/test/rl_stop_test.c:8:13:RlStopTest_Start	3
+../Core/Src/test/rl_stop_test.c:29:13:RlStopTest_CheckAirborneStop	15
+../Core/Src/test/rl_stop_test.c:84:13:RlStopTest_CheckPreviewCancel	19
+../Core/Src/test/rl_stop_test.c:136:13:RlStopTest_CheckBoundaryCancel	10
+../Core/Src/test/rl_stop_test.c:177:13:RlStopTest_CheckSupportRecovery	8
+../Core/Src/test/rl_stop_test.c:205:13:RlStopTest_CheckLateLandingHold	14
+../Core/Src/test/rl_stop_test.c:268:6:RlStopTest_Run	6

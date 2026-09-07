@@ -1,4 +1,6 @@
-../Core/Src/test/mode_transition_test.c:12:13:ModeTransitionTest_CheckSwitchFunctions	96	static
-../Core/Src/test/mode_transition_test.c:108:13:ModeTransitionTest_CheckCorrectionMemory	640	static
-../Core/Src/test/mode_transition_test.c:161:13:ModeTransitionTest_CheckCorrectionPostureMemory	712	static
-../Core/Src/test/mode_transition_test.c:220:6:ModeTransitionTest_Run	208	static
+../Core/Src/test/mode_transition_test.c:12:13:ModeTransitionTest_CheckSwitchFunctions	104	static
+../Core/Src/test/mode_transition_test.c:119:13:ModeTransitionTest_CheckRlPriority	104	static
+../Core/Src/test/mode_transition_test.c:247:13:ModeTransitionTest_CheckRlDrone	216	static
+../Core/Src/test/mode_transition_test.c:318:13:ModeTransitionTest_CheckCorrectionMemory	1240	static
+../Core/Src/test/mode_transition_test.c:371:13:ModeTransitionTest_CheckCorrectionPostureMemory	1312	static
+../Core/Src/test/mode_transition_test.c:430:6:ModeTransitionTest_Run	320	static
