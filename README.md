@@ -18,6 +18,10 @@
 
 ## 통합 v4: 시작과 문서
 
+**조종기 전제 학습 추가: [RC 명령 추종 학습](docs/ADAPTIVE_RC_TRAINING.md)**.
+`--profile rc`는 전진·후진·yaw·정지 전환을 학습하며 command 성공과 계단 완주를 구분한다.
+현재 RC curriculum은 평지 Tripod/Wave/Hybrid이다. 지형 등판과 혼합한 실기 조종 성능은 미검증이다.
+
 **최신: [phase 경계 재접촉 복구·70% 통과까지 재시도](docs/ADAPTIVE_RECONTACT.md)**.
 MJX에서 대기 중 접촉이 끊긴 발만 제한적으로 내려 복구한다. GT 높이 계산/잔차 범위는
 유지한다. curriculum 기본값은 완주율 70%를 통과해야 다음 지형으로 진행하며 무제한 재시도를 지원한다.

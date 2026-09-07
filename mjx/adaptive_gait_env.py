@@ -47,10 +47,14 @@ CRITIC_SIZE = ACTOR_SIZE + 6*CANDIDATE_COUNT*2 + 15
 class AdaptiveGaitEnv(HexapodRoughTerrainEnv):
     def __init__(self, *, terrain_level=0, perception='lidar', config=None,
                  azimuths=90, elevations=8, dropout=.05, noise=.005, gait_mode='hybrid', diagnostics=False,
-                 bootstrap_unmapped=True, action_profile='full',):
+                 bootstrap_unmapped=True, action_profile='full', command_mode='terrain', external_commands=False):
         if perception not in ('lidar', 'teacher', 'blind', 'oracle'):
             raise ValueError('perception must be lidar, teacher, blind or debug-only oracle')
         self.perception = perception
+        if command_mode not in ('terrain', 'rc'):
+            raise ValueError('command_mode must be terrain or rc')
+        self.command_mode = command_mode
+        self.external_commands = bool(external_commands)
         if gait_mode not in ('hybrid', 'tripod', 'wave'):
             raise ValueError('gait_mode must be hybrid, tripod or wave')
         self.gait_mode, self.diagnostics = gait_mode, diagnostics
@@ -98,6 +102,7 @@ class AdaptiveGaitEnv(HexapodRoughTerrainEnv):
                 'flat_safe, terrain_mid, terrain_high or full'
             )
         config = default_config() if config is None else config
+        config.operator_command_mode = command_mode == 'rc'
         # Posture is owned by the parameter policy, not a terrain-kind sampler.
         config.command.height_min = config.command.height_max = 0.
         config.command.pitch_min_deg = config.command.pitch_max_deg = 0.
@@ -134,6 +139,15 @@ class AdaptiveGaitEnv(HexapodRoughTerrainEnv):
 
     def _initialize_controller_info(self, data, info):
         info['command'] = info['command'].at[2:].set(0.)
+        if self.command_mode == 'rc':
+            info['command'] = jp.zeros(5)
+        info['rc_target'] = jp.zeros(2)
+        info['rc_slew'] = jp.zeros(2)
+        info['rc_remaining'] = jp.asarray(0.)
+        info['rc_progress'] = jp.asarray(0.)
+        info['rc_good_steps'] = jp.asarray(0.)
+        info['rc_eval_steps'] = jp.asarray(0.)
+        info['rc_command_key'] = jax.random.fold_in(info['rng'], 418)
         info['controller_state'] = adaptive.initial_state()
         info['lidar_map'] = initial_map(data.qpos[:2])
         info['projection_m'] = jp.asarray(0.)
@@ -449,6 +463,8 @@ class AdaptiveGaitEnv(HexapodRoughTerrainEnv):
         return controller_state.height_applied
 
     def _reward_command(self, info, controller_state):
+        if self.command_mode == 'rc':
+            return info['command']
         # While locomotion is running, reward against the supervisor-accepted
         # speed because SHORT/WAVE intentionally reduce speed.
         #
@@ -531,6 +547,8 @@ class AdaptiveGaitEnv(HexapodRoughTerrainEnv):
             'hold_support_rejected_s', 'bootstrap_classical_s', 'stride_preference_projected_s',
             'reward/timeout', 'termination/timeout',
             'recontact/active_s', 'recontact/exhausted', 'recontact/ik_blocked', 'recontact/applied_descent_m',
+            'command_success', 'command_good_fraction', 'command/vx', 'command/wz',
+            'command/linear_error_mps', 'command/yaw_error_radps', 'command/stop_s',
             'oracle_safe_recall', 'oracle_false_safe', 'oracle_unknown_fraction',
             'oracle_foothold_error_m', 'oracle_compared', 'oracle_edge_recall', 'oracle_edge_precision', 'action_authority_mean',)})
         return state
@@ -554,7 +572,8 @@ class AdaptiveGaitEnv(HexapodRoughTerrainEnv):
         idle = jp.all(jp.abs(state.info['command'][:2]) < .001)
         state.info['no_progress_steps'] = jp.where(idle, 0, state.info['no_progress_steps'])
         state.info['progress_anchor_potential'] = jp.where(idle,
-            state.data.qpos[0] + .5*state.info['support_height'], state.info['progress_anchor_potential'])
+            state.info['rc_progress'] if self.command_mode == 'rc' else state.data.qpos[0] + .5*state.info['support_height'],
+            state.info['progress_anchor_potential'])
         previous_contacts = state.info['contact_state']
         previous_mode = state.info['controller_state'].scheduler.mode
         previous_recontact_distance = state.info['controller_state'].scheduler.recontact_distance
@@ -675,6 +694,28 @@ class AdaptiveGaitEnv(HexapodRoughTerrainEnv):
         result.metrics['reward/timeout'] = jp.where(timeout, TIMEOUT_PENALTY, 0.)
         result.metrics['termination/timeout'] = timeout.astype(jp.float32)
         outcome = sum(result.metrics['reward/'+key] for key in ('success', 'failure', 'no_progress', 'timeout'))
+        if self.command_mode == 'rc':
+            from operator_commands import next_command
+            result.metrics['command_success'] = result.metrics['terrain_success']
+            result.metrics['terrain_success'] = jp.asarray(0.)
+            result.metrics['command_good_fraction'] = result.info['rc_good_steps']/jp.maximum(result.info['rc_eval_steps'], 1.)
+            observed_vx = result.metrics['forward_velocity_ema_mps']
+            result.metrics.update({'command/vx': result.info['command'][0],
+                'command/wz': result.info['command'][1],
+                'command/linear_error_mps': jp.abs(observed_vx-result.info['command'][0]),
+                'command/yaw_error_radps': jp.abs(result.data.qvel[5]-result.info['command'][1]),
+                'command/stop_s': jp.all(jp.abs(result.info['command'][:2]) < .001).astype(jp.float32)*self.dt})
+        if self.command_mode == 'rc' and not self.external_commands:
+            applied, slew, target, remaining, key = next_command(result.info['rc_slew'], result.info['rc_target'],
+                result.info['rc_remaining'], result.info['rc_command_key'], self.dt)
+            ready = result.info['policy_steps']*self.dt >= self._config.command_delay
+            # Publish the NEXT command in the next actor observation, never
+            # replace a command after the actor already selected its action.
+            result.info['command'] = result.info['command'].at[:2].set(jp.where(ready, applied, 0.))
+            result.info['rc_slew'] = jp.where(ready, slew, 0.)
+            result.info['rc_target'] = jp.where(ready, target, 0.)
+            result.info['rc_remaining'] = jp.where(ready, remaining, 0.)
+            result.info['rc_command_key'] = key
         return result.replace(reward=result.reward-penalty+outcome,
             done=jp.maximum(result.done, timeout.astype(jp.float32)), obs=self._get_obs(result.data, result.info))
 

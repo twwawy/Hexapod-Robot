@@ -59,6 +59,10 @@ TEACHER_CURRICULUM = tuple(StageSpec(1, level, name) for level, name in (
     (8, 'tripod-stair10'), (2, 'tripod-rough50'))) + tuple(
         stage for stage in FULL_CURRICULUM if stage.gait_stage != 1)
 
+# Free steering must first be learned without a finite one-way stair course.
+RC_CURRICULUM = (StageSpec(1, 0, 'rc-tripod-flat'), StageSpec(2, 0, 'rc-wave-flat'),
+                 StageSpec(3, 0, 'rc-hybrid-flat'))
+
 
 def write_json(path: Path, payload: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -86,7 +90,7 @@ def main() -> None:
 
     parser.add_argument(
         "--profile",
-        choices=("observe", "fast", "full", "teacher"),
+        choices=("observe", "fast", "full", "teacher", "rc"),
         default="fast",
     )
 
@@ -101,6 +105,7 @@ def main() -> None:
     parser.add_argument('--num-minibatches', type=int, default=4)
     parser.add_argument('--num-eval-envs', type=int, default=4)
     parser.add_argument('--discounting', type=float, default=.997)
+    parser.add_argument('--command-mode', choices=('terrain', 'rc'), default='terrain')
     parser.add_argument('--baseline-comparison-seconds', type=float, default=None,
                         help='Cycle-end paired check; default 20s for teacher profile, otherwise disabled.')
 
@@ -265,6 +270,12 @@ def main() -> None:
         parser.error('--discounting must be between 0 and 1')
     if args.restore and args.init_teacher:
         parser.error("choose either --restore or --init-teacher")
+    if args.profile == 'rc':
+        args.command_mode = 'rc'
+    if args.command_mode == 'rc' and args.profile != 'rc':
+        parser.error('Use --profile rc for free steering; terrain completion is a different task')
+    if args.command_mode == 'rc' and args.promote_key == 'eval/episode_terrain_success':
+        args.promote_key = 'eval/episode_command_success'
 
     if args.init_teacher and args.perception != "lidar":
         parser.error("--init-teacher requires --perception lidar")
@@ -276,6 +287,8 @@ def main() -> None:
     )
     if args.profile == 'observe':
         curriculum = tuple(StageSpec(1, 0, 'tripod-flat') for _ in range(args.cycles))
+    if args.profile == 'rc':
+        curriculum = RC_CURRICULUM
     if args.profile == 'teacher':
         if args.perception != 'teacher':
             parser.error('--profile teacher requires --perception teacher')
@@ -464,6 +477,7 @@ def main() -> None:
             command.append('--wandb' if args.wandb else '--no-wandb')
             command.extend(['--baseline-comparison-seconds', str(comparison_seconds)])
             command.extend(['--discounting', str(args.discounting)])
+            command.extend(['--command-mode', args.command_mode])
             if args.migrate_flat_boxes and stage_index == args.start_index and retry == 0:
                 command.append('--migrate-flat-boxes')
             if args.migrate_completion_reward and stage_index == args.start_index and retry == 0:

@@ -15,7 +15,10 @@ def compare_baseline(env, make_policy, params, seed, duration=20., seeds=2):
         raise ValueError('Comparison requires positive finite duration and seed count')
     policy = make_policy(params, deterministic=True)
     horizon = max(1, math.ceil(duration/float(env.dt)))
+    rc = env.command_mode == 'rc'
     metric_names = ('hold_planner_s', 'hold_contact_wait_s', 'foot_slip', 'plan_rejected')
+    if rc:
+        metric_names += ('command/linear_error_mps', 'command/yaw_error_radps')
 
     def rollout(key, use_policy):
         initial = env.reset(key)
@@ -32,8 +35,10 @@ def compare_baseline(env, make_policy, params, seed, duration=20., seeds=2):
             (initial, key, jp.zeros(1+len(metric_names)), jp.asarray(0)), None, length=horizon)
         direction = initial.data.xmat[env._root_id] @ MODEL_FORWARD
         forward = jp.dot(last.data.qpos[:3]-initial.data.qpos[:3], direction)
+        if rc:
+            totals = totals.at[-2:].set(totals[-2:]/jp.maximum(steps, 1))
         return jp.concatenate((totals, jp.array((forward, steps*env.dt, last.done,
-            last.metrics['terrain_success'], last.metrics['termination/no_progress']))))
+            last.metrics['command_success' if rc else 'terrain_success'], last.metrics['termination/no_progress']))))
 
     keys = jax.random.split(jax.random.PRNGKey(seed), seeds)
     run = jax.jit(jax.vmap(rollout, in_axes=(0, None)))
@@ -47,4 +52,5 @@ def compare_baseline(env, make_policy, params, seed, duration=20., seeds=2):
     report['comparison/policy_minus_baseline_forward_m'] = report['comparison/policy/forward_m']-report['comparison/baseline/forward_m']
     report['comparison/horizon_s'] = horizon*env.dt
     report['comparison/seed_count'] = seeds
+    report['comparison/rc_task'] = int(rc)
     return report

@@ -313,6 +313,7 @@ def _base_reward_terms(
     self_collision: jax.Array,
     command_active: jax.Array = jp.asarray(True),
     progress_speed_floor: float = PROGRESS_COMMAND_FLOOR_MPS,
+    signed_command: bool = False,
 ) -> dict[str, jax.Array]:
     """Compute locomotion rewards with no profitable stationary solution."""
     speed_command = jp.maximum(command[0], progress_speed_floor)
@@ -339,6 +340,12 @@ def _base_reward_terms(
         ),
         0.0,
     )
+    if signed_command:
+        from operator_commands import motion_score
+        reward_command = jp.where(command_active, command, jp.zeros_like(command))
+        _, moving, good, progress = motion_score(forward_velocity, yaw_velocity, reward_command)
+        motion_gate = jp.where(moving, jp.clip(progress/MOTION_GATE_COMMAND_FRACTION, 0., 1.), good.astype(jp.float32))
+        under_speed = jp.where(moving, jp.maximum(1.-progress, 0.)**2, 0.)
     return {
         "velocity": jp.exp(
             -jp.square(
@@ -1324,6 +1331,17 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
             & _posture_success(attitude, posture_target)
             & (~hard_failure)
         )
+        watchdog_active = command_active
+        if self._config.get('operator_command_mode', False):
+            from operator_commands import motion_score
+            speed, moving, good, _ = motion_score(filtered_forward_velocity, data.qvel[5], state.info['command'])
+            state.info['rc_progress'] += jp.where(command_active & moving, speed*self.dt, 0.)
+            state.info['rc_good_steps'] += (command_active & good).astype(jp.float32)
+            state.info['rc_eval_steps'] += command_active.astype(jp.float32)
+            terrain_progress_potential = state.info['rc_progress']
+            watchdog_active = command_active & moving
+            success_candidate = ((state.info['policy_steps']+1 >= self.episode_length) &
+                (state.info['rc_good_steps']/jp.maximum(state.info['rc_eval_steps'], 1.) >= .70) & ~hard_failure)
         (
             progress_anchor_potential,
             no_progress_steps,
@@ -1332,7 +1350,7 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
             potential=terrain_progress_potential,
             anchor=state.info["progress_anchor_potential"],
             stagnant_steps=state.info["no_progress_steps"],
-            command_active=command_active,
+            command_active=watchdog_active,
             success=success_candidate,
             dt=self.dt,
             min_delta=self._config.no_progress_min_delta,
@@ -1412,6 +1430,7 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
         )
         feet_world = data.site_xpos[self._foot_site_ids]
         reward_terms = _base_reward_terms(
+            signed_command=self._config.get('operator_command_mode', False),
             forward_velocity=filtered_forward_velocity,
             command=self._reward_command(state.info, controller_state),
             progress_speed_floor=self._reward_speed_floor(),
@@ -1471,6 +1490,8 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
             if self._terrain_spec.requires_final_height
             else jp.zeros(())
         )
+        if self._config.get('operator_command_mode', False):
+            ascent_bonus = jp.zeros(())  # free steering is not a fixed-X ascent mission
         success_bonus = jp.where(success, self._config.success_bonus, 0.0)
         failure_penalty = jp.where(
             hard_failure, self._config.failure_penalty, 0.0
@@ -1533,6 +1554,10 @@ class HexapodRoughTerrainEnv(mjx_env.MjxEnv):
             jp.clip(filtered_forward_velocity / speed_command, -1.0, 1.5),
             0.0,
         )
+        if self._config.get('operator_command_mode', False):
+            from operator_commands import motion_score
+            state.metrics['forward_progress_ratio'] = motion_score(
+                filtered_forward_velocity, data.qvel[5], state.info['command'])[3]
         state.metrics["forward_velocity_ema_mps"] = filtered_forward_velocity
         state.metrics["termination/controller_invalid"] = controller_invalid.astype(jp.float32)
         state.metrics["termination/joint_limit"] = joint_limit_failure.astype(jp.float32)

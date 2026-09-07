@@ -110,7 +110,7 @@ def render_policy_video(
     import jax
     import numpy as np
     from collections import deque
-    from PIL import Image
+    from PIL import Image, ImageDraw
     import mujoco
     from mujoco import mjx
 
@@ -176,6 +176,7 @@ def render_policy_video(
 
     try:
         for control_step in range(control_steps):
+            frame_command = np.asarray(state.info['command'][:2])
             key, action_key = jax.random.split(key)
 
             action, _ = policy(
@@ -200,7 +201,7 @@ def render_policy_video(
                     accepted_action=np.asarray(cs.accepted_action).tolist(),
                     root_pose=np.asarray(state.data.qpos[:7]).tolist(),
                     joints=np.asarray(state.data.qpos[env._joint_qpos_ids]).tolist(),
-                    command=np.asarray(state.info['command']).tolist(),
+                    command=frame_command.tolist(),
                     raw_contacts=np.asarray(cs.raw_contacts).tolist(),
                     confirmed_contacts=np.asarray(cs.confirmed_contacts).tolist(),
                     scheduler={k: np.asarray(v).tolist() for k, v in cs.scheduler._asdict().items()},
@@ -248,6 +249,10 @@ def render_policy_video(
                 frame = Image.fromarray(
                     renderer.render()
                 )
+                overlay = ImageDraw.Draw(frame)
+                overlay.rectangle((0, 0, width, 24), fill=(0, 0, 0))
+                overlay.text((6, 5), f'{env.command_mode} | vx={frame_command[0]:+.3f} m/s | yaw={frame_command[1]:+.3f} rad/s',
+                             fill=(255, 255, 255))
 
                 frames.append(
                     frame.convert(
@@ -297,6 +302,8 @@ def render_policy_video(
             if key.startswith("termination/") and float(np.asarray(value)) != 0.
         },
         "terrain_success": float(np.asarray(state.metrics.get("terrain_success", 0.))),
+        "command_success": float(np.asarray(state.metrics.get('command_success', 0.))),
+        "command_mode": env.command_mode,
         "trace_note": "Last approximately 5 s at 10 Hz of this video rollout; not a PPO evaluation trajectory",
         "diagnostic_tail": list(diagnostic_tail),
     }
@@ -568,6 +575,8 @@ def parse_args() -> argparse.Namespace:
                         help='Explicitly transfer reviewed v5-grid weights into new completion reward.')
     parser.add_argument('--migrate-recontact', action='store_true',
                         help='Explicit controller migration from reviewed completion reward revision.')
+    parser.add_argument('--command-mode', choices=('terrain', 'rc'), default='terrain',
+                        help='terrain: forward traversal; rc: changing forward/reverse/yaw/stop commands.')
     parser.add_argument('--discounting', type=float, default=.997,
                         help='PPO discount; .997 retains more delayed completion credit than .99.')
     args = parser.parse_args()
@@ -729,6 +738,7 @@ def main() -> None:
         noise=args.range_noise,
         gait_mode=gait_mode,
         action_profile=args.action_profile,
+        command_mode=args.command_mode,
     )
 
     # -----------------------------------------------------------------------
@@ -756,6 +766,8 @@ def main() -> None:
                 f"expected={expected_source}, "
                 f"got={old['actor_source']}"
             )
+        if old.get('command_mode', 'terrain') != args.command_mode:
+            raise ValueError('Command task changed; start a fresh RC policy rather than silently reusing terrain-task weights')
 
     # -----------------------------------------------------------------------
     # Run directory
@@ -815,7 +827,7 @@ def main() -> None:
 
     metadata["action_profile"] = args.action_profile
     metadata['discounting'] = args.discounting
-    metadata['checkpoint_selection'] = 'terrain_success_then_score'
+    metadata['checkpoint_selection'] = f'{args.command_mode}_success_then_score'
 
     metadata["initial_checkpoint"] = (
         str(restore)
@@ -901,6 +913,9 @@ def main() -> None:
     factory = network_factory()
     print(f'NETWORK: elevation CNN v5 | observation={env.observation_size} | '
           'grid=24x24x6 @ 5cm | physical action=24-D v4 | fresh v5 checkpoint required', flush=True)
+    print(f'COMMAND TASK: {args.command_mode} | '
+          + ('RC vx +/-0.08m/s, yaw +/-0.25rad/s, stop/reverse/arcs, holds 2..5s'
+             if args.command_mode == 'rc' else 'forward terrain traversal'), flush=True)
 
     network_config = checkpoint.network_config(
         env.observation_size,
@@ -1055,7 +1070,7 @@ def main() -> None:
             "score_key": args.score_key,
             "path": str(best_checkpoint),
             "metrics": best_metrics,
-            "selection": "terrain_success_then_score",
+            "selection": f'{args.command_mode}_success_then_score',
         }
 
         write_json(
@@ -1120,8 +1135,9 @@ def main() -> None:
             args.score_key
         )
 
-        success_rate = numeric.get('eval/episode_terrain_success', float('nan'))
-        previous_success = (best_metrics or {}).get('eval/episode_terrain_success', -math.inf)
+        success_key = 'eval/episode_command_success' if args.command_mode == 'rc' else 'eval/episode_terrain_success'
+        success_rate = numeric.get(success_key, float('nan'))
+        previous_success = (best_metrics or {}).get(success_key, -math.inf)
         new_best = (
             step > 0
             and score is not None
@@ -1174,7 +1190,7 @@ def main() -> None:
             cycle_metrics = {}
             if best_step is not None:
                 cycle_metrics = {'cycle/best_score': best_score, 'cycle/best_step': best_step,
-                                 'cycle/best_success_rate': best_metrics['eval/episode_terrain_success']}
+                                 'cycle/best_success_rate': best_metrics[success_key]}
                 wandb_run.summary.update(cycle_metrics)
                 wandb_run.summary['cycle/score_key'] = args.score_key
             wandb_run.log(

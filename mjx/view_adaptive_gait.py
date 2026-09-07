@@ -71,6 +71,7 @@ def main():
         azimuths=sensor['azimuths'], elevations=sensor['elevations'], dropout=sensor['dropout'], noise=sensor['noise_m'],
         gait_mode=args.gait_mode or (metadata['gait_mode'] if metadata else 'hybrid'), diagnostics=args.stage0,
         bootstrap_unmapped=not args.no_bootstrap_classical,
+        command_mode=metadata.get('command_mode', 'terrain') if metadata else 'terrain', external_commands=True,
         action_profile=metadata.get('action_profile', 'full') if metadata else 'full')
     # Use the exact emitter transform held by the JAX raycaster, including the
     # measured 45-degree mount. No separate CAD site or display-only TF is used.

@@ -25,7 +25,7 @@ def network_factory():
 
 def contract(env):
     root = Path(__file__).resolve().parent
-    sources = ('adaptive_contract.py', 'adaptive_grid.py', 'adaptive_grid_network.py', 'adaptive_gait_controller.py', 'adaptive_gait_env.py', 'adaptive_gait_perception.py',
+    sources = ('adaptive_contract.py', 'operator_commands.py', 'adaptive_grid.py', 'adaptive_grid_network.py', 'adaptive_gait_controller.py', 'adaptive_gait_env.py', 'adaptive_gait_perception.py',
                'adaptive_foothold_estimator.py', 'foothold_feasibility.py',
                'hybrid_gait_supervisor.py', 'wave_gait_scheduler.py',
                'adaptive_gait_policy.py', 'firmware_mjx_controller.py', 'rough_terrain_env.py',
@@ -44,6 +44,12 @@ def contract(env):
                               physical_failure=PHYSICAL_FAILURE_PENALTY, timeout=TIMEOUT_PENALTY),
         observation_size={'state': ACTOR_SIZE, 'privileged_state': CRITIC_SIZE},
         actor_source=env.perception, leg_order=LEG_ORDER,
+        command_mode=env.command_mode,
+        command_contract='rc_vx_wz_hold_slew_v1' if env.command_mode == 'rc' else 'terrain_forward_v1',
+        command_training=dict(vx_mps=[-.08, .08], wz_radps=[-.25, .25], hold_s=[2., 5.],
+            linear_slew_mps2=.08, yaw_slew_radps2=.4, stop=True,
+            success='episode completes safely and >=70% command-active ticks within 0.02m/s and 0.07rad/s')
+            if env.command_mode == 'rc' else None,
         gait_mode=env.gait_mode, action_profile=env.action_profile,
         action_slices={'xy': [0, 12], 'clearance': [12, 18], 'roll_pitch_height': [18, 21],
                        'stride': 21, 'apex_phase': 22, 'transfer_timing': 23},
