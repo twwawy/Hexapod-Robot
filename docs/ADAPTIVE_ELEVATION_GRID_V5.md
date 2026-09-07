@@ -1,5 +1,15 @@
 # Elevation grid 기반 residual RL — 관측/network v5
 
+## PPO 초기화 shape 오류 수정
+
+Brax PPO는 관측 크기를 `{'state': (7890,), ...}`로 전달하지만 초기 CNN 코드는
+정수 크기만 가정해 `(1, (7890,))` 배열을 만들려 했다. actor/critic 모두 정수,
+1-D tuple, JSON list를 정수 폭으로 정규화하도록 수정했다. 동작/관측/network 차원은
+변경하지 않았다. 해당 오류는 네트워크 초기화 단계에서 발생했으므로 그 실패 run에는
+복원할 학습 checkpoint가 없다. 아래 학습 명령에서 run-name만
+`adaptive-grid-v5-lidar-mid-shapefix`로 변경하고 restore 없이 다시 실행한다.
+회귀 테스트는 추가했으며 실행은 사용자에게 맡긴다.
+
 ## 구현 범위와 실행 상태
 
 `codex/adaptive-hybrid-rl-integration`에서 수정했다. 이번 변경의 simulation,

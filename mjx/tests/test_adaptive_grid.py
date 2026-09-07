@@ -63,6 +63,22 @@ class ElevationGridTest(unittest.TestCase):
         gradient = jax.grad(lambda obs: jp.sum(net.policy_network.apply(None, params, {'state': obs})))(x)
         self.assertGreater(float(jp.linalg.norm(gradient[..., VECTOR_SIZE:])), 0.)
 
+    def test_ppo_tuple_and_checkpoint_list_observation_shapes(self):
+        from adaptive_grid_network import make_grid_networks, observation_width
+        from adaptive_gait_env import ACTOR_SIZE, CRITIC_SIZE
+        for wrap in (lambda n: n, lambda n: (n,), lambda n: [n]):
+            with self.subTest(shape=wrap(ACTOR_SIZE)):
+                self.assertEqual(observation_width(wrap(ACTOR_SIZE)), ACTOR_SIZE)
+                net = make_grid_networks({'state': wrap(ACTOR_SIZE), 'privileged_state': wrap(CRITIC_SIZE)}, 24)
+                policy = net.policy_network.init(jax.random.PRNGKey(1))
+                value = net.value_network.init(jax.random.PRNGKey(2))
+                obs = {'state': jp.zeros((1, ACTOR_SIZE)), 'privileged_state': jp.zeros((1, CRITIC_SIZE))}
+                self.assertEqual(net.policy_network.apply(None, policy, obs).shape, (1, 48))
+                self.assertEqual(net.value_network.apply(None, value, obs).shape, (1,))
+        for invalid in ((2, ACTOR_SIZE), (), 7890.0):
+            with self.assertRaises(ValueError):
+                observation_width(invalid)
+
 
 if __name__ == '__main__':
     unittest.main()

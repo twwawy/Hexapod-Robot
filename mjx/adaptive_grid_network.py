@@ -1,5 +1,6 @@
 """PPO actor/critic with spatial elevation encoder and existing vector features."""
 from collections.abc import Mapping
+import operator
 import jax
 import jax.numpy as jp
 from flax import linen as nn
@@ -9,6 +10,21 @@ from adaptive_grid import GRID_SIDE, GRID_CHANNELS, GRID_SIZE
 from adaptive_gait_env import VECTOR_SIZE
 
 NETWORK_CONTRACT = 'elevation_cnn_16_32_dense64_v1'
+
+
+def observation_width(spec):
+    """Accept environment integer sizes and PPO/checkpoint 1-D shape specs."""
+    if isinstance(spec, (tuple, list)):
+        if len(spec) != 1:
+            raise ValueError(f'Elevation network requires a 1-D observation, got {spec!r}')
+        spec = spec[0]
+    try:
+        width = operator.index(spec)
+    except TypeError as exc:
+        raise ValueError(f'Observation width must be a concrete integer, got {spec!r}') from exc
+    if width < VECTOR_SIZE+GRID_SIZE:
+        raise ValueError(f'Observation width {width} cannot contain vector and elevation grid')
+    return width
 
 
 class GridHead(nn.Module):
@@ -39,7 +55,7 @@ def make_grid_networks(observation_size, action_size,
 
     def make(key_name, outputs, hidden, value=False):
         module = GridHead(outputs, tuple(hidden))
-        size = observation_size[key_name] if isinstance(observation_size, Mapping) else observation_size
+        size = observation_width(observation_size[key_name] if isinstance(observation_size, Mapping) else observation_size)
         def apply(processor, params, obs):
             raw = obs[key_name] if isinstance(obs, Mapping) else obs
             selected = networks.normalizer_select(processor, key_name) if isinstance(obs, Mapping) and processor is not None else processor
