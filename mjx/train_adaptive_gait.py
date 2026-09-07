@@ -935,6 +935,7 @@ def main() -> None:
             "cycle/*",
             step_metric="train/global_step",
         )
+        wandb_run.summary['cycle/best_video_status'] = 'waiting_for_cycle_end' if args.best_video else 'disabled'
 
         wandb_run.summary["stage/gait"] = (
             args.stage
@@ -993,6 +994,8 @@ def main() -> None:
         Save best checkpoint metadata once the checkpoint for best_step exists.
         """
         if best_step is None:
+            if wandb_run is not None:
+                wandb_run.summary['cycle/best_video_status'] = 'no_trained_checkpoint'
             return False
 
         best_checkpoint = checkpoint_for_step(
@@ -1291,6 +1294,8 @@ def main() -> None:
             )
 
             try:
+                if wandb_run is not None:
+                    wandb_run.summary['cycle/best_video_status'] = 'rendering'
                 render_policy_video(
                     env=env,
                     make_policy=latest_policy[
@@ -1306,6 +1311,9 @@ def main() -> None:
                 )
 
             except Exception as exc:
+                if wandb_run is not None:
+                    wandb_run.summary['cycle/best_video_status'] = 'render_failed'
+                    wandb_run.summary['cycle/best_video_error'] = f'{type(exc).__name__}: {exc}'
                 write_json(
                     monitor_dir
                     / "best_video_error.json",
@@ -1348,7 +1356,7 @@ def main() -> None:
                     and wandb_module is not None
                 ):
                     caption = (
-                        f"Adaptive v4 | "
+                        f"Adaptive elevation CNN v5 | "
                         f"gait stage {args.stage} | "
                         f"terrain {args.terrain_level} | "
                         f"step {best_step:,} | "
@@ -1439,6 +1447,7 @@ def main() -> None:
                             f"step-{best_step}",
                         ],
                     )
+                    wandb_run.summary['cycle/best_video_status'] = 'upload_queued'
 
         print(
             "============================================\n",
@@ -1512,6 +1521,12 @@ def main() -> None:
 
         finalize_best()
 
+    except BaseException as exc:
+        if wandb_run is not None:
+            wandb_run.summary['cycle/error'] = f'{type(exc).__name__}: {exc}'
+            if wandb_run.summary.get('cycle/best_video_status') == 'waiting_for_cycle_end':
+                wandb_run.summary['cycle/best_video_status'] = 'training_failed_before_video'
+        raise
     finally:
         if wandb_run is not None:
             wandb_run.finish()
