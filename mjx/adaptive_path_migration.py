@@ -11,16 +11,21 @@ def validate_source(path):
     from adaptive_gait_policy import resolve_checkpoint
     path = resolve_checkpoint(path)
     metadata = json.loads((path/'adaptive_contract.json').read_text())
+    already_v6 = metadata.get('observation_contract') == 'adaptive_hybrid_elevation_grid24x24x6_path_v6'
+    revision = '585bee2' if already_v6 else SOURCE_REVISION
     expected = dict(command_mode='terrain', observation_contract='adaptive_hybrid_elevation_grid24x24x6_v5',
         action_contract='adaptive_hybrid_geometry_residual_24_v4', action_size=24,
         network_contract='elevation_cnn_16_32_dense64_v1', reward_contract='adaptive_completion_outcome_v5',
         observation_size={'state': 7890, 'privileged_state': 8205})
+    if already_v6:
+        expected['observation_contract'] = 'adaptive_hybrid_elevation_grid24x24x6_path_v6'
+        expected['observation_size'] = {'state': 8790, 'privileged_state': 9105}
     for field, value in expected.items():
         if metadata.get(field) != value:
             raise ValueError(f'Unreviewed path-v6 migration {field}: {metadata.get(field)}')
     repo = Path(__file__).resolve().parent.parent
     recorded = metadata['source_sha256']
-    original_policy = subprocess.check_output(['git', '-C', str(repo), 'show', f'{SOURCE_REVISION}:mjx/adaptive_gait_policy.py'], text=True)
+    original_policy = subprocess.check_output(['git', '-C', str(repo), 'show', f'{revision}:mjx/adaptive_gait_policy.py'], text=True)
     # Require the complete recorded v5 source set, not a partial hash bypass.
     import ast
     tree = ast.parse(original_policy)
@@ -29,14 +34,14 @@ def validate_source(path):
     if set(recorded) != set(source_names):
         raise ValueError('Migration requires the full reviewed v5 source manifest')
     for name, digest in recorded.items():
-        source = subprocess.check_output(['git', '-C', str(repo), 'show', f'{SOURCE_REVISION}:mjx/{name}'])
+        source = subprocess.check_output(['git', '-C', str(repo), 'show', f'{revision}:mjx/{name}'])
         if hashlib.sha256(source).hexdigest() != digest:
             raise ValueError(f'Unreviewed path-v6 migration source: {name}')
     config = json.loads((path/'ppo_network_config.json').read_text())
     if config['action_size'] != 24 or config['observation_size'] != expected['observation_size']:
         raise ValueError('Saved network dimensions do not match reviewed v5 metadata')
-    metadata['explicit_migration'] = dict(kind='terrain_v5_to_path_v6', source=str(path),
-        source_revision=SOURCE_REVISION, new_input_weights='zero', optimizer='fresh',
+    metadata['explicit_migration'] = dict(kind='path_v6_clearance_update' if already_v6 else 'terrain_v5_to_path_v6', source=str(path),
+        source_revision=revision, new_input_weights='zero', optimizer='fresh',
         note='Warm start only; changed planner geometry can change behavior immediately')
     return path, metadata
 
@@ -58,6 +63,11 @@ def migrate_params(params):
     if (VECTOR_SIZE, ACTOR_SIZE, CRITIC_SIZE) != (5334, 8790, 9105):
         raise ValueError('Unreviewed target observation layout')
     normalizer, actor, critic = params
+    if (normalizer.mean['state'].shape == (8790,) and
+        normalizer.mean['privileged_state'].shape == (9105,)):
+        if actor['params']['Dense_1']['kernel'].shape != (5398, 256) or critic['params']['Dense_1']['kernel'].shape != (5713, 256):
+            raise ValueError('Unexpected v6 kernel shape')
+        return params  # Explicit source-only migration; no tensor expansion.
     def expand(values, tail, fill):
         old_size = 4434+tail
         if values.shape[0] != old_size:

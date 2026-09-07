@@ -11,6 +11,7 @@ import itertools
 from pathlib import Path
 import subprocess
 import sys
+import threading
 from typing import Any
 
 
@@ -85,6 +86,7 @@ def main() -> None:
                         help='Reviewed flat checkpoint transfer on the first cycle only; requires --restore.')
     parser.add_argument('--migrate-completion-reward', action='store_true',
                         help='Transfer reviewed grid v5 checkpoint to completion reward on first cycle only.')
+    parser.add_argument('--stair-clearance-extra', type=float, default=0.)
     parser.add_argument('--migrate-path-v6', action='store_true', help='Reviewed v5->v6 migration on the first cycle only.')
     parser.add_argument('--migrate-recontact', action='store_true',
                         help='Transfer reviewed completion-reward weights to boundary recontact controller.')
@@ -481,6 +483,7 @@ def main() -> None:
             command.extend(['--baseline-comparison-seconds', str(comparison_seconds)])
             command.extend(['--discounting', str(args.discounting)])
             command.extend(['--command-mode', args.command_mode])
+            command.extend(['--stair-clearance-extra', str(args.stair_clearance_extra)])
             if args.migrate_flat_boxes and stage_index == args.start_index and retry == 0:
                 command.append('--migrate-flat-boxes')
             if args.migrate_completion_reward and stage_index == args.start_index and retry == 0:
@@ -542,11 +545,30 @@ def main() -> None:
             with (root / f'cycle-{stage_index:02d}-try{retry:02d}.log').open('w') as log:
                 with subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                       text=True, bufsize=1) as process:
-                    for line in process.stdout:
-                        print(line, end='', flush=True)
-                        log.write(line)
-                        log.flush()
-                    returncode = process.wait()
+                    stopped = threading.Event()
+                    def heartbeat():
+                        while not stopped.wait(30.):
+                            if process.poll() is not None:
+                                return
+                            print(f'WORKER WAIT | pid={process.pid} still running; waiting for next trainer output (not a progress guarantee)', flush=True)
+                    threading.Thread(target=heartbeat, daemon=True).start()
+                    try:
+                        for line in process.stdout:
+                            print(line, end='', flush=True)
+                            log.write(line)
+                            log.flush()
+                        returncode = process.wait()
+                    except KeyboardInterrupt:
+                        process.terminate()
+                        try:
+                            process.wait(timeout=10.)
+                        except subprocess.TimeoutExpired:
+                            process.kill()
+                            process.wait()
+                        raise
+                    finally:
+                        stopped.set()
+
                 if returncode:
                     raise subprocess.CalledProcessError(returncode, command)
 

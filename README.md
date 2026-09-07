@@ -138,3 +138,14 @@ bash /home/huro/Hexapod-Robot-integration/scripts/resume_stair5_path_v6.sh
 Optimizer는 새로 시작한다. 매 평가 best-so-far 영상과 W&B 기록을 유지한다.
 변환·학습은 사용자 실행 대상이며 이전 정책의 보행 성능 보존을 보장하지 않는다.
 이 목적에는 별도 `Hexapod-Robot-stair5-resume`의 v5 재개 스크립트를 사용하지 않는다.
+
+## 영상 뒤 대기 / 계단 발 높이 조정
+
+현재 v6 best에서 계단 clearance를 2cm 추가해 재개:
+
+```bash
+bash /home/huro/Hexapod-Robot-integration/scripts/resume_stair5_v6_clearance.sh
+```
+
+같은 best 영상은 재사용하되 매 평가 W&B 게시를 유지한다.
+[대기 진단·높이 설정·checkpoint 호환 범위](docs/ADAPTIVE_VIDEO_WAIT_CLEARANCE.md).

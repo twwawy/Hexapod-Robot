@@ -27,6 +27,7 @@ import json
 import math
 import os
 import shutil
+import time
 from pathlib import Path
 from typing import Any
 
@@ -574,6 +575,7 @@ def parse_args() -> argparse.Namespace:
                         help='Cycle-end same-seed zero-action vs best-policy comparison; 0 disables.')
     parser.add_argument('--migrate-completion-reward', action='store_true',
                         help='Explicitly transfer reviewed v5-grid weights into new completion reward.')
+    parser.add_argument('--stair-clearance-extra', type=float, default=0., help='Extra minimum clearance on upward steps, metres (0..0.04).')
     parser.add_argument('--migrate-path-v6', action='store_true', help='Explicit reviewed terrain v5 warm start into path v6.')
     parser.add_argument('--migrate-recontact', action='store_true',
                         help='Explicit controller migration from reviewed completion reward revision.')
@@ -704,6 +706,9 @@ def main() -> None:
     # -----------------------------------------------------------------------
 
     cfg = default_config()
+    if not math.isfinite(args.stair_clearance_extra) or not 0. <= args.stair_clearance_extra <= .04:
+        raise ValueError('--stair-clearance-extra must be 0..0.04 m')
+    cfg.stair_clearance_extra = args.stair_clearance_extra
     cfg.episode_length = args.episode_length
     # Flat bootstrap curriculum:
     # Give the policy enough time to recover from poor early residuals while
@@ -1102,6 +1107,8 @@ def main() -> None:
 
         return True
 
+    rendered_best = {}
+    uploaded_best = set()
     pending_video_step = None
     published_video_steps = set()
 
@@ -1119,7 +1126,10 @@ def main() -> None:
         pending_video_step = None
         published_video_steps.add(step)
         try:
+            print(f'EVAL VIDEO START | eval={step:,} best={best_step:,}', flush=True)
+            started = time.monotonic()
             publish_best_video(step)
+            print(f'EVAL VIDEO RETURN | elapsed={time.monotonic()-started:.1f}s; PPO continues until next evaluation', flush=True)
         except Exception as exc:
             error = f'{type(exc).__name__}: {exc}'
             write_json(monitor_dir/f'eval_video_{step:012d}_error.json', {'step': step, 'error': error})
@@ -1434,19 +1444,29 @@ def main() -> None:
             try:
                 if wandb_run is not None:
                     wandb_run.summary['cycle/best_video_status'] = 'rendering'
-                render_policy_video(
-                    env=env,
-                    make_policy=latest_policy[
-                        "make_policy"
-                    ],
-                    params=best_params,
-                    output=video_path,
-                    seed=args.seed + 20_000,
-                    duration=args.best_video_duration,
-                    fps=args.video_fps,
-                    width=args.video_width,
-                    height=args.video_height,
-                )
+                cached = rendered_best.get(best_step)
+                if cached is not None and cached.is_file():
+                    shutil.copy2(cached, video_path)
+                    report = cached.with_suffix('.termination.json')
+                    if report.is_file():
+                        shutil.copy2(report, video_path.with_suffix('.termination.json'))
+                    print(f'EVAL VIDEO CACHE | reusing best step {best_step:,}', flush=True)
+                else:
+                    render_policy_video(
+                        env=env,
+                        make_policy=latest_policy[
+                            "make_policy"
+                        ],
+                        params=best_params,
+                        output=video_path,
+                        seed=args.seed + 20_000,
+                        duration=args.best_video_duration,
+                        fps=args.video_fps,
+                        width=args.video_width,
+                        height=args.video_height,
+                    )
+                    rendered_best[best_step] = video_path
+
 
             except Exception as exc:
                 if wandb_run is not None:
@@ -1571,7 +1591,8 @@ def main() -> None:
                         str(video_path),
                         name="best.gif",
                     )
-                    artifact.add_dir(str(best_checkpoint), name='checkpoint')
+                    if best_step not in uploaded_best:
+                        artifact.add_dir(str(best_checkpoint), name='checkpoint')
                     artifact.add_file(str(output / 'metrics.jsonl'), name='metrics.jsonl')
                     termination_report = video_path.with_suffix('.termination.json')
                     if termination_report.is_file():
@@ -1594,6 +1615,7 @@ def main() -> None:
                             f"eval-{evaluation_step}",
                         ],
                     )
+                    uploaded_best.add(best_step)
                     wandb_run.summary['cycle/best_video_status'] = 'upload_queued'
 
 

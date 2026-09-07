@@ -153,8 +153,11 @@ def evaluate_candidates(env, data, info, xy, nominal, basis, lift, *, apex_delta
     path_high = jp.max(jp.where(pk, ph, -jp.inf), axis=(-2, -1))
     path_high = jp.where(jp.any(pk, axis=(-2, -1)), path_high, center_h)
     required = jp.maximum(path_high-jp.maximum(feet[:, None, 2]-FOOT_RADIUS, center_h), 0.)
-    minimum_clearance = jp.maximum(.04, required+.02)
-    clearance = jp.clip(jp.maximum(required+fw.SWING_HEIGHT+jp.asarray(lift)[:, None], minimum_clearance), .04, .18)
+    rise = center_h-(feet[:, None, 2]-FOOT_RADIUS)
+    # Extra geometric clearance only for upward steps; retain flat behavior.
+    stair_extra = jp.where(rise > .025, float(env._config.get('stair_clearance_extra', 0.)), 0.)
+    minimum_clearance = jp.maximum(.04, required+.02)+stair_extra
+    clearance = jp.clip(jp.maximum(required+fw.SWING_HEIGHT+stair_extra+jp.asarray(lift)[:, None], minimum_clearance), .04, .18)
     rise = center_h-(feet[:, None, 2]-FOOT_RADIUS)
     apex_phase = jp.clip(.5-jp.clip(rise/.15, -1., 1.)*.1+apex_delta, .3, .7)
     transfer = jp.clip(.5+transfer_delta, .35, .65)*jp.ones_like(clearance)
