@@ -3,9 +3,9 @@ set -euo pipefail
 repo="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 checkpoint=/home/huro/Hexapod-Robot-integration/mjx/runs/adaptive-curriculum/stair5-path-v6-warmstart/02_tripod-stair5_try00/checkpoints/000000204800
 exec bash "$repo/scripts/train_adaptive_curriculum.sh" \
-  --profile teacher --command-mode terrain --perception teacher \
+  --profile hybrid --command-mode terrain --perception teacher \
   --start-index 2 --restore "$checkpoint" --migrate-path-v6 \
-  --run-name stair5-v6-clearance2cm \
+  --run-name hybrid-stair5-v6-clearance2cm \
   --stair-clearance-extra 0.02 \
   --timesteps-per-stage 800000 \
   --num-envs 512 --batch-size 128 --num-minibatches 4 \

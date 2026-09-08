@@ -60,6 +60,13 @@ TEACHER_CURRICULUM = tuple(StageSpec(1, level, name) for level, name in (
     (8, 'tripod-stair10'), (2, 'tripod-rough50'))) + tuple(
         stage for stage in FULL_CURRICULUM if stage.gait_stage != 1)
 
+# All terrains use one shared policy with deterministic gait supervision.
+# Index 2 stays stair5 so existing resume coordinates keep their meaning.
+HYBRID_CURRICULUM = tuple(StageSpec(3, level, 'hybrid-'+name) for level, name in (
+    (0, 'flat'), (3, 'ramp8'), (5, 'stair5'), (7, 'stair8'),
+    (1, 'rough25'), (4, 'ramp15'), (8, 'stair10'), (2, 'rough50'),
+    (9, 'stair15'), (10, 'stair20')))
+
 # Free steering must first be learned without a finite one-way stair course.
 RC_CURRICULUM = (StageSpec(1, 0, 'rc-tripod-flat'), StageSpec(2, 0, 'rc-wave-flat'),
                  StageSpec(3, 0, 'rc-hybrid-flat'))
@@ -93,8 +100,8 @@ def main() -> None:
 
     parser.add_argument(
         "--profile",
-        choices=("observe", "fast", "full", "teacher", "rc"),
-        default="teacher",
+        choices=("observe", "fast", "full", "teacher", "rc", "hybrid"),
+        default="hybrid",
     )
 
     parser.add_argument(
@@ -290,6 +297,8 @@ def main() -> None:
         if args.profile == "fast"
         else FULL_CURRICULUM
     )
+    if args.profile == 'hybrid':
+        curriculum = HYBRID_CURRICULUM
     if args.profile == 'observe':
         curriculum = tuple(StageSpec(1, 0, 'tripod-flat') for _ in range(args.cycles))
     if args.profile == 'rc':
