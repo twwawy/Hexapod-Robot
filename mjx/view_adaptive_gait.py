@@ -88,8 +88,13 @@ def main():
     model, display = env.mj_model, mujoco.MjData(env.mj_model)
     keys = queue.SimpleQueue()
     vx, wz, paused, show_map = float(np.clip(args.speed, -.12, .12)), 0., False, True
-    show_fov = True
-    show_rejected = True
+    show_fov = False
+    show_rejected = False
+    show_candidates = False
+    show_details = False
+    last_gait = int(state.info['controller_state'].scheduler.mode)
+    transition_note = 'No transition yet'
+    print('Clean view: N candidates, V reference/request labels, B rejected, G FOV.', flush=True)
     history = deque(maxlen=500)
     output = Path(__file__).resolve().parent/'generated/adaptive_gait'
     print(f'24-D adaptive | {perception} | {env.gait_mode} | {env.terrain_description} | '+
@@ -149,14 +154,21 @@ def main():
                     paused = False
                     history.clear()
                     last_log = -1.
+                    last_gait = int(state.info['controller_state'].scheduler.mode)
+                    transition_note = 'Reset'
                 elif code == ord('C'):
                     state.info['lidar_map'] = initial_map(state.data.qpos[:2])
                 elif code == ord('M'):
                     show_map = not show_map
                 elif code == ord('G'):
                     show_fov = not show_fov
+                elif code == ord('N'):
+                    show_candidates = not show_candidates
+                elif code == ord('V'):
+                    show_details = not show_details
                 elif code == ord('B'):
                     show_rejected = not show_rejected
+                    show_candidates = True
                 elif code == ord('P'):
                     save = True
             state.info['command'] = jp.array((vx, wz, 0., 0., 0.))
@@ -218,18 +230,19 @@ def main():
                 for leg in range(6):
                     for candidate in range(CANDIDATE_COUNT):
                         status = int(plan['status'][leg, candidate])
-                        if show_rejected or plan['safe'][leg, candidate]:
+                        if show_candidates and (show_rejected or plan['safe'][leg, candidate]):
                             colors = ((.5, .5, .5, .35), (1., .9, .05, .8),
                                       (1., .4, .05, .9), (.15, .35, 1., .95), (.7, .15, 1., .95), (.1, .9, .25, .9))
                             sphere(scene, (*plan['xy'][leg, candidate], plan['height'][leg, candidate]+.01),
                                    .009, colors[status])
-                    add_sphere(scene, plan['wide_nominal'][leg]+np.array((0., 0., .01)),
-                               .007, (.5, .5, 1., .8), f'{LEG_ORDER[leg]} nominal')
-                    if plan['reference_index'][leg] >= 0:
-                        add_sphere(scene, np.array((*plan['requested_xy'][leg], plan['reference_world'][leg, 2]+.065)),
-                                   .009, (0., 1., 1., 1.), f'{LEG_ORDER[leg]} RL request')
-                        add_sphere(scene, plan['reference_world'][leg]+np.array((0., 0., .025)),
-                                   .011, (1., 1., 1., .9), f'{LEG_ORDER[leg]} ref')
+                    if show_details:
+                        add_sphere(scene, plan['wide_nominal'][leg]+np.array((0., 0., .01)),
+                                   .007, (.5, .5, 1., .8), f'{LEG_ORDER[leg]} nominal')
+                        if plan['reference_index'][leg] >= 0:
+                            add_sphere(scene, np.array((*plan['requested_xy'][leg], plan['reference_world'][leg, 2]+.065)),
+                                       .009, (0., 1., 1., 1.), f'{LEG_ORDER[leg]} RL request')
+                            add_sphere(scene, plan['reference_world'][leg]+np.array((0., 0., .025)),
+                                       .011, (1., 1., 1., .9), f'{LEG_ORDER[leg]} ref')
                     if plan['selected_index'][leg] >= 0:
                         add_sphere(scene, plan['selected_world'][leg]+np.array((0., 0., .05)),
                                    .012, (1., .5, .05, 1.), f'{LEG_ORDER[leg]} selected')
@@ -239,6 +252,43 @@ def main():
                         execution_world = np.asarray(cs.root_position) + np.asarray(cs.root_rotation) @ np.array((body[1], -body[0], body[2]))
                         add_sphere(scene, execution_world,
                                    .019, (.8, .03, .02, 1.), f'{LEG_ORDER[leg]} latched')
+            actual_mode = int(cs.scheduler.mode)
+            actual = ('TRIPOD', 'WAVE')[actual_mode]
+            decision = MODE_NAMES[int(plan['decision'])]
+            if actual_mode != last_gait:
+                transition_note = f"{('TRIPOD', 'WAVE')[last_gait]} -> {actual} at {display.time:.1f}s"
+                print('GAIT TRANSITION | '+transition_note, flush=True)
+                last_gait = actual_mode
+            contact = np.asarray(state.info['confirmed_contacts']).astype(bool)
+            leg_states = np.asarray(state.info['controller_output'].gait_state).astype(int)
+            state_names = ('STANCE', 'SWING', 'LATE', 'TOUCHDOWN', 'HOLD')
+            if bool(cs.scheduler.fault):
+                phase_status = 'FAULT / reset required'
+            elif bool(cs.scheduler.recontact_active):
+                phase_status = 'Support recontact'
+            elif np.any(leg_states == 2):
+                phase_status = 'Late landing / waiting for contact'
+            elif bool(cs.scheduler.running):
+                phase_status = 'Executing latched phase'
+            elif not np.all(contact):
+                phase_status = 'Waiting for confirmed contacts'
+            elif int(plan['decision']) == 3:
+                phase_status = 'Planner HOLD: inspect candidates (N/B)'
+            else:
+                phase_status = 'Phase boundary / confirmation'
+            leg_text = '\n'.join(f'{name}: {state_names[leg_states[i]]}  contact={int(contact[i])}  safe={int(np.sum(plan["safe"][i]))}/25'
+                                 for i, name in enumerate(LEG_ORDER))
+            viewer.set_texts([
+                (mujoco.mjtFontScale.mjFONTSCALE_150, mujoco.mjtGridPos.mjGRID_TOPLEFT,
+                 'HYBRID FOOTHOLD VIEW\nActual gait\nSupervisor request\nState\nCommand vx / yaw\nApplied stride / phase\nMap known\nLast transition',
+                 f'{perception.upper()} | '+('POLICY' if policy else 'ZERO ACTION')+
+                 f'\n{actual}\n{decision}\n{phase_status}\n{vx:+.2f} / {wz:+.2f}'+
+                 f'\n{float(cs.stride_scale):.2f} / {float(cs.phase_duration):.2f}s'+
+                 f'\n{float(state.metrics["map_known_fraction"]):.0%}\n{transition_note}'),
+                (mujoco.mjtFontScale.mjFONTSCALE_100, mujoco.mjtGridPos.mjGRID_TOPRIGHT,
+                 'LEG / CONTACT / SAFE CANDIDATES\n'+leg_text, ''),
+                (mujoco.mjtFontScale.mjFONTSCALE_100, mujoco.mjtGridPos.mjGRID_BOTTOMLEFT,
+                 'ORANGE: proposed landing   RED: latched target\nN candidates | V details | B rejected | G FOV | M map\nW/S forward/reverse | Space stop | Enter pause | H reset', '')])
             viewer.sync()
             if display.time-last_log >= 1.:
                 last_log = display.time

@@ -159,3 +159,7 @@ Wave 사용 비율을 강제로 맞추지 않으므로 안전한 평지에서는
 기존 Tripod 가중치를 시작점으로 쓰는 것은 가능하지만 Wave 성능을 학습했다고 뜻하지 않는다.
 Tripod/Wave 분리 커리큘럼은 나중에 선택할 수 있도록 기존 profile로 보존한다.
 현재 실행 중인 pinned run에는 변경이 적용되지 않는다.
+
+## 착지점과 Hybrid 전환 보기
+
+[MuJoCo 화면·조작 명령](docs/ADAPTIVE_VIEWER_HUD.md): 실제 gait, supervisor 요청, 다리별 접촉 상태를 HUD로 구분한다.
