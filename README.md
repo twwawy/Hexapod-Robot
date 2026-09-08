@@ -10,7 +10,7 @@
 [![Control](https://img.shields.io/badge/Control-MATLAB%20%2F%20Simulink-F37021?style=flat-square&logo=mathworks&logoColor=white)](SW/Controller/Controller_Architecture.md)
 ![Simulation](https://img.shields.io/badge/Simulation-Isaac%20Sim%20%7C%20MuJoCo-7A5AF8?style=flat-square)
 
-**험지개척단 · 인하대학교 · 2026 종합설계경진대회**
+
 
 <img src="docs/assets/hexapod-prototype.jpg" alt="모듈형 재난대응 6족 로봇 시제품" width="880">
 
