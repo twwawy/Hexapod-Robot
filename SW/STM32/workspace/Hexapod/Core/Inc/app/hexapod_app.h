@@ -132,7 +132,9 @@ typedef struct
     LoRa_Handle_t lora;                                // LoRa 송수신 상태를 저장한다.
     ManipulatorLink_Handle_t manipulator;              // 유선 매니퓰레이터 송신 상태를 저장한다.
     RobotTelemetry_Handle_t telemetry;                 // 관제 패킷 주기를 저장한다.
-    JetsonSpi_Handle_t jetson;                         // Jetson 64바이트 SPI 프로토콜 상태를 저장한다.
+    AdaptiveSpi_Observation_t adaptive_spi_observation;  // 강화학습 관측 페이지의 공통 표본을 저장한다.
+    bool adaptive_spi_detail_next;                      // 다음 송신의 상세 페이지 여부를 저장한다.
+    JetsonSpi_Handle_t jetson;                           // 64·128바이트 SPI 통신 상태를 저장한다.
     HexapodApp_RlRuntime_t rl;                         // 패킷과 독립적인 강화학습 제어 상태를 저장한다.
     RobotSensorSnapshot_t sensor_snapshot;             // 최근 실제 센서값을 저장한다.
     RobotUserCommand_t user;                           // 최근 안전한 사용자 명령을 저장한다.
@@ -199,4 +201,6 @@ void HexapodApp_BoardUartErrorCallback(UART_HandleTypeDef *uart);  // 최종 앱
 
 void HexapodApp_BoardUartTxCpltCallback(UART_HandleTypeDef *uart);  // 최종 앱에 UART 송신 완료를 전달한다.
 
+RlController_SubmitResult_t HexapodApp_SubmitAdaptiveExecution(HexapodApp_Handle_t *handle,
+    const RobotAdaptiveExecutionPlan_t *plan);
 #endif

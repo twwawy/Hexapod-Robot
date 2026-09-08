@@ -1,0 +1,24 @@
+"""Adaptive v4 physical contract; mirrored by STM32 ROBOT_ADAPTIVE_* constants.
+
+These values do not alter the legacy firmware_mjx_controller contract.
+"""
+ACTION_SIZE = 24
+ACTION_CONTRACT = 'adaptive_hybrid_geometry_residual_24_v4'
+XY_LIMIT_M = (.06, .04)
+BODY_HEIGHT_LIMIT_M = .03
+BODY_HEIGHT_RATE_MPS = .04
+ROLL_RESIDUAL_DEG = 5.
+PITCH_RESIDUAL_DEG = 10.
+CLEARANCE_RESIDUAL_M = .04
+CLEARANCE_BASELINE_M = .06
+CLEARANCE_MARGIN_M = .02
+CLEARANCE_MIN_M = .04
+CLEARANCE_MAX_M = .18
+TRIPOD_PHASE_S = 1.
+WAVE_PHASE_S = 1.
+TRIPOD_PHASE_LIMITS = (.5, 1.4)
+WAVE_PHASE_LIMITS = (.6, 1.4)
+MAX_LINEAR_SPEED_MPS = .10
+MAX_YAW_RATE_RADPS = .3141592653589793
+APEX_LIMITS = (.3, .7)
+TRANSFER_LIMITS = (.35, .65)

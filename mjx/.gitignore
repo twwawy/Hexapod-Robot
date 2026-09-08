@@ -1,0 +1,6 @@
+generated/
+hexapod.png
+walk.png
+checkpoints/
+runs/
+*.gif

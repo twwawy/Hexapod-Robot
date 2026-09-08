@@ -1,3 +1,5 @@
+> 통합 v4: 현재 구현·남은 연결 작업은 [통합 문서](../../docs/ADAPTIVE_INTEGRATION_V4.md), wire는 [SPI v3](../../docs/ADAPTIVE_SPI_V3.md)를 참고하세요. 아래 기존 설계 설명과 구분합니다.
+
 # SB 강화학습 보행 및 Jetson–STM32 SPI 변경 계획
 
 작성일: 2026-09-06

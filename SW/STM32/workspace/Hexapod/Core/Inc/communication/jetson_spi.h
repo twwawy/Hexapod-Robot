@@ -2,6 +2,7 @@
 #define JETSON_SPI_H
 
 #include "common/robot_types.h"
+#include "communication/adaptive_spi_protocol.h"
 #include "stm32f4xx_hal.h"
 
 #include <stdbool.h>
@@ -86,9 +87,12 @@ typedef struct
 
 typedef struct
 {
+    uint16_t transfer_size;                  // 강화학습 전송 형식의 선택값을 저장한다.
+    RobotAdaptiveExecutionPlan_t execution;  // 마지막 정상 강화학습 실행 계획을 저장한다.
+    bool execution_pending;                 // 미처리 실행 계획의 수신 여부를 저장한다.
     SPI_HandleTypeDef *spi;                       // SPI2 Slave Handle을 저장한다.
-    uint8_t tx_frame[JETSON_SPI_TRANSFER_SIZE];   // SENSOR 32B와 GPS 32B를 합친 송신 버퍼다.
-    uint8_t rx_frame[JETSON_SPI_TRANSFER_SIZE];   // Jetson COMMAND 64B 수신 버퍼다.
+    uint8_t tx_frame[ADAPTIVE_SPI_SIZE];          // 64·128바이트 형식을 수용하는 송신 버퍼를 확보한다.
+    uint8_t rx_frame[ADAPTIVE_SPI_SIZE];          // 64·128바이트 형식을 수용하는 수신 버퍼를 확보한다.
     JetsonSpi_ParsedPacket_t rx_packet;           // 마지막 정상 수신 패킷을 저장한다.
     JetsonSpi_CommandFrame_t command;             // 마지막 정상 Jetson 명령 프레임을 저장한다.
     uint16_t tx_sequence;                         // 다음 센서 패킷에 넣을 순번이다.
@@ -141,4 +145,7 @@ bool JetsonSpi_GetLastRxPacket(const JetsonSpi_Handle_t *handle,
 bool JetsonSpi_TakeCommand(JetsonSpi_Handle_t *handle,
                            JetsonSpi_CommandFrame_t *command);  // 대기 중인 명령을 한 번 꺼내고 소비 처리한다.
 
+bool JetsonSpi_EnableV3(JetsonSpi_Handle_t *handle);
+bool JetsonSpi_PrepareV3(JetsonSpi_Handle_t *handle, const AdaptiveSpi_Observation_t *o, bool detail);
+bool JetsonSpi_TakeExecution(JetsonSpi_Handle_t *handle, RobotAdaptiveExecutionPlan_t *plan);
 #endif

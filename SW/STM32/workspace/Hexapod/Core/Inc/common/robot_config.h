@@ -116,4 +116,21 @@
 #define ROBOT_STICK_FILTER_HZ           5.0f        // 짐벌 LPF 차단 주파수를 정의한다.
 #define ROBOT_TEST_GIMBAL_RATE_RAWPS    5000.0f     // 시험 짐벌 변화율을 정의한다.
 
+/* Adaptive v4 only; manual gait constants above retain their original values. */
+#define ROBOT_ADAPTIVE_X_RESIDUAL_M 0.06f
+#define ROBOT_ADAPTIVE_Y_RESIDUAL_M 0.04f
+#define ROBOT_ADAPTIVE_HEIGHT_MAX_M 0.03f
+#define ROBOT_ADAPTIVE_HEIGHT_RATE_MPS 0.04f
+#define ROBOT_ADAPTIVE_SWING_MIN_M 0.04f
+#define ROBOT_ADAPTIVE_SWING_MAX_M 0.18f
+#define ROBOT_ADAPTIVE_TRIPOD_BASE_S 1.0f
+#define ROBOT_ADAPTIVE_WAVE_BASE_S 1.0f
+#define ROBOT_ADAPTIVE_TRIPOD_MIN_S 0.5f
+#define ROBOT_ADAPTIVE_WAVE_MIN_S 0.6f
+#define ROBOT_ADAPTIVE_PHASE_MAX_S 1.4f
+#define ROBOT_ADAPTIVE_APEX_MIN 0.30f
+#define ROBOT_ADAPTIVE_APEX_MAX 0.70f
+#define ROBOT_ADAPTIVE_TRANSFER_MIN 0.35f
+#define ROBOT_ADAPTIVE_TRANSFER_MAX 0.65f
+
 #endif

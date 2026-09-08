@@ -6,6 +6,7 @@
 
 typedef struct
 {
+    float adaptive_height_current_m;
     RobotBodyTwist_t gait_applied;         // 작업공간에 맞춘 실제 사용자 명령을 저장한다.
     RobotBodyTwist_t gait_requested;       // 마지막으로 통과한 축소 전 명령을 저장한다.
     RobotBodyTwist_t gait_pending;         // 검사 중인 사용자 명령을 저장한다.
@@ -66,4 +67,6 @@ RobotBodyTwist_t WorkspaceLimiter_Gait(WorkspaceLimiter_Handle_t *handle,
                                        bool reset_command,
                                        bool *accepted);  // 한 주기에 보폭 후보 하나의 세 지점을 검사한다.
 
+bool WorkspaceLimiter_SubmitExecution(WorkspaceLimiter_Handle_t *handle,
+    const RobotAdaptiveExecutionPlan_t *plan);
 #endif

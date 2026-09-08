@@ -27,6 +27,8 @@ typedef struct
 
 typedef struct
 {
+    RobotAdaptiveExecutionPlan_t execution;
+    bool execution_valid;
     RobotRlAction_t action;          // 마지막으로 수락한 출력을 저장한다.
     uint32_t session_id;             // 현재 운용 세션 번호를 저장한다.
     uint32_t last_action_ms;         // 마지막 출력 수락 시각을 저장한다.
@@ -69,4 +71,9 @@ RlController_SubmitResult_t RlController_Submit(RlController_Handle_t *handle,
 bool RlController_GetAction(const RlController_Handle_t *handle,
                             RobotRlAction_t *action, uint32_t now_ms);  // 신선한 출력만 제어 주기에 복사한다.
 
+bool RlController_ExecutionValuesValid(const RobotAdaptiveExecutionPlan_t *plan);
+RlController_SubmitResult_t RlController_SubmitExecution(RlController_Handle_t *handle,
+    const RobotAdaptiveExecutionPlan_t *plan, uint32_t now_ms);
+bool RlController_GetExecution(const RlController_Handle_t *handle,
+    RobotAdaptiveExecutionPlan_t *plan, uint32_t now_ms);
 #endif

@@ -150,8 +150,9 @@ RobotGaitPhase_t GaitManager_StepContacts(
     }
 
     if ((tripod_mode == ROBOT_TRIPOD_NORMAL) && normal_mode_enable &&
-        !handle->initialized && !handle->stop_after_landing &&
+        !handle->adaptive_enabled && !handle->initialized && !handle->stop_after_landing &&
         (handle->active_pattern != handle->requested_pattern) &&
+        (!handle->adaptive_enabled || (!handle->late_landing_hold && !handle->support_recovery_active)) &&
         GaitManager_AllMaskContact((uint8_t)((1U << ROBOT_LEG_COUNT) - 1U), contact))
     {
         handle->active_pattern = handle->requested_pattern;       // 여섯 발 접촉 상태에서 보행 패턴을 확정한다.
@@ -266,7 +267,7 @@ RobotGaitPhase_t GaitManager_StepContacts(
         bool all_swing_landed = true;  // Swing 그룹 전체 착지를 저장한다.
 
         if (!handle->initialized &&
-            ((handle->active_pattern == ROBOT_GAIT_WAVE) ||
+            (handle->adaptive_enabled || (handle->active_pattern == ROBOT_GAIT_WAVE) ||
              (handle->active_pattern != handle->requested_pattern)) &&
             !GaitManager_AllMaskContact((uint8_t)((1U << ROBOT_LEG_COUNT) - 1U), contact))
         {
@@ -289,6 +290,14 @@ RobotGaitPhase_t GaitManager_StepContacts(
             output.next_phase_swing_mask =
                 GaitManager_SwingMask(handle->active_pattern, handle->phase_index);  // 시작할 보행 패턴의 Swing 발을 전달한다.
             output.next_phase_pattern = handle->active_pattern;  // 검사할 보폭의 보행 패턴을 전달한다.
+            if (handle->adaptive_enabled) {
+                handle->adaptive_preview_pattern=handle->requested_pattern;
+                output.next_phase_pattern=handle->adaptive_preview_pattern;
+                if (handle->active_pattern != handle->adaptive_preview_pattern) {
+                    output.next_phase_swing_mask=GaitManager_SwingMask(handle->adaptive_preview_pattern,0);
+                    output.next_phase_startup=true;
+                }
+            }
             output.startup_phase = GaitManager_IsStartup(handle, handle->phase_index);  // 최초 지지발 이동 구간을 유지한다.
             output.waiting_start = true;                   // 한 제어 주기 검사 중 발 목표를 고정한다.
         }
@@ -311,6 +320,11 @@ RobotGaitPhase_t GaitManager_StepContacts(
         {
             if (!handle->initialized)
             {
+                if (handle->adaptive_enabled && handle->active_pattern != handle->adaptive_preview_pattern) {
+                    handle->active_pattern=handle->adaptive_preview_pattern;
+                    handle->phase_index=0; handle->command_pair_step_count=0;
+                }
+                handle->active_duration_s = handle->pending_duration_s;
                 handle->initialized = true;  // 세 지점 검사 후 정상 위상을 활성화한다.
                 if (!handle->resume_phase)
                 {
@@ -352,7 +366,7 @@ RobotGaitPhase_t GaitManager_StepContacts(
                 }
             }
 
-            progress = fminf(fmaxf(handle->phase_time_s / ROBOT_GAIT_PHASE_TIME_S,
+            progress = fminf(fmaxf(handle->phase_time_s / (handle->adaptive_enabled ? handle->active_duration_s : ROBOT_GAIT_PHASE_TIME_S),
                                    0.0f), 1.0f);  // 위상 진행률을 계산한다.
 
             if (handle->support_recovery_active)
@@ -463,6 +477,7 @@ RobotGaitPhase_t GaitManager_StepContacts(
                     {
                         handle->phase_index++;              // 다음 Tripod 그룹으로 전환한다.
                         handle->phase_cycle_count = 0U;     // 새 위상 주기를 초기화한다.
+                        handle->active_duration_s = handle->pending_duration_s;
                         handle->phase_time_s = 0.0f;        // 새 위상 시간을 초기화한다.
                         handle->command_pair_step_count = pair_incomplete ? 1U : 0U;  // 첫 걸음 완료 또는 새 묶음 시작을 기록한다.
                         handle->next_phase_enable = false;  // 다음 위상 Enable을 준비한다.
@@ -656,4 +671,13 @@ RobotGaitPhase_t GaitManager_Step(GaitManager_Handle_t *handle,
                                     recovery_progress,
                                     confirmed,
                                     raw);  // 단순 호출을 접촉 후보·확정 입력으로 변환한다.
+}
+
+void GaitManager_SetAdaptiveTiming(GaitManager_Handle_t *h, bool enabled, float duration_s)
+{
+    if (!h) return;
+    if (enabled && isfinite(duration_s) && duration_s >= ROBOT_ADAPTIVE_TRIPOD_MIN_S &&
+        duration_s <= ROBOT_ADAPTIVE_PHASE_MAX_S) h->pending_duration_s=duration_s;
+    if (!h->adaptive_enabled && enabled) h->active_duration_s=ROBOT_GAIT_PHASE_TIME_S;
+    h->adaptive_enabled=enabled;
 }

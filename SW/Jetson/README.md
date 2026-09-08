@@ -1,3 +1,5 @@
+> 통합 v4: 현재 구현·남은 연결 작업은 [통합 문서](../../docs/ADAPTIVE_INTEGRATION_V4.md), wire는 [SPI v3](../../docs/ADAPTIVE_SPI_V3.md)를 참고하세요. 아래 기존 설계 설명과 구분합니다.
+
 
 # Jetson 소프트웨어
 

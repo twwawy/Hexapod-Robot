@@ -1,4 +1,5 @@
 #include "high_control/workspace_limiter.h"
+#include "high_control/rl_controller.h"
 
 #include "high_control/leg_kinematics.h"
 #include "high_control/stance_trajectory.h"
@@ -173,12 +174,23 @@ static bool WorkspaceLimiter_PreviewPoint(const WorkspaceLimiter_Handle_t *handl
 
         if (handle->rl_enabled && swing)
         {
-            feet[leg] = SwingTrajectory_Calculate(progress,
+            if (handle->rl_plan.adaptive) {
+                feet[leg] = SwingTrajectory_CalculateAdaptive(progress,
+                    &handle->rl_plan.start[leg], &handle->rl_plan.target[leg],
+                    handle->rl_plan.height[leg], handle->rl_plan.apex_phase[leg],
+                    handle->rl_plan.transfer_phase[leg]);
+            } else feet[leg] = SwingTrajectory_Calculate(progress,
                                                    &handle->rl_plan.start[leg],
                                                    &handle->rl_plan.target[leg],
                                                    handle->rl_plan.height[leg],
                                                    ROBOT_SWING_RADIAL_OFFSET_M,
                                                    workspace_leg_angle_rad[leg]);  // 실행과 같은 고정 계획의 Swing을 검사한다.
+        }
+        else if (handle->rl_enabled && handle->rl_plan.adaptive) {
+            const float startup = handle->preview_startup_phase &&
+                handle->preview_pattern == ROBOT_GAIT_WAVE ? 0.5f : 1.0f;
+            feet[leg] = StanceTrajectory_Advance(&handle->preview_feet[leg],
+                &handle->rl_plan.twist, progress*handle->rl_plan.phase_duration_s*startup);
         }
         else if (handle->rl_enabled && !handle->preview_startup_phase)
         {
@@ -234,6 +246,17 @@ static bool WorkspaceLimiter_PreviewPoint(const WorkspaceLimiter_Handle_t *handl
         }
     }
 
+    if (handle->rl_enabled && handle->rl_plan.adaptive) {
+        /* Bound translation at both ends; runtime checks intermediate height every tick. */
+        RobotVec3_t current[ROBOT_LEG_COUNT];
+        for (unsigned i=0;i<ROBOT_LEG_COUNT;++i) {
+            current[i]=feet[i]; current[i].z-=handle->adaptive_height_current_m;
+        }
+        if (!WorkspaceLimiter_AllFeetValid(current, posture)) return false;
+        for (unsigned i=0; i<ROBOT_LEG_COUNT; ++i)
+            feet[i].z -= handle->rl_plan.body_height_offset_m;
+        if (!WorkspaceLimiter_AllFeetValid(feet, &handle->rl_plan.posture_reference_rad)) return false;
+    }
     return WorkspaceLimiter_AllFeetValid(feet, posture);  // 여섯 IK를 한 번씩만 검사한다.
 }
 
@@ -579,4 +602,29 @@ RobotBodyTwist_t WorkspaceLimiter_Gait(WorkspaceLimiter_Handle_t *handle,
     output = WorkspaceLimiter_ComposeYaw(&handle->gait_applied,
                                          yaw_feedback_radps);  // 걸음 중에도 최신 Heading 보정을 적용한다.
     return output;
+}
+
+bool WorkspaceLimiter_SubmitExecution(WorkspaceLimiter_Handle_t *h,
+    const RobotAdaptiveExecutionPlan_t *p)
+{
+    if (!h || !p || !p->execute || !RlController_ExecutionValuesValid(p) ||
+        !h->rl_enabled || !h->rl_plan.valid || h->rl_action_ready ||
+        h->phase_result_accepted || p->plan_id != h->rl_plan.plan_id ||
+        p->swing_mask != h->rl_plan.swing_mask ||
+        p->requested_gait_pattern != h->preview_pattern) return false;
+    FootTrajectory_Plan_t plan=h->rl_plan;
+    plan.adaptive=true; plan.phase_duration_s=p->phase_duration_s;
+    plan.body_height_offset_m=p->body_height_offset_m;
+    plan.posture_reference_rad=p->posture_reference_rad;
+    plan.gait_pattern=p->requested_gait_pattern; plan.twist=p->applied_twist;
+    for (unsigned i=0; i<ROBOT_LEG_COUNT; ++i) {
+        plan.target[i]=p->leg[i].landing; plan.height[i]=p->leg[i].clearance_m;
+        plan.apex_phase[i]=p->leg[i].apex_phase;
+        plan.transfer_phase[i]=p->leg[i].transfer_phase;
+    }
+    h->rl_plan=plan; h->gait_preview=plan.twist;
+    h->rl_action_ready=true; h->rl_plan_rejected=false;
+    h->preview_sample=0; h->preview_active=true;
+    h->phase_result_valid=false; h->phase_result_accepted=false;
+    return true;
 }

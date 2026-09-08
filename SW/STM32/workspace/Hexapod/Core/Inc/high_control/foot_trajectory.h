@@ -10,6 +10,13 @@ typedef struct
     RobotVec3_t target[ROBOT_LEG_COUNT];      // 검사와 실행이 공유할 착지 목표를 저장한다.
     float nominal_height[ROBOT_LEG_COUNT];   // 잔차 적용 전 Swing 높이를 저장한다.
     float height[ROBOT_LEG_COUNT];           // 검사와 실행이 공유할 Swing 높이를 저장한다.
+    bool adaptive;
+    float apex_phase[ROBOT_LEG_COUNT];
+    float transfer_phase[ROBOT_LEG_COUNT];
+    float phase_duration_s;
+    float body_height_offset_m;
+    RobotEuler_t posture_reference_rad;
+    RobotGaitPattern_t gait_pattern;
     RobotBodyTwist_t twist;                  // 기본 계획을 만든 위상 속도를 저장한다.
     uint16_t plan_id;                        // 기본 계획의 변경 번호를 저장한다.
     uint8_t swing_mask;                      // 이번 계획에 잔차를 적용할 다리를 저장한다.
@@ -18,6 +25,7 @@ typedef struct
 
 typedef struct
 {
+    float adaptive_height_applied_m;
     RobotVec3_t body_offset_m;                       // 보정 모드 몸체 Offset을 저장한다.
     RobotVec3_t memory[ROBOT_LEG_COUNT];             // 다리별 연속 발 위치를 저장한다.
     RobotVec3_t swing_start[ROBOT_LEG_COUNT];        // 사용자 정의 Swing 시작점을 저장한다.
@@ -82,4 +90,6 @@ RobotFootTargets_t FootTrajectory_Step(FootTrajectory_Handle_t *handle,
                                        const RobotGaitPhase_t *gait,
                                        const RobotEuler_t *posture_rad);  // 여섯 발의 연속 궤적을 계산한다.
 
+void FootTrajectory_ApplyAdaptiveHeight(FootTrajectory_Handle_t *handle,
+    RobotFootTargets_t *feet, const RobotEuler_t *posture, bool enabled, bool returning);
 #endif
