@@ -51,7 +51,7 @@
 #define ROBOT_SETTLING_TIME_S           0.5f        // 자세 안정 시간을 정의한다.
 #define ROBOT_RECOVERY_TIME_S           0.5f        // Tripod 복구 시간을 정의한다.
 
-#define ROBOT_MAX_LINEAR_SPEED_MPS      0.10f       // X축 최대 이동 속도를 정의한다.
+#define ROBOT_MAX_LINEAR_SPEED_MPS      0.05f       // X축 최대 이동 속도를 정의한다.
 #define ROBOT_MAX_LATERAL_SPEED_MPS     0.07f       // Y축 최대 횡이동 속도를 정의한다.
 #define ROBOT_MAX_CORRECTION_SPEED_MPS  0.10f       // 보정 최대 이동 속도를 정의한다.
 #define ROBOT_MAX_YAW_RATE_RADPS        (18.0f * ROBOT_DEG_TO_RAD_F)  // 조종 Yaw 최대 속도를 기존의 40%로 제한한다.

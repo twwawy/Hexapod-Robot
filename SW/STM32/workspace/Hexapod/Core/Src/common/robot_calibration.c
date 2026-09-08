@@ -20,15 +20,15 @@ const RobotCalibration_t g_robot_calibration =
     {
         .acceleration_sign = {1, 1, 1},      // WT931에서 설정한 X·Y·Z 방향을 그대로 사용한다.
         .angular_velocity_sign = {1, 1, 1},  // WT931에서 설정한 회전 방향을 그대로 사용한다.
-        .euler_angle_sign = {1, 1, 1},       // 확인한 Roll·Pitch·Yaw 부호를 그대로 사용한다.
+        .euler_angle_sign = {1, 1, 1},       // 확인한 Roll·Pitch와 기존 Yaw 부호를 사용한다.
         .euler_offset_rad =
         {
-            -0.537427843f * ROBOT_DEG_TO_RAD_F,  // 실측한 Roll 영점을 저장한다.
-             3.97391176f * ROBOT_DEG_TO_RAD_F,   // 실측한 Pitch 영점을 저장한다.
-             0.0f                                // Yaw 영점은 기존 값을 유지한다.
+            -0.919732451f * ROBOT_DEG_TO_RAD_F,  // 자동 기립에서 확인한 Roll 영점을 저장한다.
+            -1.60886240f * ROBOT_DEG_TO_RAD_F,   // 자동 기립에서 확인한 Pitch 영점을 저장한다.
+             0.0f                                // Yaw 영점은 별도 시험 전 기존 값을 유지한다.
         }
     },
-    .imu_calibrated = true,                   // WT931 축·부호·영점 확인 완료를 표시한다.
+    .imu_calibrated = true,                   // Roll·Pitch를 적용하고 Yaw는 별도 확인 대상으로 둔다.
 
     .adc =
     {
@@ -65,12 +65,12 @@ const RobotCalibration_t g_robot_calibration =
 
     .pressure =
     {
-        {20U, 10U, true, true},  // 다리 1의 20% 접촉·10% 해제값을 저장한다.
-        {20U, 10U, true, true},  // 다리 2의 20% 접촉·10% 해제값을 저장한다.
-        {20U, 10U, true, true},  // 다리 3의 20% 접촉·10% 해제값을 저장한다.
-        {20U, 10U, true, true},  // 다리 4의 20% 접촉·10% 해제값을 저장한다.
-        {20U, 10U, true, true},  // 다리 5의 20% 접촉·10% 해제값을 저장한다.
-        {20U, 10U, true, true}   // 다리 6의 20% 접촉·10% 해제값을 저장한다.
+        {40U, 10U, true, true},  // 다리 1의 40% 접촉·10% 해제값을 저장한다.
+        {40U, 10U, true, true},  // 다리 2의 40% 접촉·10% 해제값을 저장한다.
+        {40U, 10U, true, true},  // 다리 3의 40% 접촉·10% 해제값을 저장한다.
+        {40U, 10U, true, true},  // 다리 4의 40% 접촉·10% 해제값을 저장한다.
+        {40U, 10U, true, true},  // 다리 5의 40% 접촉·10% 해제값을 저장한다.
+        {40U, 10U, true, true}   // 다리 6의 40% 접촉·10% 해제값을 저장한다.
     },
 
     .servo =

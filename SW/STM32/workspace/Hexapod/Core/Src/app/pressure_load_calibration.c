@@ -10,7 +10,7 @@
 #define PRESSURE_LOAD_CAPTURE_LOADED_MS     1000U  // 체중 부하 평균 측정 시간을 정의한다.
 #define PRESSURE_LOAD_MINIMUM_DIFFERENCE      15   // 보정에 필요한 최소 raw 변화량을 정의한다.
 #define PRESSURE_LOAD_RELEASE_PERCENT          10   // 해제 임계값의 부하 비율을 정의한다.
-#define PRESSURE_LOAD_CONTACT_PERCENT          20   // 접촉 임계값의 부하 비율을 정의한다.
+#define PRESSURE_LOAD_CONTACT_PERCENT          40   // 접촉 임계값의 부하 비율을 정의한다.
 
 volatile PressureLoadCalibrationDebug_t g_pressure_load_calibration;  // 자동 압력 보정 결과를 저장한다.
 
