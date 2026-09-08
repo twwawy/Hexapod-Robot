@@ -1,6 +1,6 @@
 # GT 전진 완주 학습
 
-현재 방향은 yaw 조종을 제외한 전진 지형 완주다. `teacher` profile과 `terrain` command mode를 사용한다.
+현재 방향은 yaw 조종을 제외한 전진 지형 완주다. `hybrid` profile과 `terrain` command mode를 사용한다.
 Terrain 기본 yaw 명령은 0이고 RC의 회전·후진·정지 sampler는 사용하지 않는다.
 직진 중 회전 억제를 위한 yaw 안정화 보상은 유지한다. Residual 범위와 접촉/IK 안전은 그대로다.
 
@@ -13,7 +13,7 @@ cd /home/huro/Hexapod-Robot-integration
 source /home/huro/.venvs/hexapod-mjx/bin/activate
 
 bash scripts/train_adaptive_curriculum.sh \
-  --profile teacher \
+  --profile hybrid \
   --command-mode terrain \
   --perception teacher \
   --run-name adaptive-gt-forward-completion \
@@ -28,8 +28,8 @@ bash scripts/train_adaptive_curriculum.sh \
 ```
 
 완주율 70% 미달이면 무제한 retry하며 실패한 지형을 자동으로 넘기지 않는다.
-Tripod 순서: flat → ramp8 → stair5 → stair8 → rough25 → ramp15 → stair10 → rough50.
-이후 Wave/Hybrid 단계로 진행한다. GT는 actor grid와 planner에 사용한다.
+모든 지형 Hybrid 순서: flat → ramp8 → stair5 → stair8 → rough25 → ramp15 → stair10 → rough50.
+이후 stair15/stair20으로 진행한다. 모든 stage의 gait는 Hybrid(stage 3)다. GT는 actor grid와 planner에 사용한다.
 학습·시뮬레이션은 사용자가 실행한다.
 
 ## 기본 보행과 정책 비교

@@ -18,7 +18,7 @@ STM32 기본 SPI 통신은 기존 **64바이트 센서·GPS 형식**을 유지�
 | 항목 | 설정 |
 |---|---|
 | Task | `terrain`: 전진 지형 완주 |
-| Curriculum | `teacher`: GT 지형 기반 |
+| Curriculum | `hybrid`: 모든 지형에서 Hybrid, perception은 GT teacher |
 | Yaw 명령 | 0; 임의 좌우 회전·후진·정지 명령 sampler 미사용 |
 | Yaw 안정화 | 직진 중 불필요한 회전을 억제하는 기존 보상 유지 |
 | Residual | `terrain_mid` 유지 |
@@ -26,8 +26,8 @@ STM32 기본 SPI 통신은 기존 **64바이트 센서·GPS 형식**을 유지�
 | 실패 시 | 같은 단계에서 무제한 retry |
 | 초기 가중치 | RC checkpoint를 restore하지 않고 새로 시작 |
 
-Tripod 순서는 **flat → ramp8 → stair5 → stair8 → rough25 → ramp15 → stair10 → rough50**다.
-이후 teacher profile에 정의된 Wave/Hybrid 단계로 진행한다.
+**flat → ramp8 → stair5 → stair8 → rough25 → ramp15 → stair10 → rough50 → stair15 → stair20** 순서로 진행한다.
+모든 지형을 처음부터 Hybrid(stage 3)로 학습하며 Tripod/Wave 별도 학습 구간은 없다.
 현재는 GT로 보행을 학습하며 LiDAR 입력 학습과 실기 연결은 후속 단계다.
 
 ## 제어 구조
@@ -60,7 +60,7 @@ cd /home/huro/Hexapod-Robot-integration
 source /home/huro/.venvs/hexapod-mjx/bin/activate
 
 bash scripts/train_adaptive_curriculum.sh \
-  --profile teacher \
+  --profile hybrid \
   --command-mode terrain \
   --perception teacher \
   --run-name forward-gt-path-v6 \
@@ -151,3 +151,13 @@ bash /home/huro/Hexapod-Robot-integration/scripts/resume_stair5_v6_clearance.sh
 
 매 평가 현재 정책을 게시하며 best 영상은 갱신 시에만 게시한다.
 [대기 진단·높이 설정·checkpoint 호환 범위](docs/ADAPTIVE_VIDEO_WAIT_CLEARANCE.md).
+
+## 처음부터 Hybrid
+
+기본 profile은 `hybrid`다. 동일한 24-D policy가 모든 다리의 residual을 출력하며
+supervisor가 Tripod → 잔발 → Wave → HOLD를 결정한다.
+Wave 사용 비율을 강제로 맞추지 않으므로 안전한 평지에서는 Tripod 위주가 될 수 있다.
+실제 전환에는 기존 접촉 경계와 hysteresis가 적용된다.
+기존 Tripod 가중치를 시작점으로 쓰는 것은 가능하지만 Wave 성능을 학습했다고 뜻하지 않는다.
+Tripod/Wave 분리 커리큘럼은 나중에 선택할 수 있도록 기존 profile로 보존한다.
+현재 실행 중인 pinned run에는 변경이 적용되지 않는다.

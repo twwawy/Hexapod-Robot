@@ -42,3 +42,5 @@ bash /home/huro/Hexapod-Robot-integration/scripts/resume_stair5_v6_clearance.sh
 기존 checkpoint의 source hash 읽기만 확인했다.
 
 재개 스크립트는 평가 9회·현재 정책 영상 20초·baseline 비교 0으로 설정한다. 학습량 800000과 episode 8000은 유지한다.
+
+현재 재개 preset은 `--profile hybrid --start-index 2`로 Hybrid stair5부터 진행한다. 별도 Tripod/Wave 학습 단계는 없다.
