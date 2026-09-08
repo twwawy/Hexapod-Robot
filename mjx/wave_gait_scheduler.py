@@ -40,6 +40,8 @@ class SchedulerState(NamedTuple):
     recontact_distance: object
     recontact_exhausted: object
     recontact_ik_blocked: object
+    wave_completed: object
+    leg_age: object
 
 
 def initial_scheduler():
@@ -47,7 +49,7 @@ def initial_scheduler():
         jp.asarray(0.), jp.zeros(6, dtype=jp.bool_), jp.zeros(6, dtype=jp.bool_),
         jp.zeros(6), jp.asarray(False), jp.asarray(0.), jp.asarray(False), jp.asarray(False),
         jp.asarray(False), jp.zeros(6, dtype=jp.bool_), jp.asarray(0.), jp.zeros(6),
-        jp.asarray(False), jp.asarray(False))
+        jp.asarray(False), jp.asarray(False), jp.asarray(0), jp.zeros(6, dtype=jp.int32))
 
 
 def swing_mask(mode, phase):
@@ -55,7 +57,7 @@ def swing_mask(mode, phase):
                     (jp.arange(6) % 2) == (phase % 2))
 
 
-def advance(s, *, requested_mode, permit, proposal_epoch, command_active, contacts, raw_contacts, duration, dt):
+def advance(s, *, requested_mode, permit, proposal_epoch, command_active, contacts, raw_contacts, duration, dt, proposed_wave_phase=-1):
     all_contact = jp.all(contacts)
     fault = s.fault & command_active  # releasing the command rearms exhausted search
     wait = jp.where(~s.running & command_active & all_contact, s.start_wait+dt, 0.)
@@ -77,6 +79,10 @@ def advance(s, *, requested_mode, permit, proposal_epoch, command_active, contac
     switched = launch & (requested_mode != s.mode)
     mode = jp.where(launch, requested_mode, s.mode)
     phase = jp.where(switched, 0, s.phase)
+    # Select only at a validated boundary; map updates cannot change an active leg.
+    phase = jp.where(launch & (mode == WAVE) & (proposed_wave_phase >= 0),
+                     proposed_wave_phase % 6, phase)
+    wave_completed = jp.where(switched, 0, s.wave_completed)
     mask = swing_mask(mode, phase)
     running = s.running | launch
     airborne = jp.where(launch, False, s.airborne) | (running & mask & ~raw_contacts)
@@ -107,8 +113,10 @@ def advance(s, *, requested_mode, permit, proposal_epoch, command_active, contac
         recovering & ~settled & ~fault, recovery_mask,
         jp.where(recovering, recovery_time+dt, 0.), recovery_distance,
         (s.recontact_exhausted | exhausted) & command_active,
-        s.recontact_ik_blocked & command_active)
+        s.recontact_ik_blocked & command_active,
+        wave_completed + (complete & (mode == WAVE)).astype(jp.int32),
+        jp.where(complete, jp.where(mask, 0, jp.minimum(s.leg_age+1, 100)), s.leg_age))
     return next_state, dict(state=states.astype(jp.int32), progress=jp.full(6, progress),
-        startup=phase < jp.where(mode == WAVE, 6, 1), enabled=running,
+        startup=jp.where(mode == WAVE, wave_completed < 6, phase < 1), enabled=running,
         entering=launch & mask, frozen=frozen | complete | fault | ~running,
         swing_mask=mask & running, recontact_active=recovering & ~settled & ~fault)

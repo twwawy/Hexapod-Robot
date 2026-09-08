@@ -15,6 +15,54 @@ from foothold_feasibility import support_margin
 
 
 class HybridSafetyTest(unittest.TestCase):
+    def test_zero_stride_reposition_is_last_feasible_preference(self):
+        scales = jp.concatenate((supervisor.STRIDE_SCALES, jp.zeros(1)))
+        feasible = jp.array((False, False, False, False, False, False, True))
+        index, available = supervisor.stride_choice(feasible, jp.asarray(1.), scales)
+        self.assertTrue(bool(available))
+        self.assertEqual(float(scales[index]), 0.)
+        index, _ = supervisor.stride_choice(feasible.at[3].set(True), jp.asarray(1.), scales)
+        self.assertEqual(float(scales[index]), .5)
+
+    def test_free_wave_choice_latches_until_contact_boundary(self):
+        state = scheduler.initial_scheduler()._replace(start_wait=jp.asarray(.2))
+        kwargs = dict(requested_mode=scheduler.WAVE, permit=True, command_active=True,
+                      contacts=jp.ones(6, dtype=bool), raw_contacts=jp.ones(6, dtype=bool),
+                      duration=1., dt=.005)
+        state, gait = scheduler.advance(state, proposal_epoch=state.epoch,
+                                        proposed_wave_phase=4, **kwargs)
+        self.assertEqual(int(jp.argmax(gait['entering'])), 2)  # RB, not RF
+        changed, gait = scheduler.advance(state, proposal_epoch=state.epoch,
+                                          proposed_wave_phase=1, **kwargs)
+        self.assertEqual(int(changed.phase), 4)
+        self.assertEqual(int(jp.sum(gait['swing_mask'])), 1)
+        self.assertEqual(int(jp.argmax(gait['swing_mask'])), 2)
+
+    def test_free_wave_startup_uses_completed_count_not_selected_index(self):
+        state = scheduler.initial_scheduler()._replace(mode=jp.asarray(scheduler.WAVE),
+            start_wait=jp.asarray(.2), wave_completed=jp.asarray(6))
+        _, gait = scheduler.advance(state, requested_mode=scheduler.WAVE, permit=True,
+            proposal_epoch=state.epoch, command_active=True, contacts=jp.ones(6, dtype=bool),
+            raw_contacts=jp.ones(6, dtype=bool), duration=1., dt=.005, proposed_wave_phase=0)
+        self.assertFalse(bool(gait['startup']))
+
+    def test_recenter_rejects_invalid_start(self):
+        import adaptive_stance_recovery as recovery
+        start = controller.BASE_FEET.at[2, 2].set(-1.)
+        _, allowed, _ = recovery.plan(start, jp.asarray(0.), jp.zeros(3))
+        self.assertFalse(bool(allowed))
+
+    def test_recenter_target_and_path_are_bounded(self):
+        import adaptive_stance_recovery as recovery
+        start = controller.BASE_FEET.at[:, 2].add(-.02)
+        target, allowed, _ = recovery.plan(start, jp.asarray(0.), jp.zeros(3))
+        if bool(allowed):
+            samples = start + jp.linspace(0., 1., 21)[:, None, None]*(target-start)
+            _, valid = controller._solve_ik(samples)
+            _, limited = controller._limit_foot_reach(samples)
+            self.assertTrue(bool(jp.all(valid & ~limited)))
+            self.assertLess(float(jp.max(jp.linalg.norm(target-start, axis=-1))), .04)
+
     def test_boundary_recontact_without_new_swing_permission(self):
         state = scheduler.initial_scheduler()._replace(epoch=jp.asarray(4), phase=jp.asarray(4))
         contacts = jp.array((False, True, True, True, True, True))

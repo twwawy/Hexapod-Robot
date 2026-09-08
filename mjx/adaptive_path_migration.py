@@ -12,7 +12,12 @@ def validate_source(path):
     path = resolve_checkpoint(path)
     metadata = json.loads((path/'adaptive_contract.json').read_text())
     already_v6 = metadata.get('observation_contract') == 'adaptive_hybrid_elevation_grid24x24x6_path_v6'
+    # Explicitly reviewed source revisions only. Never accept an arbitrary v6
+    # source just because tensor dimensions happen to match.
+    recorded_revision = metadata.get('git_commit', '')
     revision = '585bee2' if already_v6 else SOURCE_REVISION
+    if already_v6 and recorded_revision.startswith('53bab78'):
+        revision = '53bab78ab54e2bbf0c97582319348d73f2ea5cec'
     expected = dict(command_mode='terrain', observation_contract='adaptive_hybrid_elevation_grid24x24x6_v5',
         action_contract='adaptive_hybrid_geometry_residual_24_v4', action_size=24,
         network_contract='elevation_cnn_16_32_dense64_v1', reward_contract='adaptive_completion_outcome_v5',
@@ -40,7 +45,7 @@ def validate_source(path):
     config = json.loads((path/'ppo_network_config.json').read_text())
     if config['action_size'] != 24 or config['observation_size'] != expected['observation_size']:
         raise ValueError('Saved network dimensions do not match reviewed v5 metadata')
-    metadata['explicit_migration'] = dict(kind='path_v6_clearance_update' if already_v6 else 'terrain_v5_to_path_v6', source=str(path),
+    metadata['explicit_migration'] = dict(kind='path_v6_free_wave_recenter_update' if already_v6 else 'terrain_v5_to_path_v6', source=str(path),
         source_revision=revision, new_input_weights='zero', optimizer='fresh',
         note='Warm start only; changed planner geometry can change behavior immediately')
     return path, metadata

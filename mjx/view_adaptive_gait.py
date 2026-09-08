@@ -306,6 +306,10 @@ def main():
                 print(f'  stride_bank=[1.3,1,.75,.5,.25,.125] feasible={plan["tripod_feasible"].astype(int)} '+
                       f'known_bad={plan["tripod_known_bad"].astype(int)} wave={bool(plan["wave_feasible"])} '+
                       f'two_phase={bool(plan["two_tripod_phases"])} return_confirm={float(plan["return_time"]):.2f}s', flush=True)
+                print(f'  lookahead_blocked={np.asarray(plan["lookahead_blocked"]).astype(int)} '
+                      f'wave_candidates_RF_LB_RM_LF_RB_LM={np.asarray(plan["wave_leg_feasible"]).astype(int)} '
+                      f'wave_choice_phase={int(plan["wave_phase"])} '
+                      f'recenter={bool(cs.recenter_active)} time={float(cs.recenter_time):.2f}s', flush=True)
                 if args.stage0:
                     print('  Stage0: '+ ' '.join(f'{k}={float(v):.4f}' for k, v in m.items()
                                                 if k.startswith('oracle_')), flush=True)
