@@ -14,6 +14,7 @@ import adaptive_gait_controller as adaptive
 import firmware_mjx_controller as fw
 import wave_gait_scheduler as scheduler
 import hybrid_gait_supervisor as supervisor
+import adaptive_foot_retry as foot_retry
 from foothold_feasibility import phase_feasibility, support_margin
 from adaptive_gait_perception import AngularLidar, SENSOR_PERIOD, MAX_AGE, initial_map, sample
 from adaptive_grid import GRID_SIZE, local_grid
@@ -159,6 +160,13 @@ class AdaptiveGaitEnv(HexapodRoughTerrainEnv):
         info['bootstrap_ready_s'] = jp.asarray(0.)
         info['foothold_plan'] = self._landing_plan(data, info, jp.zeros(adaptive.ACTION_SIZE))
         return info
+
+    def _foot_contacts(self, data):
+        # A stair riser is a collision, not load-bearing touchdown.
+        c = data._impl.contact
+        support, _ = foot_retry.contact_kinds(c.geom, c.dist, c.frame,
+                                             self._foot_geom_ids, self._geom_body_ids)
+        return support
 
     def _query(self, grid, xy, now, *, privileged=False):
         height, known, age, spread = sample(grid, xy, now)
@@ -471,7 +479,7 @@ class AdaptiveGaitEnv(HexapodRoughTerrainEnv):
         info['foothold_plan'] = plan
         info['supervisor'] = supervisor.SupervisorState(plan['return_time'], plan['wave_time'], plan['decision'])
         info['projection_m'] = jp.mean(plan['projection'])
-        return info['controller_state']._replace(request=plan['accepted_action'],
+        prepared = info['controller_state']._replace(request=plan['accepted_action'],
             proposal_end=plan['selected_pre'], proposal_world=plan['selected_world'],
             proposal_known=plan['selected_known'], proposal_safe=plan['proposal_safe'],
             proposal_clearance=plan['selected_clearance'], proposal_posture=plan['posture'],
@@ -482,6 +490,7 @@ class AdaptiveGaitEnv(HexapodRoughTerrainEnv):
             proposal_apex_phase=plan['selected_apex_phase'], proposal_transfer=plan['selected_transfer'],
             proposal_speed_scale=plan['speed_scale'], raw_contacts=info['contact_state'], confirmed_contacts=info['confirmed_contacts'],
             root_rotation=data.xmat[self._root_id], root_position=data.qpos[:3])
+        return prepared._replace(foot_retry=foot_retry.prepare(self, data, info, prepared))
 
     def _controller_step(self, controller_state, **kwargs):
         return adaptive.step(controller_state, **kwargs)
@@ -567,6 +576,7 @@ class AdaptiveGaitEnv(HexapodRoughTerrainEnv):
         state.metrics.update({name: jp.asarray(0.) for name in (
             'map_known_fraction', 'map_mae_m', 'map_compared_count', 'lidar_returns',
             'plan_rejected', 'projection_m', 'touchdown_error_m', 'foot_slip',
+            'foot_retry/active_s', 'foot_retry/rejected',
             'recenter/active_s', 'lookahead/blocked_strides', 'wave/available_legs',
             'path/proposal_repair_fraction', 'path/proposal_height_correction_m',
             'path/proposal_min_margin_m', 'path/proposal_observed_fraction',
@@ -622,6 +632,8 @@ class AdaptiveGaitEnv(HexapodRoughTerrainEnv):
             result.info['lidar_map'], result.info['rng'] = grid, key
         cs = result.info['controller_state']
         result.metrics.update({
+            'foot_retry/active_s': cs.foot_retry.active.astype(jp.float32)*self.dt,
+            'foot_retry/rejected': cs.foot_retry.rejected.astype(jp.float32),
             'recenter/active_s': cs.recenter_active.astype(jp.float32)*self.dt,
             'lookahead/blocked_strides': jp.sum(result.info['foothold_plan']['lookahead_blocked']).astype(jp.float32),
             'wave/available_legs': jp.sum(result.info['foothold_plan']['wave_leg_feasible']).astype(jp.float32),

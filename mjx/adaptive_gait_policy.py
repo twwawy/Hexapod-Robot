@@ -27,7 +27,7 @@ def contract(env):
     root = Path(__file__).resolve().parent
     sources = ('adaptive_contract.py', 'operator_commands.py', 'adaptive_grid.py', 'adaptive_grid_network.py', 'adaptive_gait_controller.py', 'adaptive_gait_env.py', 'adaptive_gait_perception.py',
                'adaptive_foothold_estimator.py', 'foothold_feasibility.py',
-               'hybrid_gait_supervisor.py', 'wave_gait_scheduler.py', 'adaptive_stance_recovery.py',
+               'hybrid_gait_supervisor.py', 'wave_gait_scheduler.py', 'adaptive_stance_recovery.py', 'adaptive_foot_retry.py',
                'adaptive_gait_policy.py', 'firmware_mjx_controller.py', 'rough_terrain_env.py',
                'prepare_rl_scene.py', 'servo_model.py', 'terrain_curriculum.py', 'lidar_extrinsics.py')
     revision = subprocess.check_output(['git', '-C', str(root.parent), 'rev-parse', 'HEAD'], text=True).strip()
@@ -39,7 +39,7 @@ def contract(env):
                              resolution_m=GRID_RESOLUTION, channels=GRID_CHANNEL_NAMES,
                              frame='body yaw aligned forward/left, height relative to body Z'),
         reward_contract=REWARD_CONTRACT, action_size=ACTION_SIZE,
-        scheduler_contract='boundary_recontact_free_wave_lookahead_v2',
+        scheduler_contract='boundary_free_wave_wall_retry_v3',
         stance_recovery_contract='all_contact_recenter_2cm_3deg_once_per_epoch_v1',
         path_contract='sampled_foot_bottleneck_projection_v1',
         path_variants=['request', 'early_lift_late_transfer', 'raise', 'raise_and_timing'],

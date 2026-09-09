@@ -264,6 +264,8 @@ def main():
             state_names = ('STANCE', 'SWING', 'LATE', 'TOUCHDOWN', 'HOLD')
             if bool(cs.scheduler.fault):
                 phase_status = 'FAULT / reset required'
+            elif bool(cs.foot_retry.active):
+                phase_status = f'{LEG_ORDER[int(cs.foot_retry.leg)]}: retract / lift / retry'
             elif bool(cs.scheduler.recontact_active):
                 phase_status = 'Support recontact'
             elif np.any(leg_states == 2):
