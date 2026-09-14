@@ -7,4 +7,5 @@
 ../Core/Src/high_control/gait_manager.c:92:6:GaitManager_SetPattern	16	static
 ../Core/Src/high_control/gait_manager.c:103:6:GaitManager_SetStopAfterLanding	16	static
 ../Core/Src/high_control/gait_manager.c:126:18:GaitManager_StepContacts	104	static
-../Core/Src/high_control/gait_manager.c:613:18:GaitManager_Step	72	static
+../Core/Src/high_control/gait_manager.c:636:18:GaitManager_Step	72	static
+../Core/Src/high_control/gait_manager.c:684:6:GaitManager_SetAdaptiveTiming	24	static

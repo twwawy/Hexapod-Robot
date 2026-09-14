@@ -6,5 +6,6 @@
 ../Core/Src/high_control/gait_manager.c:83:6:GaitManager_Init	2
 ../Core/Src/high_control/gait_manager.c:92:6:GaitManager_SetPattern	2
 ../Core/Src/high_control/gait_manager.c:103:6:GaitManager_SetStopAfterLanding	5
-../Core/Src/high_control/gait_manager.c:126:18:GaitManager_StepContacts	115
-../Core/Src/high_control/gait_manager.c:613:18:GaitManager_Step	9
+../Core/Src/high_control/gait_manager.c:126:18:GaitManager_StepContacts	127
+../Core/Src/high_control/gait_manager.c:636:18:GaitManager_Step	9
+../Core/Src/high_control/gait_manager.c:684:6:GaitManager_SetAdaptiveTiming	8

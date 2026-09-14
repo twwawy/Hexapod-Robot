@@ -20,6 +20,7 @@ typedef struct
     uint8_t command_pair_step_count;             // 현재 명령으로 완료한 걸음 수를 저장한다.
     bool airborne_seen[ROBOT_LEG_COUNT];         // Swing 중 비접촉 확인을 저장한다.
     bool landed[ROBOT_LEG_COUNT];                // Swing 착지 확인을 저장한다.
+    bool touchdown_seen[ROBOT_LEG_COUNT];        // 후보 취소 뒤에도 이번 걸음의 탐색을 유지한다.
     bool initialized;                            // 정상 보행 초기화 여부를 저장한다.
     bool run_enable;                             // 내부 보행 활성화를 저장한다.
     bool stop_pending;                           // 현재 Swing 착지 후 정지 요청을 저장한다.

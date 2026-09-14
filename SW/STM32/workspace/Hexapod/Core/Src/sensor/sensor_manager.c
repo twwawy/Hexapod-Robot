@@ -44,7 +44,7 @@ void SensorManager_Init(SensorManager_Handle_t *handle,
     FootPressure_Init(&handle->pressure);     // 압력센서 임계값을 준비한다.
 }
 
-/* GPS·WT931·MCP3008 측정과 PWM 예측으로 스냅샷을 만든다. */
+/* 전체 센서 스냅샷을 갱신하고 접촉 판정은 1 ms 압력 경로의 결과를 유지한다. */
 bool SensorManager_Update(
     SensorManager_Handle_t *handle,
     const float pwm_angle_rad[ROBOT_JOINT_COUNT],
@@ -135,7 +135,6 @@ bool SensorManager_Update(
                 pwm_valid,
                 handle->snapshot.joint_angle_rad);                         // ADC와 PWM을 최종 관절각으로 융합한다.
         }
-        SensorManager_UpdateContactState(handle);                            // 접촉과 새 접촉 Latch를 갱신한다.
         handle->snapshot.timestamp_ms = handle->adc.mcu_time_ms;             // 스냅샷 시각을 갱신한다.
     }
 

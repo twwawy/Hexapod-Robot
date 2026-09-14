@@ -324,8 +324,6 @@ static RobotVec3_t FootTrajectory_ResetLeg(FootTrajectory_Handle_t *handle,
     handle->previous_state[leg] = ROBOT_LEG_STANCE;      // 이전 상태를 Stance로 둔다.
     handle->adapted_stance[leg] = false;                 // 접촉 적응 상태를 제거한다.
     handle->custom_swing[leg] = false;                   // 사용자 Swing 시작점을 제거한다.
-    handle->swing_resume_progress[leg] = 0.0f;           // Swing 재개 진행률을 제거한다.
-    handle->swing_resume_active[leg] = false;            // Swing 재개 상태를 제거한다.
     handle->landing_z_error_valid[leg] = false;          // 이전 착지 오차를 제거한다.
     handle->touchdown_pending[leg] = false;              // 대기 중인 실측 FK를 제거한다.
     return *base;
@@ -347,7 +345,6 @@ static RobotVec3_t FootTrajectory_AdaptiveLeg(FootTrajectory_Handle_t *handle,
     RobotVec3_t rear;         // 위상 뒤쪽 발 위치를 저장한다.
     RobotVec3_t swing_start;  // 실제 Swing 시작점을 저장한다.
     RobotVec3_t output;       // 이번 발 위치를 저장한다.
-    float swing_progress;     // 정지 후 다시 매핑한 Swing 진행률을 저장한다.
     const RobotLegState_t state = gait->state[leg];         // 현재 다리 상태를 선택한다.
     const RobotLegState_t previous = handle->previous_state[leg];  // 이전 다리 상태를 선택한다.
     const float progress = gait->progress[leg];             // 현재 다리 진행률을 선택한다.
@@ -415,9 +412,6 @@ static RobotVec3_t FootTrajectory_AdaptiveLeg(FootTrajectory_Handle_t *handle,
             handle->swing_start[leg] = handle->memory[leg];  // 실제 직전 위치에서 새 Swing을 시작한다.
             handle->custom_swing[leg] = true;                // 연속 시작점을 활성화한다.
             handle->adapted_stance[leg] = false;             // 새 Swing에서 적응 상태를 해제한다.
-            handle->swing_resume_active[leg] =
-                (previous == ROBOT_LEG_TOUCHDOWN_CANDIDATE);  // 접촉 후보 취소에서만 남은 Swing을 다시 매핑한다.
-            handle->swing_resume_progress[leg] = progress;  // 재개 순간의 기존 위상 진행률을 저장한다.
         }
 
         if (handle->custom_swing[leg])
@@ -425,22 +419,12 @@ static RobotVec3_t FootTrajectory_AdaptiveLeg(FootTrajectory_Handle_t *handle,
             swing_start = handle->swing_start[leg];  // 이전 연속 위치를 Swing 시작점으로 사용한다.
         }
 
-        swing_progress = progress;  // 일반 Swing 진행률을 기본값으로 사용한다.
-        if (handle->swing_resume_active[leg])
-        {
-            const float remaining = 1.0f - handle->swing_resume_progress[leg];  // 남은 위상 비율을 계산한다.
-
-            swing_progress = (remaining > 0.000001f) ?
-                (progress - handle->swing_resume_progress[leg]) / remaining :
-                1.0f;  // 정지 위치를 0으로 두고 남은 경로를 다시 매핑한다.
-        }
-
         handle->landing_target_z[leg] = front.z;  // 이번 Swing의 정상 착지 Z를 저장한다.
         if (handle->active_plan.valid && handle->active_plan.adaptive) {
-            output = SwingTrajectory_CalculateAdaptive(swing_progress, &swing_start,
+            output = SwingTrajectory_CalculateAdaptive(progress, &swing_start,
                 &front, swing_height, handle->active_plan.apex_phase[leg],
                 handle->active_plan.transfer_phase[leg]);
-        } else output = SwingTrajectory_Calculate(swing_progress,
+        } else output = SwingTrajectory_Calculate(progress,
                                            &swing_start,
                                            &front,
                                            swing_height,

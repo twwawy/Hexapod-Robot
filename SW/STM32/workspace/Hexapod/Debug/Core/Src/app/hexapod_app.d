@@ -4,6 +4,7 @@ Core/Src/app/hexapod_app.o: ../Core/Src/app/hexapod_app.c \
  ../Core/Inc/app/pressure_load_calibration.h \
  ../Core/Inc/sensor/foot_pressure.h ../Core/Inc/app/robot_bringup.h \
  ../Core/Inc/communication/jetson_spi.h \
+ ../Core/Inc/communication/adaptive_spi_protocol.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal.h \
  ../Core/Inc/stm32f4xx_hal_conf.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_rcc.h \
@@ -64,6 +65,7 @@ Core/Src/app/hexapod_app.o: ../Core/Src/app/hexapod_app.c \
 ../Core/Inc/sensor/foot_pressure.h:
 ../Core/Inc/app/robot_bringup.h:
 ../Core/Inc/communication/jetson_spi.h:
+../Core/Inc/communication/adaptive_spi_protocol.h:
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal.h:
 ../Core/Inc/stm32f4xx_hal_conf.h:
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_rcc.h:

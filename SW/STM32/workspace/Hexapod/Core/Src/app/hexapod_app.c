@@ -237,6 +237,17 @@ static void HexapodApp_SelectRlMode(HexapodApp_Handle_t *handle,
         return;
     }
 
+    if (handle->priority.active_mode == ROBOT_MODE_LANDING)
+    {
+        handle->drone_control.gait_was_active |= was_rl || handle->rl.stopping;  // 중단한 보행을 시간 기반 복구 대상으로 유지한다.
+        RlController_EndSession(&handle->rl.input);                            // 착지 중 정책 입력을 종료한다.
+        HexapodApp_CancelRlCandidate(handle);                                 // 다음 이륙 후보를 폐기한다.
+        WorkspaceLimiter_SetRlEnabled(&handle->workspace_limiter, false);     // 기본 착지 궤적으로 전환한다.
+        GaitManager_SetStopAfterLanding(&handle->gait_manager, false);         // 접촉 기반 보행 종료 대기를 해제한다.
+        handle->rl.stopping = false;                                          // 정해진 착지 순서로 제어권을 넘긴다.
+        return;
+    }
+
     if ((user->sb != 0U) && !handle->rl.stopping)
     {
         handle->rl.rearm_required = false;  // RL 밖으로 옮긴 스위치 입력을 확인한다.

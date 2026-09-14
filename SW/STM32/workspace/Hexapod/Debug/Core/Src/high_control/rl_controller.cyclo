@@ -9,4 +9,7 @@
 ../Core/Src/high_control/rl_controller.c:117:6:RlController_SetPlan	8
 ../Core/Src/high_control/rl_controller.c:132:6:RlController_RecordObservation	5
 ../Core/Src/high_control/rl_controller.c:159:29:RlController_Submit	18
-../Core/Src/high_control/rl_controller.c:217:6:RlController_GetAction	10
+../Core/Src/high_control/rl_controller.c:218:6:RlController_GetAction	10
+../Core/Src/high_control/rl_controller.c:246:6:RlController_ExecutionValuesValid	29
+../Core/Src/high_control/rl_controller.c:277:29:RlController_SubmitExecution	5
+../Core/Src/high_control/rl_controller.c:292:6:RlController_GetExecution	6

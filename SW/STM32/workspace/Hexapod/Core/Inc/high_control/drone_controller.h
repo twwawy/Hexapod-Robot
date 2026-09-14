@@ -6,7 +6,7 @@
 typedef enum
 {
     DRONE_LANDING_LANDED = 0,  // 완전 착지 상태를 나타낸다.
-    DRONE_LANDING_ALL_FEET,    // 전체 발 접촉 대기 상태를 나타낸다.
+    DRONE_LANDING_ALL_FEET,    // 기존 상태값을 첫 그룹 복구로 연결한다.
     DRONE_LANDING_RECOVERY_135,// 1·3·5 복구 상태를 나타낸다.
     DRONE_LANDING_RECOVERY_246,// 2·4·6 복구 상태를 나타낸다.
     DRONE_LANDING_LOWERING,    // 몸체 하강 상태를 나타낸다.

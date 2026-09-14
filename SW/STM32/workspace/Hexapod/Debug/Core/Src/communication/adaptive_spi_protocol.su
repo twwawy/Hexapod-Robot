@@ -1,0 +1,8 @@
+../Core/Src/communication/adaptive_spi_protocol.c:4:17:u16	16	static
+../Core/Src/communication/adaptive_spi_protocol.c:5:16:i16	16	static
+../Core/Src/communication/adaptive_spi_protocol.c:6:13:put16	16	static
+../Core/Src/communication/adaptive_spi_protocol.c:7:13:put32	16	static
+../Core/Src/communication/adaptive_spi_protocol.c:8:13:fixed	24	static
+../Core/Src/communication/adaptive_spi_protocol.c:12:10:AdaptiveSpi_Crc	32	static
+../Core/Src/communication/adaptive_spi_protocol.c:18:6:AdaptiveSpi_DecodeExecution	56	static
+../Core/Src/communication/adaptive_spi_protocol.c:40:6:AdaptiveSpi_EncodeObservation	56	static

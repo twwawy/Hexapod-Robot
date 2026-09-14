@@ -76,7 +76,7 @@ void BodyPostureController_Init(BodyPostureController_Handle_t *handle)
     }
 }
 
-/* Roll·Pitch·보정 Yaw PI 후보를 검사하고 발 위치에 역회전한다. */
+/* Roll·Pitch PI와 조종 Yaw 후보를 검사하고 발 위치에 역회전한다. */
 BodyPostureController_Output_t BodyPostureController_Step(
     BodyPostureController_Handle_t *handle,
     const RobotVec3_t feet_body[ROBOT_LEG_COUNT],
@@ -106,7 +106,6 @@ BodyPostureController_Output_t BodyPostureController_Step(
     {
         memset(&handle->command_rad, 0, sizeof(handle->command_rad));  // 명시적 초기화 상태에서 자세 명령을 제거한다.
         memset(&handle->integral, 0, sizeof(handle->integral));        // 자세 적분을 제거한다.
-        handle->correction_yaw_base_rad = measured_rad->yaw;           // 현재 Yaw를 보정 기준으로 저장한다.
     }
     else if (drone->posture_return)
     {
@@ -178,29 +177,19 @@ BodyPostureController_Output_t BodyPostureController_Step(
     }
     else if (drone->correction_enable)
     {
-        float yaw_target;  // 보정 Yaw 절대 목표를 저장한다.
-        float yaw_error;   // 보정 Yaw 오차를 저장한다.
+        float yaw_target;  // 조종기의 상대 Yaw 목표를 저장한다.
 
         if (!handle->previous_correction)
         {
-            handle->correction_yaw_base_rad = measured_rad->yaw;  // 보정 진입 Heading을 저장한다.
             memset(&handle->integral, 0, sizeof(handle->integral));// 보정 진입 적분을 제거한다.
-            integral_candidate = handle->integral;
         }
 
-        yaw_target = BodyPosture_WrapPi(handle->correction_yaw_base_rad +
-                                         drone->posture_reference_rad.yaw);  // 상대 Yaw 목표를 만든다.
-        yaw_error = BodyPosture_WrapPi(yaw_target - measured_rad->yaw);      // Yaw 오차를 계산한다.
-        integral_candidate.yaw = BodyPosture_Clamp(
-            handle->integral.yaw + yaw_error * ROBOT_CONTROL_PERIOD_S,
-            -POSTURE_INTEGRAL_LIMIT,
-            POSTURE_INTEGRAL_LIMIT);  // Yaw 적분 후보를 계산한다.
-        candidate.yaw = BodyPosture_Clamp(
-            handle->command_rad.yaw +
-            BodyPosture_Clamp(POSTURE_KP * yaw_error + POSTURE_KI * integral_candidate.yaw,
-                              -POSTURE_RATE_MAX, POSTURE_RATE_MAX) * ROBOT_CONTROL_PERIOD_S,
+        yaw_target = BodyPosture_Clamp(drone->posture_reference_rad.yaw,
             -ROBOT_MAX_CORRECTION_YAW_RAD,
-            ROBOT_MAX_CORRECTION_YAW_RAD);  // 보정 Yaw 명령 후보를 계산한다.
+            ROBOT_MAX_CORRECTION_YAW_RAD);  // 조종 Yaw 목표를 허용 각도로 제한한다.
+        candidate.yaw = BodyPosture_MoveToward(handle->command_rad.yaw,
+                                                yaw_target,
+                                                POSTURE_RATE_MAX * ROBOT_CONTROL_PERIOD_S);  // IMU 피드백 없이 조종 목표로 이동한다.
         candidate.roll = BodyPosture_MoveToward(handle->command_rad.roll,
                                                  0.0f,
                                                  POSTURE_RATE_MAX * ROBOT_CONTROL_PERIOD_S);  // Roll을 0으로 복귀시킨다.
@@ -211,7 +200,6 @@ BodyPostureController_Output_t BodyPostureController_Step(
         if (WorkspaceLimiter_AllFeetValid(feet_body, &candidate))
         {
             handle->command_rad = candidate;                // 정상 자세 후보를 채택한다.
-            handle->integral.yaw = integral_candidate.yaw;  // Yaw 적분 후보를 채택한다.
         }
         else
         {
@@ -220,6 +208,7 @@ BodyPostureController_Output_t BodyPostureController_Step(
 
         handle->integral.roll = 0.0f;   // 보정 모드 Roll 적분을 제거한다.
         handle->integral.pitch = 0.0f;  // 보정 모드 Pitch 적분을 제거한다.
+        handle->integral.yaw = 0.0f;    // 비활성 Yaw 피드백의 적분을 제거한다.
     }
 
     for (leg = 0U; leg < ROBOT_LEG_COUNT; ++leg)

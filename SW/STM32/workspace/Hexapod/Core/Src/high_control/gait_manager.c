@@ -144,6 +144,12 @@ RobotGaitPhase_t GaitManager_StepContacts(
         return output;
     }
 
+    if ((tripod_mode == ROBOT_TRIPOD_RECOVERY_135) ||
+        (tripod_mode == ROBOT_TRIPOD_RECOVERY_246))
+    {
+        handle->late_landing_hold = false;  // 정해진 착지 복구는 이전 접촉 탐색 정지를 해제한다.
+    }
+
     if (handle->stop_after_landing && (tripod_mode == ROBOT_TRIPOD_NORMAL))
     {
         tripod_enable = false;  // 정지 요청 동안 새 정상 보행 명령을 차단한다.
@@ -189,8 +195,9 @@ RobotGaitPhase_t GaitManager_StepContacts(
             handle->support_recovery_mask = 0U;       // 지지발 재착지 대상을 제거한다.
             handle->support_recovery_active = false;  // 지지발 재착지 상태를 제거한다.
 
-            memset(handle->airborne_seen, 0, sizeof(handle->airborne_seen));  // 비접촉 이력을 제거한다.
-            memset(handle->landed, 0, sizeof(handle->landed));                // 착지 이력을 제거한다.
+            memset(handle->airborne_seen, 0, sizeof(handle->airborne_seen));    // 비접촉 이력을 제거한다.
+            memset(handle->landed, 0, sizeof(handle->landed));                  // 착지 이력을 제거한다.
+            memset(handle->touchdown_seen, 0, sizeof(handle->touchdown_seen));  // 완료한 걸음의 접촉 후보 이력을 제거한다.
         }
         else if (handle->late_landing_hold)
         {
@@ -216,8 +223,9 @@ RobotGaitPhase_t GaitManager_StepContacts(
                 handle->command_pair_step_count = 0U;     // 새 명령의 첫 걸음을 준비한다.
                 handle->support_recovery_mask = 0U;       // 이전 재착지 대상을 제거한다.
                 handle->support_recovery_active = false;  // 새 보행의 재착지를 준비한다.
-                memset(handle->airborne_seen, 0, sizeof(handle->airborne_seen));  // 비접촉 이력을 제거한다.
-                memset(handle->landed, 0, sizeof(handle->landed));                // 착지 이력을 제거한다.
+                memset(handle->airborne_seen, 0, sizeof(handle->airborne_seen));    // 비접촉 이력을 제거한다.
+                memset(handle->landed, 0, sizeof(handle->landed));                  // 착지 이력을 제거한다.
+                memset(handle->touchdown_seen, 0, sizeof(handle->touchdown_seen));  // 완료한 걸음의 접촉 후보 이력을 제거한다.
             }
 
             handle->stop_pending = false;  // 활성 명령에서 정지 요청을 해제한다.
@@ -238,8 +246,9 @@ RobotGaitPhase_t GaitManager_StepContacts(
             handle->support_recovery_mask = 0U;       // 정지 중 재착지 대상을 제거한다.
             handle->support_recovery_active = false;  // 정지 중 재착지를 비활성화한다.
 
-            memset(handle->airborne_seen, 0, sizeof(handle->airborne_seen));  // 비접촉 이력을 제거한다.
-            memset(handle->landed, 0, sizeof(handle->landed));                // 착지 이력을 제거한다.
+            memset(handle->airborne_seen, 0, sizeof(handle->airborne_seen));    // 비접촉 이력을 제거한다.
+            memset(handle->landed, 0, sizeof(handle->landed));                  // 착지 이력을 제거한다.
+            memset(handle->touchdown_seen, 0, sizeof(handle->touchdown_seen));  // 완료한 걸음의 접촉 후보 이력을 제거한다.
         }
     }
     else
@@ -257,8 +266,9 @@ RobotGaitPhase_t GaitManager_StepContacts(
         handle->support_recovery_mask = 0U;       // 특수 모드에서 재착지 대상을 제거한다.
         handle->support_recovery_active = false;  // 특수 모드에서 재착지를 비활성화한다.
 
-        memset(handle->airborne_seen, 0, sizeof(handle->airborne_seen));  // 비접촉 이력을 제거한다.
-        memset(handle->landed, 0, sizeof(handle->landed));                // 착지 이력을 제거한다.
+        memset(handle->airborne_seen, 0, sizeof(handle->airborne_seen));    // 비접촉 이력을 제거한다.
+        memset(handle->landed, 0, sizeof(handle->landed));                  // 착지 이력을 제거한다.
+        memset(handle->touchdown_seen, 0, sizeof(handle->touchdown_seen));  // 완료한 걸음의 접촉 후보 이력을 제거한다.
     }
 
     if ((tripod_mode == ROBOT_TRIPOD_NORMAL) && handle->run_enable)
@@ -493,8 +503,9 @@ RobotGaitPhase_t GaitManager_StepContacts(
                     handle->support_recovery_active = false;  // 새 위상의 재착지를 준비한다.
                     if (!handle->run_enable || !handle->next_phase_locked)
                     {
-                        memset(handle->airborne_seen, 0, sizeof(handle->airborne_seen));  // 새 위상의 비접촉 이력을 초기화한다.
-                        memset(handle->landed, 0, sizeof(handle->landed));                // 새 위상의 착지 이력을 초기화한다.
+                        memset(handle->airborne_seen, 0, sizeof(handle->airborne_seen));    // 새 위상의 비접촉 이력을 초기화한다.
+                        memset(handle->landed, 0, sizeof(handle->landed));                  // 새 위상의 착지 이력을 초기화한다.
+                        memset(handle->touchdown_seen, 0, sizeof(handle->touchdown_seen));  // 완료한 걸음의 접촉 후보 이력을 제거한다.
                     }
                 }
 
@@ -515,11 +526,12 @@ RobotGaitPhase_t GaitManager_StepContacts(
                         }
                         else if (candidate)
                         {
+                            handle->touchdown_seen[leg] = true;                 // 접촉 후보 이후 정상 Swing 복귀를 차단한다.
                             output.state[leg] = ROBOT_LEG_TOUCHDOWN_CANDIDATE;  // 접촉 확인까지 현재 발을 고정한다.
                         }
-                        else if (progress >= 1.0f)
+                        else if (handle->touchdown_seen[leg] || (progress >= 1.0f))
                         {
-                            output.state[leg] = ROBOT_LEG_LATE_LANDING;  // 정상 시간 이후 지면을 탐색한다.
+                            output.state[leg] = ROBOT_LEG_LATE_LANDING;  // 후보 취소 또는 위상 종료부터 지면을 탐색한다.
                         }
                         else
                         {
@@ -581,9 +593,10 @@ RobotGaitPhase_t GaitManager_StepContacts(
             output.late_landing_stop = output.late_landing_stop ||
                                        output.late_landing_exhausted[leg];  // 한 다리의 한계 도달을 전체 정지로 올린다.
         }
-        else if (output.state[leg] != ROBOT_LEG_TOUCHDOWN_CANDIDATE)
+        else if ((output.state[leg] != ROBOT_LEG_TOUCHDOWN_CANDIDATE) &&
+                 (output.state[leg] != ROBOT_LEG_HOLD))
         {
-            handle->late_landing_time_s[leg] = 0.0f;  // Late Landing 밖에서 탐색 시간을 초기화한다.
+            handle->late_landing_time_s[leg] = 0.0f;  // 후보 확인과 일시정지 외에는 탐색 시간을 초기화한다.
         }
     }
 
@@ -606,8 +619,9 @@ RobotGaitPhase_t GaitManager_StepContacts(
             handle->support_recovery_mask = 0U;       // 중단한 재착지 대상을 제거한다.
             handle->support_recovery_active = false;  // 중단한 재착지 상태를 제거한다.
 
-            memset(handle->airborne_seen, 0, sizeof(handle->airborne_seen));  // 비접촉 이력을 제거한다.
-            memset(handle->landed, 0, sizeof(handle->landed));                // 착지 이력을 제거한다.
+            memset(handle->airborne_seen, 0, sizeof(handle->airborne_seen));    // 비접촉 이력을 제거한다.
+            memset(handle->landed, 0, sizeof(handle->landed));                  // 착지 이력을 제거한다.
+            memset(handle->touchdown_seen, 0, sizeof(handle->touchdown_seen));  // 완료한 걸음의 접촉 후보 이력을 제거한다.
         }
     }
     else if (handle->late_landing_hold && (tripod_enable || handle->stop_after_landing))

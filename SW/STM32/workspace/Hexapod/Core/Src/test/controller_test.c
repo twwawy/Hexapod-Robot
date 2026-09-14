@@ -10,6 +10,41 @@
 #include <math.h>
 #include <string.h>
 
+/* IMU Yaw 드리프트 차단과 조종 Yaw의 이동·중립 복귀를 검사한다. */
+static bool ControllerTest_CorrectionYaw(const RobotVec3_t feet[ROBOT_LEG_COUNT])
+{
+    BodyPostureController_Handle_t controller;  // 독립적인 자세 제어 상태를 저장한다.
+    BodyPostureController_Output_t output;     // 실제 채택한 자세를 저장한다.
+    RobotDroneOutput_t command = {0};          // 보정 모드 조종 입력을 준비한다.
+    RobotEuler_t measured = {0};               // 인위적인 IMU 드리프트를 준비한다.
+    uint32_t phase;                            // 중립·회전·복귀 구간을 구분한다.
+    uint32_t cycle;                            // 구간별 제어 주기를 계산한다.
+
+    BodyPostureController_Init(&controller);  // 이전 자세 명령을 제거한다.
+    command.correction_enable = true;         // 보정 모드를 선택한다.
+    for (phase = 0U; phase < 3U; ++phase)
+    {
+        command.posture_reference_rad.yaw = (phase == 1U)
+            ? 5.0f * ROBOT_DEG_TO_RAD_F : 0.0f;  // 5도 조종 후 중립으로 복귀한다.
+        for (cycle = 0U; cycle < 200U; ++cycle)
+        {
+            measured.yaw = ((float)cycle - 100.0f) * ROBOT_DEG_TO_RAD_F;  // 몸체 회전 없이 측정 Yaw만 변화시킨다.
+            output = BodyPostureController_Step(&controller, feet,
+                                                &command, &measured, false);  // 드리프트 중 자세 제어를 실행한다.
+            if (!output.accepted ||
+                ((phase == 0U) && (fabsf(output.command_rad.yaw) > 0.00001f)))
+            {
+                return false;
+            }
+        }
+        if (fabsf(output.command_rad.yaw - command.posture_reference_rad.yaw) > 0.00001f)
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
 /* 명시적인 READY 입력으로 발 궤적과 자세·IK 계산을 연결해 검사한다. */
 bool ControllerTest_Run(void)
 {
@@ -60,7 +95,7 @@ bool ControllerTest_Run(void)
         }
     }
 
-    if (!posture.targets.command_accepted)
+    if (!posture.targets.command_accepted || !ControllerTest_CorrectionYaw(feet.foot))
     {
         return false;
     }

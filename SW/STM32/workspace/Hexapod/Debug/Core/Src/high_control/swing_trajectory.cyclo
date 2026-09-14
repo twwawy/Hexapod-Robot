@@ -1,1 +1,3 @@
 ../Core/Src/high_control/swing_trajectory.c:7:13:SwingTrajectory_Calculate	3
+../Core/Src/high_control/swing_trajectory.c:37:14:AdaptiveQuintic	1
+../Core/Src/high_control/swing_trajectory.c:43:13:SwingTrajectory_CalculateAdaptive	3

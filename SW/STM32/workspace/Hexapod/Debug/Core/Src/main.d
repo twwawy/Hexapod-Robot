@@ -32,7 +32,9 @@ Core/Src/main.o: ../Core/Src/main.c ../Core/Inc/main.h \
  ../Core/Inc/common/robot_types.h ../Core/Inc/common/robot_config.h \
  ../Core/Inc/app/pressure_load_calibration.h \
  ../Core/Inc/sensor/foot_pressure.h ../Core/Inc/app/robot_bringup.h \
- ../Core/Inc/communication/jetson_spi.h ../Core/Inc/communication/lora.h \
+ ../Core/Inc/communication/jetson_spi.h \
+ ../Core/Inc/communication/adaptive_spi_protocol.h \
+ ../Core/Inc/communication/lora.h \
  ../Core/Inc/communication/manipulator_link.h \
  ../Core/Inc/communication/robot_telemetry.h \
  ../Core/Inc/high_control/body_position_estimator.h \
@@ -93,6 +95,7 @@ Core/Src/main.o: ../Core/Src/main.c ../Core/Inc/main.h \
 ../Core/Inc/sensor/foot_pressure.h:
 ../Core/Inc/app/robot_bringup.h:
 ../Core/Inc/communication/jetson_spi.h:
+../Core/Inc/communication/adaptive_spi_protocol.h:
 ../Core/Inc/communication/lora.h:
 ../Core/Inc/communication/manipulator_link.h:
 ../Core/Inc/communication/robot_telemetry.h:

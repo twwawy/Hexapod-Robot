@@ -58,13 +58,9 @@ RobotDroneOutput_t DroneController_Step(DroneController_Handle_t *handle,
                                         float yaw_measured_rad)
 {
     RobotDroneOutput_t output;    // 이번 제어 출력을 저장한다.
-    bool all_contact = true;      // 전체 접촉 상태를 저장한다.
-    bool contact_135 = true;      // 1·3·5 접촉 상태를 저장한다.
-    bool contact_246 = true;      // 2·4·6 접촉 상태를 저장한다.
     bool lateral_mode;            // S1 횡이동 모드를 저장한다.
     bool mode_changed;            // 제어 모드 변경 여부를 저장한다.
     bool s1_changed;              // S1 이동 방식 변경 여부를 저장한다.
-    uint32_t leg;                 // 접촉을 확인할 다리 번호를 저장한다.
 
     memset(&output, 0, sizeof(output));  // 기본 출력을 0으로 준비한다.
 
@@ -72,20 +68,6 @@ RobotDroneOutput_t DroneController_Step(DroneController_Handle_t *handle,
     {
         output.kill_enable = true;  // 필수 입력 누락 시 출력을 차단한다.
         return output;
-    }
-
-    for (leg = 0U; leg < ROBOT_LEG_COUNT; ++leg)
-    {
-        all_contact = all_contact && contact[leg];  // 전체 접촉을 누적한다.
-
-        if ((leg % 2U) == 0U)
-        {
-            contact_135 = contact_135 && contact[leg];  // 1·3·5 접촉을 누적한다.
-        }
-        else
-        {
-            contact_246 = contact_246 && contact[leg];  // 2·4·6 접촉을 누적한다.
-        }
     }
 
     lateral_mode = (priority->active_mode == ROBOT_MODE_MANUAL) &&
@@ -178,7 +160,7 @@ RobotDroneOutput_t DroneController_Step(DroneController_Handle_t *handle,
             }
             else if (handle->gait_was_active)
             {
-                handle->landing_state = DRONE_LANDING_ALL_FEET;  // 보행 후 전체 발을 내린다.
+                handle->landing_state = DRONE_LANDING_RECOVERY_135;  // 접촉 대기 없이 첫 다리 그룹을 복구한다.
             }
             else
             {
@@ -196,15 +178,6 @@ RobotDroneOutput_t DroneController_Step(DroneController_Handle_t *handle,
                 break;
 
             case DRONE_LANDING_ALL_FEET:
-                output.tripod_enable = true;                         // Tripod 착지를 활성화한다.
-                output.tripod_mode = ROBOT_TRIPOD_LAND_ALL;          // 전체 발 착지를 선택한다.
-                if (all_contact)
-                {
-                    handle->landing_state = DRONE_LANDING_RECOVERY_135;  // 1·3·5 복구로 이동한다.
-                    handle->landing_state_time_s = 0.0f;                  // 복구 시간을 초기화한다.
-                }
-                break;
-
             case DRONE_LANDING_RECOVERY_135:
                 output.tripod_enable = true;                            // Tripod 복구를 활성화한다.
                 output.tripod_mode = ROBOT_TRIPOD_RECOVERY_135;         // 1·3·5 복구를 선택한다.
@@ -212,7 +185,7 @@ RobotDroneOutput_t DroneController_Step(DroneController_Handle_t *handle,
                                                       ROBOT_CONTROL_PERIOD_S,
                                                       ROBOT_RECOVERY_TIME_S);  // 복구 진행 시간을 누적한다.
                 output.recovery_progress = handle->landing_state_time_s / ROBOT_RECOVERY_TIME_S;  // 복구 진행률을 계산한다.
-                if ((handle->landing_state_time_s >= ROBOT_RECOVERY_TIME_S) && contact_135)
+                if (handle->landing_state_time_s >= ROBOT_RECOVERY_TIME_S)
                 {
                     handle->landing_state = DRONE_LANDING_RECOVERY_246;  // 2·4·6 복구로 이동한다.
                     handle->landing_state_time_s = 0.0f;                  // 복구 시간을 초기화한다.
@@ -226,7 +199,7 @@ RobotDroneOutput_t DroneController_Step(DroneController_Handle_t *handle,
                                                       ROBOT_CONTROL_PERIOD_S,
                                                       ROBOT_RECOVERY_TIME_S);  // 복구 진행 시간을 누적한다.
                 output.recovery_progress = handle->landing_state_time_s / ROBOT_RECOVERY_TIME_S;  // 복구 진행률을 계산한다.
-                if ((handle->landing_state_time_s >= ROBOT_RECOVERY_TIME_S) && contact_246)
+                if (handle->landing_state_time_s >= ROBOT_RECOVERY_TIME_S)
                 {
                     handle->landing_state = DRONE_LANDING_LOWERING;  // 몸체 하강으로 이동한다.
                     handle->landing_state_time_s = 0.0f;             // 하강 시간을 초기화한다.

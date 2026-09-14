@@ -2,6 +2,7 @@ Core/Src/test/communication_test.o: ../Core/Src/test/communication_test.c \
  ../Core/Inc/test/communication_test.h \
  ../Core/Inc/communication/jetson_spi.h ../Core/Inc/common/robot_types.h \
  ../Core/Inc/common/robot_config.h \
+ ../Core/Inc/communication/adaptive_spi_protocol.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal.h \
  ../Core/Inc/stm32f4xx_hal_conf.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_rcc.h \
@@ -37,6 +38,7 @@ Core/Src/test/communication_test.o: ../Core/Src/test/communication_test.c \
 ../Core/Inc/communication/jetson_spi.h:
 ../Core/Inc/common/robot_types.h:
 ../Core/Inc/common/robot_config.h:
+../Core/Inc/communication/adaptive_spi_protocol.h:
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal.h:
 ../Core/Inc/stm32f4xx_hal_conf.h:
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_rcc.h:

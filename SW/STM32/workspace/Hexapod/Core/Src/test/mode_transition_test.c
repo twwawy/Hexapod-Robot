@@ -4,6 +4,7 @@
 #include "high_control/control_priority.h"
 #include "high_control/drone_controller.h"
 #include "high_control/foot_trajectory.h"
+#include "high_control/gait_manager.h"
 
 #include <math.h>
 #include <string.h>
@@ -426,6 +427,72 @@ static bool ModeTransitionTest_CheckCorrectionPostureMemory(void)
            (fabsf(output.command_rad.yaw - corrected_command.yaw) <= 0.0000001f);  // 세 축 각도 유지를 확인한다.
 }
 
+/* 접촉 유무와 이전 탐색 정지에 관계없이 정해진 착지를 완료하는지 검사한다. */
+static bool ModeTransitionTest_CheckTimedLanding(void)
+{
+    uint32_t scenario;  // 정지·보행 및 접촉 조건 조합을 순회한다.
+
+    for (scenario = 0U; scenario < 6U; ++scenario)
+    {
+        DroneController_Handle_t controller;                   // 착지 상태를 저장한다.
+        GaitManager_Handle_t manager;                          // 이전 보행 정지를 재현한다.
+        RobotPriorityOutput_t priority = {0};                  // 착지 모드 입력을 준비한다.
+        RobotDroneOutput_t output = {0};                       // 착지 출력을 저장한다.
+        RobotGaitPhase_t gait;                                 // 복구 다리 상태를 저장한다.
+        bool contact[ROBOT_LEG_COUNT] = {false};                // 무접촉 입력을 준비한다.
+        const bool walking = (scenario >= 3U);                 // 보행 후 복구 여부를 선택한다.
+        const uint32_t limit = (uint32_t)((ROBOT_LANDING_TIME_S +
+            ROBOT_SETTLING_TIME_S + 2.0f * ROBOT_RECOVERY_TIME_S) /
+            ROBOT_CONTROL_PERIOD_S) + 10U;                     // 정해진 동작 시간 안에 완료를 요구한다.
+        uint32_t recovery_mask = 0U;                           // 실행한 복구 그룹을 기록한다.
+        uint32_t cycle;                                        // 착지 제어 주기를 순회한다.
+        uint32_t leg;                                          // 접촉과 복구 다리를 순회한다.
+
+        DroneController_Init(&controller);                    // 착지 제어 상태를 초기화한다.
+        GaitManager_Init(&manager);                           // 보행 상태를 초기화한다.
+        controller.previous_mode = ROBOT_MODE_MANUAL;          // 착지 진입 전 상태를 준비한다.
+        controller.posture_memory = 1.0f;                     // 완전히 서 있는 자세를 준비한다.
+        controller.gait_was_active = walking;                  // 보행 이력을 선택한다.
+        manager.late_landing_hold = true;                      // 이전 접촉 탐색 한계 정지를 재현한다.
+        priority.active_mode = ROBOT_MODE_LANDING;             // 명시적 착지를 요청한다.
+
+        for (cycle = 0U; cycle < limit; ++cycle)
+        {
+            for (leg = 0U; leg < ROBOT_LEG_COUNT; ++leg)
+            {
+                contact[leg] = ((scenario % 3U) == 1U) ||
+                    (((scenario % 3U) == 2U) && (((cycle + leg) % 7U) < 3U));  // 무접촉·전체 접촉·변동 접촉을 재현한다.
+            }
+            output = DroneController_Step(&controller, &priority, contact, 0.0f);  // 접촉 조건별 착지를 진행한다.
+            gait = GaitManager_Step(&manager, false, output.tripod_enable,
+                true, true, output.tripod_mode, output.recovery_progress, contact);  // 실제 복구 상태기를 연결한다.
+            if (!output.landing_enable || output.kill_enable || gait.late_landing_hold ||
+                (output.tripod_mode == ROBOT_TRIPOD_LAND_ALL))
+            {
+                return false;
+            }
+            for (leg = 0U; leg < ROBOT_LEG_COUNT; ++leg)
+            {
+                if (gait.state[leg] == ROBOT_LEG_RECOVERY_SWING)
+                {
+                    recovery_mask |= (uint32_t)(1U << leg);  // 실제 실행한 복구 다리를 누적한다.
+                }
+            }
+            if (output.landing_done)
+            {
+                break;
+            }
+        }
+        if (!output.landing_done || (output.posture_progress != 0.0f) ||
+            (walking && (recovery_mask != ((1U << ROBOT_LEG_COUNT) - 1U))) ||
+            (!walking && (recovery_mask != 0U)))
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
 /* 짐벌 기능이 바뀌는 모드와 S1 전환에서 잔류 명령을 검사한다. */
 bool ModeTransitionTest_Run(void)
 {
@@ -437,7 +504,8 @@ bool ModeTransitionTest_Run(void)
     bool contact[ROBOT_LEG_COUNT];              // 명시적 접촉 상태를 저장한다.
     uint32_t cycle;                             // 필터 진행 횟수를 저장한다.
 
-    if (!ModeTransitionTest_CheckSwitchFunctions() ||
+    if (!ModeTransitionTest_CheckTimedLanding() ||
+        !ModeTransitionTest_CheckSwitchFunctions() ||
         !ModeTransitionTest_CheckRlPriority() ||
         !ModeTransitionTest_CheckRlDrone() ||
         !ModeTransitionTest_CheckCorrectionMemory() ||

@@ -7,7 +7,6 @@ typedef struct
 {
     RobotEuler_t command_rad;       // 마지막 정상 자세 명령을 저장한다.
     RobotEuler_t integral;          // 자세 PI 적분값을 저장한다.
-    float correction_yaw_base_rad;  // 보정 모드 진입 Heading을 저장한다.
     bool previous_manual;           // 이전 수동 모드 상태를 저장한다.
     bool previous_correction;       // 이전 보정 모드 상태를 저장한다.
 } BodyPostureController_Handle_t;
