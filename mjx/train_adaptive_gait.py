@@ -212,10 +212,12 @@ def render_policy_video(
                     clearance=np.asarray(cs.swing_clearance).tolist(),
                     apex=np.asarray(cs.apex_phase).tolist(), transfer=np.asarray(cs.transfer).tolist(),
                     latched_target=np.asarray(cs.goal_world).tolist(),
+                    actual_feet=np.asarray(state.data.site_xpos[env._foot_site_ids]).tolist(),
+                    foot_retry={k: np.asarray(v).tolist() for k, v in cs.foot_retry._asdict().items()},
                     candidate_status=np.asarray(plan['status']).tolist(),
                     support_margin=float(plan['support_margin']), plan_permit=bool(plan['permit']),
                     metrics={k: float(v) for k, v in state.metrics.items()
-                             if k.startswith(('termination/', 'hold_'))}))
+                             if k.startswith(('termination/', 'hold_', 'foot_retry/'))}))
 
             should_render = (
                 frame_index < requested_frames
@@ -576,7 +578,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument('--migrate-completion-reward', action='store_true',
                         help='Explicitly transfer reviewed v5-grid weights into new completion reward.')
     parser.add_argument('--stair-clearance-extra', type=float, default=0., help='Extra minimum clearance on upward steps, metres (0..0.04).')
-    parser.add_argument('--migrate-path-v6', action='store_true', help='Explicit reviewed terrain v5 warm start into path v6.')
+    parser.add_argument('--migrate-path-v6', action='store_true', help='Explicit reviewed terrain v5 / 585bee2 or 53bab78 path-v6 warm start; fresh optimizer.')
     parser.add_argument('--migrate-recontact', action='store_true',
                         help='Explicit controller migration from reviewed completion reward revision.')
     parser.add_argument('--command-mode', choices=('terrain', 'rc'), default='terrain',

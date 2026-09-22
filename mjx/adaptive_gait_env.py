@@ -14,6 +14,7 @@ import adaptive_gait_controller as adaptive
 import firmware_mjx_controller as fw
 import wave_gait_scheduler as scheduler
 import hybrid_gait_supervisor as supervisor
+import adaptive_foot_retry as foot_retry
 from foothold_feasibility import phase_feasibility, support_margin
 from adaptive_gait_perception import AngularLidar, SENSOR_PERIOD, MAX_AGE, initial_map, sample
 from adaptive_grid import GRID_SIZE, local_grid
@@ -160,6 +161,13 @@ class AdaptiveGaitEnv(HexapodRoughTerrainEnv):
         info['foothold_plan'] = self._landing_plan(data, info, jp.zeros(adaptive.ACTION_SIZE))
         return info
 
+    def _foot_contacts(self, data):
+        # A stair riser is a collision, not load-bearing touchdown.
+        c = data._impl.contact
+        support, _ = foot_retry.contact_kinds(c.geom, c.dist, c.frame,
+                                             self._foot_geom_ids, self._geom_body_ids)
+        return support
+
     def _query(self, grid, xy, now, *, privileged=False):
         height, known, age, spread = sample(grid, xy, now)
 
@@ -253,32 +261,55 @@ class AdaptiveGaitEnv(HexapodRoughTerrainEnv):
         bank = jax.vmap(lambda scale, period: self._candidates(data, info, scale, period))(supervisor.STRIDE_SCALES, periods)
         checks = jax.vmap(lambda plan, period, stride: self._phase_check(plan, data, info, feet,
             scheduler.TRIPOD, phase, period, stride))(bank, periods, supervisor.STRIDE_SCALES)
-        normal_plan = jax.tree_util.tree_map(lambda value: value[1], bank)
-        # Second Tripod preview uses the first accepted group's projected contacts.
-        first_ids = checks['indices'][1]
-        first_targets = normal_plan['world'][jp.arange(6), first_ids]
-        first_feet = jp.where(scheduler.swing_mask(scheduler.TRIPOD, phase)[:, None],
-                             first_targets.at[:, 2].add(FOOT_RADIUS), feet)
-        forward = data.xmat[self._root_id] @ MODEL_FORWARD
-        shift = forward*info['command'][0]*scheduler.TRIPOD_PHASE_S
-        future_data = data.replace(qpos=data.qpos.at[:3].add(shift),
-            site_xpos=data.site_xpos.at[self._foot_site_ids].set(first_feet),
-            subtree_com=data.subtree_com.at[self._root_id].add(shift))
-        model_feet = (first_feet-future_data.qpos[:3]) @ data.xmat[self._root_id]
-        body_feet = jp.stack((-model_feet[:, 1], model_feet[:, 0], model_feet[:, 2]), axis=-1)
-        preview_memory = (body_feet @ fw._rotation_matrix(cs.posture_command).T).at[:, 2].add(cs.height_applied)
-        future_info = dict(info, controller_state=cs._replace(foot_memory=preview_memory),
-                           confirmed_contacts=jp.ones(6, dtype=jp.bool_))
-        next_plan = self._candidates(future_data, future_info)
-        next_check = self._phase_check(next_plan, future_data, future_info, first_feet,
-                                       scheduler.TRIPOD, phase+1, scheduler.TRIPOD_PHASE_S, 1.)
-        wave_phase = jp.where(cs.scheduler.mode == scheduler.WAVE, cs.scheduler.phase, 0)
-        wave_periods = jax.vmap(lambda scale: supervisor.phase_duration(scale, scheduler.WAVE))(supervisor.STRIDE_SCALES)
+        # Preview the next group for EACH stride, rather than only checking the
+        # normal stride while deciding whether to return from Wave.
+        def next_phase(plan, check, duration, scale):
+            targets = plan['world'][jp.arange(6), check['indices']]
+            projected = jp.where(check['swing_mask'][:, None],
+                                 targets.at[:, 2].add(FOOT_RADIUS), feet)
+            forward = data.xmat[self._root_id] @ MODEL_FORWARD
+            shift = forward*info['command'][0]*scheduler.TRIPOD_PHASE_S*scale
+            future_data = data.replace(qpos=data.qpos.at[:3].add(shift),
+                site_xpos=data.site_xpos.at[self._foot_site_ids].set(projected),
+                subtree_com=data.subtree_com.at[self._root_id].add(shift))
+            model = (projected-future_data.qpos[:3]) @ data.xmat[self._root_id]
+            body = jp.stack((-model[:, 1], model[:, 0], model[:, 2]), axis=-1)
+            memory = (body @ fw._rotation_matrix(cs.posture_command).T).at[:, 2].add(cs.height_applied)
+            future_info = dict(info, controller_state=cs._replace(foot_memory=memory),
+                               confirmed_contacts=jp.ones(6, dtype=jp.bool_))
+            candidate = self._candidates(future_data, future_info, scale, duration)
+            return self._phase_check(candidate, future_data, future_info, projected,
+                                     scheduler.TRIPOD, phase+1, duration, scale)
+        future_checks = jax.vmap(next_phase)(bank, checks, periods, supervisor.STRIDE_SCALES)
+        next_check = jax.tree_util.tree_map(lambda x: x[1], future_checks)
+        # Missing lookahead evidence alone does not declare Tripod unsafe.
+        lookahead_blocked = checks['feasible'] & future_checks['known_infeasible']
+        checks['feasible'] &= ~lookahead_blocked
+        checks['known_infeasible'] |= lookahead_blocked
+        wave_scales = jp.concatenate((supervisor.STRIDE_SCALES, jp.zeros(1)))
+        wave_periods = jax.vmap(lambda scale: supervisor.phase_duration(scale, scheduler.WAVE))(wave_scales)
         wave_bank = jax.vmap(lambda scale, duration: self._candidates(data, info, scale, duration,
-            mode=scheduler.WAVE))(supervisor.STRIDE_SCALES, wave_periods)
-        wave_checks = jax.vmap(lambda p, duration, scale: self._phase_check(p, data, info, feet,
-            scheduler.WAVE, wave_phase, duration, scale))(wave_bank, wave_periods, supervisor.STRIDE_SCALES)
-        wave_index, wave_available = supervisor.stride_choice(wave_checks['feasible'], requested_stride)
+            mode=scheduler.WAVE))(wave_scales, wave_periods)
+        # Geometry is generated once per stride, shared by six next-leg checks.
+        all_wave_checks = jax.vmap(lambda candidate_phase: jax.vmap(
+            lambda p, duration, scale: self._phase_check(p, data, info, feet,
+                scheduler.WAVE, candidate_phase, duration, scale))(
+                    wave_bank, wave_periods, wave_scales))(jp.arange(6))
+        # Stationary foot reposition is a fallback, not a reward-free way to
+        # avoid a feasible forward Wave step.
+        moving_wave_available = jp.any(all_wave_checks['feasible'][:, :-1])
+        all_wave_checks['feasible'] = all_wave_checks['feasible'].at[:, -1].set(
+            all_wave_checks['feasible'][:, -1] & ~moving_wave_available)
+        phase_indices, phase_available = jax.vmap(
+            lambda feasible: supervisor.stride_choice(feasible, requested_stride, wave_scales))(
+                all_wave_checks['feasible'])
+        margins = all_wave_checks['support_margin'][jp.arange(6), phase_indices]
+        # Safety is a hard gate; age prevents repeatedly choosing an easy leg.
+        ages = cs.scheduler.leg_age[scheduler.WAVE_ORDER]
+        score = jp.minimum(ages, 12)*.01 + jp.clip(margins, 0., .05)
+        wave_phase = jp.argmax(jp.where(phase_available, score, -jp.inf))
+        wave_checks = jax.tree_util.tree_map(lambda x: x[wave_phase], all_wave_checks)
+        wave_index, wave_available = supervisor.stride_choice(wave_checks['feasible'], requested_stride, wave_scales)
         wave_plan = jax.tree_util.tree_map(lambda value: value[wave_index], wave_bank)
         wave_check = jax.tree_util.tree_map(lambda value: value[wave_index], wave_checks)
         wave_check['feasible'] &= wave_available
@@ -288,10 +319,11 @@ class AdaptiveGaitEnv(HexapodRoughTerrainEnv):
             current_mode=cs.scheduler.mode, requested_scale=requested_stride, dt=self.dt, fixed_mode=self.gait_mode)
         decision = next_supervisor.decision
         if self.perception == 'blind':
+            wave_phase = jp.where(cs.scheduler.mode == scheduler.WAVE, cs.scheduler.phase, 0)
             decision = jp.asarray(supervisor.WAVE_MODE if self.gait_mode == 'wave' else supervisor.NORMAL)
             bank_index = jp.asarray(1)
         mode = jp.where(decision == supervisor.WAVE_MODE, scheduler.WAVE, scheduler.TRIPOD)
-        stride = jp.where(mode == scheduler.WAVE, supervisor.STRIDE_SCALES[wave_index], supervisor.STRIDE_SCALES[bank_index])
+        stride = jp.where(mode == scheduler.WAVE, wave_scales[wave_index], supervisor.STRIDE_SCALES[bank_index])
         period = supervisor.phase_duration(stride, mode)
         tripod_plan = jax.tree_util.tree_map(lambda value: value[bank_index], bank)
         reference_plan = jax.tree_util.tree_map(lambda t, w: jp.where(mode == scheduler.WAVE, w, t), tripod_plan, wave_plan)
@@ -431,7 +463,8 @@ class AdaptiveGaitEnv(HexapodRoughTerrainEnv):
                     projection=projection, accepted_action=accepted, posture=posture, stride=stride, period=period,
                     reference_safe=reference_plan['safe'], reference_status=reference_plan['status'],
                     decision=decision, mode=mode, permit=decision != supervisor.HOLD,
-                    bootstrap_classical=bootstrap,
+                    bootstrap_classical=bootstrap, wave_phase=wave_phase,
+                    wave_leg_feasible=phase_available, lookahead_blocked=lookahead_blocked,
                     speed_scale=stride*jp.where(mode == scheduler.WAVE, scheduler.WAVE_PHASE_S*scheduler.WAVE_SPEED_SCALE,
                                                scheduler.TRIPOD_PHASE_S)/period,
                     max_feasible_stride=max_stride, tripod_feasible=checks['feasible'],
@@ -446,16 +479,18 @@ class AdaptiveGaitEnv(HexapodRoughTerrainEnv):
         info['foothold_plan'] = plan
         info['supervisor'] = supervisor.SupervisorState(plan['return_time'], plan['wave_time'], plan['decision'])
         info['projection_m'] = jp.mean(plan['projection'])
-        return info['controller_state']._replace(request=plan['accepted_action'],
+        prepared = info['controller_state']._replace(request=plan['accepted_action'],
             proposal_end=plan['selected_pre'], proposal_world=plan['selected_world'],
             proposal_known=plan['selected_known'], proposal_safe=plan['proposal_safe'],
             proposal_clearance=plan['selected_clearance'], proposal_posture=plan['posture'],
             proposal_stride=plan['stride'], proposal_period=plan['period'], proposal_index=plan['selected_index'],
             proposal_mode=plan['mode'], proposal_permit=plan['permit'],
+            proposal_wave_phase=plan['wave_phase'],
             proposal_epoch=info['controller_state'].scheduler.epoch,
             proposal_apex_phase=plan['selected_apex_phase'], proposal_transfer=plan['selected_transfer'],
             proposal_speed_scale=plan['speed_scale'], raw_contacts=info['contact_state'], confirmed_contacts=info['confirmed_contacts'],
             root_rotation=data.xmat[self._root_id], root_position=data.qpos[:3])
+        return prepared._replace(foot_retry=foot_retry.prepare(self, data, info, prepared))
 
     def _controller_step(self, controller_state, **kwargs):
         return adaptive.step(controller_state, **kwargs)
@@ -541,6 +576,8 @@ class AdaptiveGaitEnv(HexapodRoughTerrainEnv):
         state.metrics.update({name: jp.asarray(0.) for name in (
             'map_known_fraction', 'map_mae_m', 'map_compared_count', 'lidar_returns',
             'plan_rejected', 'projection_m', 'touchdown_error_m', 'foot_slip',
+            'foot_retry/active_s', 'foot_retry/rejected',
+            'recenter/active_s', 'lookahead/blocked_strides', 'wave/available_legs',
             'path/proposal_repair_fraction', 'path/proposal_height_correction_m',
             'path/proposal_min_margin_m', 'path/proposal_observed_fraction',
             'efficiency_joint_speed', 'efficiency_vertical_speed', 'efficiency_foot_travel', 'efficiency_excess_clearance',
@@ -595,6 +632,11 @@ class AdaptiveGaitEnv(HexapodRoughTerrainEnv):
             result.info['lidar_map'], result.info['rng'] = grid, key
         cs = result.info['controller_state']
         result.metrics.update({
+            'foot_retry/active_s': cs.foot_retry.active.astype(jp.float32)*self.dt,
+            'foot_retry/rejected': cs.foot_retry.rejected.astype(jp.float32),
+            'recenter/active_s': cs.recenter_active.astype(jp.float32)*self.dt,
+            'lookahead/blocked_strides': jp.sum(result.info['foothold_plan']['lookahead_blocked']).astype(jp.float32),
+            'wave/available_legs': jp.sum(result.info['foothold_plan']['wave_leg_feasible']).astype(jp.float32),
             'recontact/active_s': cs.scheduler.recontact_active.astype(jp.float32)*self.dt,
             'recontact/exhausted': cs.scheduler.recontact_exhausted.astype(jp.float32),
             'recontact/ik_blocked': cs.scheduler.recontact_ik_blocked.astype(jp.float32),

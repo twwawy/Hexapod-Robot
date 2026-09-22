@@ -28,15 +28,15 @@ def phase_duration(scale, mode):
                     jp.clip(TRIPOD_PHASE_S*scale, *TRIPOD_PHASE_LIMITS))
 
 
-def stride_choice(feasible, requested_scale):
+def stride_choice(feasible, requested_scale, scales=STRIDE_SCALES):
     """Prefer a safe scale at/below request, otherwise nearest safe scale.
 
     A preference must not turn an existing safe plan into HOLD.
     Oversize Tripod constraints are applied by the caller.
     """
-    below = feasible & (STRIDE_SCALES <= requested_scale+1e-6)
+    below = feasible & (scales <= requested_scale+1e-6)
     preferred = jp.argmax(below.astype(jp.int32))
-    nearest = jp.argmin(jp.where(feasible, jp.abs(STRIDE_SCALES-requested_scale), jp.inf))
+    nearest = jp.argmin(jp.where(feasible, jp.abs(scales-requested_scale), jp.inf))
     return jp.where(jp.any(below), preferred, nearest), jp.any(feasible)
 
 

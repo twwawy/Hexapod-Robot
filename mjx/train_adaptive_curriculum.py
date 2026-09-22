@@ -94,7 +94,7 @@ def main() -> None:
     parser.add_argument('--migrate-completion-reward', action='store_true',
                         help='Transfer reviewed grid v5 checkpoint to completion reward on first cycle only.')
     parser.add_argument('--stair-clearance-extra', type=float, default=0.)
-    parser.add_argument('--migrate-path-v6', action='store_true', help='Reviewed v5->v6 migration on the first cycle only.')
+    parser.add_argument('--migrate-path-v6', action='store_true', help='Reviewed v5 or 585bee2/53bab78 v6 warm start on the first cycle only.')
     parser.add_argument('--migrate-recontact', action='store_true',
                         help='Transfer reviewed completion-reward weights to boundary recontact controller.')
 

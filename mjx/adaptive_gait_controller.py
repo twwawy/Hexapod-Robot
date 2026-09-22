@@ -9,6 +9,8 @@ import jax
 import jax.numpy as jp
 import firmware_mjx_controller as fw
 import wave_gait_scheduler as scheduler
+import adaptive_stance_recovery as stance_recovery
+import adaptive_foot_retry as foot_retry
 
 from adaptive_contract import ACTION_SIZE, ACTION_CONTRACT, XY_LIMIT_M, BODY_HEIGHT_LIMIT_M
 from adaptive_contract import MAX_LINEAR_SPEED_MPS, MAX_YAW_RATE_RADPS
@@ -24,6 +26,9 @@ AdaptiveState = namedtuple('AdaptiveState', fw.FirmwareState._fields + (
     'scheduler', 'proposal_mode', 'proposal_permit', 'proposal_epoch',
     'proposal_apex_phase', 'proposal_transfer', 'apex_phase', 'transfer',
     'proposal_speed_scale', 'speed_scale', 'raw_contacts', 'confirmed_contacts',
+    'proposal_wave_phase',
+    'recenter_active', 'recenter_epoch', 'recenter_start', 'recenter_target', 'recenter_time',
+    'foot_retry',
 ))
 
 
@@ -38,7 +43,8 @@ def initial_state():
                          jp.full(6, -1, dtype=jp.int32), jp.full(6, -1, dtype=jp.int32),
                          scheduler.initial_scheduler(), jp.asarray(0), jp.asarray(False), jp.asarray(-1),
                          jp.full(6, .5), jp.full(6, .5), jp.full(6, .5), jp.full(6, .5),
-                         jp.asarray(1.), jp.asarray(1.), jp.zeros(6, dtype=jp.bool_), jp.zeros(6, dtype=jp.bool_))
+                         jp.asarray(1.), jp.asarray(1.), jp.zeros(6, dtype=jp.bool_), jp.zeros(6, dtype=jp.bool_), jp.asarray(-1),
+                         jp.asarray(False), jp.asarray(-1), fw.BASE_FEET, fw.BASE_FEET, jp.asarray(0.), foot_retry.initial_state())
 
 
 def decode(action):
@@ -127,7 +133,8 @@ def _update_gait(state, tripod_enable, contacts):
         requested_mode=state.proposal_mode, permit=state.proposal_permit,
         proposal_epoch=state.proposal_epoch, command_active=tripod_enable,
         contacts=state.confirmed_contacts, raw_contacts=state.raw_contacts,
-        duration=state.phase_duration, dt=FIRMWARE_CONTROL_DT)
+        duration=state.phase_duration, dt=FIRMWARE_CONTROL_DT,
+        proposed_wave_phase=state.proposal_wave_phase)
     return dict(scheduler=sched, phase_index=sched.phase, phase_time=sched.elapsed,
                 airborne_seen=sched.airborne, landed=sched.landed,
                 gait_initialized=sched.running, gait_running=sched.running,
@@ -189,8 +196,32 @@ def step(
 ) -> tuple[AdaptiveState, FirmwareOutput]:
     """Advance one firmware tick using the environment's prepared parameters."""
     command_requested = (jp.abs(target_velocity[0]) >= .001) | (jp.abs(target_velocity[1]) >= .001)
+    # A recovery is a latched, bounded all-contact operation, never a new swing.
+    recenter_allowed = (command_requested & ~state.scheduler.running &
+        jp.all(state.confirmed_contacts) & ~state.scheduler.fault &
+        ~state.scheduler.recontact_active & (state.scheduler.epoch > 0))
+    recenter_starting = (recenter_allowed & ~state.proposal_permit &
+        ~state.recenter_active & (state.recenter_epoch != state.scheduler.epoch))
+    def propose(_):
+        return stance_recovery.plan(state.foot_memory, state.height_applied, state.posture_command)
+    target, possible, _ = jax.lax.cond(recenter_starting, propose,
+        lambda _: (state.foot_memory, jp.asarray(False), jp.asarray(0.)), operand=None)
+    recenter_launch = recenter_starting & possible
+    recenter_active = (state.recenter_active | recenter_launch) & recenter_allowed
+    recenter_start = jp.where(recenter_launch, state.foot_memory, state.recenter_start)
+    recenter_target = jp.where(recenter_launch, target, state.recenter_target)
+    recenter_time = jp.where(recenter_launch, 0., state.recenter_time)
+    # Suppress new phase launch while recovering, including the final recovery tick.
+    state = state._replace(proposal_permit=state.proposal_permit & ~recenter_active)
     recovery_hold = state.scheduler.recontact_active | state.scheduler.recontact_exhausted | state.scheduler.recontact_ik_blocked
     recovery_hold |= (command_requested & ~state.scheduler.running & (state.scheduler.epoch > 0) & ~jp.all(state.confirmed_contacts))
+    retry = state.foot_retry
+    retry_active = retry.active | retry.requested
+    retry_elapsed = jp.where(retry.requested, 0., retry.elapsed)
+    retry_support = jp.all((jp.arange(6) == retry.leg) | state.confirmed_contacts)
+    retry_abort = retry_active & (~retry_support | ~command_requested | state.scheduler.fault)
+    retry_active &= ~retry_abort
+    recovery_hold |= recenter_active | retry_active
     # Ratio coupling: shortening stride and duration together makes shorter,
     # faster steps without simply changing nominal mean speed.
     target_velocity = target_velocity * state.speed_scale
@@ -268,6 +299,17 @@ def step(
     # must not become a false stop after the supervisor reduces speed.
     tripod_enable = command_requested
     gait_updates, gait = _update_gait(state, tripod_enable, contacts)
+    # Retrying one foot freezes the current gait and its other five feet.
+    # Contact loss aborts into the existing latched fault rather than changing legs.
+    retry_tick = retry_active
+    gait_updates = {key: jax.tree_util.tree_map(lambda old, new: jp.where(retry_tick | retry_abort, old, new),
+                    getattr(state, key), value) for key, value in gait_updates.items()}
+    gait['entering'] &= ~(retry_tick | retry_abort)
+    retry_states = jp.where(jp.arange(6) == retry.leg, scheduler.SWING, scheduler.HOLD)
+    gait['state'] = jp.where(retry_tick, retry_states, gait['state'])
+    gait['state'] = jp.where(retry_abort, scheduler.HOLD, gait['state'])
+    gait['frozen'] |= retry_tick | retry_abort
+    gait['recontact_active'] &= ~(retry_tick | retry_abort)
     entering = gait['entering']
     # Check the requested stance/swing geometry with the active posture before
     # starting a tripod. A known bad target is never relabeled as blind terrain.
@@ -292,6 +334,8 @@ def step(
     boundary = jp.any(entering) & ~blocked
     phase_duration = jp.where(boundary, state.proposal_period, state.phase_duration)
     stride_scale = jp.where(boundary, state.proposal_stride, state.stride_scale)
+    # A zero-stride Wave plan repositions one foot without stance body travel.
+    gait_applied = jp.where(stride_scale <= 0., jp.zeros(4), gait_applied)
     posture_target = jp.where(boundary, state.proposal_posture, state.posture_target)
     accepted_action = state.accepted_action.at[:12].set(jp.where(
         (entering & ~blocked)[:, None], state.request[:12].reshape(6, 2),
@@ -310,6 +354,35 @@ def step(
     foot_updates = {key: jp.where(blocked, getattr(state, key), value)
                     for key, value in foot_updates.items()}
     nominal_feet = jp.where(blocked, state.foot_memory, nominal_feet)
+    retry_elapsed = jp.where(retry_tick, retry_elapsed+FIRMWARE_CONTROL_DT, retry_elapsed)
+    retry_point = foot_retry.trajectory(jp.clip(retry_elapsed/foot_retry.DURATION, 0., 1.), retry.waypoints)
+    retry_feet = state.foot_memory.at[retry.leg].set(retry_point)
+    retry_body = _rotate_inverse(_apply_height_offset(retry_feet, state.height_applied), state.posture_command)
+    _, retry_valid = _solve_ik(retry_body)
+    _, retry_limited = _limit_foot_reach(retry_body)
+    retry_path_ok = jp.all(retry_valid & ~retry_limited)
+    retry_abort |= retry_tick & ~retry_path_ok
+    nominal_feet = jp.where(retry_tick & retry_path_ok, retry_feet, nominal_feet)
+    foot_updates['foot_memory'] = nominal_feet
+    retry_done = retry_tick & (retry_elapsed >= foot_retry.DURATION) & ~retry_abort
+    retry_sched = gait_updates['scheduler']
+    gait_updates['scheduler'] = retry_sched._replace(
+        elapsed=jp.where(retry_done, state.phase_duration, retry_sched.elapsed),
+        airborne=retry_sched.airborne.at[retry.leg].set(jp.where(retry_done, True, retry_sched.airborne[retry.leg])),
+        landed=retry_sched.landed.at[retry.leg].set(jp.where(retry_done, False, retry_sched.landed[retry.leg])),
+        fault=retry_sched.fault | (retry_abort & command_requested))
+    retry = retry._replace(active=retry_tick & ~retry_done & ~retry_abort,
+                           requested=jp.asarray(False), elapsed=retry_elapsed)
+    recenter_time = jp.where(recenter_active, recenter_time+FIRMWARE_CONTROL_DT, recenter_time)
+    progress = fw._quintic(jp.clip(recenter_time/stance_recovery.DURATION_S, 0., 1.))
+    recentered = recenter_start + progress*(recenter_target-recenter_start)
+    recenter_body = _rotate_inverse(_apply_height_offset(recentered, state.height_applied), state.posture_command)
+    _, recenter_ik = _solve_ik(recenter_body)
+    _, recenter_limited = _limit_foot_reach(recenter_body)
+    recenter_valid = jp.all(recenter_ik & ~recenter_limited)
+    nominal_feet = jp.where(recenter_active & recenter_valid, recentered, nominal_feet)
+    foot_updates['foot_memory'] = nominal_feet
+    recenter_active &= recenter_valid & (recenter_time < stance_recovery.DURATION_S)
     # Workspace-check the actual vertical recovery target before committing
     # foot memory. A blocked target must not accumulate fictional search travel.
     shifted_recovery = _apply_height_offset(nominal_feet, state.height_applied)
@@ -385,6 +458,10 @@ def step(
     )
 
     next_state = state._replace(
+        foot_retry=retry,
+        recenter_active=recenter_active,
+        recenter_epoch=jp.where(recenter_starting, state.scheduler.epoch, state.recenter_epoch),
+        recenter_start=recenter_start, recenter_target=recenter_target, recenter_time=recenter_time,
         phase_duration=phase_duration, stride_scale=stride_scale,
         speed_scale=jp.where(boundary, state.proposal_speed_scale, state.speed_scale),
         goal_world=goal_world,
