@@ -93,10 +93,12 @@ macOS GUI viewer는 MuJoCo의 `mjpython` 실행 환경이 필요할 수 있다.
 ./hexapod history stair-v5 ../hexapod-stair-v5
 ./hexapod bundle /원하는/경로/hexapod-source.bundle
 git clone /원하는/경로/hexapod-source.bundle hexapod-restored
+git -C hexapod-restored switch -c RL/restored
 ```
 
 Bundle은 현재 HEAD에서 도달하는 **모든 소스 이력**을 포함한다. 원격 branch가 없어져도 원본 SHA를 복원할 수 있다.
 로컬 학습 결과·외부 checkpoint·가상환경·커밋하지 않은 파일은 포함하지 않는다.
+Bundle의 단일 ref는 `HEAD`이므로 clone 직후에는 detached HEAD이며, 위 명령으로 작업 branch를 만든다.
 미커밋 파일이 있거나 출력 파일이 이미 존재하면 생성하지 않는다.
 과거 빌드 바이너리도 Git 이력에 남아 있어 전체 bundle/clone 용량 자체는 줄지 않는다.
 

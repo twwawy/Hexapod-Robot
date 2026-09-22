@@ -15,6 +15,8 @@ ARM compiler는 STM32CubeIDE의 GNU Tools for STM32 14.3이다.
 | STM32 native 알고리즘 그룹 | 8/11 통과, 아래 기존 실패 3개 |
 | ARM Cortex-M4 전체 compile/link | 통과, `Hexapod.elf` 생성 (flash 안 함) |
 | 최신 main과 HW·STM32 Core/Drivers/.ioc 비교 | 동일 |
+| Jetson synthetic flat → zero-action geometry → wire | 통과, `execute=true`, Tripod, stride 1.0, 128-byte 파일 |
+| 실제 전체 저장소 bundle → 별도 bare clone | 통과, 원본 tip 5개 모두 도달 가능, 현재 tree 동일 |
 
 `./hexapod check --rl`은 모든 검사 그룹을 실행한 뒤 STM32 native 실패 때문에 **exit 1**을 반환한다.
 실패를 skip하거나 성공으로 처리하지 않는다. 따라서 이 브랜치를 “모든 검사 통과”나
@@ -55,3 +57,7 @@ RC command 4, path bottleneck 4, migration layout 2개다.
 전체 PPO 학습, GUI viewer, 실제 학습 checkpoint restore, Isaac Lab 실행,
 실기 SPI/DMA/DRDY·모터·LiDAR/odom·계단 완주는 실행하지 않았다.
 수치 계약/빌드 성공을 실제 보행 성능으로 대신하지 않는다.
+
+실제 bundle 복원 검증 기준은 `0634b7950727a3ff4953a15c4fd86902a6c27130`이며,
+복원 tree는 `b31961fd8e08099c45aec6ca6ce2aaa78b3325b5`로 동일했다.
+그 이후의 검증 기록 추가는 문서 변경이다. 오프라인 fixture는 실제 센서나 모터를 사용하지 않는다.
