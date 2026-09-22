@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# One entry point; no environment installation, training or hardware IO by default.
+set -euo pipefail
+repo="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -n "${HEXAPOD_PYTHON:-}" ]]; then
+    python_bin="$HEXAPOD_PYTHON"
+elif [[ -x "$repo/.venv/bin/python" ]]; then
+    python_bin="$repo/.venv/bin/python"
+elif [[ -n "${VIRTUAL_ENV:-}" && -x "$VIRTUAL_ENV/bin/python" ]]; then
+    python_bin="$VIRTUAL_ENV/bin/python"
+elif [[ -x "$HOME/.venvs/hexapod-mjx/bin/python" ]]; then
+    python_bin="$HOME/.venvs/hexapod-mjx/bin/python"
+else
+    python_bin=python3
+fi
+exec "$python_bin" "$repo/scripts/hexapod_cli.py" "$@"

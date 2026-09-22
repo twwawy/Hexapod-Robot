@@ -1,3 +1,0 @@
-../Core/Src/sensor/foot_pressure.c:6:6:FootPressure_Init	24	static
-../Core/Src/sensor/foot_pressure.c:30:6:FootPressure_SetCalibration	24	static
-../Core/Src/sensor/foot_pressure.c:61:6:FootPressure_Update	40	static

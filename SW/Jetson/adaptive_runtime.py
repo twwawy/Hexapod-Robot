@@ -41,6 +41,10 @@ class HardwareGeometry:
     dt = .02
     # Hardware never authorizes blind bootstrap from simulator assumptions.
     bootstrap_unmapped = False
+    def __init__(self):
+        # Shared path geometry reads this setting in both MJX and offline Jetson.
+        self._config = {'stair_clearance_extra': 0.0}
+
     def _query(self, grid, xy, now, *, privileged=False):
         if privileged:
             raise ValueError('Hardware geometry has no oracle')

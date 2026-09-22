@@ -1,4 +1,0 @@
-../Core/Src/high_control/control_priority.c:9:13:ControlPriority_SticksNeutral	16	static
-../Core/Src/high_control/control_priority.c:19:6:ControlPriority_Init	16	static
-../Core/Src/high_control/control_priority.c:32:6:ControlPriority_DisarmMotion	16	static
-../Core/Src/high_control/control_priority.c:44:23:ControlPriority_Step	56	static

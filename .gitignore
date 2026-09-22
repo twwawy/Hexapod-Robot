@@ -1,3 +1,12 @@
 __pycache__/
 *.py[cod]
 mjx/runs/
+.venv/
+.artifacts/
+.history/
+.build/
+SW/STM32/workspace/.metadata/
+SW/STM32/workspace/Hexapod/Debug/
+SW/STM32/workspace/Hexapod/Release/
+.DS_Store
+.pytest_cache/

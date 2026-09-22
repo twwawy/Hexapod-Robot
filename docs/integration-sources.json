@@ -1,0 +1,43 @@
+{
+  "schema": 1,
+  "repository": "https://github.com/twwawy/Hexapod-Robot",
+  "integration_branch": "RL/unified-latest",
+  "snapshot_date": "2026-09-22",
+  "sources": [
+    {
+      "id": "main",
+      "branch": "main",
+      "sha": "fdd7cfc8b98459905eebb3ee71009f8edd525b1e",
+      "committed_at": "2026-09-14T10:47:53+09:00",
+      "disposition": "Latest hardware, calibrated STM32 and default 64-byte sensor/GPS transport retained."
+    },
+    {
+      "id": "adaptive",
+      "branch": "codex/adaptive-hybrid-rl-integration",
+      "sha": "1893969a5a9fc187b998bf5a7439cb4c793aebf1",
+      "committed_at": "2026-09-09T17:51:53+09:00",
+      "disposition": "Content merge: current MJX foot retry, free-Wave recovery and viewer HUD. Main firmware and photos retained."
+    },
+    {
+      "id": "cartesian",
+      "branch": "codex/cartesian-residual-rl",
+      "sha": "f9d80587ff086a1f3df51b81185e742094c109c9",
+      "committed_at": "2026-09-06T23:16:03+09:00",
+      "disposition": "History merge: evolved root mjx remains active; duplicate SW/mjx, Isaac Lab prototype, tutorials and older assets restored together via history checkout."
+    },
+    {
+      "id": "stair-v5",
+      "branch": "codex/stair5-eval-video-resume",
+      "sha": "8948fc8e4dc70b26157ab2fc6946e4a5e1b00ee7",
+      "committed_at": "2026-09-08T07:21:32+09:00",
+      "disposition": "History merge: exact v5 resume sources preserved; newer v6 training already publishes evaluation videos. Restore pinned v5 tree for strict resume."
+    },
+    {
+      "id": "wave",
+      "branch": "codex/wave-gait-three-zone",
+      "sha": "e035a3daade39f6240f79068b3e3c89f7253b115",
+      "committed_at": "2026-09-06T22:53:59+09:00",
+      "disposition": "Already an ancestor of main; latest firmware changes win."
+    }
+  ]
+}

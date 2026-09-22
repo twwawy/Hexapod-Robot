@@ -1,9 +1,9 @@
-> 통합 v4: 현재 구현·남은 연결 작업은 [통합 문서](../../docs/ADAPTIVE_INTEGRATION_V4.md), wire는 [SPI v3](../../docs/ADAPTIVE_SPI_V3.md)를 참고하세요. 아래 기존 설계 설명과 구분합니다.
+> 현재 실행·검증·호환성은 [RL 통합 사용법](../../docs/UNIFIED_WORKFLOW.md), adaptive wire는 [SPI v3](../../docs/ADAPTIVE_SPI_V3.md)를 참고하세요. STM32 기본값은 64-byte sensor/GPS입니다.
 
 
 # Jetson 소프트웨어
 
-Jetson Orin Nano Super에서 담당할 상위 인지·자율주행 소프트웨어의 범위를 정리한다. 현재 이 폴더에는 실행 코드가 없지만 STM32 센서 패킷 규격과 Slave DMA 전송 경로는 구현되어 있다.
+Jetson Orin Nano Super에서 담당할 상위 인지·자율주행 소프트웨어의 범위를 정리한다. 현재 이 폴더에는 adaptive 실행 계획·SPI codec·오프라인 geometry/runtime 코드가 있다. 실제 LiDAR/odom 입력, 정책 상태 추정과 Jetson 장치 IO를 연결한 배포 앱은 아직 완성되지 않았다. STM32 센서 패킷 규격과 Slave DMA 전송 경로는 구현되어 있다.
 
 ## 예정 역할
 

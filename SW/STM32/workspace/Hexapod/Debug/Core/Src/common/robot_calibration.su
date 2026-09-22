@@ -1,3 +1,0 @@
-../Core/Src/common/robot_calibration.c:125:13:RobotCalibration_IsSignValid	16	static
-../Core/Src/common/robot_calibration.c:131:6:RobotCalibration_IsComplete	80	static
-../Core/Src/common/robot_calibration.c:231:6:RobotCalibration_Apply	40	static

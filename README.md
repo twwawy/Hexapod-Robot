@@ -16,61 +16,44 @@
 
 </div>
 
-## 통합 v4: 시작과 문서
+## RL 통합: 한 명령으로 시작하기
 
-**조종기 전제 학습 추가: [RC 명령 추종 학습](docs/ADAPTIVE_RC_TRAINING.md)**.
-`--profile rc`는 전진·후진·yaw·정지 전환을 학습하며 command 성공과 계단 완주를 구분한다.
-현재 RC curriculum은 평지 Tripod/Wave/Hybrid이다. 지형 등판과 혼합한 실기 조종 성능은 미검증이다.
-RC 첫 학습은 기존 계단 checkpoint의 `--restore` 없이 시작한다. curriculum shell 명령은
-commit별 독립 worktree에서 실행하여 개발 중 코드 변경이 다음 retry에 섞이지 않게 한다.
-
-**최신: [phase 경계 재접촉 복구·70% 통과까지 재시도](docs/ADAPTIVE_RECONTACT.md)**.
-MJX에서 대기 중 접촉이 끊긴 발만 제한적으로 내려 복구한다. GT 높이 계산/잔차 범위는
-유지한다. curriculum 기본값은 완주율 70%를 통과해야 다음 지형으로 진행하며 무제한 재시도를 지원한다.
-
-**현재 추천 학습: [GT teacher curriculum](docs/ADAPTIVE_GT_TEACHER.md)**.
-정확한 지형으로 먼저 학습하고 cycle마다 zero-action/best-policy를 같은 seed로 비교한다.
-기존 cycle별 W&B best score/영상은 유지한다. 실행은 사용자에게 맡긴다.
-경사면 기존 checkpoint에서 [완주 보상으로 재개](docs/ADAPTIVE_COMPLETION_REWARD.md)할 수 있다.
-잔차 범위 유지, 완주율 우선 best 선택, 최대 40초 영상과 마지막 5초 진단,
-재시도·승급 정책은 위 최신 재접촉 문서의 70% 통과 기준을 따른다.
-
-**최신 변경: elevation grid CNN 관측 v5** — 24-D 물리 action/SPI는 v4를 유지하지만,
-정책은 24×24×6 로컬 지도를 CNN으로 읽는다. 지도 극값 누적·보폭 선호 때문에 발생하는
-HOLD를 수정하고 보행 전환 지속 확인과 W&B 정지 시간 지표를 추가했다.
-**기존 checkpoint와 입력/network가 달라 새 학습이 필요하다. 이번 변경의 학습·시뮬레이션은
-실행하지 않았다.** [변경 범위·새 학습 명령·확인 항목](docs/ADAPTIVE_ELEVATION_GRID_V5.md)
-
-현재 작업 브랜치 `codex/adaptive-hybrid-rl-integration`은 최신 main에서 시작해 adaptive MJX를
-선택적으로 가져왔다. Full merge는 하지 않았다. **코드 통합과 portable 계약 검사까지 진행했으며,
-계단 등판·PPO·STM32 보드 동작은 아직 검증하지 않았다.**
-
-| 카테고리 | 문서 / 실행 경로 |
-|---|---|
-| 통합 architecture·24-D/관측·변경 내용·남은 위험 | [v4 통합 설명](docs/ADAPTIVE_INTEGRATION_V4.md) |
-| 브랜치 분석·파일 출처 | [사전 분석](docs/ADAPTIVE_INTEGRATION_ANALYSIS.md), [전체 변경 파일](docs/ADAPTIVE_INTEGRATION_FILES.md) |
-| Stage0 viewer·표시·조작 | [viewer 사용법](docs/HEXAPOD_MJX_ADAPTIVE_GAIT_USAGE.md) |
-| 학습 단계 | [학습 계획](docs/HEXAPOD_MJX_ADAPTIVE_GAIT_LEARNING_PLAN.md) |
-| 짧은 평지 cycle 반복·cycle별 W&B score/영상 | [실행 명령 및 저장 규칙](docs/ADAPTIVE_OBSERVE_CYCLES.md) |
-| Rough hfield 오류 수정·평지 가중치에서 재개 | [adaptive box 지형과 명시적 이전](docs/ADAPTIVE_ROUGH_BOXES.md) |
-| 수 회 Tripod 후 정지·영상 종료 수정 | [원인·수정·사용자 검증 명령](docs/TRIPOD_STOP_FIX.md) |
-| Jetson ↔ STM32 wire | [SPI v3](docs/ADAPTIVE_SPI_V3.md) |
-| STM32 실제 contact/Wave 기준 | [Wave gait](SW/STM32/WAVE_GAIT.md) |
-| 기존 18-D replay | `scripts/view_trained_policy.sh`, 기존 `mjx/firmware_mjx_controller.py` |
+현재 통합 브랜치는 **`RL/unified-latest`**입니다. 최신 main의 STM32·캘리브레이션과
+adaptive 브랜치의 최신 발 걸림 복구·free-Wave·viewer HUD를 합쳤습니다.
+기존 5개 브랜치의 발전 이력은 모두 보존하며, 이전 RL/Isaac Lab/v5 학습은 고정된 원본으로 복원할 수 있습니다.
 
 ```bash
-cd /home/huro/Hexapod-Robot-integration
-source /home/huro/.venvs/hexapod-mjx/bin/activate
-bash scripts/view_foothold_planner.sh --controller adaptive --terrain flat --perception oracle
-bash scripts/view_foothold_planner.sh --controller adaptive --terrain steps --perception oracle
-bash scripts/view_foothold_planner.sh --controller adaptive --terrain steps --perception lidar --stage0 --speed 0.04
+git clone --branch RL/unified-latest --single-branch https://github.com/twwawy/Hexapod-Robot.git
+cd Hexapod-Robot
+./hexapod                 # 모든 명령
+./hexapod check           # 소스·이력·STM32 native 검사
+./hexapod train --help    # 최신 hybrid 지형 curriculum 옵션
+./hexapod bundle          # 최신 소스와 전체 이력을 한 파일로 수집
 ```
 
-먼저 flat의 zero-action Tripod, 계단의 candidate/reference/selected/latched marker,
-short-step·Wave 전환과 unknown HOLD를 확인한다. 이후 학습/오프라인 Jetson/ARM 빌드는
-[순서별 명령](docs/ADAPTIVE_INTEGRATION_V4.md#사용자-실행-순서)을 사용한다.
-방향키 포커스 문제가 있으면 `W/S`로 전후, `A/D`로 회전할 수 있다. 키가 들어오면 콘솔에
-`command: vx=...`가 즉시 출력된다. `--speed 0.04`는 키 입력 없이 시작 명령을 넣는다.
+[환경 설정·전체 명령·checkpoint 호환성](docs/UNIFIED_WORKFLOW.md) ·
+[발전 과정과 브랜치별 통합 판단](docs/DEVELOPMENT_HISTORY.md) ·
+[정확한 원본 SHA](docs/integration-sources.json)
+
+검증: RL 계약 42개·CLI 8개와 ARM 빌드 통과. 원본 main에서도 재현되는 STM32 host 검사
+3개 실패가 남아 있으며 `check`는 이를 실패로 반환합니다. [검증 상세](docs/INTEGRATION_VALIDATION.md).
+
+현재 정책은 **24-D action v4 / elevation-grid path observation v6**입니다.
+기존 checkpoint는 source/shape 검사를 통과해야 하며, 명시적 warm start와 정확한 resume를 구분합니다.
+STM32 기본 통신은 **64-byte sensor/GPS v3**이며 128-byte adaptive v3는 별도 선택이 필요합니다.
+PPO 학습·실기 보행·DMA 운용은 이번 통합 검사의 범위 밖입니다.
+
+| 현재 기능 | 문서 / 명령 |
+|---|---|
+| Hybrid terrain curriculum | `./hexapod train`, [학습/복구](docs/HEXAPOD_FOOT_RETRY.md) |
+| RC 명령 추종 | `./hexapod train-rc`, [RC 학습](docs/ADAPTIVE_RC_TRAINING.md) |
+| Wave 선택·stance 복구 | [Free Wave recovery](docs/HEXAPOD_FREE_WAVE_RECOVERY.md) |
+| Stage0 / HUD viewer | `./hexapod view`, [HUD](docs/ADAPTIVE_VIEWER_HUD.md) |
+| 경로 관측 v6·기존 가중치 이전 | [Path bottleneck](docs/ADAPTIVE_PATH_BOTTLENECK.md) |
+| Jetson ↔ STM32 adaptive wire | [SPI v3](docs/ADAPTIVE_SPI_V3.md) |
+| STM32 실제 contact/Wave 기준 | [Wave gait](SW/STM32/WAVE_GAIT.md) |
+| 기존 18-D replay | `./hexapod replay` |
+| 초기 통합 구조와 당시 기록 | [v4 통합](docs/ADAPTIVE_INTEGRATION_V4.md), [v5 CNN](docs/ADAPTIVE_ELEVATION_GRID_V5.md) |
 
 ## 프로젝트 소개
 
@@ -89,7 +72,7 @@ short-step·Wave 전환과 unknown HOLD를 확인한다. 이후 학습/오프라
 | **접촉 적응** | 6개 FSR 접촉 상태 기반 Early Landing·Late Landing 보정과 작업영역 제한 |
 | **계층형 Physical AI** | Classical Controller의 발끝 목표에 제한된 Cartesian Residual을 더하는 강화학습 구조 |
 | **환경 인식** | Livox MID-360, RealSense D435, IMU를 이용한 3차원 인식·SLAM·경로계획 구조 |
-| **분산 제어** | Jetson 상위 판단과 STM32 실시간 보행 제어 분리, 128바이트 SPI v3 실행/관측 프레임 |
+| **분산 제어** | Jetson 상위 판단과 STM32 실시간 보행 제어 분리, 기본 64-byte sensor/GPS·선택형 128-byte adaptive SPI |
 | **모듈형 임무 확장** | 센서 위치 변경, 열화상·가스 센서, 매니퓰레이터, 구급·적재 모듈 확장 고려 |
 | **원격 운용** | 위치·자세·통신·이동 경로 모니터링과 목적지·모드·비상 정지 명령 구조 |
 
@@ -118,13 +101,13 @@ STM32 NUCLEO-F446RE
 
 ### STM32 ↔ Jetson 통신
 
-통합 브랜치는 **SPI v3, 128 bytes**를 기본으로 사용한다. 최종 AdaptiveExecutionPlan을
-explicit little-endian fixed point로 전달하고 CRC·session·sequence·observation age·plan을 검증한다.
-상태와 계획 상세는 같은 시점의 두 observation page로 제공한다. 기존 v2 codec은 보존하지만
-v2 master와 기본 v3 app은 호환되지 않는다. 실제 DMA/DRDY 운용은 사용자 검증 대상이다.
+현재 STM32 기본값은 **64-byte sensor/GPS SPI v3**다. 128-byte adaptive SPI v3는
+`JetsonSpi_EnableV3`로 명시적으로 선택하며 master와 전송 길이를 맞춰야 한다.
+AdaptiveExecutionPlan은 little-endian fixed point로 전달하고 CRC·session·sequence·age·plan을 검사한다.
+Adaptive 상태와 계획 상세는 두 observation page로 제공한다. 실제 DMA/DRDY 운용은 별도 검증 대상이다.
 
 - [SPI v3 정확한 offset·단위·CRC](docs/ADAPTIVE_SPI_V3.md)
-- [기존 v2 문서](SW/STM32/STM32-Jetson%20SPI%2032바이트%20패킷%20프로토콜.md)
+- [기본 64-byte sensor/GPS 문서](SW/STM32/STM32-Jetson%20SPI%2032바이트%20패킷%20프로토콜.md)
 
 ## 보행 및 지형 적응 제어
 
