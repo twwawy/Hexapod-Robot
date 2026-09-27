@@ -1,0 +1,2643 @@
+<?xml version='1.0' encoding='utf-8'?>
+<robot name="HEXAPEDAL_URDF_v2">
+  <link name="LB_flame4">
+    <visual>
+      <origin xyz="0.1005 0.11 0.0423" rpy="7.035573013e-16 -5.221354642e-16 -0.7853981634" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LB_flame4.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0.1005 0.11 0.0423" rpy="7.035573013e-16 -5.221354642e-16 -0.7853981634" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LB_flame4.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="RB_flame4">
+    <visual>
+      <origin xyz="0.1005 0.11 0.0423" rpy="4.343837099e-17 1.379834661e-16 -2.35619449" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RB_flame4.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0.1005 0.11 0.0423" rpy="4.343837099e-17 1.379834661e-16 -2.35619449" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RB_flame4.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="RM_flame4">
+    <visual>
+      <origin xyz="0.1005 0.11 0.0423" rpy="8.67361738e-17 4.958285288e-17 -3.141592654" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RM_flame4.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0.1005 0.11 0.0423" rpy="8.67361738e-17 4.958285288e-17 -3.141592654" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RM_flame4.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="LM_flame4">
+    <visual>
+      <origin xyz="0.1005 0.11 0.0423" rpy="8.67361738e-17 6.837834349e-17 1.110223025e-15" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LM_flame4.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0.1005 0.11 0.0423" rpy="8.67361738e-17 6.837834349e-17 1.110223025e-15" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LM_flame4.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="RF_flame4">
+    <visual>
+      <origin xyz="0.1005 0.11 0.0423" rpy="1.691052128e-16 1.23166243e-17 2.35619449" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RF_flame4.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0.1005 0.11 0.0423" rpy="1.691052128e-16 1.23166243e-17 2.35619449" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RF_flame4.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="LF_flame4">
+    <visual>
+      <origin xyz="0.1005 0.11 0.0423" rpy="-5.19266894e-16 -5.113174046e-16 0.7853981634" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LF_flame4.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0.1005 0.11 0.0423" rpy="-5.19266894e-16 -5.113174046e-16 0.7853981634" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LF_flame4.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="RM_DS51150_270_1">
+    <visual>
+      <origin xyz="6.872667858e-15 -0.165 0.0223" rpy="7.12189722e-17 -1.098127611e-17 -1.570796327" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RM_DS51150_270_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="6.872667858e-15 -0.165 0.0223" rpy="7.12189722e-17 -1.098127611e-17 -1.570796327" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RM_DS51150_270_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="RB_DS51150_270_1">
+    <visual>
+      <origin xyz="-5.460827912e-16 -0.165 0.0223" rpy="8.67361738e-17 1.812812689e-16 -0.7853981634" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RB_DS51150_270_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="-5.460827912e-16 -0.165 0.0223" rpy="8.67361738e-17 1.812812689e-16 -0.7853981634" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RB_DS51150_270_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="RF_DS51150_270_1">
+    <visual>
+      <origin xyz="3.864137998e-16 -0.165 0.0223" rpy="8.67361738e-17 1.812812689e-16 -2.35619449" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RF_DS51150_270_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="3.864137998e-16 -0.165 0.0223" rpy="8.67361738e-17 1.812812689e-16 -2.35619449" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RF_DS51150_270_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="LF_DS51150_270_1">
+    <visual>
+      <origin xyz="-1.174507642e-14 -0.165 0.0223" rpy="-6.239397246e-16 5.977428217e-17 2.35619449" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LF_DS51150_270_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="-1.174507642e-14 -0.165 0.0223" rpy="-6.239397246e-16 5.977428217e-17 2.35619449" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LF_DS51150_270_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="LM_DS51150_270_1">
+    <visual>
+      <origin xyz="5.654884082e-16 -0.165 0.0223" rpy="8.67361738e-17 7.14600353e-18 1.570796327" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LM_DS51150_270_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="5.654884082e-16 -0.165 0.0223" rpy="8.67361738e-17 7.14600353e-18 1.570796327" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LM_DS51150_270_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="LB_DS51150_270_1">
+    <visual>
+      <origin xyz="-5.815682896e-15 -0.165 0.0223" rpy="2.592187003e-16 5.644434456e-16 0.7853981634" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LB_DS51150_270_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="-5.815682896e-15 -0.165 0.0223" rpy="2.592187003e-16 5.644434456e-16 0.7853981634" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LB_DS51150_270_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="RF_bearing_1">
+    <visual>
+      <origin xyz="2.038112483e-15 -0.1845 -0.0273" rpy="3.141592654 1.298854755e-17 -0.7853981634" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RF_bearing_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="2.038112483e-15 -0.1845 -0.0273" rpy="3.141592654 1.298854755e-17 -0.7853981634" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RF_bearing_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="LM_bearing_1">
+    <visual>
+      <origin xyz="-0.1845 -4.756292062e-16 -0.0273" rpy="-3.141592654 4.17721413e-15 -4.440892099e-16" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LM_bearing_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="-0.1845 -4.756292062e-16 -0.0273" rpy="-3.141592654 4.17721413e-15 -4.440892099e-16" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LM_bearing_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="LF_bearing_1">
+    <visual>
+      <origin xyz="5.492804905e-15 0.1845 0.0313" rpy="-1.491605829e-15 1.090710906e-15 -0.7853981634" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LF_bearing_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="5.492804905e-15 0.1845 0.0313" rpy="-1.491605829e-15 1.090710906e-15 -0.7853981634" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LF_bearing_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="RM_bearing_1">
+    <visual>
+      <origin xyz="0.1845 -6.02187671e-15 -0.0273" rpy="-3.141592654 4.17721413e-15 -4.440892099e-16" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RM_bearing_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0.1845 -6.02187671e-15 -0.0273" rpy="-3.141592654 4.17721413e-15 -4.440892099e-16" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RM_bearing_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="RB_bearing_1">
+    <visual>
+      <origin xyz="0.1845 1.753626197e-16 -0.0273" rpy="3.141592654 3.977442457e-15 -0.7853981634" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RB_bearing_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0.1845 1.753626197e-16 -0.0273" rpy="3.141592654 3.977442457e-15 -0.7853981634" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RB_bearing_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="LB_bearing_1">
+    <visual>
+      <origin xyz="-5.393367301e-15 0.1845 -0.0273" rpy="-3.141592654 -4.685214199e-16 -0.7853981634" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LB_bearing_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="-5.393367301e-15 0.1845 -0.0273" rpy="-3.141592654 -4.685214199e-16 -0.7853981634" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LB_bearing_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="base_link">
+    <visual>
+      <origin xyz="0.1095 0.11 0.0448" rpy="8.67361738e-17 9.468566325e-17 1.165734176e-15" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/base_link.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0.1095 0.11 0.0448" rpy="8.67361738e-17 9.468566325e-17 1.165734176e-15" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/base_link.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="DXF_Lipo_2s_7200mah_100c">
+    <visual>
+      <origin xyz="0.065 0.024 -0.0188" rpy="-3.141592654 -5.204170428e-17 -1.570796327" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/DXF_Lipo_2s_7200mah_100c.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0.065 0.024 -0.0188" rpy="-3.141592654 -5.204170428e-17 -1.570796327" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/DXF_Lipo_2s_7200mah_100c.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="DXF_Lipo_3s_7200mah_100c_R">
+    <visual>
+      <origin xyz="-0.076 0.075 -0.0078" rpy="-3.141592654 1.387778781e-16 3.141592654" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/DXF_Lipo_3s_7200mah_100c_R.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="-0.076 0.075 -0.0078" rpy="-3.141592654 1.387778781e-16 3.141592654" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/DXF_Lipo_3s_7200mah_100c_R.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="DXF_Lipo_3s_7200mah_100c_L">
+    <visual>
+      <origin xyz="0.029 0.075 -0.0078" rpy="-3.141592654 2.91433544e-16 3.141592654" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/DXF_Lipo_3s_7200mah_100c_L.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0.029 0.075 -0.0078" rpy="-3.141592654 2.91433544e-16 3.141592654" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/DXF_Lipo_3s_7200mah_100c_L.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="DC_Converter_R">
+    <visual>
+      <origin xyz="0.027 0.1065 -0.0258" rpy="-3.141592654 -4.857225733e-17 1.570796327" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/DC_Converter_R.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0.027 0.1065 -0.0258" rpy="-3.141592654 -4.857225733e-17 1.570796327" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/DC_Converter_R.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="DC_Converter_L">
+    <visual>
+      <origin xyz="0.027 0.1065 -0.0258" rpy="-3.141592654 -3.816391647e-17 -1.570796327" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/DC_Converter_L.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0.027 0.1065 -0.0258" rpy="-3.141592654 -3.816391647e-17 -1.570796327" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/DC_Converter_L.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="flame2">
+    <visual>
+      <origin xyz="0.1095 0.11 0.0448" rpy="1.903164132e-16 -3.22073795e-16 7.771561172e-16" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/flame2.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0.1095 0.11 0.0448" rpy="1.903164132e-16 -3.22073795e-16 7.771561172e-16" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/flame2.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="Jetson_Orin_Nano_Super">
+    <visual>
+      <origin xyz="0.027 0.043 0.0342" rpy="-3.141592654 -1.387778781e-17 1.570796327" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/Jetson_Orin_Nano_Super.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0.027 0.043 0.0342" rpy="-3.141592654 -1.387778781e-17 1.570796327" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/Jetson_Orin_Nano_Super.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="STM32_F446RE">
+    <visual>
+      <origin xyz="-0.029 0.049 0.0132" rpy="-3.141592654 -1.387778781e-17 -1.570796327" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/STM32_F446RE.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="-0.029 0.049 0.0132" rpy="-3.141592654 -1.387778781e-17 -1.570796327" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/STM32_F446RE.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="Relay_Module_L">
+    <visual>
+      <origin xyz="0.106 -1.335155163e-16 0.0162" rpy="-3.141592654 3.469446952e-16 -1.887379142e-15" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/Relay_Module_L.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0.106 -1.335155163e-16 0.0162" rpy="-3.141592654 3.469446952e-16 -1.887379142e-15" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/Relay_Module_L.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="Relay_Module_R">
+    <visual>
+      <origin xyz="0.106 0.047 0.0162" rpy="-3.141592654 3.469446952e-16 -1.887379142e-15" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/Relay_Module_R.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0.106 0.047 0.0162" rpy="-3.141592654 3.469446952e-16 -1.887379142e-15" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/Relay_Module_R.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="Volt_Meter_2">
+    <visual>
+      <origin xyz="0.04063455967 -0.0108 -0.103" rpy="1.570796327 -3.815815383e-16 3.469446952e-17" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/Volt_Meter_2.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0.04063455967 -0.0108 -0.103" rpy="1.570796327 -3.815815383e-16 3.469446952e-17" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/Volt_Meter_2.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="Volt_Meter_3">
+    <visual>
+      <origin xyz="0.04063455967 -0.0408 -0.103" rpy="1.570796327 -3.885780586e-16 3.122502257e-17" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/Volt_Meter_3.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0.04063455967 -0.0408 -0.103" rpy="1.570796327 -3.885780586e-16 3.122502257e-17" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/Volt_Meter_3.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="Volt_Meter_1">
+    <visual>
+      <origin xyz="0.04063455967 0.0192 -0.103" rpy="1.570796327 5.096648127e-16 3.469446952e-17" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/Volt_Meter_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0.04063455967 0.0192 -0.103" rpy="1.570796327 5.096648127e-16 3.469446952e-17" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/Volt_Meter_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="AMASS_XT60E_F_FeMale_3">
+    <visual>
+      <origin xyz="-0.01136544033 -0.0218 -0.0989" rpy="1.570796327 -5.551115123e-17 2.775557562e-17" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/AMASS_XT60E_F_FeMale_3.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="-0.01136544033 -0.0218 -0.0989" rpy="1.570796327 -5.551115123e-17 2.775557562e-17" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/AMASS_XT60E_F_FeMale_3.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="AMASS_XT60_F_FeMale_1">
+    <visual>
+      <origin xyz="-0.01136544033 0.0382 -0.0989" rpy="1.570796327 -3.885780586e-16 3.122502257e-17" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/AMASS_XT60_F_FeMale_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="-0.01136544033 0.0382 -0.0989" rpy="1.570796327 -3.885780586e-16 3.122502257e-17" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/AMASS_XT60_F_FeMale_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="AMASS_XT60E_F_FeMale_2">
+    <visual>
+      <origin xyz="-0.01136544033 0.0082 -0.0989" rpy="1.570796327 -1.665334537e-16 2.775557562e-17" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/AMASS_XT60E_F_FeMale_2.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="-0.01136544033 0.0082 -0.0989" rpy="1.570796327 -1.665334537e-16 2.775557562e-17" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/AMASS_XT60E_F_FeMale_2.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="XHP_3">
+    <visual>
+      <origin xyz="-0.01601544033 -0.0063 -0.112" rpy="1.570796327 -1.665334537e-16 2.775557562e-17" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/XHP_3.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="-0.01601544033 -0.0063 -0.112" rpy="1.570796327 -1.665334537e-16 2.775557562e-17" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/XHP_3.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="XHP_4_2">
+    <visual>
+      <origin xyz="-0.01476544033 -0.0363 -0.112" rpy="1.570796327 -5.551115123e-17 2.775557562e-17" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/XHP_4_2.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="-0.01476544033 -0.0363 -0.112" rpy="1.570796327 -5.551115123e-17 2.775557562e-17" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/XHP_4_2.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="XHP_4_1">
+    <visual>
+      <origin xyz="-0.01476544033 0.0237 -0.112" rpy="1.570796327 -2.775557562e-16 2.428612866e-17" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/XHP_4_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="-0.01476544033 0.0237 -0.112" rpy="1.570796327 -2.775557562e-16 2.428612866e-17" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/XHP_4_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="NEO_M8N_GPS">
+    <visual>
+      <origin xyz="7.071067812e-05 -0.07157071068 0.0682" rpy="-3.141592654 -6.990600508e-16 1.570796327" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/NEO_M8N_GPS.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="7.071067812e-05 -0.07157071068 0.0682" rpy="-3.141592654 -6.990600508e-16 1.570796327" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/NEO_M8N_GPS.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="ON-OFF_Switch">
+    <visual>
+      <origin xyz="0.08392928932 0.03792928932 -0.0302" rpy="1.679031182e-15 9.468566325e-17 1.570796327" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/ON-OFF_Switch.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0.08392928932 0.03792928932 -0.0302" rpy="1.679031182e-15 9.468566325e-17 1.570796327" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/ON-OFF_Switch.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="FrSky_Archer_Plus_SR10">
+    <visual>
+      <origin xyz="0.02317928932 -0.06412928932 0.0629" rpy="-3.141592654 -6.591949209e-17 -1.570796327" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/FrSky_Archer_Plus_SR10.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0.02317928932 -0.06412928932 0.0629" rpy="-3.141592654 -6.591949209e-17 -1.570796327" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/FrSky_Archer_Plus_SR10.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="LoRa_RYLR998">
+    <visual>
+      <origin xyz="-0.02944071068 -0.06707928932 -0.0492" rpy="8.67361738e-17 9.468566325e-17 1.026956298e-15" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LoRa_RYLR998.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="-0.02944071068 -0.06707928932 -0.0492" rpy="8.67361738e-17 9.468566325e-17 1.026956298e-15" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LoRa_RYLR998.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="LF_motor_horn_1">
+    <visual>
+      <origin xyz="-1.187366472e-14 -0.1845 -0.0273" rpy="6.634503157e-16 -1.13847769e-15 2.35619449" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LF_motor_horn_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="-1.187366472e-14 -0.1845 -0.0273" rpy="6.634503157e-16 -1.13847769e-15 2.35619449" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LF_motor_horn_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="RF_motor_horn_1">
+    <visual>
+      <origin xyz="-3.324322845e-15 -0.1845 -0.0273" rpy="-1.929340917e-16 -6.28699329e-16 -2.35619449" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RF_motor_horn_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="-3.324322845e-15 -0.1845 -0.0273" rpy="-1.929340917e-16 -6.28699329e-16 -2.35619449" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RF_motor_horn_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="RB_motor_horn_1">
+    <visual>
+      <origin xyz="-3.781565414e-16 -0.1845 -0.0273" rpy="-7.12581367e-16 2.430163929e-16 -0.7853981634" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RB_motor_horn_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="-3.781565414e-16 -0.1845 -0.0273" rpy="-7.12581367e-16 2.430163929e-16 -0.7853981634" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RB_motor_horn_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="LM_motor_horn_1">
+    <visual>
+      <origin xyz="-2.834812654e-16 -0.1845 -0.0273" rpy="3.990502544e-15 1.301752407e-15 1.570796327" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LM_motor_horn_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="-2.834812654e-16 -0.1845 -0.0273" rpy="3.990502544e-15 1.301752407e-15 1.570796327" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LM_motor_horn_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="RM_motor_horn_1">
+    <visual>
+      <origin xyz="6.348519016e-15 -0.1845 -0.0273" rpy="-3.969318964e-15 -1.547302715e-15 -1.570796327" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RM_motor_horn_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="6.348519016e-15 -0.1845 -0.0273" rpy="-3.969318964e-15 -1.547302715e-15 -1.570796327" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RM_motor_horn_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="LB_motor_horn_1">
+    <visual>
+      <origin xyz="-6.548355887e-15 -0.1845 -0.0273" rpy="1.453994671e-16 4.432199368e-16 0.7853981634" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LB_motor_horn_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="-6.548355887e-15 -0.1845 -0.0273" rpy="1.453994671e-16 4.432199368e-16 0.7853981634" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LB_motor_horn_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="LF_DS51150_270_2">
+    <visual>
+      <origin xyz="-0.12925 0.2433675669 0.0223" rpy="-1.570796327 0.7853981634 -1.047197551" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LF_DS51150_270_2.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="-0.12925 0.2433675669 0.0223" rpy="-1.570796327 0.7853981634 -1.047197551" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LF_DS51150_270_2.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="LF_motor_horn_2">
+    <visual>
+      <origin xyz="3.67102e-14 0.2585 -0.0273" rpy="-1.570796327 0.7853981634 -1.570796327" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LF_motor_horn_2.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="3.67102e-14 0.2585 -0.0273" rpy="-1.570796327 0.7853981634 -1.570796327" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LF_motor_horn_2.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="LM_DS51150_270_2">
+    <visual>
+      <origin xyz="-0.12925 0.2433675669 0.0223" rpy="-1.570796327 -1.756115126e-15 -1.047197551" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LM_DS51150_270_2.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="-0.12925 0.2433675669 0.0223" rpy="-1.570796327 -1.756115126e-15 -1.047197551" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LM_DS51150_270_2.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="LM_motor_horn_2">
+    <visual>
+      <origin xyz="1.485947745e-15 0.2585 -0.0273" rpy="-1.570796327 -1.915134717e-15 -1.570796327" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LM_motor_horn_2.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="1.485947745e-15 0.2585 -0.0273" rpy="-1.570796327 -1.915134717e-15 -1.570796327" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LM_motor_horn_2.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="LB_DS51150_270_2">
+    <visual>
+      <origin xyz="-0.12925 0.2433675669 0.0223" rpy="-1.570796327 -0.7853981634 -1.047197551" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LB_DS51150_270_2.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="-0.12925 0.2433675669 0.0223" rpy="-1.570796327 -0.7853981634 -1.047197551" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LB_DS51150_270_2.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="LB_motor_horn_2">
+    <visual>
+      <origin xyz="9.267235243e-15 0.2585 -0.0273" rpy="-1.570796327 -0.7853981634 -1.570796327" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LB_motor_horn_2.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="9.267235243e-15 0.2585 -0.0273" rpy="-1.570796327 -0.7853981634 -1.570796327" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LB_motor_horn_2.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="RF_DS51150_270_2">
+    <visual>
+      <origin xyz="0.12925 0.2433675669 0.0223" rpy="-1.570796327 -0.7853981634 1.047197551" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RF_DS51150_270_2.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0.12925 0.2433675669 0.0223" rpy="-1.570796327 -0.7853981634 1.047197551" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RF_DS51150_270_2.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="RF_motor_horn_2">
+    <visual>
+      <origin xyz="-7.695234378e-15 0.2585 -0.0273" rpy="-1.570796327 -0.7853981634 1.570796327" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RF_motor_horn_2.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="-7.695234378e-15 0.2585 -0.0273" rpy="-1.570796327 -0.7853981634 1.570796327" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RF_motor_horn_2.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="RM_DS51150_270_2">
+    <visual>
+      <origin xyz="0.12925 0.2433675669 0.0223" rpy="-1.570796327 1.195344403e-15 1.047197551" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RM_DS51150_270_2.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0.12925 0.2433675669 0.0223" rpy="-1.570796327 1.195344403e-15 1.047197551" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RM_DS51150_270_2.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="RM_motor_horn_2">
+    <visual>
+      <origin xyz="-1.307766488e-15 0.2585 -0.0273" rpy="-1.570796327 1.906677941e-15 1.570796327" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RM_motor_horn_2.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="-1.307766488e-15 0.2585 -0.0273" rpy="-1.570796327 1.906677941e-15 1.570796327" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RM_motor_horn_2.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="RB_DS51150_270_2">
+    <visual>
+      <origin xyz="0.12925 0.2433675669 0.0223" rpy="-1.570796327 0.7853981634 1.047197551" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RB_DS51150_270_2.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0.12925 0.2433675669 0.0223" rpy="-1.570796327 0.7853981634 1.047197551" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RB_DS51150_270_2.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="RB_motor_horn_2">
+    <visual>
+      <origin xyz="6.654827085e-15 0.2585 -0.0273" rpy="-1.570796327 0.7853981634 1.570796327" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RB_motor_horn_2.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="6.654827085e-15 0.2585 -0.0273" rpy="-1.570796327 0.7853981634 1.570796327" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RB_motor_horn_2.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="LF_DS51150_270_3">
+    <visual>
+      <origin xyz="0.12925 -0.4073675674 0.02229999851" rpy="-1.57079633 0.7853981594 2.0943951" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LF_DS51150_270_3.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0.12925 -0.4073675674 0.02229999851" rpy="-1.57079633 0.7853981594 2.0943951" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LF_DS51150_270_3.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="LF_motor_horn_3">
+    <visual>
+      <origin xyz="0.4100798265 -0.175373939 -0.02730000149" rpy="-1.57079633 0.7853981594 2.967059726" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LF_motor_horn_3.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0.4100798265 -0.175373939 -0.02730000149" rpy="-1.57079633 0.7853981594 2.967059726" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LF_motor_horn_3.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="LM_DS51150_270_3">
+    <visual>
+      <origin xyz="0.12925 -0.4073675674 0.02229999851" rpy="-1.570796329 -3.97070422e-09 2.094395102" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LM_DS51150_270_3.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0.12925 -0.4073675674 0.02229999851" rpy="-1.570796329 -3.97070422e-09 2.094395102" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LM_DS51150_270_3.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="LM_motor_horn_3">
+    <visual>
+      <origin xyz="0.4100798265 -0.175373939 -0.02730000149" rpy="-1.570796329 -3.970703932e-09 2.967059728" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LM_motor_horn_3.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0.4100798265 -0.175373939 -0.02730000149" rpy="-1.570796329 -3.970703932e-09 2.967059728" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LM_motor_horn_3.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="LB_DS51150_270_3">
+    <visual>
+      <origin xyz="0.12925 -0.4073675674 0.02229999851" rpy="-1.57079633 -0.7853981674 2.094395105" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LB_DS51150_270_3.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0.12925 -0.4073675674 0.02229999851" rpy="-1.57079633 -0.7853981674 2.094395105" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LB_DS51150_270_3.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="LB_motor_horn_3">
+    <visual>
+      <origin xyz="0.4100798265 -0.175373939 -0.02730000149" rpy="-1.57079633 -0.7853981674 2.967059731" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LB_motor_horn_3.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0.4100798265 -0.175373939 -0.02730000149" rpy="-1.57079633 -0.7853981674 2.967059731" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LB_motor_horn_3.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="RF_DS51150_270_3">
+    <visual>
+      <origin xyz="-0.12925 -0.4073675674 0.02229999851" rpy="-1.57079633 -0.7853981594 -2.0943951" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RF_DS51150_270_3.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="-0.12925 -0.4073675674 0.02229999851" rpy="-1.57079633 -0.7853981594 -2.0943951" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RF_DS51150_270_3.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="RF_motor_horn_3">
+    <visual>
+      <origin xyz="-0.4100798265 -0.175373939 -0.02730000149" rpy="-1.57079633 -0.7853981594 -2.967059726" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RF_motor_horn_3.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="-0.4100798265 -0.175373939 -0.02730000149" rpy="-1.57079633 -0.7853981594 -2.967059726" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RF_motor_horn_3.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="RM_DS51150_270_3">
+    <visual>
+      <origin xyz="-0.12925 -0.4073675674 0.02229999851" rpy="-1.570796329 3.970706804e-09 -2.094395102" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RM_DS51150_270_3.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="-0.12925 -0.4073675674 0.02229999851" rpy="-1.570796329 3.970706804e-09 -2.094395102" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RM_DS51150_270_3.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="RM_motor_horn_3">
+    <visual>
+      <origin xyz="-0.4100798265 -0.175373939 -0.02730000149" rpy="-1.570796329 3.970707551e-09 -2.967059728" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RM_motor_horn_3.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="-0.4100798265 -0.175373939 -0.02730000149" rpy="-1.570796329 3.970707551e-09 -2.967059728" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RM_motor_horn_3.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="RB_DS51150_270_3">
+    <visual>
+      <origin xyz="-0.12925 -0.4073675674 0.02229999851" rpy="-1.57079633 0.7853981674 -2.094395105" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RB_DS51150_270_3.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="-0.12925 -0.4073675674 0.02229999851" rpy="-1.57079633 0.7853981674 -2.094395105" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RB_DS51150_270_3.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="RB_motor_horn_3">
+    <visual>
+      <origin xyz="-0.4100798265 -0.175373939 -0.02730000149" rpy="-1.57079633 0.7853981674 -2.967059731" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RB_motor_horn_3.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="-0.4100798265 -0.175373939 -0.02730000149" rpy="-1.57079633 0.7853981674 -2.967059731" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RB_motor_horn_3.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="LF_bearing_2">
+    <visual>
+      <origin xyz="-0.225867565 -0.12925 0.03129999952" rpy="-1.570796328 0.7853981614 0.5235987745" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LF_bearing_2.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="-0.225867565 -0.12925 0.03129999952" rpy="-1.570796328 0.7853981614 0.5235987745" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LF_bearing_2.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="LF_bearing_3">
+    <visual>
+      <origin xyz="-0.4268675679 -0.12925 0.03129999952" rpy="-1.570796328 0.7853981614 0.5235987745" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LF_bearing_3.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="-0.4268675679 -0.12925 0.03129999952" rpy="-1.570796328 0.7853981614 0.5235987745" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LF_bearing_3.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="LM_bearing_2">
+    <visual>
+      <origin xyz="0.225867565 0.12925 0.03129999952" rpy="-1.570796328 -1.985356278e-09 -2.617993878" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LM_bearing_2.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0.225867565 0.12925 0.03129999952" rpy="-1.570796328 -1.985356278e-09 -2.617993878" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LM_bearing_2.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="LM_bearing_3">
+    <visual>
+      <origin xyz="0.4268675679 0.12925 0.03129999952" rpy="-1.570796328 -1.985356295e-09 -2.617993878" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LM_bearing_3.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0.4268675679 0.12925 0.03129999952" rpy="-1.570796328 -1.985356295e-09 -2.617993878" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LM_bearing_3.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="LB_bearing_3">
+    <visual>
+      <origin xyz="0.4268675679 0.12925 0.03129999952" rpy="-1.570796328 -0.7853981654 -2.617993877" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LB_bearing_3.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0.4268675679 0.12925 0.03129999952" rpy="-1.570796328 -0.7853981654 -2.617993877" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LB_bearing_3.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="LB_bearing_2">
+    <visual>
+      <origin xyz="0.225867565 0.12925 0.03129999952" rpy="-1.570796328 -0.7853981654 -2.617993877" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LB_bearing_2.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0.225867565 0.12925 0.03129999952" rpy="-1.570796328 -0.7853981654 -2.617993877" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LB_bearing_2.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="RF_bearing_3">
+    <visual>
+      <origin xyz="0.12925 -0.4268675679 -0.02729999952" rpy="1.570796325 0.7853981614 -1.047197552" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RF_bearing_3.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0.12925 -0.4268675679 -0.02729999952" rpy="1.570796325 0.7853981614 -1.047197552" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RF_bearing_3.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="RF_bearing_2">
+    <visual>
+      <origin xyz="-0.225867565 -0.12925 -0.02729999952" rpy="1.570796325 0.7853981614 -2.617993879" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RF_bearing_2.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="-0.225867565 -0.12925 -0.02729999952" rpy="1.570796325 0.7853981614 -2.617993879" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RF_bearing_2.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="RM_bearing_2">
+    <visual>
+      <origin xyz="0.225867565 -0.12925 0.03129999952" rpy="-1.570796328 1.985350202e-09 -0.5235987756" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RM_bearing_2.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0.225867565 -0.12925 0.03129999952" rpy="-1.570796328 1.985350202e-09 -0.5235987756" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RM_bearing_2.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="RM_bearing_3">
+    <visual>
+      <origin xyz="0.4268675679 -0.12925 0.03129999952" rpy="-1.570796328 1.985348765e-09 -0.5235987756" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RM_bearing_3.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0.4268675679 -0.12925 0.03129999952" rpy="-1.570796328 1.985348765e-09 -0.5235987756" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RM_bearing_3.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="RB_bearing_2">
+    <visual>
+      <origin xyz="0.12925 0.225867565 0.03129999952" rpy="-1.570796328 0.7853981654 1.04719755" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RB_bearing_2.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0.12925 0.225867565 0.03129999952" rpy="-1.570796328 0.7853981654 1.04719755" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RB_bearing_2.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="RB_bearing_3">
+    <visual>
+      <origin xyz="-0.12925 -0.4268675679 0.03129999952" rpy="-1.570796328 0.7853981654 -2.094395104" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RB_bearing_3.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="-0.12925 -0.4268675679 0.03129999952" rpy="-1.570796328 0.7853981654 -2.094395104" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RB_bearing_3.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="LF_coxaL">
+    <visual>
+      <origin xyz="0.0273 0.0273 0.2155" rpy="1.570796327 0.7853981634 -3.141592654" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LF_coxaL.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0.0273 0.0273 0.2155" rpy="1.570796327 0.7853981634 -3.141592654" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LF_coxaL.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="LM_coxaL">
+    <visual>
+      <origin xyz="0.0273 0.0273 0.2155" rpy="-2.98347646 1.570796146 -1.485852914" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LM_coxaL.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0.0273 0.0273 0.2155" rpy="-2.98347646 1.570796146 -1.485852914" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LM_coxaL.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="LB_coxaL">
+    <visual>
+      <origin xyz="0.0273 0.0273 0.2155" rpy="-1.570796327 0.7853981634 -2.343729781e-15" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LB_coxaL.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0.0273 0.0273 0.2155" rpy="-1.570796327 0.7853981634 -2.343729781e-15" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LB_coxaL.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="RF_coxaR">
+    <visual>
+      <origin xyz="0.0273 0.0273 0.2155" rpy="1.570796327 -0.7853981634 3.141592654" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RF_coxaR.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0.0273 0.0273 0.2155" rpy="1.570796327 -0.7853981634 3.141592654" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RF_coxaR.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="RM_coxaR">
+    <visual>
+      <origin xyz="0.0273 0.0273 0.2155" rpy="-2.333163266 -1.570796215 0.7623669388" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RM_coxaR.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0.0273 0.0273 0.2155" rpy="-2.333163266 -1.570796215 0.7623669388" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RM_coxaR.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="RB_coxaR">
+    <visual>
+      <origin xyz="0.0273 0.0273 0.2155" rpy="-1.570796327 -0.7853981634 1.656701139e-15" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RB_coxaR.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0.0273 0.0273 0.2155" rpy="-1.570796327 -0.7853981634 1.656701139e-15" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RB_coxaR.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="RB_link1_right">
+    <visual>
+      <origin xyz="0.006299999651 0.3858675669 -0.10925" rpy="0.3875966867 0.3613671239 2.427868277" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RB_link1_right.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0.006299999651 0.3858675669 -0.10925" rpy="0.3875966867 0.3613671239 2.427868277" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RB_link1_right.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="RM_link1_right">
+    <visual>
+      <origin xyz="0.006299999651 0.3858675669 -0.10925" rpy="9.561955928e-16 0.5235987756 1.570796329" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RM_link1_right.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0.006299999651 0.3858675669 -0.10925" rpy="9.561955928e-16 0.5235987756 1.570796329" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RM_link1_right.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="RF_link1_right">
+    <visual>
+      <origin xyz="0.006299999651 0.3858675669 -0.10925" rpy="-0.3875966867 0.3613671239 0.7137243812" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RF_link1_right.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0.006299999651 0.3858675669 -0.10925" rpy="-0.3875966867 0.3613671239 0.7137243812" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RF_link1_right.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="LB_link1_left">
+    <visual>
+      <origin xyz="-0.05129999965 0.3858675669 -0.1092500292" rpy="0.3875966867 -0.3613671239 -2.427868277" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LB_link1_left.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="-0.05129999965 0.3858675669 -0.1092500292" rpy="0.3875966867 -0.3613671239 -2.427868277" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LB_link1_left.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="LM_link1_left">
+    <visual>
+      <origin xyz="-0.05129999965 0.3858675669 -0.1092500292" rpy="2.160718655e-15 -0.5235987756 -1.570796329" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LM_link1_left.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="-0.05129999965 0.3858675669 -0.1092500292" rpy="2.160718655e-15 -0.5235987756 -1.570796329" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LM_link1_left.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="LF_link1_left">
+    <visual>
+      <origin xyz="-0.05129999965 0.3858675669 -0.1092500292" rpy="-0.3875966867 -0.3613671239 -0.7137243812" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LF_link1_left.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="-0.05129999965 0.3858675669 -0.1092500292" rpy="-0.3875966867 -0.3613671239 -0.7137243812" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LF_link1_left.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="LF_link2">
+    <visual>
+      <origin xyz="0.4350798265 0.215373939 0.03510000149" rpy="1.570796324 -0.7853981594 -2.967059726" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LF_link2.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0.4350798265 0.215373939 0.03510000149" rpy="1.570796324 -0.7853981594 -2.967059726" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LF_link2.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="LB_link2">
+    <visual>
+      <origin xyz="0.4350798265 0.215373939 0.03510000149" rpy="1.570796324 0.7853981674 -2.967059731" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LB_link2.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0.4350798265 0.215373939 0.03510000149" rpy="1.570796324 0.7853981674 -2.967059731" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LB_link2.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="RF_link2">
+    <visual>
+      <origin xyz="-0.3850798265 0.215373939 0.03510000149" rpy="1.570796324 0.7853981594 2.967059726" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RF_link2.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="-0.3850798265 0.215373939 0.03510000149" rpy="1.570796324 0.7853981594 2.967059726" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RF_link2.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="RM_link2">
+    <visual>
+      <origin xyz="-0.3850798265 0.215373939 0.03510000149" rpy="1.570796325 -3.970706484e-09 2.967059728" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RM_link2.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="-0.3850798265 0.215373939 0.03510000149" rpy="1.570796325 -3.970706484e-09 2.967059728" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RM_link2.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="RB_link2">
+    <visual>
+      <origin xyz="-0.3850798265 0.215373939 0.03510000149" rpy="1.570796324 -0.7853981674 2.967059731" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RB_link2.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="-0.3850798265 0.215373939 0.03510000149" rpy="1.570796324 -0.7853981674 2.967059731" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RB_link2.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="flame3">
+    <visual>
+      <origin xyz="0.1094292893 0.1100707107 0.0448" rpy="8.67361738e-17 9.468566325e-17 7.852119399e-33" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/flame3.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0.1094292893 0.1100707107 0.0448" rpy="8.67361738e-17 9.468566325e-17 7.852119399e-33" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/flame3.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="LM_link2">
+    <visual>
+      <origin xyz="0.4350798265 0.215373939 0.03510000149" rpy="1.570796325 3.970703852e-09 -2.967059728" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LM_link2.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0.4350798265 0.215373939 0.03510000149" rpy="1.570796325 3.970703852e-09 -2.967059728" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LM_link2.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="M_hold_1">
+    <visual>
+      <origin xyz="0.01000000015 0.1080000001 -0.0482" rpy="1.536890484e-16 2.773278869e-17 -0.7853981634" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/M_hold_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0.01000000015 0.1080000001 -0.0482" rpy="1.536890484e-16 2.773278869e-17 -0.7853981634" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/M_hold_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="M_hold_2">
+    <visual>
+      <origin xyz="0.009900000149 -0.08789999985 -0.0482" rpy="1.978329923e-17 2.773278869e-17 0.7853981634" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/M_hold_2.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0.009900000149 -0.08789999985 -0.0482" rpy="1.978329923e-17 2.773278869e-17 0.7853981634" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/M_hold_2.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="M_hold_3">
+    <visual>
+      <origin xyz="0.009900000149 0.1079000001 -0.0482" rpy="1.978329923e-17 2.773278869e-17 0.7853981634" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/M_hold_3.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0.009900000149 0.1079000001 -0.0482" rpy="1.978329923e-17 2.773278869e-17 0.7853981634" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/M_hold_3.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="M_hold_4">
+    <visual>
+      <origin xyz="0.01000000015 -0.08779999985 -0.0482" rpy="1.536890484e-16 2.773278869e-17 -0.7853981634" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/M_hold_4.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0.01000000015 -0.08779999985 -0.0482" rpy="1.536890484e-16 2.773278869e-17 -0.7853981634" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/M_hold_4.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="LF_foot_1">
+    <visual>
+      <origin xyz="-0.3850798265 0.305373939 0.03549999851" rpy="-1.57079633 0.7853981594 -0.1745329275" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LF_foot_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="-0.3850798265 0.305373939 0.03549999851" rpy="-1.57079633 0.7853981594 -0.1745329275" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LF_foot_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="LM_foot_1">
+    <visual>
+      <origin xyz="-0.3850798265 0.305373939 0.03549999851" rpy="-1.570796329 -3.97070399e-09 -0.1745329252" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LM_foot_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="-0.3850798265 0.305373939 0.03549999851" rpy="-1.570796329 -3.97070399e-09 -0.1745329252" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LM_foot_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="LB_foot_1">
+    <visual>
+      <origin xyz="-0.3850798265 0.305373939 0.03549999851" rpy="-1.57079633 -0.7853981674 -0.1745329229" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LB_foot_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="-0.3850798265 0.305373939 0.03549999851" rpy="-1.57079633 -0.7853981674 -0.1745329229" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LB_foot_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="RF_foot_1">
+    <visual>
+      <origin xyz="0.4350798265 0.305373939 0.03549999851" rpy="-1.57079633 -0.7853981594 0.1745329275" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RF_foot_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0.4350798265 0.305373939 0.03549999851" rpy="-1.57079633 -0.7853981594 0.1745329275" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RF_foot_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="RM_foot_1">
+    <visual>
+      <origin xyz="0.4350798265 0.305373939 0.03549999851" rpy="-1.570796329 3.970707339e-09 0.1745329252" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RM_foot_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0.4350798265 0.305373939 0.03549999851" rpy="-1.570796329 3.970707339e-09 0.1745329252" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RM_foot_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="RB_foot_1">
+    <visual>
+      <origin xyz="0.4350798265 0.305373939 0.03549999851" rpy="-1.57079633 0.7853981674 0.1745329229" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RB_foot_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0.4350798265 0.305373939 0.03549999851" rpy="-1.57079633 0.7853981674 0.1745329229" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RB_foot_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="LF_foot_2">
+    <visual>
+      <origin xyz="0.4350798265 0.305373939 0.03510000149" rpy="1.570796324 -0.7853981594 -2.967059726" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LF_foot_2.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0.4350798265 0.305373939 0.03510000149" rpy="1.570796324 -0.7853981594 -2.967059726" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LF_foot_2.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="LM_foot_2">
+    <visual>
+      <origin xyz="0.4350798265 0.305373939 0.03510000149" rpy="1.570796325 3.970703176e-09 -2.967059728" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LM_foot_2.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0.4350798265 0.305373939 0.03510000149" rpy="1.570796325 3.970703176e-09 -2.967059728" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LM_foot_2.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="LB_foot_2">
+    <visual>
+      <origin xyz="0.4350798265 0.305373939 0.03510000149" rpy="1.570796324 0.7853981674 -2.967059731" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LB_foot_2.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0.4350798265 0.305373939 0.03510000149" rpy="1.570796324 0.7853981674 -2.967059731" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LB_foot_2.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="RF_foot_2">
+    <visual>
+      <origin xyz="-0.3850798265 0.305373939 0.03510000149" rpy="1.570796324 0.7853981594 2.967059726" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RF_foot_2.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="-0.3850798265 0.305373939 0.03510000149" rpy="1.570796324 0.7853981594 2.967059726" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RF_foot_2.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="RM_foot_2">
+    <visual>
+      <origin xyz="-0.3850798265 0.305373939 0.03510000149" rpy="1.570796325 -3.970708013e-09 2.967059728" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RM_foot_2.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="-0.3850798265 0.305373939 0.03510000149" rpy="1.570796325 -3.970708013e-09 2.967059728" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RM_foot_2.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="RB_foot_2">
+    <visual>
+      <origin xyz="-0.3850798265 0.305373939 0.03510000149" rpy="1.570796324 -0.7853981674 2.967059731" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RB_foot_2.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="-0.3850798265 0.305373939 0.03510000149" rpy="1.570796324 -0.7853981674 2.967059731" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RB_foot_2.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="LF_foot_3">
+    <visual>
+      <origin xyz="0.4100798265 -0.0001999985082 -0.485973939" rpy="-3.017550777 -0.1230984605 2.348540377" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LF_foot_3.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0.4100798265 -0.0001999985082 -0.485973939" rpy="-3.017550777 -0.1230984605 2.348540377" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LF_foot_3.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="LM_foot_3">
+    <visual>
+      <origin xyz="0.4100798265 -0.0001999985082 -0.485973939" rpy="3.141592651 -0.1745329252 -3.14159265" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LM_foot_3.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0.4100798265 -0.0001999985082 -0.485973939" rpy="3.141592651 -0.1745329252 -3.14159265" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LM_foot_3.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="LB_foot_3">
+    <visual>
+      <origin xyz="0.0001999985082 0.4100798265 -0.485973939" rpy="3.017550773 -0.1230984563 -0.7777440429" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LB_foot_3.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0.0001999985082 0.4100798265 -0.485973939" rpy="3.017550773 -0.1230984563 -0.7777440429" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LB_foot_3.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="RF_foot_3">
+    <visual>
+      <origin xyz="-0.4100798265 -0.0001999985082 -0.485973939" rpy="-3.017550777 0.1230984605 -2.348540377" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RF_foot_3.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="-0.4100798265 -0.0001999985082 -0.485973939" rpy="-3.017550777 0.1230984605 -2.348540377" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RF_foot_3.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="RM_foot_3">
+    <visual>
+      <origin xyz="-0.4100798265 -0.0001999985082 -0.485973939" rpy="3.141592651 0.1745329252 3.14159265" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RM_foot_3.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="-0.4100798265 -0.0001999985082 -0.485973939" rpy="3.141592651 0.1745329252 3.14159265" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RM_foot_3.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="RB_foot_3">
+    <visual>
+      <origin xyz="0.0009500014918 0.4089298265 -0.485073939" rpy="3.017550773 0.1230984563 0.7777440429" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RB_foot_3.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0.0009500014918 0.4089298265 -0.485073939" rpy="3.017550773 0.1230984563 0.7777440429" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RB_foot_3.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="LF_foot_4">
+    <visual>
+      <origin xyz="0.4100798265 -0.0001999985082 -0.485773939" rpy="-3.017550777 -0.1230984605 2.348540377" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LF_foot_4.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0.4100798265 -0.0001999985082 -0.485773939" rpy="-3.017550777 -0.1230984605 2.348540377" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LF_foot_4.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="LM_foot_4">
+    <visual>
+      <origin xyz="0.4100798265 -0.0001999985082 -0.485773939" rpy="3.141592651 -0.1745329252 -3.14159265" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LM_foot_4.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0.4100798265 -0.0001999985082 -0.485773939" rpy="3.141592651 -0.1745329252 -3.14159265" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LM_foot_4.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="LB_foot_4">
+    <visual>
+      <origin xyz="0.0001999985082 0.4100798265 -0.485773939" rpy="3.017550773 -0.1230984563 -0.7777440429" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LB_foot_4.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0.0001999985082 0.4100798265 -0.485773939" rpy="3.017550773 -0.1230984563 -0.7777440429" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/LB_foot_4.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="RF_foot_4">
+    <visual>
+      <origin xyz="0.0001999985082 -0.4100798265 -0.485773939" rpy="-3.017550777 0.1230984605 -0.7777440504" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RF_foot_4.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0.0001999985082 -0.4100798265 -0.485773939" rpy="-3.017550777 0.1230984605 -0.7777440504" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RF_foot_4.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="RM_foot_4">
+    <visual>
+      <origin xyz="-0.4100798265 -0.0001999985082 -0.485773939" rpy="3.141592651 0.1745329252 3.14159265" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RM_foot_4.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="-0.4100798265 -0.0001999985082 -0.485773939" rpy="3.141592651 0.1745329252 3.14159265" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RM_foot_4.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="RB_foot_4">
+    <visual>
+      <origin xyz="0.0009500014918 0.4089298265 -0.484873939" rpy="3.017550773 0.1230984563 0.7777440429" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RB_foot_4.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0.0009500014918 0.4089298265 -0.484873939" rpy="3.017550773 0.1230984563 0.7777440429" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/RB_foot_4.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="base">
+    <visual>
+      <origin xyz="-7.071067812e-05 7.071088885e-05 -0.0651" rpy="1.340790054e-16 -5.216796608e-34 -1.110223025e-16" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/base.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="-7.071067812e-05 7.071088885e-05 -0.0651" rpy="1.340790054e-16 -5.216796608e-34 -1.110223025e-16" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/base.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="M_column_1">
+    <visual>
+      <origin xyz="0.1080000001 0.004000000149 0.0652" rpy="-3.141592654 -8.122745745e-18 2.35619449" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/M_column_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0.1080000001 0.004000000149 0.0652" rpy="-3.141592654 -8.122745745e-18 2.35619449" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/M_column_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="link">
+    <visual>
+      <origin xyz="7.071067812e-05 -7.071067812e-05 -0.0492" rpy="1.733317794e-16 1.812812689e-16 -3.141592654" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/link.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="7.071067812e-05 -7.071067812e-05 -0.0492" rpy="1.733317794e-16 1.812812689e-16 -3.141592654" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/link.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="M_column_3_final">
+    <visual>
+      <origin xyz="7.071088885e-05 7.071067812e-05 -0.0492" rpy="1.340790054e-16 6.675788653e-33 -1.570796327" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/M_column_3_final.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="7.071088885e-05 7.071067812e-05 -0.0492" rpy="1.340790054e-16 6.675788653e-33 -1.570796327" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/M_column_3_final.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="livox_mid_360">
+    <visual>
+      <origin xyz="0.1160566535 -7.071067812e-05 -0.1161569336" rpy="-0.7853981634 -3.925231147e-17 1.570796327" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/livox_mid_360.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0.1160566535 -7.071067812e-05 -0.1161569336" rpy="-0.7853981634 -3.925231147e-17 1.570796327" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/livox_mid_360.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="mid-360-fov-asm_ver_ksh_MID-360_4_1_1">
+    <visual>
+      <origin xyz="-7.071067812e-05 -0.09719671531 0.1160566535" rpy="-2.35619449 2.602551983e-17 -7.703719778e-33" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/mid-360-fov-asm_ver_ksh_MID-360_4_1_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="-7.071067812e-05 -0.09719671531 0.1160566535" rpy="-2.35619449 2.602551983e-17 -7.703719778e-33" />
+      <geometry>
+        <mesh filename="package://HEXAPEDAL_URDF_description/versions/HEXAPEDAL_URDF_v2_description/meshes/mid-360-fov-asm_ver_ksh_MID-360_4_1_1.stl" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="46" type="fixed">
+    <parent link="base_link" />
+    <child link="DXF_Lipo_3s_7200mah_100c_R" />
+    <origin xyz="-0.1855 0.035 -0.0526" rpy="-3.141592654 -2.334635413e-16 3.141592654" />
+  </joint>
+  <joint name="47" type="fixed">
+    <parent link="base_link" />
+    <child link="DXF_Lipo_2s_7200mah_100c" />
+    <origin xyz="-0.086 -0.0445 -0.0636" rpy="-3.141592654 -1.814218371e-16 -1.570796327" />
+  </joint>
+  <joint name="48" type="fixed">
+    <parent link="base_link" />
+    <child link="DC_Converter_R" />
+    <origin xyz="0.0035 0.0825 -0.0706" rpy="-3.141592654 -7.949489455e-18 1.570796327" />
+  </joint>
+  <joint name="49" type="fixed">
+    <parent link="base_link" />
+    <child link="DC_Converter_L" />
+    <origin xyz="-0.0035 -0.0825 -0.0706" rpy="-3.141592654 -1.814218371e-16 -1.570796327" />
+  </joint>
+  <joint name="50" type="fixed">
+    <parent link="base_link" />
+    <child link="DXF_Lipo_3s_7200mah_100c_L" />
+    <origin xyz="-0.0805 0.035 -0.0526" rpy="-3.141592654 -3.861192072e-16 3.141592654" />
+  </joint>
+  <joint name="51" type="fixed">
+    <parent link="base_link" />
+    <child link="AMASS_XT60_F_FeMale_1" />
+    <origin xyz="0.1208654403 0.1437 -0.0718" rpy="-1.570796327 1.134509153e-15 -4.832637219e-16" />
+  </joint>
+  <joint name="52" type="fixed">
+    <parent link="base_link" />
+    <child link="XHP_4_1" />
+    <origin xyz="0.1242654403 0.1568 -0.0863" rpy="-1.570796327 1.141448047e-15 -3.722414194e-16" />
+  </joint>
+  <joint name="53" type="fixed">
+    <parent link="base_link" />
+    <child link="Volt_Meter_1" />
+    <origin xyz="0.06886544033 0.1478 -0.0908" rpy="-1.570796327 1.131039706e-15 4.149791495e-16" />
+  </joint>
+  <joint name="54" type="fixed">
+    <parent link="base_link" />
+    <child link="XHP_4_2" />
+    <origin xyz="0.1242654403 0.1568 -0.1463" rpy="-1.570796327 1.1379786e-15 -1.501968145e-16" />
+  </joint>
+  <joint name="55" type="fixed">
+    <parent link="base_link" />
+    <child link="AMASS_XT60E_F_FeMale_3" />
+    <origin xyz="0.1208654403 0.1437 -0.1318" rpy="-1.570796327 1.1379786e-15 -1.501968145e-16" />
+  </joint>
+  <joint name="56" type="fixed">
+    <parent link="base_link" />
+    <child link="XHP_3" />
+    <origin xyz="0.1255154403 0.1568 -0.1163" rpy="-1.570796327 1.1379786e-15 -2.612191169e-16" />
+  </joint>
+  <joint name="57" type="fixed">
+    <parent link="base_link" />
+    <child link="AMASS_XT60E_F_FeMale_2" />
+    <origin xyz="0.1208654403 0.1437 -0.1018" rpy="-1.570796327 1.1379786e-15 -2.612191169e-16" />
+  </joint>
+  <joint name="58" type="fixed">
+    <parent link="base_link" />
+    <child link="Volt_Meter_2" />
+    <origin xyz="0.06886544033 0.1478 -0.1208" rpy="-1.570796327 1.131039706e-15 -4.762672016e-16" />
+  </joint>
+  <joint name="59" type="fixed">
+    <parent link="base_link" />
+    <child link="Volt_Meter_3" />
+    <origin xyz="0.06886544033 0.1478 -0.1508" rpy="-1.570796327 1.134509153e-15 -4.832637219e-16" />
+  </joint>
+  <joint name="60" type="fixed">
+    <parent link="base_link" />
+    <child link="flame2" />
+    <origin xyz="-4.085620731e-16 4.085620731e-16 2.664535259e-17" rpy="-1.035802394e-16 4.167594583e-16 3.885780586e-16" />
+  </joint>
+  <joint name="71" type="fixed">
+    <parent link="base_link" />
+    <child link="RB_flame4" />
+    <origin xyz="-0.006363961031 0.006363961031 0.0025" rpy="1.988269594e-17 2.229702745e-16 2.35619449" />
+  </joint>
+  <joint name="72" type="fixed">
+    <parent link="base_link" />
+    <child link="RM_flame4" />
+    <origin xyz="-0.009 -7.087663789e-15 0.0025" rpy="1.734723476e-16 1.442685161e-16 -3.141592654" />
+  </joint>
+  <joint name="73" type="fixed">
+    <parent link="base_link" />
+    <child link="RF_flame4" />
+    <origin xyz="-0.006363961031 -0.006363961031 0.0025" rpy="2.15020785e-16 -1.618061085e-17 -2.35619449" />
+  </joint>
+  <joint name="74" type="fixed">
+    <parent link="base_link" />
+    <child link="LB_flame4" />
+    <origin xyz="0.006363961031 0.006363961031 0.0025" rpy="-4.154843744e-17 9.613813294e-16 0.7853981634" />
+  </joint>
+  <joint name="75" type="fixed">
+    <parent link="base_link" />
+    <child link="LM_flame4" />
+    <origin xyz="0.009 5.86197757e-16 0.0025" rpy="2.095411779e-31 2.630731977e-17 5.551115123e-17" />
+  </joint>
+  <joint name="76" type="fixed">
+    <parent link="base_link" />
+    <child link="LF_flame4" />
+    <origin xyz="0.006363961031 -0.006363961031 0.0025" rpy="9.23573117e-17 8.234188094e-16 -0.7853981634" />
+  </joint>
+  <joint name="161" type="fixed">
+    <parent link="base_link" />
+    <child link="flame3" />
+    <origin xyz="7.071067812e-05 -7.071067812e-05 7.993605777e-17" rpy="2.095411779e-31 -2.095411779e-31 1.165734176e-15" />
+  </joint>
+  <joint name="61" type="fixed">
+    <parent link="flame2" />
+    <child link="STM32_F446RE" />
+    <origin xyz="-0.061 -0.1385 -0.0316" rpy="-3.141592654 1.317573819e-16 -1.570796327" />
+  </joint>
+  <joint name="62" type="fixed">
+    <parent link="flame2" />
+    <child link="Jetson_Orin_Nano_Super" />
+    <origin xyz="0.067 0.0825 -0.0106" rpy="-3.141592654 5.123902082e-16 1.570796327" />
+  </joint>
+  <joint name="63" type="fixed">
+    <parent link="flame2" />
+    <child link="Relay_Module_L" />
+    <origin xyz="0.0035 -0.11 -0.0286" rpy="3.141592654 6.690184902e-16 -2.664535259e-15" />
+  </joint>
+  <joint name="64" type="fixed">
+    <parent link="flame2" />
+    <child link="Relay_Module_R" />
+    <origin xyz="0.0035 -0.063 -0.0286" rpy="3.141592654 6.690184902e-16 -2.664535259e-15" />
+  </joint>
+  <joint name="79" type="fixed">
+    <parent link="RB_flame4" />
+    <child link="RB_DS51150_270_1" />
+    <origin xyz="-0.1233901333 0.2655185963 0.02" rpy="2.247196399e-16 5.124729227e-17 -1.570796327" />
+  </joint>
+  <joint name="85" type="fixed">
+    <parent link="RB_flame4" />
+    <child link="RB_bearing_1" />
+    <origin xyz="-0.1371787156 -0.01838477631 -0.0696" rpy="-3.141592654 -4.563774677e-15 1.570796327" />
+  </joint>
+  <joint name="78" type="fixed">
+    <parent link="RM_flame4" />
+    <child link="RM_DS51150_270_1" />
+    <origin xyz="-0.275 0.1005 0.02" rpy="7.575489769e-17 -2.163611932e-17 -1.570796327" />
+  </joint>
+  <joint name="84" type="fixed">
+    <parent link="RM_flame4" />
+    <child link="RM_bearing_1" />
+    <origin xyz="-0.084 -0.11 -0.0696" rpy="-3.141592654 -4.226796983e-15 3.141592654" />
+  </joint>
+  <joint name="77" type="fixed">
+    <parent link="RF_flame4" />
+    <child link="RF_DS51150_270_1" />
+    <origin xyz="-0.2655185963 -0.1233901333 0.02" rpy="3.503864816e-16 -7.44195495e-17 -1.570796327" />
+  </joint>
+  <joint name="83" type="fixed">
+    <parent link="RF_flame4" />
+    <child link="RF_bearing_1" />
+    <origin xyz="-0.1371787156 -0.2793071786 -0.0696" rpy="3.141592654 -2.530517185e-17 -3.141592654" />
+  </joint>
+  <joint name="82" type="fixed">
+    <parent link="LB_flame4" />
+    <child link="LB_DS51150_270_1" />
+    <origin xyz="0.2655185963 0.1233901333 0.02" rpy="1.268000747e-15 -7.813541645e-16 -1.570796327" />
+  </joint>
+  <joint name="88" type="fixed">
+    <parent link="LB_flame4" />
+    <child link="LB_bearing_1" />
+    <origin xyz="0.1237436867 -0.01838477631 -0.0696" rpy="3.141592654 5.361404435e-17 4.179989688e-14" />
+  </joint>
+  <joint name="81" type="fixed">
+    <parent link="LM_flame4" />
+    <child link="LM_DS51150_270_1" />
+    <origin xyz="0.275 -0.1005 0.02" rpy="9.388217733e-17 -1.835783031e-17 -1.570796327" />
+  </joint>
+  <joint name="87" type="fixed">
+    <parent link="LM_flame4" />
+    <child link="LM_bearing_1" />
+    <origin xyz="0.285 -0.11 -0.0696" rpy="-3.141592654 4.108835787e-15 -1.554312234e-15" />
+  </joint>
+  <joint name="80" type="fixed">
+    <parent link="LF_flame4" />
+    <child link="LF_DS51150_270_1" />
+    <origin xyz="0.1233901333 -0.2655185963 0.02" rpy="-4.594926119e-16 1.1262232e-16 -1.570796327" />
+  </joint>
+  <joint name="86" type="fixed">
+    <parent link="LF_flame4" />
+    <child link="LF_bearing_1" />
+    <origin xyz="0.1237436867 0.01838477631 0.011" rpy="-1.6099778e-15 -2.002923234e-15 1.570796327" />
+  </joint>
+  <joint name="162" type="fixed">
+    <parent link="flame3" />
+    <child link="NEO_M8N_GPS" />
+    <origin xyz="0.1816414214 0.1093585786 0.0234" rpy="3.141592654 1.449431119e-16 1.570796327" />
+  </joint>
+  <joint name="163" type="fixed">
+    <parent link="flame3" />
+    <child link="FrSky_Archer_Plus_SR10" />
+    <origin xyz="-0.1742 -0.08625 0.0181" rpy="-3.141592654 -1.798891304e-16 -1.570796327" />
+  </joint>
+  <joint name="164" type="fixed">
+    <parent link="flame3" />
+    <child link="ON-OFF_Switch" />
+    <origin xyz="0.07214142136 -0.0255 0.075" rpy="1.814218371e-16 -1.584345518e-15 -1.570796327" />
+  </joint>
+  <joint name="165" type="fixed">
+    <parent link="flame3" />
+    <child link="LoRa_RYLR998" />
+    <origin xyz="0.13887 0.17715 0.094" rpy="-1.72563323e-31 9.860761315e-32 -1.026956298e-15" />
+  </joint>
+  <joint name="186" type="fixed">
+    <parent link="flame3" />
+    <child link="M_hold_1" />
+    <origin xyz="0.06884291117 0.07177133808 0.093" rpy="-4.154843744e-17 1.837501886e-16 0.7853981634" />
+  </joint>
+  <joint name="187" type="fixed">
+    <parent link="flame3" />
+    <child link="M_hold_2" />
+    <origin xyz="0.2103642672 0.06960859659 0.093" rpy="9.23573117e-17 6.108671527e-17 -0.7853981634" />
+  </joint>
+  <joint name="188" type="fixed">
+    <parent link="flame3" />
+    <child link="M_hold_3" />
+    <origin xyz="0.07191275944 -0.06884291117 0.093" rpy="9.23573117e-17 6.108671527e-17 -0.7853981634" />
+  </joint>
+  <joint name="189" type="fixed">
+    <parent link="flame3" />
+    <child link="M_hold_4" />
+    <origin xyz="-0.06960859659 0.2102228458 0.093" rpy="-4.154843744e-17 1.837501886e-16 0.7853981634" />
+  </joint>
+  <joint name="238" type="fixed">
+    <parent link="flame3" />
+    <child link="link" />
+    <origin xyz="-0.1093585786 -0.1101414214 0.094" rpy="2.600679532e-16 2.759669321e-16 -3.141592654" />
+  </joint>
+  <joint name="RB_1" type="revolute">
+    <parent link="RB_DS51150_270_1" />
+    <child link="RB_motor_horn_1" />
+    <origin xyz="-0.01378858223 0.01378858223 0.0496" rpy="7.993175408e-16 -6.1735124e-17 -3.330669074e-16" />
+    <axis xyz="1.64020072e-16 -1.64020072e-16 -1" />
+    <limit lower="-2.35619449" upper="2.35619449" effort="100" velocity="10" />
+  </joint>
+  <joint name="RM_1" type="revolute">
+    <parent link="RM_DS51150_270_1" />
+    <child link="RM_motor_horn_1" />
+    <origin xyz="-0.0195 3.348995033e-16 0.0496" rpy="4.040537936e-15 1.536321438e-15 3.35858728e-15" />
+    <axis xyz="-1.022424405e-19 -6.123231646e-17 -1" />
+    <limit lower="-2.35619449" upper="2.35619449" effort="100" velocity="10" />
+  </joint>
+  <joint name="RF_1" type="revolute">
+    <parent link="RF_DS51150_270_1" />
+    <child link="RF_motor_horn_1" />
+    <origin xyz="-0.01378858223 -0.01378858223 0.0496" rpy="2.796702655e-16 8.099805979e-16 -5.551115123e-16" />
+    <axis xyz="-1.436086128e-16 -1.33057863e-16 -1" />
+    <limit lower="-2.35619449" upper="2.35619449" effort="100" velocity="10" />
+  </joint>
+  <joint name="LB_1" type="revolute">
+    <parent link="LB_DS51150_270_1" />
+    <child link="LB_motor_horn_1" />
+    <origin xyz="0.01378858223 0.01378858223 0.0496" rpy="1.138192332e-16 1.212235089e-16 -2.220446049e-16" />
+    <axis xyz="6.663243712e-17 1.99631334e-17 -1" />
+    <limit lower="-2.35619449" upper="2.35619449" effort="100" velocity="10" />
+  </joint>
+  <joint name="LM_1" type="revolute">
+    <parent link="LM_DS51150_270_1" />
+    <child link="LM_motor_horn_1" />
+    <origin xyz="0.0195 -6.494718277e-16 0.0496" rpy="-3.903766371e-15 -1.294606403e-15 3.552713679e-15" />
+    <axis xyz="-1.802988762e-17 6.050033138e-17 -1" />
+    <limit lower="-2.35619449" upper="2.35619449" effort="100" velocity="10" />
+  </joint>
+  <joint name="LF_1" type="revolute">
+    <parent link="LF_DS51150_270_1" />
+    <child link="LF_motor_horn_1" />
+    <origin xyz="0.01378858223 -0.01378858223 0.0496" rpy="-1.28739004e-15 1.198251972e-15 1.110223025e-16" />
+    <axis xyz="-1.372111733e-16 -5.087672479e-17 -1" />
+    <limit lower="-2.35619449" upper="2.35619449" effort="100" velocity="10" />
+  </joint>
+  <joint name="230" type="fixed">
+    <parent link="M_hold_1" />
+    <child link="M_column_1" />
+    <origin xyz="0.1428355698 0.004242640687 0.1134" rpy="-3.141592654 -1.961004294e-17 3.141592654" />
+  </joint>
+  <joint name="91" type="fixed">
+    <parent link="RB_motor_horn_1" />
+    <child link="RB_coxaR" />
+    <origin xyz="-0.1909895416 0.1523815113 -0.2118" rpy="1.570796327 0.7853981634 0.7853981634" />
+  </joint>
+  <joint name="90" type="fixed">
+    <parent link="RM_motor_horn_1" />
+    <child link="RM_coxaR" />
+    <origin xyz="-0.2428 -0.0273 -0.2118" rpy="-2.225378741e-15 1.570796327 0" />
+  </joint>
+  <joint name="89" type="fixed">
+    <parent link="RF_motor_horn_1" />
+    <child link="RF_coxaR" />
+    <origin xyz="-0.1523815113 -0.1909895416 -0.2118" rpy="-1.570796327 0.7853981634 -0.7853981634" />
+  </joint>
+  <joint name="94" type="fixed">
+    <parent link="LB_motor_horn_1" />
+    <child link="LB_coxaL" />
+    <origin xyz="0.1523815113 0.1909895416 -0.2118" rpy="1.570796327 -0.7853981634 -0.7853981634" />
+  </joint>
+  <joint name="93" type="fixed">
+    <parent link="LM_motor_horn_1" />
+    <child link="LM_coxaL" />
+    <origin xyz="0.2428 0.0273 -0.2118" rpy="4.264099935e-15 -1.570796327 0" />
+  </joint>
+  <joint name="92" type="fixed">
+    <parent link="LF_motor_horn_1" />
+    <child link="LF_coxaL" />
+    <origin xyz="0.1909895416 -0.1523815113 -0.2118" rpy="-1.570796327 -0.7853981634 0.7853981634" />
+  </joint>
+  <joint name="231" type="fixed">
+    <parent link="M_column_1" />
+    <child link="base" />
+    <origin xyz="0.1080707108 0.00392928926 0.1303" rpy="-3.141592654 8.668542821e-17 2.35619449" />
+  </joint>
+  <joint name="109" type="fixed">
+    <parent link="RB_coxaR" />
+    <child link="RB_motor_horn_2" />
+    <origin xyz="-0.3351686143 -0.008202438662 -0.0273" rpy="-1.570796327 0.7853981634 -2.35619449" />
+  </joint>
+  <joint name="104" type="fixed">
+    <parent link="RM_coxaR" />
+    <child link="RM_motor_horn_2" />
+    <origin xyz="-0.2312 -0.2428 -0.0273" rpy="-1.570796327 5.838338461e-15 -1.570796327" />
+  </joint>
+  <joint name="103" type="fixed">
+    <parent link="RF_coxaR" />
+    <child link="RF_motor_horn_2" />
+    <origin xyz="0.008202438662 -0.3351686143 -0.0273" rpy="-1.570796327 -0.7853981634 -0.7853981634" />
+  </joint>
+  <joint name="124" type="fixed">
+    <parent link="LB_coxaL" />
+    <child link="LB_motor_horn_2" />
+    <origin xyz="0.3351686143 -0.008202438662 0.0273" rpy="-1.570796327 -0.7853981634 2.35619449" />
+  </joint>
+  <joint name="119" type="fixed">
+    <parent link="LM_coxaL" />
+    <child link="LM_motor_horn_2" />
+    <origin xyz="0.2312 -0.2428 0.0273" rpy="-1.570796327 4.375122237e-15 1.570796327" />
+  </joint>
+  <joint name="114" type="fixed">
+    <parent link="LF_coxaL" />
+    <child link="LF_motor_horn_2" />
+    <origin xyz="-0.008202438662 -0.3351686143 0.0273" rpy="-1.570796327 0.7853981634 0.7853981634" />
+  </joint>
+  <joint name="240" type="fixed">
+    <parent link="base" />
+    <child link="M_column_3_final" />
+    <origin xyz="-2.107359707e-10 -0.000141421567 -0.0159" rpy="1.340790054e-16 1.340790054e-16 1.570796327" />
+  </joint>
+  <joint name="RB_2" type="revolute">
+    <parent link="RB_motor_horn_2" />
+    <child link="RB_DS51150_270_2" />
+    <origin xyz="-0.001357594459 0.07150258715 0.1195" rpy="-0.3875966867 -0.3613671239 0.07167378445" />
+    <axis xyz="-1.160947417e-16 -1.389925855e-16 1" />
+    <limit lower="-2.35619449" upper="2.35619449" effort="100" velocity="10" />
+  </joint>
+  <joint name="RM_2" type="revolute">
+    <parent link="RM_motor_horn_2" />
+    <child link="RM_DS51150_270_2" />
+    <origin xyz="-0.0515199285 0.0496 0.1195" rpy="-4.925338527e-16 -0.5235987756 -2.333925891e-15" />
+    <axis xyz="2.366582716e-30 -5.29751618e-20 1" />
+    <limit lower="-2.35619449" upper="2.35619449" effort="100" velocity="10" />
+  </joint>
+  <joint name="RF_2" type="revolute">
+    <parent link="RF_motor_horn_2" />
+    <child link="RF_DS51150_270_2" />
+    <origin xyz="-0.07150258715 -0.001357594459 0.1195" rpy="0.3875966867 -0.3613671239 -0.07167378445" />
+    <axis xyz="-9.930737877e-17 1.340070244e-16 1" />
+    <limit lower="-2.35619449" upper="2.35619449" effort="100" velocity="10" />
+  </joint>
+  <joint name="LB_2" type="revolute">
+    <parent link="LB_motor_horn_2" />
+    <child link="LB_DS51150_270_2" />
+    <origin xyz="0.001357594459 0.07150258715 0.1195" rpy="-0.3875966867 0.3613671239 -0.07167378445" />
+    <axis xyz="4.723109263e-19 1.292841885e-17 1" />
+    <limit lower="-2.35619449" upper="2.35619449" effort="100" velocity="10" />
+  </joint>
+  <joint name="LM_2" type="revolute">
+    <parent link="LM_motor_horn_2" />
+    <child link="LM_DS51150_270_2" />
+    <origin xyz="0.0515199285 0.0496 0.1195" rpy="-1.679527352e-15 0.5235987756 -3.163013125e-15" />
+    <axis xyz="-1.57772181e-30 -1.774937037e-29 1" />
+    <limit lower="-2.35619449" upper="2.35619449" effort="100" velocity="10" />
+  </joint>
+  <joint name="LF_2" type="revolute">
+    <parent link="LF_motor_horn_2" />
+    <child link="LF_DS51150_270_2" />
+    <origin xyz="0.07150258715 -0.001357594459 0.1195" rpy="0.3875966867 0.3613671239 0.07167378445" />
+    <axis xyz="7.327854399e-17 1.291687505e-16 1" />
+    <limit lower="-2.35619449" upper="2.35619449" effort="100" velocity="10" />
+  </joint>
+  <joint name="241" type="fixed">
+    <parent link="M_column_3_final" />
+    <child link="livox_mid_360" />
+    <origin xyz="0.0001414213562 0.03466874472 0.1293601483" rpy="-0.7853981634 -3.520682012e-17 -3.141592654" />
+  </joint>
+  <joint name="105" type="fixed">
+    <parent link="RB_DS51150_270_2" />
+    <child link="RB_link1_right" />
+    <origin xyz="-0.2207117996 0.04683424204 0.04267564172" rpy="-1.305067207 0.3111842447 -1.165904542" />
+  </joint>
+  <joint name="99" type="fixed">
+    <parent link="RM_DS51150_270_2" />
+    <child link="RM_link1_right" />
+    <origin xyz="-0.1891836203 -0.12295 0.04267564172" rpy="-1.289761424 -0.4478323963 -0.588002606" />
+  </joint>
+  <joint name="95" type="fixed">
+    <parent link="RF_DS51150_270_2" />
+    <child link="RF_link1_right" />
+    <origin xyz="-0.04683424204 -0.2207117996 0.04267564172" rpy="-0.8860771225 -1.164418545 -0.3217505576" />
+  </joint>
+  <joint name="120" type="fixed">
+    <parent link="LB_DS51150_270_2" />
+    <child link="LB_link1_left" />
+    <origin xyz="0.1888920047 0.07865405744 0.04267566703" rpy="-1.305067207 -0.3111842447 1.165904542" />
+  </joint>
+  <joint name="115" type="fixed">
+    <parent link="LM_DS51150_270_2" />
+    <child link="LM_link1_left" />
+    <origin xyz="0.1891836348 -0.07795000002 0.04267566703" rpy="-1.289761424 0.4478323963 0.588002606" />
+  </joint>
+  <joint name="110" type="fixed">
+    <parent link="LF_DS51150_270_2" />
+    <child link="LF_link1_left" />
+    <origin xyz="0.07865405744 -0.1888920047 0.04267566703" rpy="-0.8860771225 1.164418545 0.3217505576" />
+  </joint>
+  <joint name="242" type="fixed">
+    <parent link="livox_mid_360" />
+    <child link="mid-360-fov-asm_ver_ksh_MID-360_4_1_1" />
+    <origin xyz="0.1161273642 0.09552134562 0.2328782586" rpy="2.35619449 -0.7853981634 -1.570796327" />
+  </joint>
+  <joint name="106" type="fixed">
+    <parent link="RB_link1_right" />
+    <child link="RB_DS51150_270_3" />
+    <origin xyz="-0.4406595943 0.6266993914 -0.2792278236" rpy="-2.255515538 1.164418545 1.249045761" />
+  </joint>
+  <joint name="107" type="fixed">
+    <parent link="RB_link1_right" />
+    <child link="RB_bearing_2" />
+    <origin xyz="0.153894059 0.04487365595 0.1864778248" rpy="0.8860771199 -1.164418548 0.321750556" />
+  </joint>
+  <joint name="108" type="fixed">
+    <parent link="RB_link1_right" />
+    <child link="RB_bearing_3" />
+    <origin xyz="-0.4462368968 0.6450046149 -0.288977824" rpy="-2.255515536 1.164418546 1.249045764" />
+  </joint>
+  <joint name="100" type="fixed">
+    <parent link="RM_link1_right" />
+    <child link="RM_DS51150_270_3" />
+    <origin xyz="-0.7547367767 0.1315500021 -0.2792278236" rpy="-1.851831232 0.4478323976 2.553590045" />
+  </joint>
+  <joint name="101" type="fixed">
+    <parent link="RM_link1_right" />
+    <child link="RM_bearing_2" />
+    <origin xyz="-0.4477098726 0.14055 0.3363211163" rpy="-0.8570719516 -0.8480620783 2.284520707" />
+  </joint>
+  <joint name="102" type="fixed">
+    <parent link="RM_link1_right" />
+    <child link="RM_bearing_3" />
+    <origin xyz="-0.6217809813 0.1405500005 0.2358211149" rpy="-0.8570719516 -0.8480620783 2.284520707" />
+  </joint>
+  <joint name="96" type="fixed">
+    <parent link="RF_link1_right" />
+    <child link="RF_DS51150_270_3" />
+    <origin xyz="-0.6266993914 -0.4406595943 -0.2792278236" rpy="-1.836525449 -0.311184243 -2.73670087" />
+  </joint>
+  <joint name="97" type="fixed">
+    <parent link="RF_link1_right" />
+    <child link="RF_bearing_2" />
+    <origin xyz="-0.2663471788 -0.3822419802 0.3300211164" rpy="1.115262968 -0.1777106026 -1.988772587" />
+  </joint>
+  <joint name="98" type="fixed">
+    <parent link="RF_link1_right" />
+    <child link="RF_bearing_3" />
+    <origin xyz="-0.4832185839 -0.5991133834 -0.2998897438" rpy="2.255515523 1.164418546 -1.24904578" />
+  </joint>
+  <joint name="121" type="fixed">
+    <parent link="LB_link1_left" />
+    <child link="LB_DS51150_270_3" />
+    <origin xyz="0.4565694762 0.6426093146 -0.2402566805" rpy="-2.255515538 -1.164418545 -1.249045761" />
+  </joint>
+  <joint name="122" type="fixed">
+    <parent link="LB_link1_left" />
+    <child link="LB_bearing_2" />
+    <origin xyz="-0.0203821132 0.1783856445 -0.3608211142" rpy="2.026329684 -0.1777105983 0.4179762607" />
+  </joint>
+  <joint name="123" type="fixed">
+    <parent link="LB_link1_left" />
+    <child link="LB_bearing_3" />
+    <origin xyz="0.1027047478 0.3014725061 -0.4613211156" rpy="2.026329684 -0.1777105983 0.4179762607" />
+  </joint>
+  <joint name="116" type="fixed">
+    <parent link="LM_link1_left" />
+    <child link="LM_DS51150_270_3" />
+    <origin xyz="0.7772367767 0.1315500313 -0.2402566805" rpy="-1.851831232 -0.4478323976 -2.553590045" />
+  </joint>
+  <joint name="117" type="fixed">
+    <parent link="LM_link1_left" />
+    <child link="LM_bearing_2" />
+    <origin xyz="0.1117253684 0.1405500293 -0.3608211142" rpy="2.284520704 -0.8480620766 -0.8570719448" />
+  </joint>
+  <joint name="118" type="fixed">
+    <parent link="LM_link1_left" />
+    <child link="LM_bearing_3" />
+    <origin xyz="0.285796477 0.1405500298 -0.4613211156" rpy="2.284520704 -0.8480620766 -0.8570719448" />
+  </joint>
+  <joint name="111" type="fixed">
+    <parent link="LF_link1_left" />
+    <child link="LF_DS51150_270_3" />
+    <origin xyz="0.6426093146 -0.4565694762 -0.2402566805" rpy="-1.836525449 0.311184243 2.73670087" />
+  </joint>
+  <joint name="112" type="fixed">
+    <parent link="LF_link1_left" />
+    <child link="LF_bearing_2" />
+    <origin xyz="0.388405806 -0.1896380487 0.3588211163" rpy="0.3875966846 1.084101374 -1.642470111" />
+  </joint>
+  <joint name="113" type="fixed">
+    <parent link="LF_link1_left" />
+    <child link="LF_bearing_3" />
+    <origin xyz="0.5114926676 -0.3127249097 0.2583211149" rpy="0.3875966846 1.084101374 -1.642470111" />
+  </joint>
+  <joint name="RB_3" type="revolute">
+    <parent link="RB_DS51150_270_3" />
+    <child link="RB_motor_horn_3" />
+    <origin xyz="-0.2021463569 0.1320013646 0.2772347113" rpy="-0.7002390164 -0.5724287461 0.2141098831" />
+    <axis xyz="-2.212226709e-16 -1.588928344e-17 -1" />
+    <limit lower="-2.35619449" upper="2.35619449" effort="100" velocity="10" />
+  </joint>
+  <joint name="RM_3" type="revolute">
+    <parent link="RM_DS51150_270_3" />
+    <child link="RM_motor_horn_3" />
+    <origin xyz="-0.2362781198 -0.0495999997 0.2772347113" rpy="-3.458113844e-09 -0.872664626 -5.254648551e-10" />
+    <axis xyz="-5.025554992e-18 5.989221078e-18 -1" />
+    <limit lower="-2.35619449" upper="2.35619449" effort="100" velocity="10" />
+  </joint>
+  <joint name="RF_3" type="revolute">
+    <parent link="RF_DS51150_270_3" />
+    <child link="RF_motor_horn_3" />
+    <origin xyz="-0.1320013646 -0.2021463569 0.2772347113" rpy="0.7002390135 -0.5724287498 -0.2141098879" />
+    <axis xyz="-5.714420304e-18 5.561122354e-17 -1" />
+    <limit lower="-2.35619449" upper="2.35619449" effort="100" velocity="10" />
+  </joint>
+  <joint name="LB_3" type="revolute">
+    <parent link="LB_DS51150_270_3" />
+    <child link="LB_motor_horn_3" />
+    <origin xyz="0.2021463569 0.1320013646 0.2772347113" rpy="-0.7002390164 0.5724287461 -0.2141098831" />
+    <axis xyz="3.680699663e-17 -1.102385423e-15 -1" />
+    <limit lower="-2.35619449" upper="2.35619449" effort="100" velocity="10" />
+  </joint>
+  <joint name="LM_3" type="revolute">
+    <parent link="LM_DS51150_270_3" />
+    <child link="LM_motor_horn_3" />
+    <origin xyz="0.2362781198 -0.0495999997 0.2772347113" rpy="-3.458112485e-09 0.872664626 5.254615744e-10" />
+    <axis xyz="4.135903063e-25 -1.658493712e-16 -1" />
+    <limit lower="-2.35619449" upper="2.35619449" effort="100" velocity="10" />
+  </joint>
+  <joint name="LF_3" type="revolute">
+    <parent link="LF_DS51150_270_3" />
+    <child link="LF_motor_horn_3" />
+    <origin xyz="0.1320013646 -0.2021463569 0.2772347113" rpy="0.7002390135 0.5724287498 0.2141098879" />
+    <axis xyz="-9.375741384e-17 1.114884907e-17 -1" />
+    <limit lower="-2.35619449" upper="2.35619449" effort="100" velocity="10" />
+  </joint>
+  <joint name="160" type="fixed">
+    <parent link="RB_motor_horn_3" />
+    <child link="RB_link2" />
+    <origin xyz="-0.07469343252 -0.01355349649 -0.3891527443" rpy="2.889693557 0.2442666009 -1.601877526" />
+  </joint>
+  <joint name="159" type="fixed">
+    <parent link="RM_motor_horn_3" />
+    <child link="RM_link2" />
+    <origin xyz="-0.04323246336 -0.06240000192 -0.3891527443" rpy="3.141592652 0.3490658504 -7.361848144e-09" />
+  </joint>
+  <joint name="158" type="fixed">
+    <parent link="RF_motor_horn_3" />
+    <child link="RF_link2" />
+    <origin xyz="0.01355349649 -0.07469343252 -0.3891527443" rpy="-2.889693559 0.2442666027 1.601877511" />
+  </joint>
+  <joint name="157" type="fixed">
+    <parent link="LB_motor_horn_3" />
+    <child link="LB_link2" />
+    <origin xyz="0.1095116444 0.02126471565 -0.3804703354" rpy="2.889693557 -0.2442666009 1.601877526" />
+  </joint>
+  <joint name="167" type="fixed">
+    <parent link="LM_motor_horn_3" />
+    <child link="LM_link2" />
+    <origin xyz="0.09247285101 -0.06240000174 -0.3804703354" rpy="3.141592652 -0.3490658504 7.361842575e-09" />
+  </joint>
+  <joint name="155" type="fixed">
+    <parent link="LF_motor_horn_3" />
+    <child link="LF_link2" />
+    <origin xyz="0.02126471565 -0.1095116444 -0.3804703354" rpy="-2.889693559 -0.2442666027 -1.601877511" />
+  </joint>
+  <joint name="211" type="fixed">
+    <parent link="RB_link2" />
+    <child link="RB_foot_1" />
+    <origin xyz="-0.5818979132 0.5824635988 0.05378653136" rpy="-0.2518990997 -0.2442665976 -3.110511462" />
+  </joint>
+  <joint name="217" type="fixed">
+    <parent link="RB_link2" />
+    <child link="RB_foot_2" />
+    <origin xyz="-0.01105090217 0.01105090254 -0.08863269777" rpy="-5.218261187e-16 6.486363781e-17 0" />
+  </joint>
+  <joint name="223" type="fixed">
+    <parent link="RB_link2" />
+    <child link="RB_foot_3" />
+    <origin xyz="-0.471620723 -0.07430789207 -0.4786607033" rpy="-1.818908861 0.8004738183 -2.358873294" />
+  </joint>
+  <joint name="210" type="fixed">
+    <parent link="RM_link2" />
+    <child link="RM_foot_1" />
+    <origin xyz="-0.8233279209 0.0004000001623 0.05378653136" rpy="-6.177319687e-09 -0.3490658504 -3.141592653" />
+  </joint>
+  <joint name="216" type="fixed">
+    <parent link="RM_link2" />
+    <child link="RM_foot_2" />
+    <origin xyz="-0.01562833599 2.6524412e-10 -0.08863269777" rpy="2.660470455e-16 -1.201250968e-16 -1.528296488e-15" />
+  </joint>
+  <joint name="222" type="fixed">
+    <parent link="RM_link2" />
+    <child link="RM_foot_3" />
+    <origin xyz="-0.1151037332 0.2155739391 -0.5088164516" rpy="-1.540187031 0.1718547549 0.177169795" />
+  </joint>
+  <joint name="209" type="fixed">
+    <parent link="RF_link2" />
+    <child link="RF_foot_1" />
+    <origin xyz="-0.5824635988 -0.5818979132 0.05378653136" rpy="0.2518990915 -0.244266606 3.110511462" />
+  </joint>
+  <joint name="215" type="fixed">
+    <parent link="RF_link2" />
+    <child link="RF_foot_2" />
+    <origin xyz="-0.01105090254 -0.01105090217 -0.08863269777" rpy="6.025392466e-17 -3.588606703e-17 -1.110223025e-16" />
+  </joint>
+  <joint name="221" type="fixed">
+    <parent link="RF_link2" />
+    <child link="RF_foot_3" />
+    <origin xyz="-0.2338244245 0.07104316394 -0.5088164516" rpy="-1.533918177 -0.6131443157 0.9361042054" />
+  </joint>
+  <joint name="208" type="fixed">
+    <parent link="LB_link2" />
+    <child link="LB_foot_1" />
+    <origin xyz="0.5818979132 0.5824635988 0.05378653136" rpy="-0.2518990997 0.2442665976 3.110511462" />
+  </joint>
+  <joint name="214" type="fixed">
+    <parent link="LB_link2" />
+    <child link="LB_foot_2" />
+    <origin xyz="0.01105090217 0.01105090254 -0.08863269777" rpy="7.400558975e-17 2.811678208e-16 1.110223025e-16" />
+  </joint>
+  <joint name="220" type="fixed">
+    <parent link="LB_link2" />
+    <child link="LB_foot_3" />
+    <origin xyz="0.5070742173 -0.1079387303 -0.479347335" rpy="-1.818908861 -0.8004738183 2.358873294" />
+  </joint>
+  <joint name="207" type="fixed">
+    <parent link="LM_link2" />
+    <child link="LM_foot_1" />
+    <origin xyz="0.8233279209 0.0004000001623 0.05378653136" rpy="-6.177313391e-09 0.3490658504 3.141592653" />
+  </joint>
+  <joint name="213" type="fixed">
+    <parent link="LM_link2" />
+    <child link="LM_foot_2" />
+    <origin xyz="0.01562833599 2.652448261e-10 -0.08863269777" rpy="3.091759634e-16 1.478806566e-16 -6.758464959e-16" />
+  </joint>
+  <joint name="219" type="fixed">
+    <parent link="LM_link2" />
+    <child link="LM_foot_3" />
+    <origin xyz="0.06586334552 0.215573939 -0.5174988604" rpy="-1.540187031 -0.1718547549 -0.177169795" />
+  </joint>
+  <joint name="206" type="fixed">
+    <parent link="LF_link2" />
+    <child link="LF_foot_1" />
+    <origin xyz="0.5824635988 -0.5818979132 0.05378653136" rpy="0.2518990915 0.244266606 -3.110511462" />
+  </joint>
+  <joint name="212" type="fixed">
+    <parent link="LF_link2" />
+    <child link="LF_foot_2" />
+    <origin xyz="0.01105090254 -0.01105090217 -0.08863269777" rpy="-3.073604732e-16 2.880025903e-17 1.554312234e-15" />
+  </joint>
+  <joint name="218" type="fixed">
+    <parent link="LF_link2" />
+    <child link="LF_foot_3" />
+    <origin xyz="0.1990062123 0.1058613758 -0.5174988604" rpy="-1.533918177 0.6131443157 -0.9361042054" />
+  </joint>
+  <joint name="229" type="fixed">
+    <parent link="RB_foot_3" />
+    <child link="RB_foot_4" />
+    <origin xyz="2.45575652e-05 -2.455756603e-05 0.0001969615893" rpy="5.551115123e-17 -9.714451465e-17 2.844946501e-16" />
+  </joint>
+  <joint name="228" type="fixed">
+    <parent link="RM_foot_3" />
+    <child link="RM_foot_4" />
+    <origin xyz="3.472964235e-05 -5.894322877e-13 0.0001969615893" rpy="0 1.942890293e-16 1.033975766e-25" />
+  </joint>
+  <joint name="227" type="fixed">
+    <parent link="RF_foot_3" />
+    <child link="RF_foot_4" />
+    <origin xyz="-0.5755127437 0.00471055114 0.07137184772" rpy="0.246189993 0.001865419591 1.555718884" />
+  </joint>
+  <joint name="226" type="fixed">
+    <parent link="LB_foot_3" />
+    <child link="LB_foot_4" />
+    <origin xyz="-2.45575652e-05 -2.455756603e-05 0.0001969615893" rpy="-4.163336342e-17 2.775557562e-17 5.551115123e-17" />
+  </joint>
+  <joint name="225" type="fixed">
+    <parent link="LM_foot_3" />
+    <child link="LM_foot_4" />
+    <origin xyz="-3.472964235e-05 -5.893952687e-13 0.0001969615893" rpy="8.271806126e-25 -5.551115123e-17 -7.858215819e-24" />
+  </joint>
+  <joint name="224" type="fixed">
+    <parent link="LF_foot_3" />
+    <child link="LF_foot_4" />
+    <origin xyz="-2.455756603e-05 2.45575652e-05 0.0001969615893" rpy="0 -4.163336342e-17 -7.285838599e-17" />
+  </joint>
+  <link name="livox_mid_360_origin" />
+  <joint name="livox_mid_360_origin_joint" type="fixed">
+    <parent link="livox_mid_360" />
+    <child link="livox_mid_360_origin" />
+    <origin xyz="0 0 0" rpy="0 0 0" />
+  </joint>
+</robot>

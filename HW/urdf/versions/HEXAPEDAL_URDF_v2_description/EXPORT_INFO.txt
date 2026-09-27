@@ -1,0 +1,6 @@
+Fusion URDF export
+Base link: base_link
+LiDAR component/link: livox_mid_360
+LiDAR origin frame: livox_mid_360_origin (zero offset from LiDAR component origin)
+STL unit conversion: millimeter to meter via mesh scale 0.001
+Disconnected components fixed to base: 0
